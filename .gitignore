@@ -1,0 +1,74 @@
+# ============================================================
+# Dependencies
+# ============================================================
+node_modules/
+.pnpm-store/
+
+# ============================================================
+# Environment / secrets — never commit real credentials
+# ============================================================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.production.local
+.dev.vars
+*.pem
+*.key
+credentials.json
+*serviceAccount*.json
+*service-account*.json
+
+# ============================================================
+# Build output
+# ============================================================
+dist/
+dist-ssr/
+.output/
+.vinxi/
+.nitro/
+.tanstack/
+.wrangler/
+build/
+*.tsbuildinfo
+
+# ============================================================
+# Logs
+# ============================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============================================================
+# Editor / OS
+# ============================================================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ============================================================
+# Stale/backup files
+# ============================================================
+*.bak
+
+# ============================================================
+# Proprietary business logic — pricing rules, prompts, and the
+# standalone widget deliberately stay LOCAL ONLY, never pushed to
+# GitHub. Live working copies remain at E:\transco (root).
+# ============================================================
+/calculate_price_LATEST.js
+/system_prompt_LATEST.txt
+/input_schema_LATEST.json
+/web-chat-widget.html
