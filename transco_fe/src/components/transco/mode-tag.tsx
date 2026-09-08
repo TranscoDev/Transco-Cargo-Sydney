@@ -1,7 +1,7 @@
 import { Bot, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { ConversationMode } from "@/lib/transco/types";
+import { MODE_LABELS, type ConversationMode } from "@/lib/transco/types";
 
 export function ModeTag({ mode, className }: { mode: ConversationMode; className?: string }) {
   const isHuman = mode === "HUMAN";
@@ -17,7 +17,7 @@ export function ModeTag({ mode, className }: { mode: ConversationMode; className
       )}
     >
       <Icon className="h-3 w-3" />
-      {mode}
+      {MODE_LABELS[mode]}
     </span>
   );
 }

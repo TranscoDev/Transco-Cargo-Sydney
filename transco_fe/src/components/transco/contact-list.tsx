@@ -12,7 +12,7 @@ type Channel = "ALL" | "WHATSAPP" | "WEBSITE";
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "UNREAD", label: "Unread" },
-  { key: "HUMAN", label: "Human" },
+  { key: "HUMAN", label: "Staff" },
   { key: "ATTENTION", label: "⚠️ Attention" },
 ];
 
@@ -75,7 +75,7 @@ export function ContactList({
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
           <h2 className="truncate text-sm font-semibold text-foreground">Conversations</h2>
           <p className="shrink-0 text-[11px] text-muted-foreground">
-            {unreadTotal} unread · {humanTotal} human
+            {unreadTotal} unread · {humanTotal} staff
             {attentionTotal > 0 && (
               <span className="font-medium text-destructive"> · {attentionTotal} flagged</span>
             )}

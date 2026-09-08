@@ -87,7 +87,7 @@ export function ChatPanel({
           <div className="min-w-0">
             <p className="text-xs font-semibold text-destructive">Flagged for follow-up</p>
             <p className="truncate text-xs text-destructive/90">
-              {conversation.needsAttentionMessage?.content ?? "The chatbot handed this off to a human."}
+              {conversation.needsAttentionMessage?.content ?? "The chatbot handed this off to staff."}
             </p>
           </div>
         </div>

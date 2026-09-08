@@ -49,7 +49,7 @@ export function MessageComposer({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={
-            isHuman ? "Type a message as a human agent…" : "Switch to Human to type a message…"
+            isHuman ? "Type a message as staff…" : "Switch to Staff to type a message…"
           }
           aria-label="Message"
           className={cn(
@@ -75,7 +75,7 @@ export function MessageComposer({
       <p className="mt-1.5 text-[10px] text-muted-foreground">
         {isHuman
           ? "Enter to send · Shift+Enter for a new line"
-          : "This conversation is handled by the chatbot. Switch to Human to reply as an agent."}
+          : "This conversation is handled by the chatbot. Switch to Staff to reply."}
       </p>
     </div>
   );

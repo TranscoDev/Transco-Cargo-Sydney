@@ -1,5 +1,13 @@
 export type ConversationMode = "CHATBOT" | "HUMAN";
 
+/** Display label only — the underlying "HUMAN" value is unchanged
+ * everywhere else (backend, comparisons, storage). Staff just reads
+ * better than "Human" in a dashboard built for staff to use. */
+export const MODE_LABELS: Record<ConversationMode, string> = {
+  CHATBOT: "CHATBOT",
+  HUMAN: "STAFF",
+};
+
 /** Absent/undefined means "whatsapp" — every conversation that existed
  * before this field was added stays implicitly WhatsApp, no backfill
  * needed. */

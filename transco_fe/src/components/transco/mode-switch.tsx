@@ -1,7 +1,7 @@
 import { Bot, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { ConversationMode } from "@/lib/transco/types";
+import { MODE_LABELS, type ConversationMode } from "@/lib/transco/types";
 
 export function ModeSwitch({
   mode,
@@ -36,7 +36,7 @@ export function ModeSwitch({
               )}
             >
               <Icon className="h-3.5 w-3.5" />
-              {m}
+              {MODE_LABELS[m]}
             </button>
           );
         })}
@@ -52,7 +52,7 @@ export function ModeSwitch({
             : "border border-border bg-panel text-foreground hover:bg-secondary",
         )}
       >
-        {isHuman ? "Switch to Chatbot" : "Switch to Human"}
+        {isHuman ? "Switch to Chatbot" : "Switch to Staff"}
       </button>
     </div>
   );

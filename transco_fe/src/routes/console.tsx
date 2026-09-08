@@ -16,12 +16,12 @@ export const Route = createFileRoute("/console")({
       {
         name: "description",
         content:
-          "Monitor WhatsApp customer conversations, spot unread messages, and hand chats between chatbot and human agents.",
+          "Monitor WhatsApp customer conversations, spot unread messages, and hand chats between chatbot and staff.",
       },
       { property: "og:title", content: "Conversation Console — Transco" },
       {
         property: "og:description",
-        content: "Monitor WhatsApp customer conversations and hand chats between chatbot and human.",
+        content: "Monitor WhatsApp customer conversations and hand chats between chatbot and staff.",
       },
     ],
   }),
@@ -103,7 +103,7 @@ function ConsoleBody() {
               <MessagesSquare className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-3 text-sm font-medium text-foreground">Select a conversation</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Yellow-highlighted chats are currently handled by a human agent.
+                Yellow-highlighted chats are currently handled by staff.
               </p>
             </div>
           </div>

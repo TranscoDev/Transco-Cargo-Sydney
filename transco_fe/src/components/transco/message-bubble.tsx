@@ -37,7 +37,7 @@ export function MessageBubble({
         )}
         {isHuman && (
           <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-human-foreground">
-            Human
+            Staff
           </p>
         )}
         {flagged && (
