@@ -46,14 +46,35 @@ const WEB_GREETING_TEXT =
 // One "customer" document per website visitor session. Separate query
 // shape (sessionId, not phoneNumber) so this can never collide with or
 // be picked up by any WhatsApp-side lookup.
+//
+// phoneNumber is set to the sessionId itself, NOT null. The customers
+// collection has a UNIQUE index on phoneNumber (for WhatsApp numbers),
+// and a plain (non-sparse) unique index treats every null the same —
+// so a literal null here would let only the very first web visitor
+// ever be created; every visitor after that would collide with it and
+// fail outright. sessionId is already guaranteed unique per browser
+// (see getSessionId() in web-chat-widget.html) and already reads
+// clearly as "not a real phone number", so it doubles as a safe,
+// collision-free placeholder without needing any database migration.
 async function findOrCreateWebCustomer(sessionId) {
+  // A short, readable tag so staff can tell different visitors apart
+  // in the console instead of seeing an identical "Website Visitor"
+  // for everyone. Taken from the end of sessionId, which is always
+  // "web-<timestamp>-<random>" (see getSessionId() in
+  // web-chat-widget.html) — the last 4 characters always fall within
+  // the random part, never the timestamp, so this stays readable and
+  // effectively unique per browser. Overwritten with their real name
+  // below once they complete a booking and we actually know who they
+  // are (see the BOOK DROPOFF handling further down).
+  const visitorTag = sessionId.slice(-4).toUpperCase();
+
   const result = await customers().findOneAndUpdate(
     { sessionId, channel: 'website' },
     {
       $setOnInsert: {
         sessionId,
-        phoneNumber: null,
-        name: 'Website Visitor',
+        phoneNumber: sessionId,
+        name: `Website Visitor #${visitorTag}`,
         mode: 'CHATBOT',
         channel: 'website',
         createdAt: new Date()
@@ -174,6 +195,15 @@ module.exports = function createWebChatRouter({
             status: 'pending',
             createdAt: new Date()
           };
+
+          // Now that we actually know who this visitor is, replace the
+          // generic "Website Visitor #XXXX" tag with their real name —
+          // takes effect the next time the console loads this
+          // conversation (doesn't repaint an already-open chat live).
+          await customers().updateOne(
+            { _id: customer._id },
+            { $set: { name: finalName } }
+          );
 
           const { insertedId } = await bookings().insertOne(booking);
 
