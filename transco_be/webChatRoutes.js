@@ -22,11 +22,32 @@ const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
 const SHOW_MENU_MARKER = '[[SHOW_MENU]]';
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 
+// Shown once, prepended to a brand-new visitor's real answer when
+// their very first message is itself a real question rather than a
+// greeting (a plain "hi" already gets the full greeting on its own,
+// via the SHOW_MENU_MARKER branch below). Kept in sync by hand with
+// request_type=7 in the Flowise tool — deliberately duplicated rather
+// than triggered by a second, synthetic Flowise call, which would
+// pollute that customer's conversation memory with a "hi" they never
+// actually sent. Ends without "How can I help you today?", since the
+// real answer follows immediately in the same message.
+const WEB_GREETING_TEXT =
+  "👋 *Welcome to Transco Cargo Sydney!*\n\n" +
+  "I'm your dedicated Transco Cargo agent, here to make shipping to Sri Lanka.\n\n" +
+  "📦 Shipping & Pricing\n" +
+  "🔎 Shipment Tracking\n" +
+  "🕐 Opening Hours & Bookings\n" +
+  "🚚 Shipping Information\n\n" +
+  "💬 Happy to chat in English, සිංහල, or தமிழ் — just write in whichever you're comfortable with.\n\n" +
+  "🎉 *Current Promotion:* Ship 3 boxes to the same receiver and the 3rd box's freight is FREE!\n\n" +
+  "🌐 Website: https://transcosydney.com.au/\n" +
+  "📋 Declaration Form: https://transcosydney.com.au/declaration-form";
+
 // One "customer" document per website visitor session. Separate query
 // shape (sessionId, not phoneNumber) so this can never collide with or
 // be picked up by any WhatsApp-side lookup.
 async function findOrCreateWebCustomer(sessionId) {
-  return customers().findOneAndUpdate(
+  const result = await customers().findOneAndUpdate(
     { sessionId, channel: 'website' },
     {
       $setOnInsert: {
@@ -38,8 +59,13 @@ async function findOrCreateWebCustomer(sessionId) {
         createdAt: new Date()
       }
     },
-    { upsert: true, returnDocument: 'after' }
+    { upsert: true, returnDocument: 'after', includeResultMetadata: true }
   );
+
+  return {
+    customer: result.value,
+    isNewCustomer: Boolean(result.lastErrorObject?.upserted)
+  };
 }
 
 module.exports = function createWebChatRouter({
@@ -66,7 +92,7 @@ module.exports = function createWebChatRouter({
         return res.status(400).json({ error: 'message is required' });
       }
 
-      const customer = await findOrCreateWebCustomer(sessionId);
+      const { customer, isNewCustomer } = await findOrCreateWebCustomer(sessionId);
 
       const incoming = await saveMessage({
         customerId: customer._id,
@@ -106,6 +132,13 @@ module.exports = function createWebChatRouter({
       // WhatsApp channel (server.js) does anything special with this.
       if (cleanContent.startsWith(SHOW_MENU_MARKER)) {
         cleanContent = cleanContent.slice(SHOW_MENU_MARKER.length).trimStart();
+
+      } else if (isNewCustomer) {
+        // A brand-new visitor whose first message was a real question,
+        // not a greeting (that case is handled above) — show the
+        // welcome message and the answer together as one reply, rather
+        // than answering with no greeting at all.
+        cleanContent = WEB_GREETING_TEXT + "\n\n" + cleanContent;
       }
 
       // Strip the booking marker so it never leaks to the customer as
