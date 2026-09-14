@@ -48,6 +48,10 @@ export interface Conversation {
    * switches to HUMAN. */
   needsAttention?: boolean | undefined;
   needsAttentionMessage?: NeedsAttentionMessage | undefined;
+  /** Staff-entered contact details — never collected automatically from
+   * conversation content. Shown/edited in the Contacts directory. */
+  email?: string | undefined;
+  notes?: string | undefined;
 }
 
 export interface ConversationSummary {

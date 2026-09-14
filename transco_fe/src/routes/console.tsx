@@ -6,6 +6,7 @@ import { BookingsPanel } from "@/components/transco/bookings-panel";
 import { ChatPanel } from "@/components/transco/chat-panel";
 import { ConsoleLayout, type ConsoleTab } from "@/components/transco/console-layout";
 import { ContactList } from "@/components/transco/contact-list";
+import { ContactsDirectory } from "@/components/transco/contacts-directory";
 import { getCurrentUser, logout } from "@/lib/transco/auth";
 import { ConversationsProvider, useConversations } from "@/lib/transco/store";
 
@@ -52,7 +53,13 @@ function ConsolePage() {
           void navigate({ to: "/" });
         }}
       >
-        {activeTab === "bookings" ? <ConsoleBookings /> : <ConsoleBody />}
+        {activeTab === "bookings" ? (
+          <ConsoleBookings />
+        ) : activeTab === "contacts" ? (
+          <ConsoleContacts setActiveTab={setActiveTab} />
+        ) : (
+          <ConsoleBody />
+        )}
       </ConsoleLayoutWithData>
     </ConversationsProvider>
   );
@@ -79,6 +86,20 @@ function ConsoleLayoutWithData({
 function ConsoleBookings() {
   const { bookings, deleteBooking } = useConversations();
   return <BookingsPanel bookings={bookings} onDelete={deleteBooking} />;
+}
+
+function ConsoleContacts({ setActiveTab }: { setActiveTab: (tab: ConsoleTab) => void }) {
+  const { conversations, selectConversation, updateContact } = useConversations();
+  return (
+    <ContactsDirectory
+      conversations={conversations}
+      onSelect={(id) => {
+        selectConversation(id);
+        setActiveTab("conversations");
+      }}
+      onUpdateContact={updateContact}
+    />
+  );
 }
 
 function ConsoleBody() {

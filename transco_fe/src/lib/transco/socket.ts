@@ -32,6 +32,11 @@ export interface MaintenanceChangedPayload {
   maintenanceMode: boolean;
 }
 
+export interface ContactUpdatedPayload {
+  customerId: string;
+  customer: BackendCustomer;
+}
+
 export interface ModeChangedPayload {
   customerId: string;
   mode: ConversationMode;

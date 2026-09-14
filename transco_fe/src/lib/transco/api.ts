@@ -36,6 +36,8 @@ export interface BackendCustomer {
   channel?: ConversationChannel;
   needsAttention?: boolean;
   needsAttentionMessage?: { content: string; createdAt: string } | null;
+  email?: string;
+  notes?: string;
 }
 
 export interface BackendCustomerWithMessages extends BackendCustomer {
@@ -88,6 +90,8 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     messages: c.messages.map(mapMessage),
     needsAttention: c.needsAttention === true,
     needsAttentionMessage: c.needsAttentionMessage ?? undefined,
+    email: c.email,
+    notes: c.notes,
   };
 }
 
@@ -180,3 +184,18 @@ export async function setMaintenanceMode(maintenanceMode: boolean): Promise<void
   if (!res.ok) {
     throw new Error(`Failed to update maintenance mode (${res.status})`);
   }
+}
+
+export async function updateContactInfo(
+  customerId: string,
+  info: { email?: string; notes?: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/contact-info`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(info),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update contact info (${res.status})`);
+  }
+}

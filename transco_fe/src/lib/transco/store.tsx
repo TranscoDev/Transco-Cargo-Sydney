@@ -20,11 +20,13 @@ import {
   sendHumanMessage,
   setCustomerMode,
   setMaintenanceMode as setMaintenanceModeRequest,
+  updateContactInfo as updateContactInfoRequest,
 } from "./api";
 import {
   connectConsoleSocket,
   type BookingCreatedPayload,
   type BookingDeletedPayload,
+  type ContactUpdatedPayload,
   type MaintenanceChangedPayload,
   type MessageCreatedPayload,
   type ModeChangedPayload,
@@ -74,6 +76,8 @@ interface ConversationsApi {
    * customer gets a friendly pause notice instead of an AI reply. */
   maintenanceMode: boolean;
   toggleMaintenanceMode: () => void;
+  /** Staff-entered contact details, editable from the Contacts directory. */
+  updateContact: (conversationId: string, info: { email?: string; notes?: string }) => void;
 }
 
 const ConversationsContext = createContext<ConversationsApi | null>(null);
@@ -201,6 +205,20 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const patch = useCallback((conversationId: string, fn: (c: Conversation) => Conversation) => {
     setConversations((prev) => prev.map((c) => (c.id === conversationId ? fn(c) : c)));
   }, []);
+
+  const updateContact = useCallback(
+    (conversationId: string, info: { email?: string; notes?: string }) => {
+      patch(conversationId, (c) => ({
+        ...c,
+        email: info.email !== undefined ? info.email : c.email,
+        notes: info.notes !== undefined ? info.notes : c.notes,
+      }));
+      updateContactInfoRequest(conversationId, info).catch((err) => {
+        console.error("Failed to persist contact info:", err);
+      });
+    },
+    [patch],
+  );
 
   const appendMessage = useCallback(
     (conversationId: string, message: Message) => {
@@ -401,6 +419,16 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        case "customer.contact_updated": {
+          const { customerId, customer } = event.payload as ContactUpdatedPayload;
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === customerId ? { ...c, email: customer.email, notes: customer.notes } : c,
+            ),
+          );
+          return;
+        }
+
         case "customer.mode_changed": {
           const { customerId, mode } = event.payload as ModeChangedPayload;
           setConversations((prev) =>
@@ -518,6 +546,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       deleteBooking,
       maintenanceMode,
       toggleMaintenanceMode,
+      updateContact,
     }),
     [
       bookings,
@@ -534,6 +563,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       setMode,
       summaries,
       toggleMaintenanceMode,
+      updateContact,
       updateMessageStatus,
     ],
   );

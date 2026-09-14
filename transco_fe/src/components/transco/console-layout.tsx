@@ -1,10 +1,10 @@
-import { CalendarClock, LogOut, MessageSquareDot, Moon, PauseCircle, PlayCircle, Sun } from "lucide-react";
+import { CalendarClock, LogOut, MessageSquareDot, Moon, PauseCircle, PlayCircle, Sun, Users } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
 
-export type ConsoleTab = "conversations" | "bookings";
+export type ConsoleTab = "conversations" | "bookings" | "contacts";
 
 export function ConsoleLayout({
   agentName,
@@ -87,6 +87,19 @@ export function ConsoleLayout({
             >
               <CalendarClock className="h-3.5 w-3.5" />
               Bookings
+            </button>
+            <button
+              type="button"
+              onClick={() => onTabChange("contacts")}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                activeTab === "contacts"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-secondary",
+              )}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Contacts
             </button>
           </nav>
         </div>

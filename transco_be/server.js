@@ -2282,6 +2282,76 @@ app.patch(
 
 
 // ============================================================
+// CONTACT INFO (Contacts directory — email/notes, staff-entered)
+// ============================================================
+//
+// email/notes aren't collected from any conversation automatically —
+// nothing in the bot asks for or extracts them. This is purely staff
+// filling in extra detail on a contact directly in the console, the
+// same way you'd add a note to a contact card in any address book.
+
+app.patch(
+  '/api/customers/:customerId/contact-info',
+  async (req, res) => {
+
+    try {
+
+      const { customerId } = req.params;
+      const { email, notes } = req.body ?? {};
+
+      if (!ObjectId.isValid(customerId)) {
+        return res.status(400).json({ error: 'Invalid customer id' });
+      }
+
+      if (email !== undefined && typeof email !== 'string') {
+        return res.status(400).json({ error: 'email must be a string' });
+      }
+
+      if (notes !== undefined && typeof notes !== 'string') {
+        return res.status(400).json({ error: 'notes must be a string' });
+      }
+
+      const setFields = {};
+      if (email !== undefined) setFields.email = email.trim();
+      if (notes !== undefined) setFields.notes = notes.trim();
+
+      if (Object.keys(setFields).length === 0) {
+        return res.status(400).json({ error: 'email or notes is required' });
+      }
+
+      const updated = await customers().findOneAndUpdate(
+        { _id: new ObjectId(customerId) },
+        { $set: setFields },
+        { returnDocument: 'after' }
+      );
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Customer not found' });
+      }
+
+      broadcast('customer.contact_updated', {
+        customerId: updated._id,
+        customer: updated
+      });
+
+      res.status(200).json({ customer: updated });
+
+    } catch (err) {
+
+      console.error(
+        'Error updating contact info:',
+        err.message
+      );
+
+      res.status(500).json({
+        error: 'Failed to update contact info'
+      });
+    }
+  }
+);
+
+
+// ============================================================
 // FLOWISE
 // ============================================================
 
