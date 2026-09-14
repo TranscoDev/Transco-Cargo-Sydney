@@ -722,13 +722,39 @@ async function sendAndTrackOutbound(
 ) {
   const HANDOFF_MARKER = '[[HANDOFF]]';
   const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
+  const FLYER_ONLY_MARKER = '[[SEND_FLYER]]';
   const SHOW_MENU_MARKER = '[[SHOW_MENU]]';
+  const ASK_QUANTITY_MARKER = '[[ASK_QUANTITY]]';
+  const SHOW_BOX_MENU_MARKER = '[[SHOW_BOX_MENU]]';
+  const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
+  const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
 
   const needsAttention = content.startsWith(HANDOFF_MARKER);
 
   let cleanContent = needsAttention
     ? content.slice(HANDOFF_MARKER.length).trimStart()
     : content;
+
+  // Can appear anywhere in the reply (typically appended at the very
+  // end, after a video/flyer's accompanying text, or after a Sea/Air
+  // Freight info dump) — stripped up front, independent of whichever
+  // branch below actually sends the content, so the relevant native
+  // menu shows after it regardless of whether this reply also included
+  // media.
+  const wantsBoxMenu = cleanContent.includes(SHOW_BOX_MENU_MARKER);
+  if (wantsBoxMenu) {
+    cleanContent = cleanContent.split(SHOW_BOX_MENU_MARKER).join('').trim();
+  }
+
+  const wantsAirMenu = cleanContent.includes(SHOW_AIR_MENU_MARKER);
+  if (wantsAirMenu) {
+    cleanContent = cleanContent.split(SHOW_AIR_MENU_MARKER).join('').trim();
+  }
+
+  const wantsSeaMenu = cleanContent.includes(SHOW_SEA_MENU_MARKER);
+  if (wantsSeaMenu) {
+    cleanContent = cleanContent.split(SHOW_SEA_MENU_MARKER).join('').trim();
+  }
 
 
   // ==========================================================
@@ -753,6 +779,25 @@ async function sendAndTrackOutbound(
     if (!skipShowMenu) {
       await sendWelcomeMenu(customer);
     }
+    return;
+  }
+
+
+  // ==========================================================
+  // ASK QUANTITY COMMAND
+  // ==========================================================
+  // Flowise's request_type=1 flow prefixes its "how many boxes?"
+  // question with [[ASK_QUANTITY]] once box type and (for Tea Chest)
+  // nothing else is known yet. On WhatsApp we replace that plain-text
+  // question with a native tappable list (1-9 + "10 or more" — see
+  // QUANTITY_MENU_ITEMS, capped at 10 rows by WhatsApp's own list
+  // limit) instead of leaving it as free text. The question text
+  // itself (already in the customer's language) becomes the list's
+  // body, so this stays consistent across English/Sinhala/Tamil.
+
+  if (cleanContent.startsWith(ASK_QUANTITY_MARKER)) {
+    const bodyText = cleanContent.slice(ASK_QUANTITY_MARKER.length).trim();
+    await sendQuantityMenu(customer, bodyText);
     return;
   }
 
@@ -822,55 +867,71 @@ async function sendAndTrackOutbound(
   // BOX MEDIA COMMAND
   // ==========================================================
 
-  if (cleanContent.includes(BOX_MEDIA_MARKER)) {
+  const wantsVideo = cleanContent.includes(BOX_MEDIA_MARKER);
+  const wantsFlyerOnly = !wantsVideo && cleanContent.includes(FLYER_ONLY_MARKER);
+
+  if (wantsVideo || wantsFlyerOnly) {
 
     console.log(
-      `BOX_MEDIA command detected for ${customer.phoneNumber}`
+      `${wantsVideo ? 'BOX_MEDIA' : 'FLYER_ONLY'} command detected for ${customer.phoneNumber}`
     );
 
+    // Strip the marker itself out of the text that goes on to be sent
+    // as a real message below — it was previously only ever checked
+    // for, never removed, which didn't matter while this whole branch
+    // discarded cleanContent anyway (see the ACCOMPANYING TEXT step
+    // further down, added to fix exactly that).
+    cleanContent = cleanContent.split(BOX_MEDIA_MARKER).join('').split(FLYER_ONLY_MARKER).join('').trim();
+
     // --------------------------------------------------------
-    // 1. SEND VIDEO
+    // 1. SEND VIDEO (skipped for a flyer-only reply, e.g. the
+    // WhatsApp menu's "Sea Freight Info" option — informational,
+    // not the general shipping-intent promo)
     // --------------------------------------------------------
 
-    const videoMessage = await saveMessage({
-      customerId: customer._id,
-      senderType,
-      content: '[BOX PROMO VIDEO]',
-      isRead: true,
-      replyToMessageId,
-      whatsappStatus: null
-    });
+    let videoMessage = null;
 
-    try {
-      await sendWhatsAppVideo(
-        customer.phoneNumber,
-        videoMessage._id.toString()
-      );
+    if (wantsVideo) {
+      videoMessage = await saveMessage({
+        customerId: customer._id,
+        senderType,
+        content: '[BOX PROMO VIDEO]',
+        isRead: true,
+        replyToMessageId,
+        whatsappStatus: null
+      });
 
-      videoMessage.whatsappStatus = 'SENT';
+      try {
+        await sendWhatsAppVideo(
+          customer.phoneNumber,
+          videoMessage._id.toString()
+        );
 
-    } catch (err) {
-      console.error(
-        'WhatsApp video send failed:',
-        err.response?.data ?? err.message
-      );
+        videoMessage.whatsappStatus = 'SENT';
 
-      videoMessage.whatsappStatus = 'FAILED';
-    }
+      } catch (err) {
+        console.error(
+          'WhatsApp video send failed:',
+          err.response?.data ?? err.message
+        );
 
-    await messages().updateOne(
-      { _id: videoMessage._id },
-      {
-        $set: {
-          whatsappStatus: videoMessage.whatsappStatus
-        }
+        videoMessage.whatsappStatus = 'FAILED';
       }
-    );
 
-    await broadcastMessageCreated(
-      customer,
-      videoMessage
-    );
+      await messages().updateOne(
+        { _id: videoMessage._id },
+        {
+          $set: {
+            whatsappStatus: videoMessage.whatsappStatus
+          }
+        }
+      );
+
+      await broadcastMessageCreated(
+        customer,
+        videoMessage
+      );
+    }
 
 
     // --------------------------------------------------------
@@ -919,6 +980,75 @@ async function sendAndTrackOutbound(
 
 
     // --------------------------------------------------------
+    // 3. ACCOMPANYING TEXT (if any)
+    // --------------------------------------------------------
+    // Whatever the LLM wrote alongside the marker (e.g. request_type=16's
+    // promo blurb or request_type=29's Sea Freight intro) used to be
+    // silently discarded — this function returned right after sending
+    // the media, so the customer got a bare video/image with zero
+    // explanation. That's exactly what showed up as a real bug: a
+    // customer asked "what is this video about?" and got no answer at
+    // all, just another unexplained flyer image.
+
+    let textMessage = null;
+
+    if (cleanContent) {
+      textMessage = await saveMessage({
+        customerId: customer._id,
+        senderType,
+        content: cleanContent,
+        isRead: true,
+        replyToMessageId,
+        whatsappStatus: null
+      });
+
+      try {
+        await sendWhatsAppMessage(
+          customer.phoneNumber,
+          cleanContent,
+          textMessage._id.toString()
+        );
+
+        textMessage.whatsappStatus = 'SENT';
+
+      } catch (err) {
+        console.error(
+          'WhatsApp text (accompanying media) send failed:',
+          err.response?.data ?? err.message
+        );
+
+        textMessage.whatsappStatus = 'FAILED';
+      }
+
+      await messages().updateOne(
+        { _id: textMessage._id },
+        { $set: { whatsappStatus: textMessage.whatsappStatus } }
+      );
+
+      await broadcastMessageCreated(customer, textMessage);
+    }
+
+
+    // --------------------------------------------------------
+    // 4. BOX / AIR / SEA FREIGHT MENU (if requested)
+    // --------------------------------------------------------
+    // Shown last, after the video/flyer and its explanation, so a
+    // customer who's just been sold on the promo can go straight into
+    // getting a quote (or another next step) with one tap instead of
+    // typing it out.
+
+    if (wantsBoxMenu) {
+      await sendBoxTypeMenu(customer);
+    }
+    if (wantsAirMenu) {
+      await sendAirFreightMenu(customer);
+    }
+    if (wantsSeaMenu) {
+      await sendSeaFreightMenu(customer);
+    }
+
+
+    // --------------------------------------------------------
     // HUMAN HANDOFF
     // --------------------------------------------------------
 
@@ -926,13 +1056,14 @@ async function sendAndTrackOutbound(
       const attentionSource = replyToMessageId
         ? await messages().findOne({ _id: replyToMessageId })
         : null;
-      await markNeedsAttention(customer, attentionSource ?? flyerMessage);
+      await markNeedsAttention(customer, attentionSource ?? textMessage ?? flyerMessage);
     }
 
     return {
-      type: 'BOX_MEDIA',
+      type: wantsVideo ? 'BOX_MEDIA' : 'FLYER_ONLY',
       videoMessage,
-      flyerMessage
+      flyerMessage,
+      textMessage
     };
   }
 
@@ -996,6 +1127,20 @@ async function sendAndTrackOutbound(
     await markNeedsAttention(customer, attentionSource ?? outgoing);
   }
 
+  // Shown last, in case a plain-text reply (no video/flyer) also asked
+  // for a menu — same handling as the media branch above. This is the
+  // path request_type=14/15/29's text replies actually go through
+  // (they don't send video/flyer), so this is where Air/Sea menus
+  // normally fire.
+  if (wantsBoxMenu) {
+    await sendBoxTypeMenu(customer);
+  }
+  if (wantsAirMenu) {
+    await sendAirFreightMenu(customer);
+  }
+  if (wantsSeaMenu) {
+    await sendSeaFreightMenu(customer);
+  }
 
   return outgoing;
 }
@@ -1150,15 +1295,46 @@ app.post('/webhook', async (req, res) => {
     // deterministic ID-to-phrase lookup, not AI classification, so a
     // tap can never be misread the way a typed reply could be.
     let tappedMenuLabel = null;
+    // "Get a Price Quote" shows the box-type menu directly instead of
+    // going through Flowise — asking box type BEFORE quantity, the
+    // same order a human would ask in. See sendBoxTypeMenu above.
+    let showBoxTypeMenu = false;
+    // "10 or more" on the quantity menu has no fixed phrase to feed
+    // Flowise (we don't know the real number) — reply directly asking
+    // for a typed number instead of routing it through the AI at all.
+    let askTypedQuantity = false;
+    // "Our Website" is a static fact, not something that needs an AI
+    // round-trip — reply directly with the link, same reasoning as
+    // askTypedQuantity above.
+    let askWebsiteLink = false;
 
     if (!text && message.type === 'interactive' && message.interactive?.list_reply) {
-      const tappedItem = WELCOME_MENU_ITEMS.find(
-        item => item.id === message.interactive.list_reply.id
-      );
+      const tappedId = message.interactive.list_reply.id;
 
-      if (tappedItem) {
-        text = tappedItem.phrase;
+      if (tappedId === 'menu_price') {
+        showBoxTypeMenu = true;
+        text = message.interactive.list_reply.title;
         tappedMenuLabel = message.interactive.list_reply.title;
+      } else if (tappedId === 'qty_10plus') {
+        askTypedQuantity = true;
+        text = message.interactive.list_reply.title;
+        tappedMenuLabel = message.interactive.list_reply.title;
+      } else if (tappedId === 'menu_website') {
+        askWebsiteLink = true;
+        text = message.interactive.list_reply.title;
+        tappedMenuLabel = message.interactive.list_reply.title;
+      } else {
+        const tappedItem =
+          WELCOME_MENU_ITEMS.find(item => item.id === tappedId) ||
+          BOX_TYPE_MENU_ITEMS.find(item => item.id === tappedId) ||
+          QUANTITY_MENU_ITEMS.find(item => item.id === tappedId) ||
+          AIR_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
+          SEA_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId);
+
+        if (tappedItem) {
+          text = tappedItem.phrase;
+          tappedMenuLabel = message.interactive.list_reply.title;
+        }
       }
     }
 
@@ -1227,6 +1403,31 @@ app.post('/webhook', async (req, res) => {
       customer,
       inboundMessage
     );
+
+    if (showBoxTypeMenu && customer.mode === 'CHATBOT') {
+      await sendBoxTypeMenu(customer);
+      return;
+    }
+
+    if (askTypedQuantity && customer.mode === 'CHATBOT') {
+      await sendAndTrackOutbound(
+        customer,
+        'CHATBOT',
+        "No problem! Just type in the exact number of boxes you're sending (up to 30) and I'll work out the price.",
+        inboundMessage._id
+      );
+      return;
+    }
+
+    if (askWebsiteLink && customer.mode === 'CHATBOT') {
+      await sendAndTrackOutbound(
+        customer,
+        'CHATBOT',
+        "🌐 Here's our website: https://transcosydney.com.au/",
+        inboundMessage._id
+      );
+      return;
+    }
 
 
     // ========================================================
@@ -2219,26 +2420,42 @@ async function sendWhatsAppMessage(
 // to keep in sync with the rest of the bot's knowledge.
 
 const WELCOME_MENU_ITEMS = [
-  { id: 'menu_price', title: '💰 Get a Price Quote', phrase: "I'd like to get a price quote" },
+  { id: 'menu_calendar', title: '🗓️ Shipment Calendar', phrase: 'What is your shipping schedule?' },
   { id: 'menu_track', title: '📦 Track My Shipment', phrase: 'I want to track my shipment' },
-  { id: 'menu_air', title: '✈️ Air Freight Info', phrase: 'Tell me about Air Freight' },
-  { id: 'menu_sea', title: '🚢 Sea Freight Info', phrase: 'Tell me about Sea Freight' },
   { id: 'menu_declaration', title: '📋 Declaration Form', phrase: 'Send me the Declaration Form' },
-  { id: 'menu_staff', title: '👤 Talk to Our Team', phrase: "I'd like to talk to a staff member" }
+  { id: 'menu_price', title: '💰 Get a Price Quote', phrase: "I'd like to get a price quote" },
+  { id: 'menu_sea', title: '🚢 Sea Freight Info', phrase: 'Tell me about Sea Freight' },
+  { id: 'menu_air', title: '✈️ Air Freight Info', phrase: 'Tell me about Air Freight' },
+  { id: 'menu_staff', title: '👤 Talk to Our Team', phrase: "I'd like to talk to a staff member" },
+  // Bypasses Flowise entirely — see the dedicated tap handler in the
+  // webhook below (askWebsiteLink) — no phrase/AI round-trip needed
+  // for something this simple and static.
+  { id: 'menu_website', title: '🌐 Our Website', phrase: null }
 ];
 
 // Same wording as the plain-text greeting (request_type=7 in the
 // Flowise tool) minus the four-line feature list, which the tappable
-// menu below now covers instead.
+// menu below now covers instead. The website link itself lives only
+// in the menu now (see WELCOME_MENU_ITEMS' menu_website entry above),
+// not duplicated here in the body text.
 const WELCOME_BODY_TEXT =
   "👋 *Welcome to Transco Cargo Sydney!*\n\n" +
   "I'm your dedicated Transco Cargo agent, here to make shipping to Sri Lanka.\n\n" +
   "💬 Happy to chat in English, සිංහල, or தமிழ் — just write in whichever you're comfortable with.\n\n" +
-  "🎉 *Current Promotion:* Ship 3 boxes to the same receiver and the 3rd box's freight is FREE!\n\n" +
-  "🌐 Website: https://transcosydney.com.au/\n\n" +
+  "🎉 *Current Promotion:* Send 2 boxes and get the 3rd one FREE! (Sea Freight only)\n\n" +
   "*How can I help you today?*";
 
-async function sendWhatsAppInteractiveList(to, bizOpaqueCallbackData) {
+// Generic native WhatsApp tappable list — shared by the welcome menu
+// and the box-type menu below, rather than duplicating the WhatsApp
+// API payload/call for each one.
+async function sendWhatsAppInteractiveList(to, bizOpaqueCallbackData, {
+  headerText = 'Transco Cargo Sydney',
+  bodyText,
+  footerText = 'We reply in English, Sinhala & Tamil',
+  buttonLabel = 'Menu',
+  sectionTitle = 'Quick Options',
+  items
+}) {
 
   const payload = {
     messaging_product: 'whatsapp',
@@ -2246,17 +2463,17 @@ async function sendWhatsAppInteractiveList(to, bizOpaqueCallbackData) {
     type: 'interactive',
     interactive: {
       type: 'list',
-      header: { type: 'text', text: 'Transco Cargo Sydney' },
+      header: { type: 'text', text: headerText },
       body: {
-        text: WELCOME_BODY_TEXT
+        text: bodyText
       },
-      footer: { text: 'We reply in English, Sinhala & Tamil' },
+      footer: { text: footerText },
       action: {
-        button: 'Menu',
+        button: buttonLabel,
         sections: [
           {
-            title: 'Quick Options',
-            rows: WELCOME_MENU_ITEMS.map(({ id, title }) => ({ id, title }))
+            title: sectionTitle,
+            rows: items.map(({ id, title }) => ({ id, title }))
           }
         ]
       }
@@ -2303,7 +2520,8 @@ async function sendWelcomeMenu(customer) {
   try {
     await sendWhatsAppInteractiveList(
       customer.phoneNumber,
-      outgoing._id.toString()
+      outgoing._id.toString(),
+      { bodyText: WELCOME_BODY_TEXT, items: WELCOME_MENU_ITEMS }
     );
 
     outgoing.whatsappStatus = 'SENT';
@@ -2311,6 +2529,272 @@ async function sendWelcomeMenu(customer) {
   } catch (err) {
     console.error(
       'Welcome menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
+// Shown instead of routing through Flowise when "Get a Price Quote" is
+// tapped on the welcome menu — asks for box type FIRST via another
+// native tappable list, before quantity is ever asked. A tap here
+// feeds a clear phrase into the same trusted Flowise pipeline any
+// typed answer would (see the interactive-message handling in the
+// webhook), so the classifier still asks for quantity/destination
+// afterwards exactly as it does for a typed "Tea Chest" answer.
+const BOX_TYPE_MENU_ITEMS = [
+  { id: 'boxtype_gift', title: '🎁 Gift Box', phrase: "I'd like a price for a Gift Box" },
+  { id: 'boxtype_tea', title: '📦 Tea Chest', phrase: "I'd like a price for a Tea Chest" },
+  { id: 'boxtype_odd', title: '📐 Odd Size / Custom', phrase: "I have an oddly shaped or custom-sized item to ship" }
+];
+
+async function sendBoxTypeMenu(customer) {
+
+  const bodyText = "📦 What type of box are you sending?";
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    BOX_TYPE_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Get a Price Quote',
+        bodyText,
+        buttonLabel: 'Select Box',
+        sectionTitle: 'Box Types',
+        items: BOX_TYPE_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Box type menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
+// Shown when Flowise's request_type=1 flow needs a box quantity — see
+// the ASK_QUANTITY COMMAND handling below. WhatsApp list messages cap
+// out at 10 rows total, so this can't just be "1" through "30" — the
+// common case (under 10 boxes) gets one tap, and "10 or more" is
+// special-cased in the webhook handler to prompt for a typed number
+// instead of feeding a vague phrase back through Flowise.
+const QUANTITY_MENU_ITEMS = [
+  { id: 'qty_1', title: '1 box', phrase: '1 box' },
+  { id: 'qty_2', title: '2 boxes', phrase: '2 boxes' },
+  { id: 'qty_3', title: '3 boxes', phrase: '3 boxes' },
+  { id: 'qty_4', title: '4 boxes', phrase: '4 boxes' },
+  { id: 'qty_5', title: '5 boxes', phrase: '5 boxes' },
+  { id: 'qty_6', title: '6 boxes', phrase: '6 boxes' },
+  { id: 'qty_7', title: '7 boxes', phrase: '7 boxes' },
+  { id: 'qty_8', title: '8 boxes', phrase: '8 boxes' },
+  { id: 'qty_9', title: '9 boxes', phrase: '9 boxes' },
+  { id: 'qty_10plus', title: '10 or more', phrase: null }
+];
+
+async function sendQuantityMenu(customer, bodyText) {
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    QUANTITY_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Get a Price Quote',
+        bodyText,
+        buttonLabel: 'Select Quantity',
+        sectionTitle: 'How Many Boxes',
+        items: QUANTITY_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Quantity menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
+// Shown after Flowise's Air Freight info reply (request_type=14, before
+// weight/box type is known) — see the SHOW_AIR_MENU COMMAND handling
+// below. Curated to the handful of things people actually ask right
+// after reading Air Freight pricing, not every possible FAQ (WhatsApp
+// caps a list at 10 rows, and past a few options it stops being quick
+// to scan). Gift Box/Tea Chest feed straight into an instant quote at
+// that box's minimum chargeable weight — Air Freight only prices those
+// two box types (see AIR_MIN_WEIGHT_KG in the pricing tool), so Wine
+// Box/Odd Size aren't offered here the way they are for Sea Freight.
+const AIR_FREIGHT_MENU_ITEMS = [
+  { id: 'air_gift', title: '🎁 Gift Box Quote', phrase: "I'd like an Air Freight quote for a Gift Box" },
+  { id: 'air_tea', title: '📦 Tea Chest Quote', phrase: "I'd like an Air Freight quote for a Tea Chest" },
+  { id: 'air_general', title: '⚖️ General Cargo', phrase: "I'd like an Air Freight quote for general cargo, priced by weight" },
+  { id: 'air_banned', title: "🚫 What Can't I Send?", phrase: "What can't I send via Air Freight?" },
+  { id: 'air_team', title: '👤 Talk to Our Team', phrase: "I'd like to talk to a staff member" }
+];
+
+async function sendAirFreightMenu(customer) {
+
+  const bodyText = "✈️ What would you like to do next?";
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    AIR_FREIGHT_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Air Freight',
+        bodyText,
+        buttonLabel: 'Choose an Option',
+        sectionTitle: 'Air Freight Options',
+        items: AIR_FREIGHT_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Air freight menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
+// Shown after Flowise's Sea Freight info/comparison replies
+// (request_type=15, 29) — see the SHOW_SEA_MENU COMMAND handling
+// below. The box-type options reuse the exact same phrases as
+// BOX_TYPE_MENU_ITEMS so they feed into the identical, already-proven
+// box-type -> quantity flow; the other two options are the most common
+// side-questions right after reading Sea Freight info.
+const SEA_FREIGHT_MENU_ITEMS = [
+  { id: 'sea_gift', title: '🎁 Gift Box Quote', phrase: "I'd like a price for a Gift Box" },
+  { id: 'sea_tea', title: '📦 Tea Chest Quote', phrase: "I'd like a price for a Tea Chest" },
+  { id: 'sea_odd', title: '📐 Odd Size / Custom', phrase: "I have an oddly shaped or custom-sized item to ship" },
+  { id: 'sea_schedule', title: '🗓️ Shipping Schedule', phrase: 'What is your shipping schedule?' },
+  { id: 'sea_pickup', title: '🚚 Home Pickup Info', phrase: 'Can someone pick up my boxes from home?' },
+  { id: 'sea_team', title: '👤 Talk to Our Team', phrase: "I'd like to talk to a staff member" }
+];
+
+async function sendSeaFreightMenu(customer) {
+
+  const bodyText = "🚢 What would you like to do next?";
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    SEA_FREIGHT_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Sea Freight',
+        bodyText,
+        buttonLabel: 'Choose an Option',
+        sectionTitle: 'Sea Freight Options',
+        items: SEA_FREIGHT_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Sea freight menu send failed:',
       err.response?.data ?? err.message
     );
 

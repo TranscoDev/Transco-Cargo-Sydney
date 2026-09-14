@@ -19,7 +19,12 @@ const { customers, bookings } = require('./db');
 
 const HANDOFF_MARKER = '[[HANDOFF]]';
 const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
+const FLYER_ONLY_MARKER = '[[SEND_FLYER]]';
 const SHOW_MENU_MARKER = '[[SHOW_MENU]]';
+const ASK_QUANTITY_MARKER = '[[ASK_QUANTITY]]';
+const SHOW_BOX_MENU_MARKER = '[[SHOW_BOX_MENU]]';
+const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
+const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 
 // Shown once, prepended to a brand-new visitor's real answer when
@@ -39,7 +44,7 @@ const WEB_GREETING_TEXT =
   "🕐 Opening Hours & Bookings\n" +
   "🚚 Shipping Information\n\n" +
   "💬 Happy to chat in English, සිංහල, or தமிழ் — just write in whichever you're comfortable with.\n\n" +
-  "🎉 *Current Promotion:* Ship 3 boxes to the same receiver and the 3rd box's freight is FREE!\n\n" +
+  "🎉 *Current Promotion:* Send 2 boxes and get the 3rd one FREE! (Sea Freight only)\n\n" +
   "🌐 Website: https://transcosydney.com.au/\n" +
   "📋 Declaration Form: https://transcosydney.com.au/declaration-form";
 
@@ -154,12 +159,29 @@ module.exports = function createWebChatRouter({
       if (cleanContent.startsWith(SHOW_MENU_MARKER)) {
         cleanContent = cleanContent.slice(SHOW_MENU_MARKER.length).trimStart();
 
+      } else if (cleanContent.startsWith(ASK_QUANTITY_MARKER)) {
+        // Same reasoning as SHOW_MENU_MARKER above — no tappable-list
+        // UI on the website widget, so just show the plain question.
+        cleanContent = cleanContent.slice(ASK_QUANTITY_MARKER.length).trimStart();
+
       } else if (isNewCustomer) {
         // A brand-new visitor whose first message was a real question,
         // not a greeting (that case is handled above) — show the
         // welcome message and the answer together as one reply, rather
         // than answering with no greeting at all.
         cleanContent = WEB_GREETING_TEXT + "\n\n" + cleanContent;
+      }
+
+      // No tappable menus on the website widget either — same
+      // reasoning as above, just drop the markers.
+      if (cleanContent.includes(SHOW_BOX_MENU_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_BOX_MENU_MARKER).join('').trim();
+      }
+      if (cleanContent.includes(SHOW_AIR_MENU_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_AIR_MENU_MARKER).join('').trim();
+      }
+      if (cleanContent.includes(SHOW_SEA_MENU_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_SEA_MENU_MARKER).join('').trim();
       }
 
       // Strip the booking marker so it never leaks to the customer as
@@ -233,6 +255,11 @@ module.exports = function createWebChatRouter({
               videoUrl: `${MEDIA_BASE_URL}/media/BOX_Promo_video.mp4`,
               flyerUrl: `${MEDIA_BASE_URL}/media/Box_Flyer.jpg`
             }
+          : null;
+      } else if (cleanContent.includes(FLYER_ONLY_MARKER)) {
+        cleanContent = cleanContent.split(FLYER_ONLY_MARKER).join('').trim();
+        media = MEDIA_BASE_URL
+          ? { flyerUrl: `${MEDIA_BASE_URL}/media/Box_Flyer.jpg` }
           : null;
       }
 
