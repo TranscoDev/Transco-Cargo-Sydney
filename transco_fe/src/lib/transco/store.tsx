@@ -14,15 +14,18 @@ import {
   deleteBooking as deleteBookingRequest,
   fetchBookings,
   fetchConversations,
+  fetchMaintenanceMode,
   mapMessage,
   markConversationRead,
   sendHumanMessage,
   setCustomerMode,
+  setMaintenanceMode as setMaintenanceModeRequest,
 } from "./api";
 import {
   connectConsoleSocket,
   type BookingCreatedPayload,
   type BookingDeletedPayload,
+  type MaintenanceChangedPayload,
   type MessageCreatedPayload,
   type ModeChangedPayload,
   type NeedsAttentionPayload,
@@ -67,6 +70,10 @@ interface ConversationsApi {
   /** Weekday drop-off bookings collected by the chatbot, newest first. */
   bookings: Booking[];
   deleteBooking: (bookingId: string) => void;
+  /** True while the bot is globally paused ("Maintenance Mode") — every
+   * customer gets a friendly pause notice instead of an AI reply. */
+  maintenanceMode: boolean;
+  toggleMaintenanceMode: () => void;
 }
 
 const ConversationsContext = createContext<ConversationsApi | null>(null);
@@ -99,6 +106,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // as a fallback for genuinely running without a reachable backend.
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [maintenanceMode, setMaintenanceModeState] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const selectedRef = useRef<string | null>(null);
@@ -141,6 +149,32 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMaintenanceMode()
+      .then((on) => {
+        if (cancelled) return;
+        setMaintenanceModeState(on);
+      })
+      .catch((err) => {
+        console.warn("Could not load maintenance mode.", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleMaintenanceMode = useCallback(() => {
+    setMaintenanceModeState((prev) => {
+      const next = !prev;
+      setMaintenanceModeRequest(next).catch((err) => {
+        console.error("Failed to persist maintenance mode:", err);
+        setMaintenanceModeState((current) => (current === next ? prev : current));
+      });
+      return next;
+    });
   }, []);
 
   const deleteBooking = useCallback((bookingId: string) => {
@@ -361,6 +395,12 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        case "settings.maintenance_changed": {
+          const { maintenanceMode: on } = event.payload as MaintenanceChangedPayload;
+          setMaintenanceModeState(on);
+          return;
+        }
+
         case "customer.mode_changed": {
           const { customerId, mode } = event.payload as ModeChangedPayload;
           setConversations((prev) =>
@@ -476,11 +516,14 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sending,
       bookings,
       deleteBooking,
+      maintenanceMode,
+      toggleMaintenanceMode,
     }),
     [
       bookings,
       conversations,
       deleteBooking,
+      maintenanceMode,
       markAsRead,
       receiveCustomerMessage,
       selectConversation,
@@ -490,6 +533,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sending,
       setMode,
       summaries,
+      toggleMaintenanceMode,
       updateMessageStatus,
     ],
   );

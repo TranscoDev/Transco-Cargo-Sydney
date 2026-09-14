@@ -1,4 +1,4 @@
-import { CalendarClock, LogOut, MessageSquareDot, Moon, Sun } from "lucide-react";
+import { CalendarClock, LogOut, MessageSquareDot, Moon, PauseCircle, PlayCircle, Sun } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -11,12 +11,16 @@ export function ConsoleLayout({
   onLogout,
   activeTab,
   onTabChange,
+  maintenanceMode,
+  onToggleMaintenance,
   children,
 }: {
   agentName: string;
   onLogout: () => void;
   activeTab: ConsoleTab;
   onTabChange: (tab: ConsoleTab) => void;
+  maintenanceMode: boolean;
+  onToggleMaintenance: () => void;
   children: ReactNode;
 }) {
   const [theme, setTheme] = useState<Theme>("light");
@@ -31,8 +35,22 @@ export function ConsoleLayout({
     setTheme(next);
   };
 
+  const handleToggleMaintenance = () => {
+    const confirmed = window.confirm(
+      maintenanceMode
+        ? "Resume the bot for all customers? It will start replying automatically again."
+        : "Pause the bot for ALL customers? Every conversation will get an automatic \"we're briefly offline\" reply until you resume it here.",
+    );
+    if (confirmed) onToggleMaintenance();
+  };
+
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
+      {maintenanceMode && (
+        <div className="shrink-0 border-b border-amber-600/30 bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-700 dark:text-amber-400 md:px-4">
+          ⏸️ Bot is paused for all customers — replies are on hold until you resume it.
+        </div>
+      )}
       <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-panel px-3 py-2 md:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex min-w-0 items-center gap-2">
@@ -76,6 +94,25 @@ export function ConsoleLayout({
           <span className="hidden max-w-40 truncate text-xs capitalize text-muted-foreground sm:inline">
             {agentName}
           </span>
+          <button
+            type="button"
+            onClick={handleToggleMaintenance}
+            aria-label={maintenanceMode ? "Resume bot for all customers" : "Pause bot for all customers"}
+            title={maintenanceMode ? "Resume bot for all customers" : "Pause bot for all customers"}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              maintenanceMode
+                ? "border-amber-600/40 bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400"
+                : "border-border text-foreground hover:bg-secondary",
+            )}
+          >
+            {maintenanceMode ? (
+              <PlayCircle className="h-3.5 w-3.5" />
+            ) : (
+              <PauseCircle className="h-3.5 w-3.5" />
+            )}
+            {maintenanceMode ? "Resume Bot" : "Pause Bot"}
+          </button>
           <button
             type="button"
             onClick={toggleTheme}

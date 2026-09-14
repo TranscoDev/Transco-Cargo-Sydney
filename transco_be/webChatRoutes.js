@@ -103,7 +103,9 @@ module.exports = function createWebChatRouter({
   sendBookingEmail,
   sendStaffBookingWhatsApp,
   createCalendarEvent,
-  MEDIA_BASE_URL
+  MEDIA_BASE_URL,
+  isMaintenanceModeOn,
+  MAINTENANCE_MESSAGE
 }) {
   const router = express.Router();
 
@@ -139,6 +141,29 @@ module.exports = function createWebChatRouter({
           reply: null,
           handedOff: true,
           note: 'A staff member is handling this conversation.'
+        });
+      }
+
+      // Maintenance Mode: same rule as WhatsApp — skip Flowise
+      // entirely and send the same friendly pause notice, without
+      // flagging the conversation for staff attention (they already
+      // know, they're the ones who turned it on).
+      if (await isMaintenanceModeOn()) {
+        const pauseMessage = await saveMessage({
+          customerId: customer._id,
+          senderType: 'CHATBOT',
+          content: MAINTENANCE_MESSAGE,
+          isRead: true,
+          replyToMessageId: incoming._id,
+          whatsappStatus: null
+        });
+
+        await broadcastMessageCreated(customer, pauseMessage);
+
+        return res.json({
+          reply: MAINTENANCE_MESSAGE,
+          media: null,
+          handedOff: false
         });
       }
 

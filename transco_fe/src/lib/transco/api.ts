@@ -161,3 +161,22 @@ export async function setCustomerMode(customerId: string, mode: ConversationMode
     throw new Error(`Failed to update mode (${res.status})`);
   }
 }
+
+export async function fetchMaintenanceMode(): Promise<boolean> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/maintenance`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load maintenance mode (${res.status})`);
+  }
+  const data = (await res.json()) as { maintenanceMode: boolean };
+  return data.maintenanceMode;
+}
+
+export async function setMaintenanceMode(maintenanceMode: boolean): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/maintenance`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ maintenanceMode }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update maintenance mode (${res.status})`);
+  }

@@ -6,7 +6,7 @@ const express = require('express');
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
 
-const { connectToDatabase, customers, messages, users, bookings } = require('./db');
+const { connectToDatabase, customers, messages, users, bookings, settings } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 
 const app = express();
@@ -29,6 +29,35 @@ app.use((req, res, next) => {
 
   next();
 });
+
+
+// ============================================================
+// MAINTENANCE MODE (global pause)
+// ============================================================
+//
+// A single global on/off switch, checked before every AUTOMATED
+// (CHATBOT-mode) reply on both WhatsApp and the website. Deliberately
+// does NOT affect conversations already in HUMAN mode — staff who've
+// already taken a conversation over can keep replying manually; this
+// only stops the bot from picking up new or ongoing automated
+// conversations. Built for exactly one scenario: someone finds the
+// bot and starts abusing it (spam, prank messages) — staff can shut
+// off all automated replies instantly from the console, everywhere,
+// without needing to touch Flowise or redeploy anything.
+//
+// Combined English/Sinhala/Tamil text, since language isn't known yet
+// at this point — the classifier that would normally detect it
+// (Flowise) is exactly what's being skipped while paused.
+
+const MAINTENANCE_MESSAGE =
+  "👋 Thanks for reaching out! Our chat assistant is temporarily paused for maintenance — we'll be back shortly. For anything urgent, please call us on 0468 382 023.\n\n" +
+  "ආයුබෝවන්! අපේ chat assistant එක temporary maintenance එකක් සඳහා නවත්වලා තියෙනවා — ඉක්මනින්ම නැවත ලැබෙනවා. හදිසි නම් 0468 382 023 අමතන්න.\n\n" +
+  "வணக்கம்! எங்கள் chat assistant தற்காலிகமாக maintenance காரணமாக நிறுத்தப்பட்டுள்ளது — விரைவில் மீண்டும் வரும். அவசரமெனில் 0468 382 023 ஐ அழைக்கவும்.";
+
+async function isMaintenanceModeOn() {
+  const doc = await settings().findOne({ _id: 'global' });
+  return Boolean(doc?.maintenanceMode);
+}
 
 
 // ============================================================
@@ -1429,6 +1458,21 @@ app.post('/webhook', async (req, res) => {
       return;
     }
 
+    // Maintenance Mode: skip Flowise entirely and send the same
+    // friendly pause notice to every automated conversation. Checked
+    // AFTER the menu-tap shortcuts above (no point showing a box-type
+    // menu just to immediately pause) but still before any real AI
+    // reply. Never touches HUMAN-mode conversations.
+    if (customer.mode === 'CHATBOT' && await isMaintenanceModeOn()) {
+      await sendAndTrackOutbound(
+        customer,
+        'CHATBOT',
+        MAINTENANCE_MESSAGE,
+        inboundMessage._id
+      );
+      return;
+    }
+
 
     // ========================================================
     // CHATBOT MODE
@@ -1599,6 +1643,45 @@ app.get('/api/auth/session', (req, res) => {
 
 
 // ============================================================
+// MAINTENANCE MODE SETTING (read/write)
+// ============================================================
+
+app.get('/api/settings/maintenance', async (req, res) => {
+  try {
+    const maintenanceMode = await isMaintenanceModeOn();
+    res.status(200).json({ maintenanceMode });
+  } catch (err) {
+    console.error('Error reading maintenance mode:', err.message);
+    res.status(500).json({ error: 'Failed to read maintenance mode' });
+  }
+});
+
+app.patch('/api/settings/maintenance', async (req, res) => {
+  try {
+    const { maintenanceMode } = req.body ?? {};
+
+    if (typeof maintenanceMode !== 'boolean') {
+      return res.status(400).json({ error: 'maintenanceMode must be a boolean' });
+    }
+
+    await settings().updateOne(
+      { _id: 'global' },
+      { $set: { maintenanceMode } },
+      { upsert: true }
+    );
+
+    broadcast('settings.maintenance_changed', { maintenanceMode });
+
+    res.status(200).json({ maintenanceMode });
+
+  } catch (err) {
+    console.error('Error updating maintenance mode:', err.message);
+    res.status(500).json({ error: 'Failed to update maintenance mode' });
+  }
+});
+
+
+// ============================================================
 // GET CUSTOMERS
 // ============================================================
 
@@ -1707,7 +1790,9 @@ app.use('/api/web-chat', createWebChatRouter({
   sendBookingEmail,
   sendStaffBookingWhatsApp,
   createCalendarEvent,
-  MEDIA_BASE_URL
+  MEDIA_BASE_URL,
+  isMaintenanceModeOn,
+  MAINTENANCE_MESSAGE
 }));
 
 

@@ -28,6 +28,10 @@ export interface StatusChangedPayload {
   whatsappStatus: MessageStatus;
 }
 
+export interface MaintenanceChangedPayload {
+  maintenanceMode: boolean;
+}
+
 export interface ModeChangedPayload {
   customerId: string;
   mode: ConversationMode;

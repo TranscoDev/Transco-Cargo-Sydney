@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { MessagesSquare } from "lucide-react";
 
@@ -43,7 +43,7 @@ function ConsolePage() {
 
   return (
     <ConversationsProvider>
-      <ConsoleLayout
+      <ConsoleLayoutWithData
         agentName={agentName}
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -53,8 +53,26 @@ function ConsolePage() {
         }}
       >
         {activeTab === "bookings" ? <ConsoleBookings /> : <ConsoleBody />}
-      </ConsoleLayout>
+      </ConsoleLayoutWithData>
     </ConversationsProvider>
+  );
+}
+
+function ConsoleLayoutWithData({
+  children,
+  ...rest
+}: {
+  agentName: string;
+  activeTab: ConsoleTab;
+  onTabChange: (tab: ConsoleTab) => void;
+  onLogout: () => void;
+  children: ReactNode;
+}) {
+  const { maintenanceMode, toggleMaintenanceMode } = useConversations();
+  return (
+    <ConsoleLayout {...rest} maintenanceMode={maintenanceMode} onToggleMaintenance={toggleMaintenanceMode}>
+      {children}
+    </ConsoleLayout>
   );
 }
 
