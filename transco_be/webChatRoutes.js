@@ -25,6 +25,7 @@ const ASK_QUANTITY_MARKER = '[[ASK_QUANTITY]]';
 const SHOW_BOX_MENU_MARKER = '[[SHOW_BOX_MENU]]';
 const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
 const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
+const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 
 // Shown once, prepended to a brand-new visitor's real answer when
@@ -207,6 +208,9 @@ module.exports = function createWebChatRouter({
       }
       if (cleanContent.includes(SHOW_SEA_MENU_MARKER)) {
         cleanContent = cleanContent.split(SHOW_SEA_MENU_MARKER).join('').trim();
+      }
+      if (cleanContent.includes(SHOW_FREIGHT_MODE_MENU_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_FREIGHT_MODE_MENU_MARKER).join('').trim();
       }
 
       // Strip the booking marker so it never leaks to the customer as

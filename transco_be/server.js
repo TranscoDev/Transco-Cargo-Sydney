@@ -757,6 +757,7 @@ async function sendAndTrackOutbound(
   const SHOW_BOX_MENU_MARKER = '[[SHOW_BOX_MENU]]';
   const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
   const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
+  const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
 
   const needsAttention = content.startsWith(HANDOFF_MARKER);
 
@@ -783,6 +784,15 @@ async function sendAndTrackOutbound(
   const wantsSeaMenu = cleanContent.includes(SHOW_SEA_MENU_MARKER);
   if (wantsSeaMenu) {
     cleanContent = cleanContent.split(SHOW_SEA_MENU_MARKER).join('').trim();
+  }
+
+  // Sea-vs-Air comparison (request_type=15) shouldn't nudge the
+  // customer toward Sea Freight with a Sea-only menu before they've
+  // actually chosen — they asked specifically to compare, so the menu
+  // needs to offer both directions, not assume one.
+  const wantsFreightModeMenu = cleanContent.includes(SHOW_FREIGHT_MODE_MENU_MARKER);
+  if (wantsFreightModeMenu) {
+    cleanContent = cleanContent.split(SHOW_FREIGHT_MODE_MENU_MARKER).join('').trim();
   }
 
 
@@ -1075,6 +1085,9 @@ async function sendAndTrackOutbound(
     if (wantsSeaMenu) {
       await sendSeaFreightMenu(customer);
     }
+    if (wantsFreightModeMenu) {
+      await sendFreightModeMenu(customer);
+    }
 
 
     // --------------------------------------------------------
@@ -1169,6 +1182,9 @@ async function sendAndTrackOutbound(
   }
   if (wantsSeaMenu) {
     await sendSeaFreightMenu(customer);
+  }
+  if (wantsFreightModeMenu) {
+    await sendFreightModeMenu(customer);
   }
 
   return outgoing;
@@ -2963,9 +2979,12 @@ async function sendAirFreightMenu(customer) {
   await broadcastMessageCreated(customer, outgoing);
 }
 
-// Shown after Flowise's Sea Freight info/comparison replies
-// (request_type=15, 29) — see the SHOW_SEA_MENU COMMAND handling
-// below. The box-type options reuse the exact same phrases as
+// Shown after Flowise's plain Sea Freight info reply (request_type=29)
+// — see the SHOW_SEA_MENU COMMAND handling below. NOT used for the
+// Sea-vs-Air comparison (request_type=15) anymore — that one hasn't
+// had the customer choose a side yet, so it gets its own combined
+// menu instead (FREIGHT_MODE_MENU_ITEMS below). The box-type options
+// here reuse the exact same phrases as
 // BOX_TYPE_MENU_ITEMS so they feed into the identical, already-proven
 // box-type -> quantity flow; the other two options are the most common
 // side-questions right after reading Sea Freight info.
@@ -3015,6 +3034,72 @@ async function sendSeaFreightMenu(customer) {
   } catch (err) {
     console.error(
       'Sea freight menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
+// Shown after Flowise's Sea-vs-Air comparison reply (request_type=15)
+// — see the SHOW_FREIGHT_MODE_MENU COMMAND handling below. The
+// customer explicitly asked to compare the two, so unlike
+// SEA_FREIGHT_MENU_ITEMS/AIR_FREIGHT_MENU_ITEMS (which assume a mode
+// already chosen), this offers both sides side by side instead of
+// defaulting to Sea Freight before they've picked one.
+const FREIGHT_MODE_MENU_ITEMS = [
+  { id: 'mode_sea_gift', title: '🎁 Sea: Gift Box', phrase: "I'd like a price for a Gift Box" },
+  { id: 'mode_sea_tea', title: '📦 Sea: Tea Chest', phrase: "I'd like a price for a Tea Chest" },
+  { id: 'mode_air_gift', title: '🎁 Air: Gift Box', phrase: "I'd like an Air Freight quote for a Gift Box" },
+  { id: 'mode_air_tea', title: '📦 Air: Tea Chest', phrase: "I'd like an Air Freight quote for a Tea Chest" },
+  { id: 'mode_air_general', title: '⚖️ Air: By Weight', phrase: "I'd like an Air Freight quote for general cargo, priced by weight" },
+  { id: 'mode_team', title: '👤 Talk to Our Team', phrase: "I'd like to talk to a staff member" }
+];
+
+async function sendFreightModeMenu(customer) {
+
+  const bodyText = "🚢✈️ Which would you like to go with?";
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    FREIGHT_MODE_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Sea vs Air',
+        bodyText,
+        buttonLabel: 'Choose an Option',
+        sectionTitle: 'Freight Options',
+        items: FREIGHT_MODE_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Freight mode menu send failed:',
       err.response?.data ?? err.message
     );
 
