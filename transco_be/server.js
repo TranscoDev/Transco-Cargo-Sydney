@@ -3207,11 +3207,24 @@ async function handleStatusUpdate(
     return;
   }
 
+  // Turns WhatsApp's raw error code into a plain-English reason staff
+  // can actually act on, instead of just a red "failed" icon with no
+  // explanation. Code 131047 is specifically the 24-hour messaging
+  // window — by far the most common, and most confusing, failure
+  // staff will hit when replying to a conversation that's gone quiet.
+  let failureReason = null;
+
   if (status.status === 'failed' && status.errors?.length) {
+    const firstError = status.errors[0];
+
     console.error(
       `WhatsApp delivery failed for ${status.recipient_id} (wamid ${status.id}):`,
       JSON.stringify(status.errors)
     );
+
+    failureReason = firstError.code === 131047
+      ? "This customer hasn't messaged in over 24 hours, so WhatsApp won't deliver a new message until they write in again."
+      : (firstError.title || 'WhatsApp could not deliver this message.');
   }
 
 
@@ -3234,6 +3247,9 @@ async function handleStatusUpdate(
   }
 
 
+  const setFields = { whatsappStatus: mapped };
+  if (failureReason) setFields.failureReason = failureReason;
+
   const updated =
     await messages().findOneAndUpdate(
 
@@ -3245,9 +3261,7 @@ async function handleStatusUpdate(
       },
 
       {
-        $set: {
-          whatsappStatus: mapped
-        }
+        $set: setFields
       },
 
       {
@@ -3268,7 +3282,9 @@ async function handleStatusUpdate(
       messageId: updated._id,
       customerId: updated.customerId,
       whatsappStatus:
-        updated.whatsappStatus
+        updated.whatsappStatus,
+      failureReason:
+        updated.failureReason ?? null
     }
   );
 }

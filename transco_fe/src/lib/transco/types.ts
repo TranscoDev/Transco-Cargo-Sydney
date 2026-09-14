@@ -26,6 +26,9 @@ export interface Message {
   createdAt: string;
   status?: MessageStatus | undefined;
   read?: boolean | undefined;
+  /** Plain-English reason a FAILED status happened (e.g. the WhatsApp
+   * 24-hour messaging window) — set only when status is FAILED. */
+  failureReason?: string | null | undefined;
 }
 
 /** The message that triggered a needs-attention flag, kept around so

@@ -26,6 +26,10 @@ export interface StatusChangedPayload {
   messageId: string;
   customerId: string;
   whatsappStatus: MessageStatus;
+  /** Plain-English reason a "FAILED" status happened — e.g. the
+   * WhatsApp 24-hour messaging window — so staff see why, not just a
+   * red icon. Null/absent for non-failure status changes. */
+  failureReason?: string | null;
 }
 
 export interface MaintenanceChangedPayload {

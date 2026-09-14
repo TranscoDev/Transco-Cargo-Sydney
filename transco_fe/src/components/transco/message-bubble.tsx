@@ -48,9 +48,16 @@ export function MessageBubble({
         <p className="whitespace-pre-wrap break-words leading-snug">
           {renderWhatsAppText(message.body)}
         </p>
+        {message.status === "FAILED" && message.failureReason && (
+          <p className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-destructive">
+            ⚠️ {message.failureReason}
+          </p>
+        )}
         <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums text-muted-foreground">
           {formatMessageTime(message.createdAt)}
-          {outgoing && <MessageStatusIcon status={message.status} />}
+          {outgoing && (
+            <MessageStatusIcon status={message.status} failureReason={message.failureReason} />
+          )}
         </p>
       </div>
     </div>

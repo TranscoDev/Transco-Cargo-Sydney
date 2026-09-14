@@ -397,14 +397,17 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         }
 
         case "message.status_changed": {
-          const { customerId, messageId, whatsappStatus } = event.payload as StatusChangedPayload;
+          const { customerId, messageId, whatsappStatus, failureReason } =
+            event.payload as StatusChangedPayload;
           setConversations((prev) =>
             prev.map((c) =>
               c.id === customerId
                 ? {
                     ...c,
                     messages: c.messages.map((m) =>
-                      m.id === messageId ? { ...m, status: whatsappStatus } : m,
+                      m.id === messageId
+                        ? { ...m, status: whatsappStatus, failureReason: failureReason ?? undefined }
+                        : m,
                     ),
                   }
                 : c,

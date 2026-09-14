@@ -25,6 +25,7 @@ export interface BackendMessage {
   isRead: boolean;
   replyToMessageId: string | null;
   whatsappStatus: MessageStatus | null;
+  failureReason?: string | null;
   createdAt: string;
 }
 
@@ -77,6 +78,7 @@ export function mapMessage(m: BackendMessage): Message {
     createdAt: m.createdAt,
     status: m.whatsappStatus ?? undefined,
     read: m.senderType === "CUSTOMER" ? m.isRead : undefined,
+    failureReason: m.failureReason ?? undefined,
   };
 }
 

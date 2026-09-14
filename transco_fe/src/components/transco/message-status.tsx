@@ -5,9 +5,11 @@ import type { MessageStatus } from "@/lib/transco/types";
 
 export function MessageStatusIcon({
   status,
+  failureReason,
   className,
 }: {
   status?: MessageStatus | undefined;
+  failureReason?: string | null | undefined;
   className?: string;
 }) {
   if (!status) return null;
@@ -15,7 +17,8 @@ export function MessageStatusIcon({
   if (status === "FAILED") {
     return (
       <AlertCircle
-        aria-label="Failed to send"
+        aria-label={failureReason ?? "Failed to send"}
+        title={failureReason ?? "Failed to send"}
         className={cn("h-3.5 w-3.5 text-destructive", className)}
       />
     );

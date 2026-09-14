@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { AlertTriangle, ArrowLeft, Phone } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Clock, Phone } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatDayDivider } from "@/lib/transco/time";
@@ -20,6 +20,24 @@ function groupByDay(messages: Message[]) {
   return groups;
 }
 
+const WHATSAPP_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** WhatsApp only lets a free-form reply through within 24h of the
+ * customer's last message — outside that window every send fails with
+ * error 131047 until they write in again. Website chat has no such
+ * restriction. Surfaced proactively here so staff see it before typing,
+ * not just as a failed-send icon after the fact. */
+function whatsappWindowClosedHoursAgo(conversation: Conversation): number | null {
+  if (conversation.channel === "website") return null;
+  const lastCustomerMessage = [...conversation.messages]
+    .reverse()
+    .find((m) => m.sender === "CUSTOMER");
+  if (!lastCustomerMessage) return null;
+  const elapsedMs = Date.now() - new Date(lastCustomerMessage.createdAt).getTime();
+  if (elapsedMs < WHATSAPP_WINDOW_MS) return null;
+  return Math.floor((elapsedMs - WHATSAPP_WINDOW_MS) / (60 * 60 * 1000));
+}
+
 export function ChatPanel({
   conversation,
   sending,
@@ -38,6 +56,7 @@ export function ChatPanel({
   const flaggedCreatedAt = conversation.needsAttention
     ? conversation.needsAttentionMessage?.createdAt
     : undefined;
+  const windowClosedHoursAgo = whatsappWindowClosedHoursAgo(conversation);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -107,6 +126,16 @@ export function ChatPanel({
           </div>
         ))}
       </div>
+
+      {windowClosedHoursAgo !== null && (
+        <div className="flex shrink-0 items-start gap-2 border-t border-amber-600/30 bg-amber-500/10 px-3 py-2 md:px-6">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            This customer hasn't messaged in over 24 hours ({windowClosedHoursAgo}h past the window), so
+            WhatsApp will block a new message until they write in again.
+          </p>
+        </div>
+      )}
 
       <MessageComposer mode={conversation.mode} disabled={sending} onSend={onSend} />
     </section>
