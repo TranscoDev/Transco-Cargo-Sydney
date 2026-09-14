@@ -20,7 +20,7 @@ const { customers, bookings } = require('./db');
 const HANDOFF_MARKER = '[[HANDOFF]]';
 const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
 const SHOW_MENU_MARKER = '[[SHOW_MENU]]';
-const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
+const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 
 // Shown once, prepended to a brand-new visitor's real answer when
 // their very first message is itself a real question rather than a
@@ -176,7 +176,7 @@ module.exports = function createWebChatRouter({
       let bookingCreated = false;
 
       if (bookMatch) {
-        const [fullMarker, requestedDay, requestedTime, boxSummary, contactName, contactPhone] = bookMatch;
+        const [fullMarker, requestedDay, requestedTime, requestedDateISO, boxSummary, contactName, contactPhone] = bookMatch;
         cleanContent = cleanContent.slice(fullMarker.length).trimStart();
         bookingRequested = true;
 
@@ -190,6 +190,7 @@ module.exports = function createWebChatRouter({
             phoneNumber: finalPhone,
             requestedDay: requestedDay.toLowerCase(),
             requestedTime,
+            requestedDateISO: requestedDateISO || null,
             boxSummary: boxSummary ? boxSummary.trim() : null,
             channel: 'website',
             status: 'pending',

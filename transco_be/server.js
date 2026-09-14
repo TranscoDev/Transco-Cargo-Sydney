@@ -295,19 +295,25 @@ function escapeHtml(str) {
 // order), the same date math already used for the Google Calendar
 // sync. Falls back to just the weekday name if anything goes wrong,
 // rather than letting a date-formatting hiccup break the notification.
+const MONTH_NAMES_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 function formatBookingDayLine(booking) {
   const dayLabel =
     booking.requestedDay.charAt(0).toUpperCase() +
     booking.requestedDay.slice(1);
 
   try {
-    const date = nextDateForWeekday(booking.requestedDay, booking.requestedTime);
-    const dateLabel = date.toLocaleDateString('en-AU', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'Australia/Sydney'
-    });
+    const date = resolveBookingDate(booking);
+    // Built manually from the UTC-suffixed getters (matching the
+    // getSydneyNow()/nextDateForWeekday() convention) rather than
+    // toLocaleDateString(..., {timeZone: 'Australia/Sydney'}) — that
+    // asks the runtime's own timezone database to do the conversion,
+    // which is exactly the fragile pattern that caused a booking to
+    // be mislabeled with the wrong date in the first place.
+    const dateLabel = `${date.getUTCDate()} ${MONTH_NAMES_FULL[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
     return `${dayLabel}, ${dateLabel}`;
   } catch (err) {
     return dayLabel;
@@ -480,9 +486,44 @@ async function getGoogleCalendarAccessToken(credentials) {
 }
 
 
+// Computes the current Sydney wall-clock time WITHOUT depending on the
+// runtime's own Intl/timezone database. The previous approach — new
+// Date(new Date().toLocaleString('en-US', {timeZone: 'Australia/
+// Sydney'})) — silently breaks if the hosting environment's timezone
+// data is incomplete, which is confirmed to have happened live: a
+// "tomorrow" booking resolved to the wrong weekday entirely. This
+// applies Sydney's own fixed DST rule directly instead: AEDT (UTC+11)
+// from the first Sunday of October to the first Sunday of April, AEST
+// (UTC+10) otherwise — no timezone database needed at all.
+// IMPORTANT: the returned Date is deliberately shifted, so always read
+// it back with the UTC-suffixed getters (getUTCDay, getUTCHours,
+// getUTCDate, etc.) — never the plain local getters, which would
+// apply the server's OWN timezone on top and double-shift it. Every
+// function below that works with "Sydney time" follows this same
+// convention, so they can all be combined safely.
+function getSydneyNow() {
+  const utcNow = new Date();
+  const year = utcNow.getUTCFullYear();
+
+  const firstSundayUTC = (y, monthIndex0) => {
+    const d = new Date(Date.UTC(y, monthIndex0, 1));
+    return new Date(Date.UTC(y, monthIndex0, 1 + ((7 - d.getUTCDay()) % 7)));
+  };
+
+  const aprFirstSunday = firstSundayUTC(year, 3);
+  const octFirstSunday = firstSundayUTC(year, 9);
+
+  const isDST = utcNow >= octFirstSunday || utcNow < aprFirstSunday;
+  const offsetHours = isDST ? 11 : 10;
+
+  return new Date(utcNow.getTime() + offsetHours * 60 * 60 * 1000);
+}
+
 // Finds the next real calendar date for a weekday name + HH:MM time,
 // in Australia/Sydney time. If that day/time is later today, uses
-// today; otherwise rolls forward to next week's occurrence.
+// today; otherwise rolls forward to next week's occurrence. Returned
+// Date follows the same "read with UTC getters" convention as
+// getSydneyNow() above.
 
 function nextDateForWeekday(dayName, timeHHMM) {
   const DAY_NAMES = [
@@ -492,16 +533,14 @@ function nextDateForWeekday(dayName, timeHHMM) {
 
   const targetDow = DAY_NAMES.indexOf(dayName.toLowerCase());
 
-  const nowSydney = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'Australia/Sydney' })
-  );
+  const nowSydney = getSydneyNow();
 
   const [hh, mm] = timeHHMM.split(':').map(Number);
 
-  let diff = (targetDow - nowSydney.getDay() + 7) % 7;
+  let diff = (targetDow - nowSydney.getUTCDay() + 7) % 7;
 
   if (diff === 0) {
-    const nowMinutes = nowSydney.getHours() * 60 + nowSydney.getMinutes();
+    const nowMinutes = nowSydney.getUTCHours() * 60 + nowSydney.getUTCMinutes();
     const targetMinutes = hh * 60 + mm;
 
     if (targetMinutes <= nowMinutes) {
@@ -509,20 +548,46 @@ function nextDateForWeekday(dayName, timeHHMM) {
     }
   }
 
-  const target = new Date(nowSydney);
-  target.setDate(nowSydney.getDate() + diff);
-  target.setHours(hh, mm, 0, 0);
+  return new Date(Date.UTC(
+    nowSydney.getUTCFullYear(),
+    nowSydney.getUTCMonth(),
+    nowSydney.getUTCDate() + diff,
+    hh, mm, 0, 0
+  ));
+}
 
-  return target;
+// Resolves the actual target Date for a booking. If the customer named
+// an explicit date (e.g. "12th September") rather than a day name, the
+// Flowise tool already resolved it to a real calendar date using its
+// own clock — requestedDateISO carries that through untouched, so it's
+// used directly here instead of being re-derived. This is exactly what
+// a past booking was missing: re-deriving "next Thursday" from a
+// guessed day name landed on a completely different, wrong date than
+// what the customer actually asked for. Falls back to the day-name
+// lookup only when no explicit date was captured.
+function resolveBookingDate(booking) {
+  if (booking.requestedDateISO) {
+    const [y, m, d] = booking.requestedDateISO.split('-').map(Number);
+    const [hh, mm] = booking.requestedTime.split(':').map(Number);
+    return new Date(Date.UTC(y, m - 1, d, hh, mm, 0, 0));
+  }
+  return nextDateForWeekday(booking.requestedDay, booking.requestedTime);
 }
 
 
+// Reads via the UTC-suffixed getters — date here follows the
+// getSydneyNow()/nextDateForWeekday() convention (a Date object
+// deliberately shifted so its UTC getters report Sydney wall-clock
+// values). Produces a floating (no offset) datetime string; Google
+// Calendar is told separately (see the "timeZone: 'Australia/Sydney'"
+// field alongside this) how to interpret it — so this never depends
+// on our own runtime's timezone database either.
 function formatCalendarDateTime(date) {
   const pad = n => String(n).padStart(2, '0');
 
   return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}:00`
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}` +
+    `T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:00`
   );
 }
 
@@ -543,7 +608,7 @@ async function createCalendarEvent(booking) {
     const credentials = JSON.parse(GOOGLE_SERVICE_ACCOUNT_JSON);
     const accessToken = await getGoogleCalendarAccessToken(credentials);
 
-    const startDate = nextDateForWeekday(booking.requestedDay, booking.requestedTime);
+    const startDate = resolveBookingDate(booking);
     const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
 
     const response = await axios.post(
@@ -706,11 +771,11 @@ async function sendAndTrackOutbound(
   // same pattern as [[HANDOFF]].
 
   const bookDropoffMatch = cleanContent.match(
-    /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i
+    /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i
   );
 
   if (bookDropoffMatch) {
-    const [fullMarker, requestedDay, requestedTime, boxSummary, contactName, contactPhone] = bookDropoffMatch;
+    const [fullMarker, requestedDay, requestedTime, requestedDateISO, boxSummary, contactName, contactPhone] = bookDropoffMatch;
 
     cleanContent = cleanContent.slice(fullMarker.length).trimStart();
 
@@ -726,6 +791,7 @@ async function sendAndTrackOutbound(
       phoneNumber: (contactPhone && contactPhone.trim()) || customer.phoneNumber,
       requestedDay: requestedDay.toLowerCase(),
       requestedTime,
+      requestedDateISO: requestedDateISO || null,
       boxSummary: boxSummary ? boxSummary.trim() : null,
       status: 'pending',
       createdAt: new Date()
