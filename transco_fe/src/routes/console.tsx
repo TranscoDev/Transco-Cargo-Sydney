@@ -84,8 +84,10 @@ function ConsoleLayoutWithData({
 }
 
 function ConsoleBookings() {
-  const { bookings, deleteBooking } = useConversations();
-  return <BookingsPanel bookings={bookings} onDelete={deleteBooking} />;
+  const { bookings, deleteBooking, updateBookingStatus } = useConversations();
+  return (
+    <BookingsPanel bookings={bookings} onDelete={deleteBooking} onUpdateStatus={updateBookingStatus} />
+  );
 }
 
 function ConsoleContacts({ setActiveTab }: { setActiveTab: (tab: ConsoleTab) => void }) {

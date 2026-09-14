@@ -1850,7 +1850,7 @@ app.get('/api/bookings/count', async (req, res) => {
 
     const count = await bookings().countDocuments({
       requestedDay: day,
-      status: { $ne: 'cancelled' }
+      status: { $nin: ['cancelled', 'completed'] }
     });
 
     res.status(200).json({
@@ -1925,6 +1925,71 @@ app.delete('/api/bookings/:bookingId', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to delete booking'
+    });
+  }
+});
+
+
+// ============================================================
+// UPDATE BOOKING STATUS
+// ============================================================
+//
+// Lets staff mark a booking "completed" once the customer has actually
+// dropped their boxes off, or move it back to "pending" if that was a
+// mistake — without deleting the record (which is still available
+// separately for genuine removals). Completed bookings are excluded
+// from the daily cap count above (see /api/bookings/count) so a past
+// visit never blocks a future week's slot.
+
+app.patch('/api/bookings/:bookingId/status', async (req, res) => {
+
+  try {
+
+    const { bookingId } = req.params;
+    const { status } = req.body || {};
+
+    if (!ObjectId.isValid(bookingId)) {
+      return res.status(400).json({
+        error: 'Invalid booking id'
+      });
+    }
+
+    if (!['pending', 'confirmed', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({
+        error: 'Invalid status'
+      });
+    }
+
+    const updated = await bookings().findOneAndUpdate(
+      { _id: new ObjectId(bookingId) },
+      { $set: { status } },
+      { returnDocument: 'after' }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        error: 'Booking not found'
+      });
+    }
+
+    broadcast('booking.status_changed', {
+      _id: bookingId,
+      status
+    });
+
+    res.status(200).json({
+      success: true
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error updating booking status:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to update booking status'
     });
   }
 });

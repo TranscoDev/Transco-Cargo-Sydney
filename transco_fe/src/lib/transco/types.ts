@@ -70,7 +70,7 @@ export interface ConversationSummary {
   needsAttentionMessage?: NeedsAttentionMessage | undefined;
 }
 
-export type BookingStatus = "pending" | "confirmed" | "cancelled";
+export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
 export interface Booking {
   id: string;

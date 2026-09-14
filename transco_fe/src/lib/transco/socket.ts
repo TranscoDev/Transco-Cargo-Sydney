@@ -74,6 +74,11 @@ export interface BookingDeletedPayload {
   _id: string;
 }
 
+export interface BookingStatusChangedPayload {
+  _id: string;
+  status: BookingStatus;
+}
+
 const WS_URL = API_BASE_URL.replace(/^http/, "ws");
 
 /** Connects, auto-reconnects on drop, and returns a teardown function. */

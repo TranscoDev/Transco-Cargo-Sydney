@@ -20,12 +20,14 @@ import {
   sendHumanMessage,
   setCustomerMode,
   setMaintenanceMode as setMaintenanceModeRequest,
+  updateBookingStatus as updateBookingStatusRequest,
   updateContactInfo as updateContactInfoRequest,
 } from "./api";
 import {
   connectConsoleSocket,
   type BookingCreatedPayload,
   type BookingDeletedPayload,
+  type BookingStatusChangedPayload,
   type ContactUpdatedPayload,
   type MaintenanceChangedPayload,
   type MessageCreatedPayload,
@@ -36,6 +38,7 @@ import {
 } from "./socket";
 import type {
   Booking,
+  BookingStatus,
   Conversation,
   ConversationMode,
   ConversationSummary,
@@ -72,6 +75,7 @@ interface ConversationsApi {
   /** Weekday drop-off bookings collected by the chatbot, newest first. */
   bookings: Booking[];
   deleteBooking: (bookingId: string) => void;
+  updateBookingStatus: (bookingId: string, status: BookingStatus) => void;
   /** True while the bot is globally paused ("Maintenance Mode") — every
    * customer gets a friendly pause notice instead of an AI reply. */
   maintenanceMode: boolean;
@@ -197,6 +201,26 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       if (removed) {
         setBookings((prev) =>
           prev.some((b) => b.id === bookingId) ? prev : [removed!, ...prev],
+        );
+      }
+    });
+  }, []);
+
+  const updateBookingStatus = useCallback((bookingId: string, status: BookingStatus) => {
+    // Optimistic; reverted on failure the same way deleteBooking is above.
+    let previousStatus: BookingStatus | undefined;
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id !== bookingId) return b;
+        previousStatus = b.status;
+        return { ...b, status };
+      }),
+    );
+    updateBookingStatusRequest(bookingId, status).catch((err) => {
+      console.error("Failed to update booking status:", err);
+      if (previousStatus) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus! } : b)),
         );
       }
     });
@@ -496,6 +520,12 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        case "booking.status_changed": {
+          const { _id, status } = event.payload as BookingStatusChangedPayload;
+          setBookings((prev) => prev.map((b) => (b.id === _id ? { ...b, status } : b)));
+          return;
+        }
+
         case "message.read_state_changed": {
           const { customerId, messageIds, isRead } = event.payload as ReadStateChangedPayload;
           const idSet = new Set(messageIds);
@@ -547,6 +577,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sending,
       bookings,
       deleteBooking,
+      updateBookingStatus,
       maintenanceMode,
       toggleMaintenanceMode,
       updateContact,
@@ -555,6 +586,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       bookings,
       conversations,
       deleteBooking,
+      updateBookingStatus,
       maintenanceMode,
       markAsRead,
       receiveCustomerMessage,

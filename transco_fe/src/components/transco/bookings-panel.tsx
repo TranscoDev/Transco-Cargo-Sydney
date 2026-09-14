@@ -1,7 +1,7 @@
-import { CalendarClock, Trash2 } from "lucide-react";
+import { CalendarClock, Check, RotateCcw, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { Booking } from "@/lib/transco/types";
+import type { Booking, BookingStatus } from "@/lib/transco/types";
 
 const DAY_ORDER = ["tuesday", "wednesday", "thursday", "friday"];
 
@@ -26,9 +26,11 @@ function groupByDay(bookings: Booking[]): Map<string, Booking[]> {
 export function BookingsPanel({
   bookings,
   onDelete,
+  onUpdateStatus,
 }: {
   bookings: Booking[];
   onDelete: (bookingId: string) => void;
+  onUpdateStatus: (bookingId: string, status: BookingStatus) => void;
 }) {
   const grouped = groupByDay(bookings);
   const days = [...grouped.keys()].sort(
@@ -59,46 +61,79 @@ export function BookingsPanel({
                   {dayLabel(day)}
                 </h2>
                 <div className="flex flex-col gap-2">
-                  {grouped.get(day)!.map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="flex items-center justify-between gap-3 rounded-md border border-border bg-panel px-3 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {booking.customerName || booking.phoneNumber}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {booking.phoneNumber}
-                        </p>
+                  {grouped.get(day)!.map((booking) => {
+                    const isCompleted = booking.status === "completed";
+                    return (
+                      <div
+                        key={booking.id}
+                        className={cn(
+                          "flex items-center justify-between gap-3 rounded-md border border-border bg-panel px-3 py-2.5",
+                          isCompleted && "opacity-60",
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <p
+                            className={cn(
+                              "truncate text-sm font-medium text-foreground",
+                              isCompleted && "line-through",
+                            )}
+                          >
+                            {booking.customerName || booking.phoneNumber}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {booking.phoneNumber}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-sm font-semibold tabular-nums text-foreground">
+                            {booking.requestedTime}
+                          </span>
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                              booking.status === "completed"
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : booking.status === "confirmed"
+                                  ? "bg-primary text-primary-foreground"
+                                  : booking.status === "cancelled"
+                                    ? "bg-secondary text-muted-foreground line-through"
+                                    : "bg-human-soft text-human-foreground",
+                            )}
+                          >
+                            {booking.status}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateStatus(booking.id, isCompleted ? "pending" : "completed")
+                            }
+                            aria-label={isCompleted ? "Reopen booking" : "Mark booking done"}
+                            title={isCompleted ? "Reopen booking" : "Mark booking done"}
+                            className={cn(
+                              "rounded-md p-1 transition-colors",
+                              isCompleted
+                                ? "text-emerald-600 hover:bg-secondary dark:text-emerald-400"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                            )}
+                          >
+                            {isCompleted ? (
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(booking.id)}
+                            aria-label="Delete booking"
+                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-sm font-semibold tabular-nums text-foreground">
-                          {booking.requestedTime}
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                            booking.status === "confirmed"
-                              ? "bg-primary text-primary-foreground"
-                              : booking.status === "cancelled"
-                                ? "bg-secondary text-muted-foreground line-through"
-                                : "bg-human-soft text-human-foreground",
-                          )}
-                        >
-                          {booking.status}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(booking.id)}
-                          aria-label="Delete booking"
-                          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}

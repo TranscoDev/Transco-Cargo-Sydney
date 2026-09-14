@@ -157,6 +157,20 @@ export async function deleteBooking(bookingId: string): Promise<void> {
   }
 }
 
+export async function updateBookingStatus(
+  bookingId: string,
+  status: BookingStatus,
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update booking status (${res.status})`);
+  }
+}
+
 export async function setCustomerMode(customerId: string, mode: ConversationMode): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/mode`, {
     method: "PATCH",
