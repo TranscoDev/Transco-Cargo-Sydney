@@ -1374,7 +1374,8 @@ app.post('/webhook', async (req, res) => {
           BOX_TYPE_MENU_ITEMS.find(item => item.id === tappedId) ||
           QUANTITY_MENU_ITEMS.find(item => item.id === tappedId) ||
           AIR_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
-          SEA_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId);
+          SEA_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
+          FREIGHT_MODE_MENU_ITEMS.find(item => item.id === tappedId);
 
         if (tappedItem) {
           text = tappedItem.phrase;
@@ -3050,16 +3051,19 @@ async function sendSeaFreightMenu(customer) {
 
 // Shown after Flowise's Sea-vs-Air comparison reply (request_type=15)
 // — see the SHOW_FREIGHT_MODE_MENU COMMAND handling below. The
-// customer explicitly asked to compare the two, so unlike
-// SEA_FREIGHT_MENU_ITEMS/AIR_FREIGHT_MENU_ITEMS (which assume a mode
-// already chosen), this offers both sides side by side instead of
-// defaulting to Sea Freight before they've picked one.
+// customer explicitly asked to compare the two and hasn't picked a
+// side yet, so this is deliberately just the two modes themselves (not
+// a jump straight to box type/weight like SEA_FREIGHT_MENU_ITEMS or
+// AIR_FREIGHT_MENU_ITEMS do) — an earlier version offered 6 granular
+// box-type-per-mode options here, which buried the actual Sea-or-Air
+// decision the customer was trying to make under sub-choices they
+// hadn't gotten to yet. Reuses the exact same phrases as the welcome
+// menu's "Sea Freight Info"/"Air Freight Info" options (already
+// proven), which land back on request_type=29/14 and show that mode's
+// own box-type menu next.
 const FREIGHT_MODE_MENU_ITEMS = [
-  { id: 'mode_sea_gift', title: '🎁 Sea: Gift Box', phrase: "I'd like a price for a Gift Box" },
-  { id: 'mode_sea_tea', title: '📦 Sea: Tea Chest', phrase: "I'd like a price for a Tea Chest" },
-  { id: 'mode_air_gift', title: '🎁 Air: Gift Box', phrase: "I'd like an Air Freight quote for a Gift Box" },
-  { id: 'mode_air_tea', title: '📦 Air: Tea Chest', phrase: "I'd like an Air Freight quote for a Tea Chest" },
-  { id: 'mode_air_general', title: '⚖️ Air: By Weight', phrase: "I'd like an Air Freight quote for general cargo, priced by weight" },
+  { id: 'mode_sea', title: '🚢 Sea Freight', phrase: 'Tell me about Sea Freight' },
+  { id: 'mode_air', title: '✈️ Air Freight', phrase: 'Tell me about Air Freight' },
   { id: 'mode_team', title: '👤 Talk to Our Team', phrase: "I'd like to talk to a staff member" }
 ];
 
