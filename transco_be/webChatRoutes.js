@@ -13,6 +13,10 @@
 // Reused as-is from server.js (passed in, not re-implemented):
 // getFlowiseReply, saveMessage, markNeedsAttention,
 // broadcastMessageCreated, broadcast — all already channel-agnostic.
+// The six menu item arrays (WELCOME_MENU_ITEMS etc.) are also passed
+// in from server.js rather than duplicated here, so a menu edited on
+// the WhatsApp side (new item, changed phrase) never drifts out of
+// sync with what the website offers.
 
 const express = require('express');
 const { customers, bookings } = require('./db');
@@ -106,27 +110,80 @@ module.exports = function createWebChatRouter({
   createCalendarEvent,
   MEDIA_BASE_URL,
   isWebsitePausedOn,
-  MAINTENANCE_MESSAGE
+  MAINTENANCE_MESSAGE,
+  WELCOME_MENU_ITEMS,
+  BOX_TYPE_MENU_ITEMS,
+  QUANTITY_MENU_ITEMS,
+  AIR_FREIGHT_MENU_ITEMS,
+  SEA_FREIGHT_MENU_ITEMS,
+  FREIGHT_MODE_MENU_ITEMS
 }) {
   const router = express.Router();
 
+  // Three menu items have no real phrase to feed Flowise — same three
+  // special cases the WhatsApp webhook handles by ID (see the
+  // interactive-message handling in server.js). Resolving a tap here
+  // mirrors that exactly: these three bypass Flowise entirely, every
+  // other tapped item resolves to its phrase and flows through the
+  // normal pipeline below, same as a typed message would.
+  function resolveMenuTap(menuItemId) {
+    if (menuItemId === 'menu_price') {
+      return { bypass: 'box_type_menu', title: '💰 Get a Price Quote' };
+    }
+    if (menuItemId === 'qty_10plus') {
+      return { bypass: 'ask_typed_quantity', title: '10 or more' };
+    }
+    if (menuItemId === 'menu_website') {
+      return { bypass: 'website_link', title: '🌐 Our Website' };
+    }
+
+    const item =
+      (WELCOME_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
+      (BOX_TYPE_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
+      (QUANTITY_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
+      (AIR_FREIGHT_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
+      (SEA_FREIGHT_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
+      (FREIGHT_MODE_MENU_ITEMS || []).find(i => i.id === menuItemId);
+
+    if (!item) return null;
+    return { bypass: null, title: item.title, phrase: item.phrase };
+  }
+
   router.post('/', async (req, res) => {
     try {
-      const { sessionId, message } = req.body || {};
+      const { sessionId, message, menuItemId } = req.body || {};
 
       if (!sessionId || typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'sessionId is required' });
       }
-      if (!message || typeof message !== 'string' || !message.trim()) {
+
+      // Either a typed message OR a tapped menu item id — never both,
+      // never neither.
+      let resolvedTap = null;
+      if (menuItemId !== undefined) {
+        if (typeof menuItemId !== 'string' || !menuItemId.trim()) {
+          return res.status(400).json({ error: 'menuItemId must be a non-empty string' });
+        }
+        resolvedTap = resolveMenuTap(menuItemId.trim());
+        if (!resolvedTap) {
+          return res.status(400).json({ error: 'Unrecognized menuItemId' });
+        }
+      } else if (!message || typeof message !== 'string' || !message.trim()) {
         return res.status(400).json({ error: 'message is required' });
       }
 
       const { customer, isNewCustomer } = await findOrCreateWebCustomer(sessionId);
 
+      // What the customer "said", for the transcript and for staff to
+      // read back later — the tapped item's readable title for a menu
+      // tap (e.g. "🎁 Gift Box"), or the typed text otherwise. Mirrors
+      // tappedMenuLabel || text on the WhatsApp side.
+      const displayedCustomerText = resolvedTap ? resolvedTap.title : message.trim();
+
       const incoming = await saveMessage({
         customerId: customer._id,
         senderType: 'CUSTOMER',
-        content: message.trim(),
+        content: displayedCustomerText,
         isRead: false,
         replyToMessageId: null,
         whatsappStatus: null
@@ -167,11 +224,52 @@ module.exports = function createWebChatRouter({
         return res.json({
           reply: MAINTENANCE_MESSAGE,
           media: null,
+          menu: null,
           handedOff: false
         });
       }
 
-      const rawReply = await getFlowiseReply(message.trim(), sessionId);
+      // The three Flowise-bypass taps — same three special cases the
+      // WhatsApp webhook short-circuits on (menu_price, qty_10plus,
+      // menu_website). No AI round-trip, no booking/media handling
+      // below applies to these; reply immediately and return.
+      if (resolvedTap && resolvedTap.bypass) {
+        let bypassReply;
+        let bypassMenu = null;
+
+        if (resolvedTap.bypass === 'box_type_menu') {
+          bypassReply = '📦 What type of box are you sending?';
+          bypassMenu = { items: BOX_TYPE_MENU_ITEMS };
+        } else if (resolvedTap.bypass === 'ask_typed_quantity') {
+          bypassReply = "No problem! Just type in the exact number of boxes you're sending (up to 30) and I'll work out the price.";
+        } else {
+          bypassReply = '🌐 Here\'s our website: https://transcosydney.com.au/';
+        }
+
+        const outgoing = await saveMessage({
+          customerId: customer._id,
+          senderType: 'CHATBOT',
+          content: bypassReply,
+          isRead: true,
+          replyToMessageId: incoming._id,
+          whatsappStatus: null
+        });
+
+        await broadcastMessageCreated(customer, outgoing);
+
+        return res.json({
+          reply: bypassReply,
+          media: null,
+          menu: bypassMenu,
+          handedOff: false
+        });
+      }
+
+      // Either the tapped item's phrase (e.g. "I'd like a price for a
+      // Gift Box"), or the customer's own typed text.
+      const outgoingText = resolvedTap ? resolvedTap.phrase : message.trim();
+
+      const rawReply = await getFlowiseReply(outgoingText, sessionId);
 
       if (!rawReply) {
         return res.status(502).json({ error: 'No reply from assistant — please try again.' });
@@ -182,16 +280,25 @@ module.exports = function createWebChatRouter({
         ? rawReply.slice(HANDOFF_MARKER.length).trimStart()
         : rawReply;
 
-      // The website has no tappable-menu UI — just drop the marker and
-      // show the plain greeting underneath exactly as before. Only the
-      // WhatsApp channel (server.js) does anything special with this.
+      // Menu markers now carry real tappable options for the website
+      // widget too — not just WhatsApp. SHOW_MENU/ASK_QUANTITY are
+      // PREFIX markers whose accompanying text is the whole message
+      // (the welcome question / the "how many boxes" question), so
+      // nothing else needs stripping alongside them. The other four
+      // are markers appended after an already-complete message (e.g.
+      // a price quote or comparison ending in "tap an option below"),
+      // so their menu is attached to that same reply instead of a
+      // separate message, which is the simplest mapping onto a single
+      // chat bubble with buttons underneath it.
+      let menu = null;
+
       if (cleanContent.startsWith(SHOW_MENU_MARKER)) {
         cleanContent = cleanContent.slice(SHOW_MENU_MARKER.length).trimStart();
+        menu = { items: WELCOME_MENU_ITEMS };
 
       } else if (cleanContent.startsWith(ASK_QUANTITY_MARKER)) {
-        // Same reasoning as SHOW_MENU_MARKER above — no tappable-list
-        // UI on the website widget, so just show the plain question.
         cleanContent = cleanContent.slice(ASK_QUANTITY_MARKER.length).trimStart();
+        menu = { items: QUANTITY_MENU_ITEMS };
 
       } else if (isNewCustomer) {
         // A brand-new visitor whose first message was a real question,
@@ -201,19 +308,21 @@ module.exports = function createWebChatRouter({
         cleanContent = WEB_GREETING_TEXT + "\n\n" + cleanContent;
       }
 
-      // No tappable menus on the website widget either — same
-      // reasoning as above, just drop the markers.
       if (cleanContent.includes(SHOW_BOX_MENU_MARKER)) {
         cleanContent = cleanContent.split(SHOW_BOX_MENU_MARKER).join('').trim();
+        menu = { items: BOX_TYPE_MENU_ITEMS };
       }
       if (cleanContent.includes(SHOW_AIR_MENU_MARKER)) {
         cleanContent = cleanContent.split(SHOW_AIR_MENU_MARKER).join('').trim();
+        menu = { items: AIR_FREIGHT_MENU_ITEMS };
       }
       if (cleanContent.includes(SHOW_SEA_MENU_MARKER)) {
         cleanContent = cleanContent.split(SHOW_SEA_MENU_MARKER).join('').trim();
+        menu = { items: SEA_FREIGHT_MENU_ITEMS };
       }
       if (cleanContent.includes(SHOW_FREIGHT_MODE_MENU_MARKER)) {
         cleanContent = cleanContent.split(SHOW_FREIGHT_MODE_MENU_MARKER).join('').trim();
+        menu = { items: FREIGHT_MODE_MENU_ITEMS };
       }
 
       // Strip the booking marker so it never leaks to the customer as
@@ -323,6 +432,7 @@ module.exports = function createWebChatRouter({
       res.json({
         reply: cleanContent,
         media,
+        menu,
         handedOff: false
       });
 

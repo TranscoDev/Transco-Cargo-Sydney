@@ -1821,38 +1821,6 @@ app.get('/api/customers', async (req, res) => {
 
 
 // ============================================================
-// WEBSITE CHAT WIDGET (transcosydney.com.au)
-// ============================================================
-// Fully additive — see webChatRoutes.js. Does not touch, call, or
-// share state with anything on the WhatsApp path.
-
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/web-chat')) {
-    res.header('Access-Control-Allow-Origin', 'https://transcosydney.com.au');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.sendStatus(204);
-  }
-  next();
-});
-
-const createWebChatRouter = require('./webChatRoutes');
-app.use('/api/web-chat', createWebChatRouter({
-  getFlowiseReply,
-  saveMessage,
-  markNeedsAttention,
-  broadcastMessageCreated,
-  broadcast,
-  sendBookingEmail,
-  sendStaffBookingWhatsApp,
-  createCalendarEvent,
-  MEDIA_BASE_URL,
-  isWebsitePausedOn,
-  MAINTENANCE_MESSAGE
-}));
-
-
-// ============================================================
 // LIST BOOKINGS (weekday drop-off appointments)
 // ============================================================
 
@@ -3156,6 +3124,49 @@ async function sendFreightModeMenu(customer) {
 
   await broadcastMessageCreated(customer, outgoing);
 }
+
+
+// ============================================================
+// WEBSITE CHAT WIDGET (transcosydney.com.au)
+// ============================================================
+// Fully additive — see webChatRoutes.js. Does not touch, call, or
+// share state with anything on the WhatsApp path. Wired up down here
+// (rather than right after the webhook routes above) because it needs
+// the menu item arrays declared above — WELCOME_MENU_ITEMS through
+// FREIGHT_MODE_MENU_ITEMS — passed straight through so the website
+// widget can offer the exact same tappable options WhatsApp does,
+// instead of silently dropping every menu marker as plain text.
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/web-chat')) {
+    res.header('Access-Control-Allow-Origin', 'https://transcosydney.com.au');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
+
+const createWebChatRouter = require('./webChatRoutes');
+app.use('/api/web-chat', createWebChatRouter({
+  getFlowiseReply,
+  saveMessage,
+  markNeedsAttention,
+  broadcastMessageCreated,
+  broadcast,
+  sendBookingEmail,
+  sendStaffBookingWhatsApp,
+  createCalendarEvent,
+  MEDIA_BASE_URL,
+  isWebsitePausedOn,
+  MAINTENANCE_MESSAGE,
+  WELCOME_MENU_ITEMS,
+  BOX_TYPE_MENU_ITEMS,
+  QUANTITY_MENU_ITEMS,
+  AIR_FREIGHT_MENU_ITEMS,
+  SEA_FREIGHT_MENU_ITEMS,
+  FREIGHT_MODE_MENU_ITEMS
+}));
 
 
 // ============================================================
