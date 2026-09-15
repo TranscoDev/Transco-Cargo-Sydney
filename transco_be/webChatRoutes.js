@@ -105,7 +105,7 @@ module.exports = function createWebChatRouter({
   sendStaffBookingWhatsApp,
   createCalendarEvent,
   MEDIA_BASE_URL,
-  isMaintenanceModeOn,
+  isWebsitePausedOn,
   MAINTENANCE_MESSAGE
 }) {
   const router = express.Router();
@@ -145,11 +145,14 @@ module.exports = function createWebChatRouter({
         });
       }
 
-      // Maintenance Mode: same rule as WhatsApp — skip Flowise
-      // entirely and send the same friendly pause notice, without
-      // flagging the conversation for staff attention (they already
-      // know, they're the ones who turned it on).
-      if (await isMaintenanceModeOn()) {
+      // Maintenance Mode (website side): skip Flowise entirely and
+      // send the same friendly pause notice, without flagging the
+      // conversation for staff attention (they already know, they're
+      // the ones who turned it on). Checks ONLY the website flag —
+      // independent of the WhatsApp flag checked in server.js, so
+      // staff can pause the publicly-exposed website widget without
+      // silencing WhatsApp for genuine customers.
+      if (await isWebsitePausedOn()) {
         const pauseMessage = await saveMessage({
           customerId: customer._id,
           senderType: 'CHATBOT',

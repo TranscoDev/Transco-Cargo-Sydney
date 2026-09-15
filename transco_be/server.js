@@ -45,18 +45,34 @@ app.use((req, res, next) => {
 // off all automated replies instantly from the console, everywhere,
 // without needing to touch Flowise or redeploy anything.
 //
+// Two independent flags (websitePaused, whatsappPaused) rather than
+// one — the website widget is publicly discoverable by anyone who
+// visits transcosydney.com.au, so it's a more likely target for abuse
+// than WhatsApp (which requires already having the business number).
+// Staff need to be able to shut off just the exposed channel without
+// silencing WhatsApp for genuine customers at the same time. "Stop
+// All"/"Resume All" in the console is just both flags set together in
+// one request — there's no separate third flag for it, which would
+// only invite a state where it disagrees with the two real ones.
+//
 // Combined English/Sinhala/Tamil text, since language isn't known yet
 // at this point — the classifier that would normally detect it
-// (Flowise) is exactly what's being skipped while paused.
+// (Flowise) is exactly what's being skipped while paused. Shared by
+// both channels; no reason for the wording to differ.
 
 const MAINTENANCE_MESSAGE =
   "👋 Thanks for reaching out! Our chat assistant is temporarily paused for maintenance — we'll be back shortly. For anything urgent, please call us on 0468 382 023.\n\n" +
   "ආයුබෝවන්! අපේ chat assistant එක temporary maintenance එකක් සඳහා නවත්වලා තියෙනවා — ඉක්මනින්ම නැවත ලැබෙනවා. හදිසි නම් 0468 382 023 අමතන්න.\n\n" +
   "வணக்கம்! எங்கள் chat assistant தற்காலிகமாக maintenance காரணமாக நிறுத்தப்பட்டுள்ளது — விரைவில் மீண்டும் வரும். அவசரமெனில் 0468 382 023 ஐ அழைக்கவும்.";
 
-async function isMaintenanceModeOn() {
+async function isWebsitePausedOn() {
   const doc = await settings().findOne({ _id: 'global' });
-  return Boolean(doc?.maintenanceMode);
+  return Boolean(doc?.websitePaused);
+}
+
+async function isWhatsAppPausedOn() {
+  const doc = await settings().findOne({ _id: 'global' });
+  return Boolean(doc?.whatsappPaused);
 }
 
 
@@ -1475,12 +1491,14 @@ app.post('/webhook', async (req, res) => {
       return;
     }
 
-    // Maintenance Mode: skip Flowise entirely and send the same
-    // friendly pause notice to every automated conversation. Checked
-    // AFTER the menu-tap shortcuts above (no point showing a box-type
-    // menu just to immediately pause) but still before any real AI
-    // reply. Never touches HUMAN-mode conversations.
-    if (customer.mode === 'CHATBOT' && await isMaintenanceModeOn()) {
+    // Maintenance Mode (WhatsApp side): skip Flowise entirely and send
+    // the same friendly pause notice to every automated conversation.
+    // Checked AFTER the menu-tap shortcuts above (no point showing a
+    // box-type menu just to immediately pause) but still before any
+    // real AI reply. Never touches HUMAN-mode conversations. Checks
+    // ONLY the WhatsApp flag — the website widget has its own,
+    // independent flag checked in webChatRoutes.js.
+    if (customer.mode === 'CHATBOT' && await isWhatsAppPausedOn()) {
       await sendAndTrackOutbound(
         customer,
         'CHATBOT',
@@ -1660,40 +1678,61 @@ app.get('/api/auth/session', (req, res) => {
 
 
 // ============================================================
-// MAINTENANCE MODE SETTING (read/write)
+// PAUSE STATE SETTING (read/write) — website and WhatsApp bots,
+// independently
 // ============================================================
+// A single PATCH covers all of the console's "Pause Website"/"Pause
+// WhatsApp"/"Stop All"/"Resume All" actions — each just sends whichever
+// of the two flags it wants to change (Stop All sends both true,
+// Resume All sends both false, the two per-channel toggles send one
+// flag each). Whatever isn't included in the request body is left as
+// it was.
 
-app.get('/api/settings/maintenance', async (req, res) => {
+app.get('/api/settings/pause-state', async (req, res) => {
   try {
-    const maintenanceMode = await isMaintenanceModeOn();
-    res.status(200).json({ maintenanceMode });
+    const websitePaused = await isWebsitePausedOn();
+    const whatsappPaused = await isWhatsAppPausedOn();
+    res.status(200).json({ websitePaused, whatsappPaused });
   } catch (err) {
-    console.error('Error reading maintenance mode:', err.message);
-    res.status(500).json({ error: 'Failed to read maintenance mode' });
+    console.error('Error reading pause state:', err.message);
+    res.status(500).json({ error: 'Failed to read pause state' });
   }
 });
 
-app.patch('/api/settings/maintenance', async (req, res) => {
+app.patch('/api/settings/pause-state', async (req, res) => {
   try {
-    const { maintenanceMode } = req.body ?? {};
+    const { websitePaused, whatsappPaused } = req.body ?? {};
 
-    if (typeof maintenanceMode !== 'boolean') {
-      return res.status(400).json({ error: 'maintenanceMode must be a boolean' });
+    if (websitePaused === undefined && whatsappPaused === undefined) {
+      return res.status(400).json({ error: 'At least one of websitePaused/whatsappPaused is required' });
     }
+    if (websitePaused !== undefined && typeof websitePaused !== 'boolean') {
+      return res.status(400).json({ error: 'websitePaused must be a boolean' });
+    }
+    if (whatsappPaused !== undefined && typeof whatsappPaused !== 'boolean') {
+      return res.status(400).json({ error: 'whatsappPaused must be a boolean' });
+    }
+
+    const update = {};
+    if (websitePaused !== undefined) update.websitePaused = websitePaused;
+    if (whatsappPaused !== undefined) update.whatsappPaused = whatsappPaused;
 
     await settings().updateOne(
       { _id: 'global' },
-      { $set: { maintenanceMode } },
+      { $set: update },
       { upsert: true }
     );
 
-    broadcast('settings.maintenance_changed', { maintenanceMode });
+    const newWebsitePaused = await isWebsitePausedOn();
+    const newWhatsappPaused = await isWhatsAppPausedOn();
 
-    res.status(200).json({ maintenanceMode });
+    broadcast('settings.pause_state_changed', { websitePaused: newWebsitePaused, whatsappPaused: newWhatsappPaused });
+
+    res.status(200).json({ websitePaused: newWebsitePaused, whatsappPaused: newWhatsappPaused });
 
   } catch (err) {
-    console.error('Error updating maintenance mode:', err.message);
-    res.status(500).json({ error: 'Failed to update maintenance mode' });
+    console.error('Error updating pause state:', err.message);
+    res.status(500).json({ error: 'Failed to update pause state' });
   }
 });
 
@@ -1808,7 +1847,7 @@ app.use('/api/web-chat', createWebChatRouter({
   sendStaffBookingWhatsApp,
   createCalendarEvent,
   MEDIA_BASE_URL,
-  isMaintenanceModeOn,
+  isWebsitePausedOn,
   MAINTENANCE_MESSAGE
 }));
 

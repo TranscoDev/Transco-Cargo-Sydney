@@ -39,8 +39,9 @@ function bookings() {
 }
 
 // Small collection for global, single-document settings (currently
-// just Maintenance Mode) — one document per setting, keyed by _id, so
-// there's never any ambiguity about which record is "the" setting.
+// the per-channel Maintenance Mode flags, websitePaused/whatsappPaused)
+// — one document per setting, keyed by _id, so there's never any
+// ambiguity about which record is "the" setting.
 function settings() {
   return getDb().collection('settings');
 }
