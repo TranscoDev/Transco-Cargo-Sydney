@@ -3137,9 +3137,23 @@ async function sendFreightModeMenu(customer) {
 // widget can offer the exact same tappable options WhatsApp does,
 // instead of silently dropping every menu marker as plain text.
 
+// TEMPORARY: transco-widget-test.transcocargo.workers.dev added
+// alongside the real site so the widget can be tested end-to-end (real
+// replies, not just CORS-blocked ones) before it's pasted into
+// Hostinger — see the throwaway Cloudflare Worker set up for this.
+// Remove this second origin once Hostinger testing is done; the real
+// site's origin below stays permanently.
+const WEB_CHAT_ALLOWED_ORIGINS = [
+  'https://transcosydney.com.au',
+  'https://transco-widget-test.transcocargo.workers.dev'
+];
+
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/web-chat')) {
-    res.header('Access-Control-Allow-Origin', 'https://transcosydney.com.au');
+    const origin = req.headers.origin;
+    if (WEB_CHAT_ALLOWED_ORIGINS.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
