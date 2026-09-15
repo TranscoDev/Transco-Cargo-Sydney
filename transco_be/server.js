@@ -774,12 +774,32 @@ async function sendAndTrackOutbound(
   const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
   const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
   const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
+  const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 
   const needsAttention = content.startsWith(HANDOFF_MARKER);
 
   let cleanContent = needsAttention
     ? content.slice(HANDOFF_MARKER.length).trimStart()
     : content;
+
+  // The customer stated (or corrected) their real name in
+  // conversation — not necessarily as part of completing a booking
+  // (that case is handled separately, wherever this reply's booking
+  // marker is parsed). Update the console's display name right away,
+  // rather than trusting only the WhatsApp profile display name (a
+  // nickname, a shared family phone, a business name — already known
+  // to be unreliable, see the booking flow's own name-capture notes).
+  const setNameMatch = cleanContent.match(SET_NAME_RE);
+  if (setNameMatch) {
+    const statedName = setNameMatch[1].trim();
+    cleanContent = cleanContent.slice(setNameMatch[0].length).trimStart();
+    if (statedName) {
+      await customers().updateOne(
+        { _id: customer._id },
+        { $set: { name: statedName } }
+      );
+    }
+  }
 
   // Can appear anywhere in the reply (typically appended at the very
   // end, after a video/flyer's accompanying text, or after a Sea/Air

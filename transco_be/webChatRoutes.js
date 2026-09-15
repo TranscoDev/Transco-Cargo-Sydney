@@ -31,6 +31,7 @@ const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
 const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
 const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
+const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 
 // Shown once, prepended to a brand-new visitor's real answer when
 // their very first message is itself a real question rather than a
@@ -279,6 +280,24 @@ module.exports = function createWebChatRouter({
       let cleanContent = needsAttention
         ? rawReply.slice(HANDOFF_MARKER.length).trimStart()
         : rawReply;
+
+      // The customer stated (or corrected) their real name in
+      // conversation — not necessarily as part of completing a
+      // booking (that case is handled separately below, in case both
+      // somehow overlap). Update the console's display name right
+      // away rather than leaving it as the generic "Website Visitor
+      // #XXXX" tag until/unless a booking happens to go through.
+      const setNameMatch = cleanContent.match(SET_NAME_RE);
+      if (setNameMatch) {
+        const statedName = setNameMatch[1].trim();
+        cleanContent = cleanContent.slice(setNameMatch[0].length).trimStart();
+        if (statedName) {
+          await customers().updateOne(
+            { _id: customer._id },
+            { $set: { name: statedName } }
+          );
+        }
+      }
 
       // Menu markers now carry real tappable options for the website
       // widget too — not just WhatsApp. SHOW_MENU/ASK_QUANTITY are
