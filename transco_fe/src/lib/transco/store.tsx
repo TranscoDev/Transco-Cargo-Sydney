@@ -14,14 +14,15 @@ import {
   deleteBooking as deleteBookingRequest,
   fetchBookings,
   fetchConversations,
-  fetchMaintenanceMode,
+  fetchPauseState,
   mapMessage,
   markConversationRead,
   sendHumanMessage,
   setCustomerMode,
-  setMaintenanceMode as setMaintenanceModeRequest,
+  setPauseState as setPauseStateRequest,
   updateBookingStatus as updateBookingStatusRequest,
   updateContactInfo as updateContactInfoRequest,
+  type PauseState,
 } from "./api";
 import {
   connectConsoleSocket,
@@ -29,7 +30,7 @@ import {
   type BookingDeletedPayload,
   type BookingStatusChangedPayload,
   type ContactUpdatedPayload,
-  type MaintenanceChangedPayload,
+  type PauseStateChangedPayload,
   type MessageCreatedPayload,
   type ModeChangedPayload,
   type NeedsAttentionPayload,
@@ -76,10 +77,14 @@ interface ConversationsApi {
   bookings: Booking[];
   deleteBooking: (bookingId: string) => void;
   updateBookingStatus: (bookingId: string, status: BookingStatus) => void;
-  /** True while the bot is globally paused ("Maintenance Mode") — every
-   * customer gets a friendly pause notice instead of an AI reply. */
-  maintenanceMode: boolean;
-  toggleMaintenanceMode: () => void;
+  /** True while the website bot is paused — website visitors get a friendly
+   * pause notice instead of an AI reply. Independent of whatsappPaused. */
+  websitePaused: boolean;
+  /** True while the WhatsApp bot is paused — independent of websitePaused. */
+  whatsappPaused: boolean;
+  /** Send only the flag(s) you want to change — e.g. `{ websitePaused: true }`
+   * for "Pause Website Bot", or both together for "Stop All"/"Resume All". */
+  updatePauseState: (partial: Partial<PauseState>) => void;
   /** Staff-entered contact details, editable from the Contacts directory. */
   updateContact: (conversationId: string, info: { email?: string; notes?: string }) => void;
 }
@@ -114,11 +119,16 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // as a fallback for genuinely running without a reachable backend.
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [maintenanceMode, setMaintenanceModeState] = useState(false);
+  const [websitePaused, setWebsitePausedState] = useState(false);
+  const [whatsappPaused, setWhatsappPausedState] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedId;
+  const websitePausedRef = useRef(false);
+  websitePausedRef.current = websitePaused;
+  const whatsappPausedRef = useRef(false);
+  whatsappPausedRef.current = whatsappPaused;
 
   // Becomes true once the initial backend fetch succeeds. Governs whether
   // sendMessage talks to the real API (and waits for the WS echo instead of
@@ -161,27 +171,39 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchMaintenanceMode()
-      .then((on) => {
+    fetchPauseState()
+      .then((state) => {
         if (cancelled) return;
-        setMaintenanceModeState(on);
+        setWebsitePausedState(state.websitePaused);
+        setWhatsappPausedState(state.whatsappPaused);
       })
       .catch((err) => {
-        console.warn("Could not load maintenance mode.", err);
+        console.warn("Could not load pause state.", err);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const toggleMaintenanceMode = useCallback(() => {
-    setMaintenanceModeState((prev) => {
-      const next = !prev;
-      setMaintenanceModeRequest(next).catch((err) => {
-        console.error("Failed to persist maintenance mode:", err);
-        setMaintenanceModeState((current) => (current === next ? prev : current));
-      });
-      return next;
+  const updatePauseState = useCallback((partial: Partial<PauseState>) => {
+    // Optimistic: apply locally right away, roll back just the fields
+    // this call touched if the request fails (a later, unrelated update
+    // may have already moved local state on, so only revert what's
+    // actually still equal to what we optimistically set).
+    const prevWebsite = websitePausedRef.current;
+    const prevWhatsapp = whatsappPausedRef.current;
+
+    if (partial.websitePaused !== undefined) setWebsitePausedState(partial.websitePaused);
+    if (partial.whatsappPaused !== undefined) setWhatsappPausedState(partial.whatsappPaused);
+
+    setPauseStateRequest(partial).catch((err) => {
+      console.error("Failed to persist pause state:", err);
+      if (partial.websitePaused !== undefined) {
+        setWebsitePausedState((current) => (current === partial.websitePaused ? prevWebsite : current));
+      }
+      if (partial.whatsappPaused !== undefined) {
+        setWhatsappPausedState((current) => (current === partial.whatsappPaused ? prevWhatsapp : current));
+      }
     });
   }, []);
 
@@ -440,9 +462,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        case "settings.maintenance_changed": {
-          const { maintenanceMode: on } = event.payload as MaintenanceChangedPayload;
-          setMaintenanceModeState(on);
+        case "settings.pause_state_changed": {
+          const { websitePaused: on, whatsappPaused: onWA } = event.payload as PauseStateChangedPayload;
+          setWebsitePausedState(on);
+          setWhatsappPausedState(onWA);
           return;
         }
 
@@ -578,8 +601,9 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       bookings,
       deleteBooking,
       updateBookingStatus,
-      maintenanceMode,
-      toggleMaintenanceMode,
+      websitePaused,
+      whatsappPaused,
+      updatePauseState,
       updateContact,
     }),
     [
@@ -587,7 +611,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       conversations,
       deleteBooking,
       updateBookingStatus,
-      maintenanceMode,
+      websitePaused,
+      whatsappPaused,
       markAsRead,
       receiveCustomerMessage,
       selectConversation,
@@ -597,7 +622,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sending,
       setMode,
       summaries,
-      toggleMaintenanceMode,
+      updatePauseState,
       updateContact,
       updateMessageStatus,
     ],

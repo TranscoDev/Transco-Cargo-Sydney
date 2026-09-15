@@ -75,9 +75,14 @@ function ConsoleLayoutWithData({
   onLogout: () => void;
   children: ReactNode;
 }) {
-  const { maintenanceMode, toggleMaintenanceMode } = useConversations();
+  const { websitePaused, whatsappPaused, updatePauseState } = useConversations();
   return (
-    <ConsoleLayout {...rest} maintenanceMode={maintenanceMode} onToggleMaintenance={toggleMaintenanceMode}>
+    <ConsoleLayout
+      {...rest}
+      websitePaused={websitePaused}
+      whatsappPaused={whatsappPaused}
+      onUpdatePauseState={updatePauseState}
+    >
       {children}
     </ConsoleLayout>
   );
@@ -113,6 +118,8 @@ function ConsoleBody() {
     sendMessage,
     setMode,
     sending,
+    websitePaused,
+    whatsappPaused,
   } = useConversations();
 
   return (
@@ -126,6 +133,8 @@ function ConsoleBody() {
           conversations={summaries}
           selectedId={selectedId}
           onSelect={selectConversation}
+          websitePaused={websitePaused}
+          whatsappPaused={whatsappPaused}
         />
       </aside>
 

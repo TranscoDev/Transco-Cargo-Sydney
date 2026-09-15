@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, MessageCircle, Globe } from "lucide-react";
+import { Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/lib/transco/types";
@@ -34,10 +34,17 @@ export function ContactList({
   conversations,
   selectedId,
   onSelect,
+  websitePaused,
+  whatsappPaused,
 }: {
   conversations: ConversationSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Shows a paused indicator directly on the Website tab, independent of
+   * whatsappPaused — so staff can see at a glance which channel (if any)
+   * is currently paused without opening the Bot Controls dropdown. */
+  websitePaused: boolean;
+  whatsappPaused: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState<Channel>("ALL");
@@ -82,26 +89,35 @@ export function ContactList({
           </p>
         </div>
 
-        {/* Channel switcher — a separate inbox per platform, "All" combines both */}
+        {/* Channel switcher — a separate inbox per platform, "All" combines both.
+            A channel tab whose bot is currently paused gets amber styling
+            (matching the Bot Controls banner/dropdown elsewhere), so staff
+            can see which channel is paused without opening that dropdown. */}
         <div className="mt-3 flex gap-1 rounded-md bg-secondary/60 p-1">
           {channels.map((c) => {
             const active = channel === c.key;
+            const paused = c.key === "WEBSITE" ? websitePaused : c.key === "WHATSAPP" ? whatsappPaused : false;
+            const label = paused ? `${c.label} (Paused)` : c.label;
             return (
               <button
                 key={c.key}
                 type="button"
                 onClick={() => setChannel(c.key)}
-                title={c.label}
-                aria-label={c.label}
+                title={label}
+                aria-label={label}
                 aria-current={active}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-colors",
-                  active
-                    ? "bg-panel text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                  paused
+                    ? active
+                      ? "bg-amber-500/25 text-amber-800 shadow-sm dark:text-amber-300"
+                      : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
+                    : active
+                      ? "bg-panel text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <c.Icon className="h-3.5 w-3.5" />
+                {paused ? <PauseCircle className="h-3.5 w-3.5" /> : <c.Icon className="h-3.5 w-3.5" />}
                 {c.label}
               </button>
             );

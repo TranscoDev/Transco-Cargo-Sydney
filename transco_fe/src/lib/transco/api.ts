@@ -182,24 +182,32 @@ export async function setCustomerMode(customerId: string, mode: ConversationMode
   }
 }
 
-export async function fetchMaintenanceMode(): Promise<boolean> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/maintenance`, { headers: authHeaders() });
-  if (!res.ok) {
-    throw new Error(`Failed to load maintenance mode (${res.status})`);
-  }
-  const data = (await res.json()) as { maintenanceMode: boolean };
-  return data.maintenanceMode;
+export interface PauseState {
+  websitePaused: boolean;
+  whatsappPaused: boolean;
 }
 
-export async function setMaintenanceMode(maintenanceMode: boolean): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/settings/maintenance`, {
+export async function fetchPauseState(): Promise<PauseState> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/pause-state`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load pause state (${res.status})`);
+  }
+  return (await res.json()) as PauseState;
+}
+
+/** Send only the flag(s) you want to change — e.g. `{ websitePaused: true }`
+ * to pause just the website bot, or both flags together for "Stop All"/
+ * "Resume All". Whatever isn't included is left as it was. */
+export async function setPauseState(partial: Partial<PauseState>): Promise<PauseState> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/pause-state`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ maintenanceMode }),
+    body: JSON.stringify(partial),
   });
   if (!res.ok) {
-    throw new Error(`Failed to update maintenance mode (${res.status})`);
+    throw new Error(`Failed to update pause state (${res.status})`);
   }
+  return (await res.json()) as PauseState;
 }
 
 export async function updateContactInfo(

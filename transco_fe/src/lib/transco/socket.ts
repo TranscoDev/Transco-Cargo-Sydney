@@ -32,8 +32,9 @@ export interface StatusChangedPayload {
   failureReason?: string | null;
 }
 
-export interface MaintenanceChangedPayload {
-  maintenanceMode: boolean;
+export interface PauseStateChangedPayload {
+  websitePaused: boolean;
+  whatsappPaused: boolean;
 }
 
 export interface ContactUpdatedPayload {
