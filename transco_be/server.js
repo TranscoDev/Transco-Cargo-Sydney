@@ -774,6 +774,7 @@ async function sendAndTrackOutbound(
   const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
   const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
   const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
+  const SHOW_PICKUP_DELIVERY_MENU_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU]]';
   const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 
   const needsAttention = content.startsWith(HANDOFF_MARKER);
@@ -873,6 +874,25 @@ async function sendAndTrackOutbound(
   if (cleanContent.startsWith(ASK_QUANTITY_MARKER)) {
     const bodyText = cleanContent.slice(ASK_QUANTITY_MARKER.length).trim();
     await sendQuantityMenu(customer, bodyText);
+    return;
+  }
+
+
+  // ==========================================================
+  // PICKUP OR DELIVERY MENU COMMAND
+  // ==========================================================
+  // Flowise's request_type=1 flow prefixes its "Wattala warehouse
+  // pickup or door delivery?" question with
+  // [[SHOW_PICKUP_DELIVERY_MENU]] whenever it needs to know which
+  // before it can quote a price. Same pattern as ASK QUANTITY above —
+  // the question text becomes the native list's body, staying
+  // consistent across English/Sinhala/Tamil. Tapping "Door Delivery"
+  // still leads to being asked for a destination next, same as if the
+  // customer had typed it — this just saves the typing.
+
+  if (cleanContent.startsWith(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
+    const bodyText = cleanContent.slice(SHOW_PICKUP_DELIVERY_MENU_MARKER.length).trim();
+    await sendPickupDeliveryMenu(customer, bodyText);
     return;
   }
 
@@ -1411,7 +1431,8 @@ app.post('/webhook', async (req, res) => {
           QUANTITY_MENU_ITEMS.find(item => item.id === tappedId) ||
           AIR_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
           SEA_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
-          FREIGHT_MODE_MENU_ITEMS.find(item => item.id === tappedId);
+          FREIGHT_MODE_MENU_ITEMS.find(item => item.id === tappedId) ||
+          PICKUP_DELIVERY_MENU_ITEMS.find(item => item.id === tappedId);
 
         if (tappedItem) {
           text = tappedItem.phrase;
@@ -3145,6 +3166,67 @@ async function sendFreightModeMenu(customer) {
   await broadcastMessageCreated(customer, outgoing);
 }
 
+// Shown whenever the pricing tool needs to know pickup vs. delivery
+// before it can quote a price (request_type=1's various box-type
+// paths all ask this same question when $is_pickup and $delivery_tier
+// are both unknown) — see the SHOW_PICKUP_DELIVERY_MENU COMMAND
+// handling below. Door Delivery still needs a destination afterwards,
+// same as if the customer had typed "door delivery" — this tap just
+// saves them typing it out.
+const PICKUP_DELIVERY_MENU_ITEMS = [
+  { id: 'delivery_pickup', title: '🏭 Wattala Warehouse Pickup', phrase: "I'd like to collect this from your Wattala warehouse myself" },
+  { id: 'delivery_door', title: '🚚 Door Delivery', phrase: "I'd like door delivery" }
+];
+
+async function sendPickupDeliveryMenu(customer, bodyText) {
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    PICKUP_DELIVERY_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Pickup or Delivery',
+        bodyText,
+        buttonLabel: 'Choose an Option',
+        sectionTitle: 'Collection Options',
+        items: PICKUP_DELIVERY_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Pickup/delivery menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
 
 // ============================================================
 // WEBSITE CHAT WIDGET (transcosydney.com.au)
@@ -3199,7 +3281,8 @@ app.use('/api/web-chat', createWebChatRouter({
   QUANTITY_MENU_ITEMS,
   AIR_FREIGHT_MENU_ITEMS,
   SEA_FREIGHT_MENU_ITEMS,
-  FREIGHT_MODE_MENU_ITEMS
+  FREIGHT_MODE_MENU_ITEMS,
+  PICKUP_DELIVERY_MENU_ITEMS
 }));
 
 
