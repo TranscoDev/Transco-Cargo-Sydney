@@ -318,12 +318,12 @@ module.exports = function createWebChatRouter({
         cleanContent = cleanContent.slice(SHOW_MENU_MARKER.length).trimStart();
         menu = { items: WELCOME_MENU_ITEMS };
 
-      } else if (cleanContent.startsWith(ASK_QUANTITY_MARKER)) {
-        cleanContent = cleanContent.slice(ASK_QUANTITY_MARKER.length).trimStart();
+      } else if (cleanContent.includes(ASK_QUANTITY_MARKER)) {
+        cleanContent = cleanContent.split(ASK_QUANTITY_MARKER).join('').trim();
         menu = { items: QUANTITY_MENU_ITEMS };
 
-      } else if (cleanContent.startsWith(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
-        cleanContent = cleanContent.slice(SHOW_PICKUP_DELIVERY_MENU_MARKER.length).trimStart();
+      } else if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_MARKER).join('').trim();
         menu = { items: PICKUP_DELIVERY_MENU_ITEMS };
 
       } else if (isNewCustomer) {

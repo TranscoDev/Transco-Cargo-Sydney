@@ -871,8 +871,8 @@ async function sendAndTrackOutbound(
   // itself (already in the customer's language) becomes the list's
   // body, so this stays consistent across English/Sinhala/Tamil.
 
-  if (cleanContent.startsWith(ASK_QUANTITY_MARKER)) {
-    const bodyText = cleanContent.slice(ASK_QUANTITY_MARKER.length).trim();
+  if (cleanContent.includes(ASK_QUANTITY_MARKER)) {
+    const bodyText = cleanContent.split(ASK_QUANTITY_MARKER).join('').trim();
     await sendQuantityMenu(customer, bodyText);
     return;
   }
@@ -890,8 +890,8 @@ async function sendAndTrackOutbound(
   // still leads to being asked for a destination next, same as if the
   // customer had typed it — this just saves the typing.
 
-  if (cleanContent.startsWith(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
-    const bodyText = cleanContent.slice(SHOW_PICKUP_DELIVERY_MENU_MARKER.length).trim();
+  if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
+    const bodyText = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_MARKER).join('').trim();
     await sendPickupDeliveryMenu(customer, bodyText);
     return;
   }
