@@ -1167,6 +1167,21 @@ async function sendAndTrackOutbound(
 
 
   // ==========================================================
+  // SAFETY NET — STRIP ANY UNRECOGNIZED MARKER
+  // ==========================================================
+  // By this point every real marker the tool can return has already
+  // been matched and handled above. Anything still shaped like
+  // [[SOMETHING]] here is either a marker the LLM hallucinated on its
+  // own (has happened — e.g. a made-up [[ASK_DESTINATION]] that isn't
+  // one this system defines) or a typo in a real one — either way it
+  // must never reach the customer as visible bracket text.
+  if (/\[\[[^\]]*\]\]/.test(cleanContent)) {
+    console.warn('Unrecognized [[...]] marker in reply, stripping before send:', cleanContent);
+    cleanContent = cleanContent.replace(/\[\[[^\]]*\]\]/g, '').trim();
+  }
+
+
+  // ==========================================================
   // NORMAL TEXT MESSAGE
   // ==========================================================
 
