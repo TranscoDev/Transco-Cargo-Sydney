@@ -330,8 +330,13 @@ module.exports = function createWebChatRouter({
         // A brand-new visitor whose first message was a real question,
         // not a greeting (that case is handled above) — show the
         // welcome message and the answer together as one reply, rather
-        // than answering with no greeting at all.
+        // than answering with no greeting at all. Same welcome text as
+        // the SHOW_MENU_MARKER branch above, so it should carry the
+        // exact same tappable menu buttons too — this was previously
+        // missed, leaving a new visitor with the welcome text but no
+        // way to tap through it.
         cleanContent = WEB_GREETING_TEXT + "\n\n" + cleanContent;
+        menu = { items: WELCOME_MENU_ITEMS };
       }
 
       if (cleanContent.includes(SHOW_BOX_MENU_MARKER)) {
