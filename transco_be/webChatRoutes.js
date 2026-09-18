@@ -31,6 +31,8 @@ const SHOW_AIR_MENU_MARKER = '[[SHOW_AIR_MENU]]';
 const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
 const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
 const SHOW_PICKUP_DELIVERY_MENU_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU]]';
+const SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU_INDIA]]';
+const SHOW_COUNTRY_MENU_MARKER = '[[SHOW_COUNTRY_MENU]]';
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 
@@ -119,7 +121,9 @@ module.exports = function createWebChatRouter({
   AIR_FREIGHT_MENU_ITEMS,
   SEA_FREIGHT_MENU_ITEMS,
   FREIGHT_MODE_MENU_ITEMS,
-  PICKUP_DELIVERY_MENU_ITEMS
+  PICKUP_DELIVERY_MENU_ITEMS,
+  PICKUP_DELIVERY_MENU_ITEMS_INDIA,
+  COUNTRY_MENU_ITEMS
 }) {
   const router = express.Router();
 
@@ -147,7 +151,9 @@ module.exports = function createWebChatRouter({
       (AIR_FREIGHT_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
       (SEA_FREIGHT_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
       (FREIGHT_MODE_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
-      (PICKUP_DELIVERY_MENU_ITEMS || []).find(i => i.id === menuItemId);
+      (PICKUP_DELIVERY_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
+      (PICKUP_DELIVERY_MENU_ITEMS_INDIA || []).find(i => i.id === menuItemId) ||
+      (COUNTRY_MENU_ITEMS || []).find(i => i.id === menuItemId);
 
     if (!item) return null;
     return { bypass: null, title: item.title, phrase: item.phrase };
@@ -325,6 +331,14 @@ module.exports = function createWebChatRouter({
       } else if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
         cleanContent = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_MARKER).join('').trim();
         menu = { items: PICKUP_DELIVERY_MENU_ITEMS };
+
+      } else if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER).join('').trim();
+        menu = { items: PICKUP_DELIVERY_MENU_ITEMS_INDIA };
+
+      } else if (cleanContent.includes(SHOW_COUNTRY_MENU_MARKER)) {
+        cleanContent = cleanContent.split(SHOW_COUNTRY_MENU_MARKER).join('').trim();
+        menu = { items: COUNTRY_MENU_ITEMS };
 
       } else if (isNewCustomer) {
         // A brand-new visitor whose first message was a real question,

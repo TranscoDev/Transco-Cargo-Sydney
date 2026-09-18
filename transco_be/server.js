@@ -775,6 +775,8 @@ async function sendAndTrackOutbound(
   const SHOW_SEA_MENU_MARKER = '[[SHOW_SEA_MENU]]';
   const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
   const SHOW_PICKUP_DELIVERY_MENU_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU]]';
+  const SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU_INDIA]]';
+  const SHOW_COUNTRY_MENU_MARKER = '[[SHOW_COUNTRY_MENU]]';
   const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 
   const needsAttention = content.startsWith(HANDOFF_MARKER);
@@ -893,6 +895,27 @@ async function sendAndTrackOutbound(
   if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_MARKER)) {
     const bodyText = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_MARKER).join('').trim();
     await sendPickupDeliveryMenu(customer, bodyText);
+    return;
+  }
+
+  // India's pickup point is Seven Hills, not Wattala — a separate
+  // marker (rather than reusing SHOW_PICKUP_DELIVERY_MENU_MARKER)
+  // keeps the button wording correct per country instead of showing
+  // an India customer a "Wattala Warehouse Pickup" button.
+  if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER)) {
+    const bodyText = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER).join('').trim();
+    await sendPickupDeliveryMenuIndia(customer, bodyText);
+    return;
+  }
+
+  // Two entirely different pricing/logistics models live behind this
+  // one bot (Sri Lanka vs. India) — asked as a tappable menu whenever
+  // a generic "I want to send something" intent (request_type=16)
+  // doesn't already make the destination clear, same reasoning as
+  // pickup-vs-delivery above.
+  if (cleanContent.includes(SHOW_COUNTRY_MENU_MARKER)) {
+    const bodyText = cleanContent.split(SHOW_COUNTRY_MENU_MARKER).join('').trim();
+    await sendCountryMenu(customer, bodyText);
     return;
   }
 
@@ -1447,7 +1470,9 @@ app.post('/webhook', async (req, res) => {
           AIR_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
           SEA_FREIGHT_MENU_ITEMS.find(item => item.id === tappedId) ||
           FREIGHT_MODE_MENU_ITEMS.find(item => item.id === tappedId) ||
-          PICKUP_DELIVERY_MENU_ITEMS.find(item => item.id === tappedId);
+          PICKUP_DELIVERY_MENU_ITEMS.find(item => item.id === tappedId) ||
+          PICKUP_DELIVERY_MENU_ITEMS_INDIA.find(item => item.id === tappedId) ||
+          COUNTRY_MENU_ITEMS.find(item => item.id === tappedId);
 
         if (tappedItem) {
           text = tappedItem.phrase;
@@ -3181,6 +3206,65 @@ async function sendFreightModeMenu(customer) {
   await broadcastMessageCreated(customer, outgoing);
 }
 
+// Two entirely different destinations (and pricing models) run through
+// this one bot — shown whenever a generic "I want to send something"
+// intent (request_type=16) doesn't already make it clear which one,
+// so the reply that follows (promo video for Sri Lanka, or a plain
+// intro for India) is actually the right one.
+const COUNTRY_MENU_ITEMS = [
+  { id: 'country_sri_lanka', title: '🇱🇰 Sri Lanka', phrase: "I'm shipping to Sri Lanka" },
+  { id: 'country_india', title: '🇮🇳 India', phrase: "I'm shipping to India" }
+];
+
+async function sendCountryMenu(customer, bodyText) {
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    COUNTRY_MENU_ITEMS.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Which Country?',
+        bodyText,
+        buttonLabel: 'Choose an Option',
+        sectionTitle: 'Destination',
+        items: COUNTRY_MENU_ITEMS
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'Country menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
 // Shown whenever the pricing tool needs to know pickup vs. delivery
 // before it can quote a price (request_type=1's various box-type
 // paths all ask this same question when $is_pickup and $delivery_tier
@@ -3228,6 +3312,64 @@ async function sendPickupDeliveryMenu(customer, bodyText) {
   } catch (err) {
     console.error(
       'Pickup/delivery menu send failed:',
+      err.response?.data ?? err.message
+    );
+
+    outgoing.whatsappStatus = 'FAILED';
+  }
+
+  await messages().updateOne(
+    { _id: outgoing._id },
+    { $set: { whatsappStatus: outgoing.whatsappStatus } }
+  );
+
+  await broadcastMessageCreated(customer, outgoing);
+}
+
+// Same pattern as PICKUP_DELIVERY_MENU_ITEMS above, but for India
+// orders — India's pickup point is our Seven Hills warehouse, not
+// Wattala (that's Sri Lanka-only), so this needs its own wording
+// rather than reusing the Sri Lanka menu.
+const PICKUP_DELIVERY_MENU_ITEMS_INDIA = [
+  { id: 'delivery_pickup_india', title: '🏭 Seven Hills Warehouse Pickup', phrase: "I'd like to collect this from your Seven Hills warehouse myself" },
+  { id: 'delivery_door_india', title: '🚚 Door Delivery', phrase: "I'd like door delivery" }
+];
+
+async function sendPickupDeliveryMenuIndia(customer, bodyText) {
+
+  const summary =
+    bodyText +
+    "\n\n[Menu: " +
+    PICKUP_DELIVERY_MENU_ITEMS_INDIA.map(item => item.title).join(' / ') +
+    ']';
+
+  const outgoing = await saveMessage({
+    customerId: customer._id,
+    senderType: 'CHATBOT',
+    content: summary,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null
+  });
+
+  try {
+    await sendWhatsAppInteractiveList(
+      customer.phoneNumber,
+      outgoing._id.toString(),
+      {
+        headerText: 'Pickup or Delivery',
+        bodyText,
+        buttonLabel: 'Choose an Option',
+        sectionTitle: 'Collection Options',
+        items: PICKUP_DELIVERY_MENU_ITEMS_INDIA
+      }
+    );
+
+    outgoing.whatsappStatus = 'SENT';
+
+  } catch (err) {
+    console.error(
+      'India pickup/delivery menu send failed:',
       err.response?.data ?? err.message
     );
 
@@ -3297,7 +3439,9 @@ app.use('/api/web-chat', createWebChatRouter({
   AIR_FREIGHT_MENU_ITEMS,
   SEA_FREIGHT_MENU_ITEMS,
   FREIGHT_MODE_MENU_ITEMS,
-  PICKUP_DELIVERY_MENU_ITEMS
+  PICKUP_DELIVERY_MENU_ITEMS,
+  PICKUP_DELIVERY_MENU_ITEMS_INDIA,
+  COUNTRY_MENU_ITEMS
 }));
 
 
