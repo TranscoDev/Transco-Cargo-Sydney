@@ -901,7 +901,7 @@ async function sendAndTrackOutbound(
   // India's pickup point is Seven Hills, not Wattala — a separate
   // marker (rather than reusing SHOW_PICKUP_DELIVERY_MENU_MARKER)
   // keeps the button wording correct per country instead of showing
-  // an India customer a "Wattala Warehouse Pickup" button.
+  // an India customer a "Wattala Pickup" button.
   if (cleanContent.includes(SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER)) {
     const bodyText = cleanContent.split(SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER).join('').trim();
     await sendPickupDeliveryMenuIndia(customer, bodyText);
@@ -3273,7 +3273,7 @@ async function sendCountryMenu(customer, bodyText) {
 // same as if the customer had typed "door delivery" — this tap just
 // saves them typing it out.
 const PICKUP_DELIVERY_MENU_ITEMS = [
-  { id: 'delivery_pickup', title: '🏭 Wattala Warehouse Pickup', phrase: "I'd like to collect this from your Wattala warehouse myself" },
+  { id: 'delivery_pickup', title: '🏭 Wattala Pickup', phrase: "I'd like to collect this from your Wattala warehouse myself" },
   { id: 'delivery_door', title: '🚚 Door Delivery', phrase: "I'd like door delivery" }
 ];
 
@@ -3331,7 +3331,7 @@ async function sendPickupDeliveryMenu(customer, bodyText) {
 // Wattala (that's Sri Lanka-only), so this needs its own wording
 // rather than reusing the Sri Lanka menu.
 const PICKUP_DELIVERY_MENU_ITEMS_INDIA = [
-  { id: 'delivery_pickup_india', title: '🏭 Seven Hills Warehouse Pickup', phrase: "I'd like to collect this from your Seven Hills warehouse myself" },
+  { id: 'delivery_pickup_india', title: '🏭 Seven Hills Pickup', phrase: "I'd like to collect this from your Seven Hills warehouse myself" },
   { id: 'delivery_door_india', title: '🚚 Door Delivery', phrase: "I'd like door delivery" }
 ];
 
