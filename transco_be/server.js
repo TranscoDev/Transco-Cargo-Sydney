@@ -650,6 +650,15 @@ function resolveBookingDate(booking) {
   return nextDateForWeekday(booking.requestedDay, booking.requestedTime);
 }
 
+// YYYY-MM-DD from a resolveBookingDate() result — shared by the REST
+// listing and the booking.created broadcast so a live-socket booking and
+// a page-refreshed one always carry the same resolvedDate shape.
+function resolvedDateString(booking) {
+  const date = resolveBookingDate(booking);
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+}
+
 
 // Reads via the UTC-suffixed getters — date here follows the
 // getSydneyNow()/nextDateForWeekday() convention (a Date object
@@ -995,7 +1004,8 @@ async function sendAndTrackOutbound(
 
     broadcast('booking.created', {
       _id: insertedId,
-      ...booking
+      ...booking,
+      resolvedDate: resolvedDateString(booking)
     });
 
     await sendBookingEmail(booking);
@@ -1968,8 +1978,17 @@ app.get('/api/bookings', async (req, res) => {
       .sort({ createdAt: -1 })
       .toArray();
 
+    // Same resolution used for the Google Calendar sync (real date if
+    // requestedDateISO was captured, otherwise the next real occurrence
+    // of that weekday) — computed here so the console's calendar view
+    // never has to reimplement this timezone-sensitive logic itself.
+    const withResolvedDate = allBookings.map(booking => ({
+      ...booking,
+      resolvedDate: resolvedDateString(booking)
+    }));
+
     res.status(200).json({
-      bookings: allBookings
+      bookings: withResolvedDate
     });
 
   } catch (err) {

@@ -69,6 +69,8 @@ export interface BookingCreatedPayload {
   requestedTime: string;
   status: BookingStatus;
   createdAt: string;
+  boxSummary?: string | null;
+  resolvedDate: string;
 }
 
 export interface BookingDeletedPayload {

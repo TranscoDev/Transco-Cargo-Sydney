@@ -658,6 +658,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
                 requestedTime: b.requestedTime,
                 status: b.status,
                 createdAt: b.createdAt,
+                boxSummary: b.boxSummary,
+                resolvedDate: b.resolvedDate,
               },
               ...prev,
             ];

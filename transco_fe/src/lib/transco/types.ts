@@ -188,4 +188,13 @@ export interface Booking {
   requestedTime: string;
   status: BookingStatus;
   createdAt: string;
+  /** Short plain-English line the bot itself generated (e.g. "3 Tea Chest
+   * boxes") — null when the booking was made with no box details yet. */
+  boxSummary?: string | null | undefined;
+  /** YYYY-MM-DD, Sydney-local — resolved server-side (same logic as the
+   * Google Calendar sync): the real captured date if given, otherwise the
+   * next actual occurrence of requestedDay. Always a concrete date, never
+   * just a recurring weekday name, so the calendar view can place it on
+   * one real cell. */
+  resolvedDate: string;
 }

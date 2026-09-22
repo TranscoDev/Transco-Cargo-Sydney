@@ -75,6 +75,8 @@ export interface BackendBooking {
   requestedTime: string;
   status: BookingStatus;
   createdAt: string;
+  boxSummary?: string | null;
+  resolvedDate: string;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -87,6 +89,8 @@ export function mapBooking(b: BackendBooking): Booking {
     requestedTime: b.requestedTime,
     status: b.status,
     createdAt: b.createdAt,
+    boxSummary: b.boxSummary,
+    resolvedDate: b.resolvedDate,
   };
 }
 
