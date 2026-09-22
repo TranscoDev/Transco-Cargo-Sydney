@@ -60,6 +60,19 @@ function shipmentHistory() {
   return getDb().collection('shipmentHistory');
 }
 
+// A log entry per email promotion send — not used to re-send anything,
+// purely a record for staff of what went out, when, and to how many.
+function campaigns() {
+  return getDb().collection('campaigns');
+}
+
+// Staff-saved, reusable Contacts filter combinations (status/source/has
+// email/search) — shared across whoever's logged into the console, not
+// per-browser, so the whole team sees the same saved segments.
+function segments() {
+  return getDb().collection('segments');
+}
+
 module.exports = {
   connectToDatabase,
   getDb,
@@ -68,5 +81,7 @@ module.exports = {
   users,
   bookings,
   settings,
-  shipmentHistory
+  shipmentHistory,
+  campaigns,
+  segments
 };

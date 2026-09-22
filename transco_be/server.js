@@ -8,7 +8,7 @@ const { ObjectId } = require('mongodb');
 
 const multer = require('multer');
 
-const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory } = require('./db');
+const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory, campaigns, segments } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
@@ -28,7 +28,12 @@ const importUpload = multer({
 
 const app = express();
 
-app.use(express.json());
+// Default 100kb is too small for a campaign email's flyer attachment
+// (base64-encoded, so a ~5MB image becomes ~7MB of JSON) — raised
+// globally rather than per-route since no other endpoint needs a small
+// body and Express doesn't let two json() parsers with different limits
+// coexist cleanly on overlapping paths.
+app.use(express.json({ limit: '10mb' }));
 
 
 // ============================================================
@@ -2771,6 +2776,188 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: err.message });
   }
   next(err);
+});
+
+
+// ============================================================
+// EMAIL PROMOTIONS (staff-selected customers, sent via Resend)
+// ============================================================
+//
+// Never sends WhatsApp — that stays blocked on Meta template approval +
+// opt-in (see the Contacts CRM plan). Email has no such gate, so this is
+// the one channel that's actually usable today. DO_NOT_CONTACT/BLOCKED
+// customers are always excluded, even if their id is passed in — this is
+// enforced server-side, not just hidden in the UI, since campaign
+// endpoints are exactly the kind of thing a UI-only guard isn't enough for.
+
+app.post('/api/campaigns/email', async (req, res) => {
+
+  try {
+
+    const { customerIds, subject, body, attachment } = req.body ?? {};
+
+    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+      return res.status(400).json({ error: 'customerIds must be a non-empty array' });
+    }
+
+    if (!subject || typeof subject !== 'string' || !subject.trim()) {
+      return res.status(400).json({ error: 'subject is required' });
+    }
+
+    if (!body || typeof body !== 'string' || !body.trim()) {
+      return res.status(400).json({ error: 'body is required' });
+    }
+
+    if (!RESEND_API_KEY) {
+      return res.status(503).json({ error: 'Email sending is not configured (RESEND_API_KEY missing)' });
+    }
+
+    // Optional flyer/image/PDF attachment — { filename, contentType,
+    // contentBase64 }, read client-side via FileReader. Resend's own
+    // attachment field takes base64 content directly, no upload step
+    // needed. Capped well under the 10mb JSON body limit so there's
+    // always room for the rest of the request.
+    let resendAttachment = null;
+    if (attachment !== undefined && attachment !== null) {
+      if (
+        typeof attachment !== 'object' ||
+        !attachment.filename ||
+        typeof attachment.filename !== 'string' ||
+        !attachment.contentBase64 ||
+        typeof attachment.contentBase64 !== 'string'
+      ) {
+        return res.status(400).json({ error: 'attachment must have filename and contentBase64' });
+      }
+      // 6MB raw file inflates to ~8MB once base64-encoded — cap a little
+      // above that so a file right at the frontend's own 6MB limit isn't
+      // rejected here on a rounding technicality.
+      if (attachment.contentBase64.length > 8.5 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Attachment is too large (max ~6MB)' });
+      }
+      resendAttachment = {
+        filename: attachment.filename,
+        content: attachment.contentBase64
+      };
+    }
+
+    const validIds = customerIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+    const targets = await customers().find({ _id: { $in: validIds } }).toArray();
+
+    const results = {
+      requested: customerIds.length,
+      sent: 0,
+      skippedNoEmail: 0,
+      skippedExcludedStatus: 0,
+      failed: 0
+    };
+
+    const bodyHtml = escapeHtml(body).split('\n').join('<br>');
+
+    for (const customer of targets) {
+
+      if (customer.status === 'DO_NOT_CONTACT' || customer.status === 'BLOCKED') {
+        results.skippedExcludedStatus += 1;
+        continue;
+      }
+
+      if (!customer.email) {
+        results.skippedNoEmail += 1;
+        continue;
+      }
+
+      try {
+        await axios.post(
+          'https://api.resend.com/emails',
+          {
+            from: 'Transco Cargo Sydney <onboarding@resend.dev>',
+            to: customer.email,
+            subject: subject.trim(),
+            html: `<p>Hi ${escapeHtml(customer.name || 'there')},</p><p>${bodyHtml}</p>`,
+            ...(resendAttachment ? { attachments: [resendAttachment] } : {})
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        results.sent += 1;
+      } catch (sendErr) {
+        console.error(`Campaign email failed for ${customer.email}:`, sendErr.message);
+        results.failed += 1;
+      }
+    }
+
+    await campaigns().insertOne({
+      subject: subject.trim(),
+      body: body.trim(),
+      attachmentFilename: resendAttachment?.filename ?? null,
+      ...results,
+      sentAt: new Date()
+    });
+
+    res.status(200).json(results);
+
+  } catch (err) {
+
+    console.error('Error sending email campaign:', err.message);
+
+    res.status(500).json({
+      error: 'Failed to send email campaign'
+    });
+  }
+});
+
+
+// ============================================================
+// SAVED SEGMENTS (reusable Contacts filter combinations)
+// ============================================================
+
+app.get('/api/segments', async (req, res) => {
+  try {
+    const all = await segments().find({}).sort({ createdAt: 1 }).toArray();
+    res.status(200).json({ segments: all });
+  } catch (err) {
+    console.error('Error listing segments:', err.message);
+    res.status(500).json({ error: 'Failed to list segments' });
+  }
+});
+
+app.post('/api/segments', async (req, res) => {
+  try {
+    const { name, filter } = req.body ?? {};
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    if (!filter || typeof filter !== 'object') {
+      return res.status(400).json({ error: 'filter is required' });
+    }
+
+    const doc = { name: name.trim(), filter, createdAt: new Date() };
+    const { insertedId } = await segments().insertOne(doc);
+
+    res.status(201).json({ segment: { _id: insertedId, ...doc } });
+  } catch (err) {
+    console.error('Error creating segment:', err.message);
+    res.status(500).json({ error: 'Failed to create segment' });
+  }
+});
+
+app.delete('/api/segments/:segmentId', async (req, res) => {
+  try {
+    const { segmentId } = req.params;
+    if (!ObjectId.isValid(segmentId)) {
+      return res.status(400).json({ error: 'Invalid segment id' });
+    }
+    await segments().deleteOne({ _id: new ObjectId(segmentId) });
+    res.status(204).send();
+  } catch (err) {
+    console.error('Error deleting segment:', err.message);
+    res.status(500).json({ error: 'Failed to delete segment' });
+  }
 });
 
 
