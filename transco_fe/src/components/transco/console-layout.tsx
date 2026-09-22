@@ -94,17 +94,17 @@ export function ConsoleLayout({
           {bannerText}
         </div>
       )}
-      <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-panel px-3 py-2 md:px-4">
+      <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 bg-header px-3 py-2 text-header-foreground md:px-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex min-w-0 items-center gap-2">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
               <MessageSquareDot className="h-4 w-4" />
             </span>
             <span className="flex min-w-0 items-baseline gap-1.5">
-              <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+              <span className="truncate text-sm font-semibold tracking-tight text-header-foreground">
                 Transco
               </span>
-              <span className="hidden max-w-28 truncate text-xs capitalize text-muted-foreground sm:inline">
+              <span className="hidden max-w-28 truncate text-xs capitalize text-header-foreground/65 sm:inline">
                 {agentName}
               </span>
             </span>
@@ -117,8 +117,8 @@ export function ConsoleLayout({
               className={cn(
                 "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                 activeTab === "conversations"
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-secondary",
+                  ? "bg-white/15 text-header-foreground"
+                  : "text-header-foreground/65 hover:bg-white/10 hover:text-header-foreground",
               )}
             >
               Conversations
@@ -129,8 +129,8 @@ export function ConsoleLayout({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                 activeTab === "bookings"
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-secondary",
+                  ? "bg-white/15 text-header-foreground"
+                  : "text-header-foreground/65 hover:bg-white/10 hover:text-header-foreground",
               )}
             >
               <CalendarClock className="h-3.5 w-3.5" />
@@ -142,8 +142,8 @@ export function ConsoleLayout({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                 activeTab === "contacts"
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-secondary",
+                  ? "bg-white/15 text-header-foreground"
+                  : "text-header-foreground/65 hover:bg-white/10 hover:text-header-foreground",
               )}
             >
               <Users className="h-3.5 w-3.5" />
@@ -161,8 +161,8 @@ export function ConsoleLayout({
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
                   anyPaused
-                    ? "border-amber-600/40 bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400"
-                    : "border-border text-foreground hover:bg-secondary",
+                    ? "border-amber-400/40 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                    : "border-white/20 text-header-foreground hover:bg-white/10",
                 )}
               >
                 {anyPaused ? (
@@ -201,14 +201,14 @@ export function ConsoleLayout({
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
             title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border text-foreground transition-colors hover:bg-secondary"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-white/20 text-header-foreground transition-colors hover:bg-white/10"
           >
             {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
           <button
             type="button"
             onClick={onLogout}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/20 px-2.5 py-1.5 text-xs font-medium text-header-foreground transition-colors hover:bg-white/10"
           >
             <LogOut className="h-3.5 w-3.5" />
             Sign out
