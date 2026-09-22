@@ -100,8 +100,13 @@ export function ConsoleLayout({
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
               <MessageSquareDot className="h-4 w-4" />
             </span>
-            <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-              Transco
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+                Transco
+              </span>
+              <span className="hidden max-w-28 truncate text-xs capitalize text-muted-foreground sm:inline">
+                {agentName}
+              </span>
             </span>
           </span>
 
@@ -147,9 +152,6 @@ export function ConsoleLayout({
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <span className="hidden max-w-40 truncate text-xs capitalize text-muted-foreground sm:inline">
-            {agentName}
-          </span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
