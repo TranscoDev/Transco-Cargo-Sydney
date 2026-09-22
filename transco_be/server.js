@@ -6,9 +6,25 @@ const express = require('express');
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
 
+const multer = require('multer');
+
 const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
+const { readRowsFromBuffer, processImportRows } = require('./importLogic');
+
+// Memory storage — files are small (a customer sheet, not a video) and
+// this only ever runs the parse-then-discard import flow, never needs to
+// persist the upload itself.
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const okExt = /\.(xlsx|xls|csv)$/i.test(file.originalname);
+    if (!okExt) return cb(new Error('Only .xlsx, .xls, or .csv files are supported'));
+    cb(null, true);
+  }
+});
 
 const app = express();
 
@@ -2694,6 +2710,67 @@ app.post('/api/customers', async (req, res) => {
       error: 'Failed to create contact'
     });
   }
+});
+
+
+// ============================================================
+// EXCEL/CSV CUSTOMER IMPORT (staff-facing — same logic the CLI import
+// script uses, see importLogic.js)
+// ============================================================
+//
+// For bulk sheet updates (management hands over an updated customer
+// list), not for adding one contact — that's POST /api/customers above.
+// Always commits: a staff member choosing to upload a file has already
+// decided to import it, there's no separate confirm step here. Safe to
+// run repeatedly on the same or a growing sheet — matching/dedup is the
+// same idempotent logic proven in importHistoricalCustomers.js.
+
+app.post('/api/imports/customers', importUpload.single('file'), async (req, res) => {
+
+  try {
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded (expected field name "file")' });
+    }
+
+    let rows;
+    try {
+      rows = readRowsFromBuffer(req.file.buffer);
+    } catch (parseErr) {
+      return res.status(400).json({ error: `Could not read that file: ${parseErr.message}` });
+    }
+
+    const { summary, reviewRows } = await processImportRows(rows, {
+      customersColl: customers(),
+      shipmentsColl: shipmentHistory()
+    });
+
+    broadcast('customers.imported', { summary });
+
+    res.status(200).json({
+      summary,
+      // Capped — a review queue of hundreds isn't meant to render as a
+      // giant list in the UI, just enough to spot-check what needs
+      // manual attention.
+      reviewRows: reviewRows.slice(0, 50),
+      reviewRowsTruncated: reviewRows.length > 50
+    });
+
+  } catch (err) {
+
+    console.error('Error importing customers file:', err.message);
+
+    res.status(500).json({
+      error: 'Failed to import file'
+    });
+  }
+});
+
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err?.message?.includes('Only .xlsx')) {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
 });
 
 
