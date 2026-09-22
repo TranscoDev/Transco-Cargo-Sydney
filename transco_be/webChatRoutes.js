@@ -91,8 +91,10 @@ async function findOrCreateWebCustomer(sessionId) {
         name: `Website Visitor #${visitorTag}`,
         mode: 'CHATBOT',
         channel: 'website',
+        status: 'ACTIVE',
         createdAt: new Date()
-      }
+      },
+      $addToSet: { sources: 'website' }
     },
     { upsert: true, returnDocument: 'after', includeResultMetadata: true }
   );

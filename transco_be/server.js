@@ -6,8 +6,9 @@ const express = require('express');
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
 
-const { connectToDatabase, customers, messages, users, bookings, settings } = require('./db');
+const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
+const { normalizePhoneNumber } = require('./normalizePhone');
 
 const app = express();
 
@@ -268,8 +269,17 @@ async function findOrCreateCustomer(phoneNumber, waName) {
       $setOnInsert: {
         phoneNumber,
         name: waName || phoneNumber,
-        mode: 'CHATBOT'
-      }
+        mode: 'CHATBOT',
+        // ACTIVE by default — a real customer contacting us right now.
+        // Only the Excel importer sets HISTORICAL, and only on customers
+        // it creates itself; this never downgrades an existing status.
+        status: 'ACTIVE'
+      },
+      // Merges into whatever sources a historical-import match already
+      // has (e.g. ["historical"] -> ["historical","whatsapp"]) rather
+      // than overwriting — this is the "historical customer later
+      // messages WhatsApp" merge the Contacts source badges rely on.
+      $addToSet: { sources: 'whatsapp' }
     },
 
     {
@@ -1828,7 +1838,8 @@ app.get('/api/customers', async (req, res) => {
 
     const [
       allCustomers,
-      allMessages
+      allMessages,
+      allShipments
     ] = await Promise.all([
 
       customers()
@@ -1838,6 +1849,10 @@ app.get('/api/customers', async (req, res) => {
       messages()
         .find({})
         .sort({ createdAt: 1 })
+        .toArray(),
+
+      shipmentHistory()
+        .find({})
         .toArray()
 
     ]);
@@ -1870,6 +1885,19 @@ app.get('/api/customers', async (req, res) => {
     }
 
 
+    const shipmentsByCustomer = new Map();
+
+    for (const shipment of allShipments) {
+      const key = shipment.customerId.toString();
+      const bucket = shipmentsByCustomer.get(key);
+      if (bucket) {
+        bucket.push(shipment);
+      } else {
+        shipmentsByCustomer.set(key, [shipment]);
+      }
+    }
+
+
     const result =
       allCustomers.map(customer => ({
 
@@ -1877,6 +1905,11 @@ app.get('/api/customers', async (req, res) => {
 
         messages:
           messagesByCustomer.get(
+            customer._id.toString()
+          ) ?? [],
+
+        shipments:
+          shipmentsByCustomer.get(
             customer._id.toString()
           ) ?? []
 
@@ -2519,6 +2552,149 @@ app.patch(
     }
   }
 );
+
+
+// ============================================================
+// CUSTOMER STATUS (Active / Historical / Review / Do Not Contact / Blocked)
+// ============================================================
+//
+// Separate from Source (sources[]) — status is staff-controlled and never
+// touched automatically except by the importer's own defaults. Blocked/
+// Do Not Contact customers are never deleted, only flagged, so their
+// shipment/conversation history stays available for internal reference.
+
+const CUSTOMER_STATUSES = ['ACTIVE', 'HISTORICAL', 'REVIEW', 'DO_NOT_CONTACT', 'BLOCKED'];
+
+app.patch(
+  '/api/customers/:customerId/status',
+  async (req, res) => {
+
+    try {
+
+      const { customerId } = req.params;
+      const { status } = req.body ?? {};
+
+      if (!ObjectId.isValid(customerId)) {
+        return res.status(400).json({ error: 'Invalid customer id' });
+      }
+
+      if (!CUSTOMER_STATUSES.includes(status)) {
+        return res.status(400).json({
+          error: `status must be one of: ${CUSTOMER_STATUSES.join(', ')}`
+        });
+      }
+
+      const updated = await customers().findOneAndUpdate(
+        { _id: new ObjectId(customerId) },
+        { $set: { status } },
+        { returnDocument: 'after' }
+      );
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Customer not found' });
+      }
+
+      broadcast('customer.contact_updated', {
+        customerId: updated._id,
+        customer: updated
+      });
+
+      res.status(200).json({ customer: updated });
+
+    } catch (err) {
+
+      console.error(
+        'Error updating customer status:',
+        err.message
+      );
+
+      res.status(500).json({
+        error: 'Failed to update customer status'
+      });
+    }
+  }
+);
+
+
+// ============================================================
+// MANUAL CONTACT (staff-entered, no prior conversation)
+// ============================================================
+//
+// Same findOrCreateCustomer-style matching as the live WhatsApp/website
+// paths — a manually-entered number that already exists (e.g. a
+// historical import match) gets "manual" added to its sources rather
+// than creating a duplicate customer.
+
+app.post('/api/customers', async (req, res) => {
+
+  try {
+
+    const { name, phone, email, notes } = req.body ?? {};
+
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ error: 'phone is required' });
+    }
+
+    const normalizedPhone = normalizePhoneNumber(phone);
+
+    if (!normalizedPhone) {
+      return res.status(400).json({
+        error: 'Could not recognize that phone number — check the digits and country code'
+      });
+    }
+
+    const setOnInsert = {
+      phoneNumber: normalizedPhone,
+      name: name.trim(),
+      mode: 'CHATBOT',
+      status: 'ACTIVE'
+    };
+
+    if (email && typeof email === 'string' && email.trim()) {
+      setOnInsert.email = email.trim();
+    }
+
+    if (notes && typeof notes === 'string' && notes.trim()) {
+      setOnInsert.notes = notes.trim();
+    }
+
+    const result = await customers().findOneAndUpdate(
+      { phoneNumber: normalizedPhone },
+      {
+        $setOnInsert: setOnInsert,
+        $addToSet: { sources: 'manual' }
+      },
+      { upsert: true, returnDocument: 'after', includeResultMetadata: true }
+    );
+
+    const isNewCustomer = Boolean(result.lastErrorObject?.upserted);
+
+    broadcast('customer.contact_updated', {
+      customerId: result.value._id,
+      customer: result.value
+    });
+
+    res.status(isNewCustomer ? 201 : 200).json({
+      customer: result.value,
+      isNewCustomer
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error creating manual contact:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to create contact'
+    });
+  }
+});
 
 
 // ============================================================

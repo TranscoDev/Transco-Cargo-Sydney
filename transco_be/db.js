@@ -13,6 +13,12 @@ async function connectToDatabase(uri, dbName = 'transco') {
   await db.collection('users').createIndex({ email: 1 }, { unique: true });
   await db.collection('bookings').createIndex({ createdAt: 1 });
 
+  // dedupeKey makes re-running an Excel import safe: the same sender+
+  // receiver pairing upserts the same shipment history record instead of
+  // creating a duplicate every time an updated sheet is imported.
+  await db.collection('shipmentHistory').createIndex({ dedupeKey: 1 }, { unique: true });
+  await db.collection('shipmentHistory').createIndex({ customerId: 1 });
+
   console.log('Connected to MongoDB');
   return db;
 }
@@ -46,4 +52,21 @@ function settings() {
   return getDb().collection('settings');
 }
 
-module.exports = { connectToDatabase, getDb, customers, messages, users, bookings, settings };
+// Historical shipment records (currently from the Excel customer import) —
+// one document per sender+receiver pairing, linked to a customer via
+// customerId. Kept separate from `messages` since these never came through
+// a conversation. See importHistoricalCustomers.js.
+function shipmentHistory() {
+  return getDb().collection('shipmentHistory');
+}
+
+module.exports = {
+  connectToDatabase,
+  getDb,
+  customers,
+  messages,
+  users,
+  bookings,
+  settings,
+  shipmentHistory
+};
