@@ -11,17 +11,24 @@ import {
 
 import { createMessage, getMockConversations, simulatedInbound } from "./mock-data";
 import {
+  createManualContact,
+  createSegment as createSegmentRequest,
   deleteBooking as deleteBookingRequest,
+  deleteSegment as deleteSegmentRequest,
   fetchBookings,
   fetchConversations,
   fetchPauseState,
+  fetchSegments,
+  importCustomersFile,
   mapMessage,
   markConversationRead,
+  sendEmailCampaign as sendEmailCampaignRequest,
   sendHumanMessage,
   setCustomerMode,
   setPauseState as setPauseStateRequest,
   updateBookingStatus as updateBookingStatusRequest,
   updateContactInfo as updateContactInfoRequest,
+  updateCustomerStatus as updateCustomerStatusRequest,
   type PauseState,
 } from "./api";
 import {
@@ -40,11 +47,17 @@ import {
 import type {
   Booking,
   BookingStatus,
+  CampaignAttachment,
   Conversation,
   ConversationMode,
   ConversationSummary,
+  CustomerStatus,
+  EmailCampaignResult,
+  ImportResult,
   Message,
   MessageStatus,
+  Segment,
+  SegmentFilter,
 } from "./types";
 
 /**
@@ -87,6 +100,35 @@ interface ConversationsApi {
   updatePauseState: (partial: Partial<PauseState>) => void;
   /** Staff-entered contact details, editable from the Contacts directory. */
   updateContact: (conversationId: string, info: { email?: string; notes?: string }) => void;
+  /** Independent of Source — staff-controlled classification (Active,
+   * Historical, Needs Review, Do Not Contact, Blocked). */
+  updateStatus: (conversationId: string, status: CustomerStatus) => void;
+  /** Adds a staff-entered contact with no prior conversation. Resolves once
+   * the backend confirms creation/match so the caller can close its form. */
+  addContact: (info: {
+    name: string;
+    phone: string;
+    email?: string | undefined;
+    notes?: string | undefined;
+  }) => Promise<void>;
+  /** Sends a promo email to the given customer ids via Resend — WhatsApp
+   * broadcast is intentionally not offered here (see the Contacts CRM
+   * plan: blocked on Meta template approval + opt-in). */
+  sendEmailCampaign: (
+    customerIds: string[],
+    subject: string,
+    body: string,
+    attachment?: CampaignAttachment | undefined,
+  ) => Promise<EmailCampaignResult>;
+  /** Staff-saved, reusable Contacts filter combinations — shared across
+   * the whole console, not per-browser. */
+  segments: Segment[];
+  saveSegment: (name: string, filter: SegmentFilter) => Promise<void>;
+  deleteSegment: (segmentId: string) => void;
+  /** Bulk Excel/CSV import — for an updated sheet from management, not for
+   * a single new contact (see addContact). Refreshes the full customer
+   * list on success since it may create/update many customers at once. */
+  importCustomers: (file: File) => Promise<ImportResult>;
 }
 
 const ConversationsContext = createContext<ConversationsApi | null>(null);
@@ -119,6 +161,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // as a fallback for genuinely running without a reachable backend.
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [segments, setSegments] = useState<Segment[]>([]);
   const [websitePaused, setWebsitePausedState] = useState(false);
   const [whatsappPaused, setWhatsappPausedState] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -163,6 +206,21 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.warn("Could not load bookings.", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSegments()
+      .then((real) => {
+        if (cancelled) return;
+        setSegments(real);
+      })
+      .catch((err) => {
+        console.warn("Could not load saved segments.", err);
       });
     return () => {
       cancelled = true;
@@ -264,6 +322,76 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       });
     },
     [patch],
+  );
+
+  const updateStatus = useCallback(
+    (conversationId: string, status: CustomerStatus) => {
+      const previous = conversations.find((c) => c.id === conversationId)?.status;
+      patch(conversationId, (c) => ({ ...c, status }));
+      updateCustomerStatusRequest(conversationId, status).catch((err) => {
+        console.error("Failed to persist customer status:", err);
+        patch(conversationId, (c) => ({ ...c, status: previous }));
+      });
+    },
+    [conversations, patch],
+  );
+
+  const addContact = useCallback(
+    async (info: {
+      name: string;
+      phone: string;
+      email?: string | undefined;
+      notes?: string | undefined;
+    }) => {
+      const created = await createManualContact(info);
+      setConversations((prev) => {
+        const existingIdx = prev.findIndex((c) => c.id === created.id);
+        if (existingIdx === -1) return [...prev, created];
+        // Matched an existing customer (e.g. a historical import) — merge
+        // rather than overwrite its conversation history with the empty
+        // one this endpoint returns.
+        const next = [...prev];
+        next[existingIdx] = { ...prev[existingIdx]!, sources: created.sources };
+        return next;
+      });
+    },
+    [],
+  );
+
+  const importCustomers = useCallback(async (file: File) => {
+    const result = await importCustomersFile(file);
+    // May have created/matched many customers at once — a targeted patch
+    // isn't worth the complexity here, just refetch the full list.
+    try {
+      const fresh = await fetchConversations();
+      setConversations(fresh);
+    } catch (err) {
+      console.warn("Import succeeded but refreshing the contact list failed:", err);
+    }
+    return result;
+  }, []);
+
+  const sendEmailCampaign = useCallback(
+    (customerIds: string[], subject: string, body: string, attachment?: CampaignAttachment | undefined) =>
+      sendEmailCampaignRequest(customerIds, subject, body, attachment),
+    [],
+  );
+
+  const saveSegment = useCallback(async (name: string, filter: SegmentFilter) => {
+    const created = await createSegmentRequest(name, filter);
+    setSegments((prev) => [...prev, created]);
+  }, []);
+
+  const deleteSegmentCb = useCallback(
+    (segmentId: string) => {
+      const previous = segments;
+      setSegments((prev) => prev.filter((s) => s.id !== segmentId));
+      deleteSegmentRequest(segmentId).catch((err) => {
+        console.error("Failed to delete segment:", err);
+        setSegments(previous);
+      });
+    },
+    [segments],
   );
 
   const appendMessage = useCallback(
@@ -605,6 +733,13 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       whatsappPaused,
       updatePauseState,
       updateContact,
+      updateStatus,
+      addContact,
+      sendEmailCampaign,
+      segments,
+      saveSegment,
+      deleteSegment: deleteSegmentCb,
+      importCustomers,
     }),
     [
       bookings,
@@ -624,6 +759,13 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       summaries,
       updatePauseState,
       updateContact,
+      updateStatus,
+      addContact,
+      sendEmailCampaign,
+      segments,
+      saveSegment,
+      deleteSegmentCb,
+      importCustomers,
       updateMessageStatus,
     ],
   );

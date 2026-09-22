@@ -96,7 +96,18 @@ function ConsoleBookings() {
 }
 
 function ConsoleContacts({ setActiveTab }: { setActiveTab: (tab: ConsoleTab) => void }) {
-  const { conversations, selectConversation, updateContact } = useConversations();
+  const {
+    conversations,
+    selectConversation,
+    updateContact,
+    updateStatus,
+    addContact,
+    sendEmailCampaign,
+    segments,
+    saveSegment,
+    deleteSegment,
+    importCustomers,
+  } = useConversations();
   return (
     <ContactsDirectory
       conversations={conversations}
@@ -105,6 +116,13 @@ function ConsoleContacts({ setActiveTab }: { setActiveTab: (tab: ConsoleTab) => 
         setActiveTab("conversations");
       }}
       onUpdateContact={updateContact}
+      onUpdateStatus={updateStatus}
+      onAddContact={addContact}
+      onSendEmailCampaign={sendEmailCampaign}
+      segments={segments}
+      onSaveSegment={saveSegment}
+      onDeleteSegment={deleteSegment}
+      onImportCustomers={importCustomers}
     />
   );
 }

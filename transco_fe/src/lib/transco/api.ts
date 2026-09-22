@@ -3,12 +3,20 @@ import { getAuthToken } from "./auth";
 import type {
   Booking,
   BookingStatus,
+  CampaignAttachment,
   Conversation,
   ConversationChannel,
   ConversationMode,
+  CustomerSource,
+  CustomerStatus,
+  EmailCampaignResult,
+  ImportResult,
   Message,
   MessageStatus,
+  Segment,
+  SegmentFilter,
   SenderType,
+  ShipmentHistoryEntry,
 } from "./types";
 
 /**
@@ -39,10 +47,23 @@ export interface BackendCustomer {
   needsAttentionMessage?: { content: string; createdAt: string } | null;
   email?: string;
   notes?: string;
+  sources?: CustomerSource[];
+  status?: CustomerStatus;
+}
+
+export interface BackendShipment {
+  _id: string;
+  batchNumber: string | null;
+  receiverName: string;
+  receiverAddress: string;
+  receiverPhone: string | null;
+  receiverEmail: string | null;
+  importedAt: string;
 }
 
 export interface BackendCustomerWithMessages extends BackendCustomer {
   messages: BackendMessage[];
+  shipments?: BackendShipment[];
 }
 
 export interface BackendBooking {
@@ -82,6 +103,18 @@ export function mapMessage(m: BackendMessage): Message {
   };
 }
 
+function mapShipment(s: BackendShipment): ShipmentHistoryEntry {
+  return {
+    id: s._id,
+    batchNumber: s.batchNumber,
+    receiverName: s.receiverName,
+    receiverAddress: s.receiverAddress,
+    receiverPhone: s.receiverPhone,
+    receiverEmail: s.receiverEmail,
+    importedAt: s.importedAt,
+  };
+}
+
 export function mapConversation(c: BackendCustomerWithMessages): Conversation {
   return {
     id: c._id,
@@ -94,6 +127,9 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     needsAttentionMessage: c.needsAttentionMessage ?? undefined,
     email: c.email,
     notes: c.notes,
+    sources: c.sources,
+    status: c.status,
+    shipments: c.shipments?.map(mapShipment),
   };
 }
 
@@ -223,3 +259,115 @@ export async function updateContactInfo(
     throw new Error(`Failed to update contact info (${res.status})`);
   }
 }
+
+export async function updateCustomerStatus(
+  customerId: string,
+  status: CustomerStatus,
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update customer status (${res.status})`);
+  }
+}
+
+/** Staff-entered contact with no prior conversation — matched against
+ * existing customers by phone on the backend, so re-adding a number that
+ * already exists merges "manual" into its sources instead of duplicating. */
+export async function createManualContact(info: {
+  name: string;
+  phone: string;
+  email?: string | undefined;
+  notes?: string | undefined;
+}): Promise<Conversation> {
+  const res = await fetch(`${API_BASE_URL}/api/customers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(info),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create contact (${res.status})`);
+  }
+  const data = (await res.json()) as { customer: BackendCustomer };
+  return mapConversation({ ...data.customer, messages: [], shipments: [] });
+}
+
+export async function sendEmailCampaign(
+  customerIds: string[],
+  subject: string,
+  body: string,
+  attachment?: CampaignAttachment | undefined,
+): Promise<EmailCampaignResult> {
+  const res = await fetch(`${API_BASE_URL}/api/campaigns/email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ customerIds, subject, body, attachment: attachment ?? null }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Failed to send campaign (${res.status})`);
+  }
+  return data as EmailCampaignResult;
+}
+
+interface BackendSegment {
+  _id: string;
+  name: string;
+  filter: SegmentFilter;
+}
+
+function mapSegment(s: BackendSegment): Segment {
+  return { id: s._id, name: s.name, filter: s.filter };
+}
+
+export async function fetchSegments(): Promise<Segment[]> {
+  const res = await fetch(`${API_BASE_URL}/api/segments`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load segments (${res.status})`);
+  }
+  const data = (await res.json()) as { segments: BackendSegment[] };
+  return data.segments.map(mapSegment);
+}
+
+export async function createSegment(name: string, filter: SegmentFilter): Promise<Segment> {
+  const res = await fetch(`${API_BASE_URL}/api/segments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name, filter }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save segment (${res.status})`);
+  }
+  const data = (await res.json()) as { segment: BackendSegment };
+  return mapSegment(data.segment);
+}
+
+export async function importCustomersFile(file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE_URL}/api/imports/customers`, {
+    method: "POST",
+    headers: authHeaders(), // no Content-Type — fetch sets the multipart boundary itself
+    body: formData,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Failed to import file (${res.status})`);
+  }
+  return data as ImportResult;
+}
+
+export async function deleteSegment(segmentId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/segments/${segmentId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete segment (${res.status})`);
+  }
+}
+
