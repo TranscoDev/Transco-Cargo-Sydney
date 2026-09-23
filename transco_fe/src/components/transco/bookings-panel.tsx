@@ -5,8 +5,6 @@ import { BookingCalendar } from "@/components/transco/booking-calendar";
 import { cn } from "@/lib/utils";
 import type { Booking, BookingStatus } from "@/lib/transco/types";
 
-const DAY_ORDER = ["tuesday", "wednesday", "thursday", "friday"];
-
 const STATUS_FILTERS: (BookingStatus | "all")[] = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
@@ -16,18 +14,30 @@ const STATUS_BADGE: Record<BookingStatus, string> = {
   cancelled: "bg-secondary text-muted-foreground",
 };
 
-function dayLabel(day: string): string {
-  return day.charAt(0).toUpperCase() + day.slice(1);
+/** "Tuesday, 23 September" from a YYYY-MM-DD resolvedDate — every booking
+ * shown under one header genuinely happened on this one calendar day, not
+ * just "some Tuesday" (see groupByDate below — that used to be the bug). */
+function dayLabel(dateKey: string): string {
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString("en-AU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 function todayKey(): string {
-  return new Date().toLocaleDateString("en-AU", { weekday: "long" }).toLowerCase();
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-function groupByDay(bookings: Booking[]): Map<string, Booking[]> {
+/** Groups by the actual resolved calendar date, not the recurring weekday
+ * name — grouping by "tuesday" merged every Tuesday that ever had a
+ * booking into one bucket, regardless of which week it was. */
+function groupByDate(bookings: Booking[]): Map<string, Booking[]> {
   const groups = new Map<string, Booking[]>();
   for (const booking of bookings) {
-    const key = booking.requestedDay.toLowerCase();
+    const key = booking.resolvedDate;
     const bucket = groups.get(key);
     if (bucket) bucket.push(booking);
     else groups.set(key, [booking]);
@@ -71,8 +81,10 @@ export function BookingsPanel({
     });
   }, [bookings, query, statusFilter, selectedDate]);
 
-  const grouped = groupByDay(filtered);
-  const days = [...grouped.keys()].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const grouped = groupByDate(filtered);
+  // YYYY-MM-DD strings sort correctly as plain strings — no weekday
+  // lookup table needed.
+  const days = [...grouped.keys()].sort();
 
   return (
     <div className="flex h-full min-h-0 bg-chat-canvas">
