@@ -23,6 +23,7 @@ import {
   mapMessage,
   markConversationRead,
   sendEmailCampaign as sendEmailCampaignRequest,
+  sendAttachment as sendAttachmentRequest,
   sendHumanMessage,
   setCustomerMode,
   setPauseState as setPauseStateRequest,
@@ -80,6 +81,9 @@ interface ConversationsApi {
   selectedConversation: Conversation | null;
   selectConversation: (id: string | null) => void;
   sendMessage: (conversationId: string, body: string) => void;
+  /** WhatsApp only for now — throws if the conversation isn't in HUMAN
+   * mode or there's no live backend. See sendAttachment in api.ts. */
+  sendAttachment: (conversationId: string, file: File, caption?: string) => Promise<void>;
   setMode: (conversationId: string, mode: ConversationMode) => void;
   markAsRead: (conversationId: string) => void;
   /** Simulates an inbound WhatsApp event; stands in for a socket push. */
@@ -476,6 +480,27 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
     [appendMessage, conversations, patch],
   );
 
+  const sendAttachment = useCallback(
+    async (conversationId: string, file: File, caption?: string) => {
+      const conversation = conversations.find((c) => c.id === conversationId);
+      if (!conversation || conversation.mode !== "HUMAN") {
+        throw new Error("Switch to Staff mode before sending an attachment.");
+      }
+      if (!isLiveRef.current) {
+        throw new Error("Attachments need a live backend connection — not available in demo mode.");
+      }
+      setSending(true);
+      try {
+        await sendAttachmentRequest(conversationId, file, caption);
+        // No local append — same as sendMessage above, the message.created
+        // broadcast is the single source that adds it.
+      } finally {
+        setSending(false);
+      }
+    },
+    [conversations],
+  );
+
   const receiveCustomerMessage = useCallback(
     (conversationId: string, body: string) => {
       const isOpen = selectedRef.current === conversationId;
@@ -723,6 +748,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       selectedConversation,
       selectConversation,
       sendMessage,
+      sendAttachment,
       setMode,
       markAsRead,
       receiveCustomerMessage,
@@ -756,6 +782,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       selectedConversation,
       selectedId,
       sendMessage,
+      sendAttachment,
       sending,
       setMode,
       summaries,

@@ -11,6 +11,7 @@ import type {
   CustomerStatus,
   EmailCampaignResult,
   ImportResult,
+  MediaType,
   Message,
   MessageStatus,
   Segment,
@@ -35,6 +36,8 @@ export interface BackendMessage {
   whatsappStatus: MessageStatus | null;
   failureReason?: string | null;
   createdAt: string;
+  mediaUrl?: string | null;
+  mediaType?: MediaType | null;
 }
 
 export interface BackendCustomer {
@@ -104,6 +107,8 @@ export function mapMessage(m: BackendMessage): Message {
     status: m.whatsappStatus ?? undefined,
     read: m.senderType === "CUSTOMER" ? m.isRead : undefined,
     failureReason: m.failureReason ?? undefined,
+    mediaUrl: m.mediaUrl,
+    mediaType: m.mediaType,
   };
 }
 
@@ -175,6 +180,30 @@ export async function sendHumanMessage(
   });
   if (!res.ok) {
     throw new Error(`Failed to send message (${res.status})`);
+  }
+}
+
+/** WhatsApp only for now — the website widget has no live-push channel
+ * for a staff-initiated message at all yet, so this isn't offered for
+ * website customers (the caller should hide the attach button there). */
+export async function sendAttachment(
+  customerId: string,
+  file: File,
+  caption?: string,
+  replyToMessageId?: string,
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (caption) formData.append("caption", caption);
+  if (replyToMessageId) formData.append("replyToMessageId", replyToMessageId);
+  const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/attachments`, {
+    method: "POST",
+    headers: authHeaders(), // no Content-Type — fetch sets the multipart boundary itself
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to send attachment (${res.status})`);
   }
 }
 

@@ -42,12 +42,14 @@ export function ChatPanel({
   conversation,
   sending,
   onSend,
+  onSendAttachment,
   onModeChange,
   onBack,
 }: {
   conversation: Conversation;
   sending: boolean;
   onSend: (body: string) => void;
+  onSendAttachment?: ((file: File, caption?: string) => Promise<void>) | undefined;
   onModeChange: (mode: ConversationMode) => void;
   onBack?: () => void;
 }) {
@@ -137,7 +139,13 @@ export function ChatPanel({
         </div>
       )}
 
-      <MessageComposer mode={conversation.mode} disabled={sending} onSend={onSend} />
+      <MessageComposer
+        mode={conversation.mode}
+        channel={conversation.channel}
+        disabled={sending}
+        onSend={onSend}
+        onSendAttachment={onSendAttachment}
+      />
     </section>
   );
 }

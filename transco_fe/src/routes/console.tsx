@@ -134,6 +134,7 @@ function ConsoleBody() {
     selectedConversation,
     selectConversation,
     sendMessage,
+    sendAttachment,
     setMode,
     sending,
     websitePaused,
@@ -162,6 +163,7 @@ function ConsoleBody() {
             conversation={selectedConversation}
             sending={sending}
             onSend={(body) => sendMessage(selectedConversation.id, body)}
+            onSendAttachment={(file, caption) => sendAttachment(selectedConversation.id, file, caption)}
             onModeChange={(mode) => setMode(selectedConversation.id, mode)}
             onBack={() => selectConversation(null)}
           />

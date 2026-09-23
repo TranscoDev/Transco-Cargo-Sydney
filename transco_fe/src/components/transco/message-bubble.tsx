@@ -1,9 +1,46 @@
+import { FileText } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { formatMessageTime } from "@/lib/transco/time";
 import { renderWhatsAppText } from "@/lib/transco/whatsapp-format";
 import type { Message } from "@/lib/transco/types";
 
 import { MessageStatusIcon } from "./message-status";
+
+function MediaContent({ message }: { message: Message }) {
+  if (!message.mediaUrl) return null;
+  switch (message.mediaType) {
+    case "image":
+      return (
+        <a href={message.mediaUrl} target="_blank" rel="noopener noreferrer" className="block">
+          <img
+            src={message.mediaUrl}
+            alt={message.body || "Attachment"}
+            className="mb-1 max-h-64 w-full rounded-md object-cover"
+          />
+        </a>
+      );
+    case "video":
+      return (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <video src={message.mediaUrl} controls className="mb-1 max-h-64 w-full rounded-md" />
+      );
+    case "audio":
+      return <audio src={message.mediaUrl} controls className="mb-1 w-full" />;
+    default:
+      return (
+        <a
+          href={message.mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-1 flex items-center gap-2 rounded-md bg-black/5 px-2.5 py-2 underline-offset-2 hover:underline dark:bg-white/5"
+        >
+          <FileText className="h-4 w-4 shrink-0" />
+          <span className="truncate text-sm">Document</span>
+        </a>
+      );
+  }
+}
 
 export function MessageBubble({
   message,
@@ -45,9 +82,12 @@ export function MessageBubble({
             ⚠️ Flagged
           </p>
         )}
-        <p className="whitespace-pre-wrap break-words leading-snug">
-          {renderWhatsAppText(message.body)}
-        </p>
+        <MediaContent message={message} />
+        {message.body && (
+          <p className="whitespace-pre-wrap break-words leading-snug">
+            {renderWhatsAppText(message.body)}
+          </p>
+        )}
         {message.status === "FAILED" && message.failureReason && (
           <p className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-destructive">
             ⚠️ {message.failureReason}

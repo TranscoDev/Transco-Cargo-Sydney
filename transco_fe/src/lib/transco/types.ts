@@ -117,6 +117,10 @@ export type SenderType = "CUSTOMER" | "CHATBOT" | "HUMAN";
 
 export type MessageStatus = "SENT" | "DELIVERED" | "READ" | "FAILED";
 
+/** Mirrors the WhatsApp message type a staff attachment gets sent as —
+ * determined server-side from the uploaded file's mimetype. */
+export type MediaType = "image" | "video" | "audio" | "document";
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -129,6 +133,10 @@ export interface Message {
   /** Plain-English reason a FAILED status happened (e.g. the WhatsApp
    * 24-hour messaging window) — set only when status is FAILED. */
   failureReason?: string | null | undefined;
+  /** Set only for a staff-sent attachment (flyer/video/document) — body
+   * is used as the caption when present, empty otherwise. */
+  mediaUrl?: string | null | undefined;
+  mediaType?: MediaType | null | undefined;
 }
 
 /** The message that triggered a needs-attention flag, kept around so

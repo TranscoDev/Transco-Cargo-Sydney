@@ -2,6 +2,8 @@ require('dotenv').config({ quiet: true });
 
 const http = require('http');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
@@ -24,6 +26,30 @@ const importUpload = multer({
     if (!okExt) return cb(new Error('Only .xlsx, .xls, or .csv files are supported'));
     cb(null, true);
   }
+});
+
+// Staff-sent attachments (flyers, videos, documents) — unlike the import
+// above, these need to persist and be reachable at a public URL so
+// WhatsApp's own servers can fetch them (the same `link` pattern already
+// proven for the bot's own flyer/video sends). Written to a Railway
+// volume, not the app's own bundled `media` folder, since anything saved
+// to the container's ephemeral local disk is lost on the next deploy.
+const ATTACHMENT_UPLOAD_DIR = process.env.MEDIA_UPLOAD_DIR || '/data/media-uploads';
+fs.mkdirSync(ATTACHMENT_UPLOAD_DIR, { recursive: true });
+
+const attachmentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, ATTACHMENT_UPLOAD_DIR),
+    filename: (req, file, cb) => {
+      const unique = crypto.randomBytes(16).toString('hex');
+      cb(null, `${unique}${path.extname(file.originalname).toLowerCase()}`);
+    }
+  }),
+  // WhatsApp's own per-type caps (image 5MB, video/audio 16MB, document
+  // 100MB) vary by type multer can't yet know at this point — 16MB covers
+  // image/video/audio comfortably; a staff PDF/doc bigger than that is
+  // rare enough not to special-case yet.
+  limits: { fileSize: 16 * 1024 * 1024 }
 });
 
 const app = express();
@@ -116,6 +142,10 @@ async function isWhatsAppPausedOn() {
 //
 
 app.use('/media', express.static('media'));
+
+// Staff-uploaded attachments — served from the persistent volume, not
+// the bundled `media` folder above (see attachmentUpload's own comment).
+app.use('/uploads', express.static(ATTACHMENT_UPLOAD_DIR));
 
 
 // ============================================================
@@ -327,7 +357,9 @@ async function saveMessage({
   content,
   isRead,
   replyToMessageId,
-  whatsappStatus
+  whatsappStatus,
+  mediaUrl = null,
+  mediaType = null
 }) {
   const doc = {
     customerId,
@@ -336,6 +368,8 @@ async function saveMessage({
     isRead,
     replyToMessageId,
     whatsappStatus,
+    mediaUrl,
+    mediaType,
     createdAt: new Date()
   };
 
@@ -2418,6 +2452,128 @@ app.post(
 
 
 // ============================================================
+// STAFF SENDS ATTACHMENT (flyer/image/video/document)
+// ============================================================
+//
+// WhatsApp only — the website widget has no live-push channel for a
+// staff-initiated message at all yet (a plain HUMAN text reply already
+// can't reach an idle website visitor today), so this is scoped to
+// WhatsApp rather than silently failing for website customers.
+
+app.post(
+  '/api/customers/:customerId/attachments',
+  attachmentUpload.single('file'),
+  async (req, res) => {
+
+    try {
+
+      const { customerId } = req.params;
+      const { caption, replyToMessageId } = req.body ?? {};
+
+      if (!ObjectId.isValid(customerId)) {
+        return res.status(400).json({ error: 'Invalid customer id' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded (expected field name "file")' });
+      }
+
+      const customer = await customers().findOne({ _id: new ObjectId(customerId) });
+
+      if (!customer) {
+        return res.status(404).json({ error: 'Customer not found' });
+      }
+
+      if (customer.mode !== 'HUMAN') {
+        return res.status(409).json({ error: 'Conversation is not in HUMAN mode' });
+      }
+
+      if (customer.channel === 'website') {
+        return res.status(400).json({
+          error: 'Attachments are not supported for website chats yet — WhatsApp only for now'
+        });
+      }
+
+      if (!MEDIA_BASE_URL) {
+        return res.status(503).json({ error: 'Attachments are not configured (MEDIA_BASE_URL missing)' });
+      }
+
+      let resolvedReplyId = null;
+      if (replyToMessageId) {
+        if (!ObjectId.isValid(replyToMessageId)) {
+          return res.status(400).json({ error: 'Invalid replyToMessageId' });
+        }
+        const target = await messages().findOne({
+          _id: new ObjectId(replyToMessageId),
+          customerId: customer._id,
+          senderType: 'CUSTOMER'
+        });
+        if (!target) {
+          return res.status(400).json({
+            error: 'replyToMessageId does not reference a customer message in this conversation'
+          });
+        }
+        resolvedReplyId = target._id;
+      }
+
+      const mediaType = whatsAppMediaTypeFor(req.file.mimetype);
+      const mediaUrl = `${MEDIA_BASE_URL}/uploads/${req.file.filename}`;
+
+      const outgoing = await saveMessage({
+        customerId: customer._id,
+        senderType: 'HUMAN',
+        content: caption ? caption.trim() : '',
+        isRead: true,
+        replyToMessageId: resolvedReplyId,
+        whatsappStatus: null,
+        mediaUrl,
+        mediaType
+      });
+
+      try {
+        await sendWhatsAppMedia(
+          customer.phoneNumber,
+          mediaType,
+          mediaUrl,
+          caption ? caption.trim() : null,
+          outgoing._id.toString(),
+          req.file.originalname
+        );
+        outgoing.whatsappStatus = 'SENT';
+      } catch (err) {
+        console.error('WhatsApp attachment send failed:', err.response?.data ?? err.message);
+        outgoing.whatsappStatus = 'FAILED';
+      }
+
+      await messages().updateOne(
+        { _id: outgoing._id },
+        { $set: { whatsappStatus: outgoing.whatsappStatus } }
+      );
+
+      await broadcastMessageCreated(customer, outgoing);
+
+      res.status(201).json({ message: outgoing });
+
+    } catch (err) {
+
+      console.error('Error sending attachment:', err.message);
+
+      res.status(500).json({
+        error: 'Failed to send attachment'
+      });
+    }
+  }
+);
+
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
+});
+
+
+// ============================================================
 // CUSTOMER MODE
 // ============================================================
 
@@ -4043,6 +4199,57 @@ async function sendWhatsAppImage(
     }
 
   );
+}
+
+
+// ============================================================
+// WHATSAPP MEDIA (generic — staff-sent attachments)
+// ============================================================
+//
+// Same `type` + `{link}` pattern as sendWhatsAppVideo/sendWhatsAppImage
+// above, generalized to whatever media type/URL a staff attachment
+// upload resolves to, instead of the two fixed promo assets those
+// functions always send.
+
+async function sendWhatsAppMedia(to, mediaType, mediaUrl, caption, bizOpaqueCallbackData, originalFilename) {
+
+  const mediaObject = { link: mediaUrl };
+  if (caption) mediaObject.caption = caption;
+  // Documents show a filename in WhatsApp's UI — without one it just
+  // shows the random storage name, which means nothing to the customer.
+  if (mediaType === 'document' && originalFilename) mediaObject.filename = originalFilename;
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    to: to,
+    type: mediaType,
+    [mediaType]: mediaObject
+  };
+
+  if (bizOpaqueCallbackData) {
+    payload.biz_opaque_callback_data = bizOpaqueCallbackData;
+  }
+
+  await axios.post(
+    `${WHATSAPP_API_BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+}
+
+// Maps an uploaded file's mimetype to the WhatsApp message type it needs
+// to be sent as — anything not recognized as image/video/audio falls
+// back to 'document', which WhatsApp accepts for nearly any file type.
+function whatsAppMediaTypeFor(mimetype) {
+  if (mimetype.startsWith('image/')) return 'image';
+  if (mimetype.startsWith('video/')) return 'video';
+  if (mimetype.startsWith('audio/')) return 'audio';
+  return 'document';
 }
 
 
