@@ -122,7 +122,7 @@ function Sidebar() {
     setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
-    <aside className="hidden w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-panel px-2 py-3 md:flex">
+    <aside className="hidden w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-nav-border bg-nav px-2 py-3 md:flex">
       {NAV_SECTIONS.map((section) => {
         const Icon = section.icon;
         const [only] = section.items;
@@ -134,7 +134,9 @@ function Sidebar() {
               to={only.to}
               className={cn(
                 "flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary",
+                active
+                  ? "bg-nav-active text-nav-active-foreground"
+                  : "text-nav-foreground hover:bg-nav-hover",
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -155,8 +157,8 @@ function Sidebar() {
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors",
                 groupActive
-                  ? "bg-primary/15 text-primary"
-                  : "text-primary/80 hover:bg-primary/10 hover:text-primary",
+                  ? "bg-nav-hover text-nav-active-foreground"
+                  : "text-nav-muted hover:bg-nav-hover hover:text-nav-foreground",
               )}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -176,8 +178,8 @@ function Sidebar() {
                       className={cn(
                         "rounded-md px-4 py-1.5 text-sm transition-colors",
                         active
-                          ? "bg-primary/10 font-medium text-primary"
-                          : "text-foreground/80 hover:bg-secondary hover:text-foreground",
+                          ? "bg-nav-active font-medium text-nav-active-foreground"
+                          : "text-nav-muted hover:bg-nav-hover hover:text-nav-foreground",
                       )}
                     >
                       {item.label}

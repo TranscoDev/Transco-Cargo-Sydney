@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { createMessage, getMockConversations, simulatedInbound } from "./mock-data";
+import { logout as clearSession } from "./auth";
 import {
   createManualContact,
   createSegment as createSegmentRequest,
@@ -205,6 +206,18 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         if (cancelled) return;
+        const message = err instanceof Error ? err.message : "";
+        // A reachable backend that rejects the request (expired/invalid
+        // session — e.g. the server's session secret rotated) must never
+        // be papered over with fabricated demo customers. Only a
+        // genuinely unreachable backend (no server running at all, the
+        // standalone-demo case) falls back to mock data.
+        if (message.includes("(401)")) {
+          console.warn("Session is no longer valid — signing out.", err);
+          clearSession();
+          window.location.href = "/";
+          return;
+        }
         console.warn("Could not reach the backend; showing local demo data instead.", err);
         setConversations(getMockConversations());
       });

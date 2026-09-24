@@ -71,6 +71,14 @@
   --color-panel: var(--panel);
   --color-header: var(--header-bg);
   --color-header-foreground: var(--header-foreground);
+  --color-nav: var(--nav-bg);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-hover: var(--nav-hover);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-foreground: var(--nav-active-foreground);
+  --color-nav-border: var(--nav-border);
+  --color-nav-tint: var(--nav-tint);
 }
 
 :root {
@@ -110,6 +118,25 @@
   --header-bg: oklch(0.24 0.035 258);
   --header-foreground: oklch(0.98 0.006 90);
 
+  /* Left nav sidebar — same navy family as the header so header+sidebar
+   * read as one continuous "chrome" frame around the light content area,
+   * instead of the sidebar washing out into the same near-white panel
+   * color as everything else. Also deliberately NOT redefined in .dark,
+   * same reasoning as header-bg above. */
+  --nav-bg: oklch(0.205 0.032 258);
+  --nav-foreground: oklch(0.95 0.008 90);
+  --nav-muted: oklch(0.68 0.025 255);
+  --nav-hover: oklch(0.28 0.04 258);
+  --nav-active: oklch(0.34 0.09 177);
+  --nav-active-foreground: oklch(0.97 0.02 177);
+  --nav-border: oklch(1 0 0 / 8%);
+
+  /* A light echo of the navy, for panels that should read as "part of
+   * the same theme" without being bold chrome themselves — e.g. the
+   * conversation context sidebar. Same hue as --nav-bg, just very
+   * light instead of dark. */
+  --nav-tint: oklch(0.965 0.012 258);
+
   /* HUMAN mode accent — restrained amber/yellow */
   --human: oklch(0.79 0.15 85);
   --human-soft: oklch(0.96 0.055 92);
@@ -136,6 +163,7 @@
   --background: oklch(0.16 0.015 255);
   --foreground: oklch(0.984 0.003 247.858);
   --panel: oklch(0.2 0.015 255);
+  --nav-tint: oklch(0.23 0.025 258);
   --chat-canvas: oklch(0.18 0.015 255);
   --bubble-in: oklch(0.24 0.012 255);
   --bubble-out: oklch(0.32 0.055 177);

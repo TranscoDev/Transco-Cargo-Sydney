@@ -35,7 +35,7 @@ export function CustomerContextPanel({
     .slice(0, 3);
 
   return (
-    <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-panel p-4 xl:block">
+    <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-nav-tint p-4 xl:block">
       <div className="mb-4">
         <p className="text-sm font-semibold text-foreground">{conversation.customerName}</p>
         <div className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
@@ -68,7 +68,7 @@ export function CustomerContextPanel({
         ) : (
           <div className="flex flex-col gap-1.5">
             {recentBookings.map((b) => (
-              <div key={b.id} className="rounded-md border border-border bg-background px-2 py-1.5 text-xs">
+              <div key={b.id} className="rounded-md border border-border bg-panel px-2 py-1.5 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-medium capitalize">{b.resolvedDate}</span>
                   <span className="capitalize text-muted-foreground">{b.status}</span>
@@ -89,7 +89,7 @@ export function CustomerContextPanel({
                 key={s.id}
                 to="/console/shipments/$shipmentId"
                 params={{ shipmentId: s.id }}
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-xs hover:border-primary/40"
+                className="rounded-md border border-border bg-panel px-2 py-1.5 text-xs hover:border-primary/40"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{s.shipmentNumber}</span>
