@@ -83,8 +83,9 @@ export function BookingsPanel({
 
   const grouped = groupByDate(filtered);
   // YYYY-MM-DD strings sort correctly as plain strings — no weekday
-  // lookup table needed.
-  const days = [...grouped.keys()].sort();
+  // lookup table needed. Descending so the newest date shows first,
+  // same as most activity feeds — older bookings scroll further down.
+  const days = [...grouped.keys()].sort().reverse();
 
   return (
     <div className="flex h-full min-h-0 bg-chat-canvas">

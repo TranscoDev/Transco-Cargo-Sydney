@@ -611,8 +611,8 @@ async function getGoogleCalendarAccessToken(credentials) {
 // apply the server's OWN timezone on top and double-shift it. Every
 // function below that works with "Sydney time" follows this same
 // convention, so they can all be combined safely.
-function getSydneyNow() {
-  const utcNow = new Date();
+function getSydneyNow(baseUtcDate) {
+  const utcNow = baseUtcDate || new Date();
   const year = utcNow.getUTCFullYear();
 
   const firstSundayUTC = (y, monthIndex0) => {
@@ -635,7 +635,7 @@ function getSydneyNow() {
 // Date follows the same "read with UTC getters" convention as
 // getSydneyNow() above.
 
-function nextDateForWeekday(dayName, timeHHMM) {
+function nextDateForWeekday(dayName, timeHHMM, referenceSydneyNow) {
   const DAY_NAMES = [
     'sunday', 'monday', 'tuesday', 'wednesday',
     'thursday', 'friday', 'saturday'
@@ -643,7 +643,7 @@ function nextDateForWeekday(dayName, timeHHMM) {
 
   const targetDow = DAY_NAMES.indexOf(dayName.toLowerCase());
 
-  const nowSydney = getSydneyNow();
+  const nowSydney = referenceSydneyNow || getSydneyNow();
 
   const [hh, mm] = timeHHMM.split(':').map(Number);
 
@@ -666,15 +666,27 @@ function nextDateForWeekday(dayName, timeHHMM) {
   ));
 }
 
-// Resolves the actual target Date for a booking. If the customer named
-// an explicit date (e.g. "12th September") rather than a day name, the
-// Flowise tool already resolved it to a real calendar date using its
-// own clock — requestedDateISO carries that through untouched, so it's
-// used directly here instead of being re-derived. This is exactly what
-// a past booking was missing: re-deriving "next Thursday" from a
-// guessed day name landed on a completely different, wrong date than
-// what the customer actually asked for. Falls back to the day-name
-// lookup only when no explicit date was captured.
+// YYYY-MM-DD for a weekday name + time, resolved ONCE (either against
+// live "now", or against a specific reference instant for backfilling
+// an existing booking using its own createdAt) — this is what makes a
+// weekday-only booking's date permanent instead of being silently
+// re-derived (and drifting a week forward) on every later fetch. See
+// resolveBookingDate() below for why re-deriving from "now" every time
+// was the actual bug.
+function dateStringForWeekday(dayName, timeHHMM, referenceSydneyNow) {
+  const date = nextDateForWeekday(dayName, timeHHMM, referenceSydneyNow);
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+}
+
+// Resolves the actual target Date for a booking. Every booking now gets
+// a real requestedDateISO stored permanently at creation time (see the
+// BOOK_DROPOFF handler above), so this just reads it straight back —
+// the date is never re-derived from "now" on a later fetch, which used
+// to make a booking silently jump a week forward once its requested
+// time-of-day had passed. The day-name lookup below only exists as a
+// safety net for any booking record that predates that fix and hasn't
+// been backfilled.
 function resolveBookingDate(booking) {
   if (booking.requestedDateISO) {
     const [y, m, d] = booking.requestedDateISO.split('-').map(Number);
@@ -1022,13 +1034,25 @@ async function sendAndTrackOutbound(
     // family phone, a business name). Only fall back to what's on file
     // if the customer's reply genuinely didn't include one (the
     // never-get-stuck path still confirms the booking regardless).
+    // requestedDateISO is captured here, permanently, at the moment the
+    // booking is made — not re-derived from "now" on every later fetch.
+    // A booking made against an explicit date (the marker's own date=
+    // group) already has one; a booking made against a bare weekday
+    // name ("wednesday") gets one resolved right now, while "now" is
+    // still legitimately the reference point. Past bug: leaving this
+    // null and re-deriving "next wednesday from now" on every GET
+    // /api/bookings meant the SAME booking silently jumped a week
+    // forward the instant its requested time-of-day passed — hitting
+    // every weekday-only booking at once, not just the one being acted
+    // on at the time.
+    const normalizedDay = requestedDay.toLowerCase();
     const booking = {
       customerId: customer._id,
       customerName: (contactName && contactName.trim()) || customer.name,
       phoneNumber: (contactPhone && contactPhone.trim()) || customer.phoneNumber,
-      requestedDay: requestedDay.toLowerCase(),
+      requestedDay: normalizedDay,
       requestedTime,
-      requestedDateISO: requestedDateISO || null,
+      requestedDateISO: requestedDateISO || dateStringForWeekday(normalizedDay, requestedTime),
       boxSummary: boxSummary ? boxSummary.trim() : null,
       status: 'pending',
       createdAt: new Date()
