@@ -7,6 +7,7 @@ import type {
   Conversation,
   ConversationChannel,
   ConversationMode,
+  CustomerProfile,
   CustomerSource,
   CustomerStatus,
   EmailCampaignResult,
@@ -52,6 +53,10 @@ export interface BackendCustomer {
   notes?: string;
   sources?: CustomerSource[];
   status?: CustomerStatus;
+  totalBookings?: number;
+  totalShipments?: number;
+  totalRevenue?: number;
+  outstandingBalance?: number | null;
 }
 
 export interface BackendShipment {
@@ -139,11 +144,15 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     sources: c.sources,
     status: c.status,
     shipments: c.shipments?.map(mapShipment),
+    totalBookings: c.totalBookings,
+    totalShipments: c.totalShipments,
+    totalRevenue: c.totalRevenue,
+    outstandingBalance: c.outstandingBalance,
   };
 }
 
-/** No endpoint currently requires this, but every real request carries it
- * so nothing needs to change here once authorization is enforced server-side. */
+/** Every /api/* route except login and the public web-chat widget now
+ * requires this (server-side requireAuth middleware, added Phase 0). */
 function authHeaders(): Record<string, string> {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -156,6 +165,35 @@ export async function fetchConversations(): Promise<Conversation[]> {
   }
   const data = (await res.json()) as { customers: BackendCustomerWithMessages[] };
   return data.customers.map(mapConversation);
+}
+
+interface BackendCustomerProfile extends BackendCustomerWithMessages {
+  bookings: BackendBooking[];
+  totalBookings: number;
+  totalShipments: number;
+  totalRevenue: number;
+  outstandingBalance: number | null;
+  financeDataAvailable: boolean;
+}
+
+/** GET /api/customers/:id/profile — the CRM detail view. Separate from
+ * fetchConversations() (the list endpoint) since this pulls a fuller,
+ * single-customer aggregate (booking history, finance placeholder
+ * fields) that would be wasteful to compute for every row in the list. */
+export async function fetchCustomerProfile(customerId: string): Promise<CustomerProfile> {
+  const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/profile`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load customer profile (${res.status})`);
+  }
+  const data = (await res.json()) as { customer: BackendCustomerProfile };
+  const c = data.customer;
+  return {
+    ...mapConversation(c),
+    bookings: c.bookings.map(mapBooking),
+    financeDataAvailable: c.financeDataAvailable,
+  };
 }
 
 export async function markConversationRead(customerId: string): Promise<void> {
@@ -262,6 +300,21 @@ export async function fetchPauseState(): Promise<PauseState> {
     throw new Error(`Failed to load pause state (${res.status})`);
   }
   return (await res.json()) as PauseState;
+}
+
+export interface DashboardSummary {
+  todaysBookings: number;
+  newCustomersToday: number;
+  unreadConversations: number;
+  attentionConversations: number;
+}
+
+export async function fetchDashboardSummary(): Promise<DashboardSummary> {
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/summary`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load dashboard summary (${res.status})`);
+  }
+  return (await res.json()) as DashboardSummary;
 }
 
 /** Send only the flag(s) you want to change — e.g. `{ websitePaused: true }`

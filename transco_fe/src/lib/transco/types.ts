@@ -170,6 +170,24 @@ export interface Conversation {
   status?: CustomerStatus | undefined;
   /** Only populated for customers with historical-import shipment records. */
   shipments?: ShipmentHistoryEntry[] | undefined;
+  /** CRM aggregate fields — computed server-side at read time from
+   * bookings/shipments/(later invoices+payments), never stored on the
+   * customer record itself. totalRevenue/outstandingBalance are 0/null
+   * until Finance ships (Phase 5); see financeDataAvailable on
+   * CustomerProfile for the explicit "not built yet" flag. */
+  totalBookings?: number | undefined;
+  totalShipments?: number | undefined;
+  totalRevenue?: number | undefined;
+  outstandingBalance?: number | null | undefined;
+}
+
+/** GET /api/customers/:id/profile — the CRM detail view. A superset of
+ * Conversation: same customer fields, plus this customer's own booking
+ * history and an explicit flag for whether the finance fields are real
+ * data yet (they're not, until Phase 5). */
+export interface CustomerProfile extends Conversation {
+  bookings: Booking[];
+  financeDataAvailable: boolean;
 }
 
 export interface ConversationSummary {

@@ -149,6 +149,52 @@ app.use('/uploads', express.static(ATTACHMENT_UPLOAD_DIR));
 
 
 // ============================================================
+// AUTH MIDDLEWARE
+// ============================================================
+//
+// Until now, signSession()/verifySession() (defined further below,
+// but hoisted since they're function declarations) were fully
+// implemented but only ever actually checked by GET /api/auth/session
+// — every other route, including every one that mutates data, was
+// wide open to anyone who found the URL. This closes that gap.
+//
+// Scoped to '/api' only, so /webhook (Meta's own verify-token scheme,
+// no staff session exists), /media, and /uploads (must stay publicly
+// fetchable — WhatsApp's servers and customers with a direct link have
+// no staff token) are never touched by this at all, without needing to
+// be listed anywhere. Within '/api', an explicit PUBLIC allowlist
+// (not a blocklist) so a new route added later without thinking about
+// auth is protected by default instead of silently shipping open.
+// Relative to the '/api' mount point below — Express strips the
+// mount prefix from req.path inside an app.use(mountPath, ...)
+// handler, so these must NOT repeat the leading '/api'.
+const PUBLIC_API_PREFIXES = [
+  '/auth/login',   // issues the token — can't require one to get one
+  '/web-chat'      // public website chat widget, no staff session
+];
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const payload = verifySession(token);
+
+  if (!payload) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  req.user = payload;
+  next();
+}
+
+app.use('/api', (req, res, next) => {
+  if (PUBLIC_API_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
+    return next();
+  }
+  return requireAuth(req, res, next);
+});
+
+
+// ============================================================
 // ENVIRONMENT VARIABLES
 // ============================================================
 
@@ -257,7 +303,21 @@ async function seedStaffUser() {
 // SESSION
 // ============================================================
 
-const SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+// Was previously always crypto.randomBytes(...) with no env override —
+// meaning a brand new secret every process boot, silently invalidating
+// every staff member's session on every restart/redeploy. Now prefers
+// a persisted SESSION_SECRET env var; only falls back to a random,
+// process-local one (with a loud warning) if that var isn't set yet.
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  (() => {
+    console.warn(
+      'SESSION_SECRET is not set as an environment variable — using a random ' +
+      'value for this process only. Every staff member will be logged out on ' +
+      'the next restart/redeploy until SESSION_SECRET is set persistently.'
+    );
+    return crypto.randomBytes(32).toString('hex');
+  })();
 
 
 function signSession(payload) {
@@ -1928,7 +1988,8 @@ app.get('/api/customers', async (req, res) => {
     const [
       allCustomers,
       allMessages,
-      allShipments
+      allShipments,
+      allBookings
     ] = await Promise.all([
 
       customers()
@@ -1942,9 +2003,29 @@ app.get('/api/customers', async (req, res) => {
 
       shipmentHistory()
         .find({})
+        .toArray(),
+
+      // Only used to compute per-customer counts below (CRM list
+      // columns) — never stored back onto the customer document
+      // itself, so this can never drift out of sync.
+      bookings()
+        .find({})
         .toArray()
 
     ]);
+
+
+    const bookingsByCustomer = new Map();
+
+    for (const booking of allBookings) {
+      const key = booking.customerId.toString();
+      const bucket = bookingsByCustomer.get(key);
+      if (bucket) {
+        bucket.push(booking);
+      } else {
+        bookingsByCustomer.set(key, [booking]);
+      }
+    }
 
 
     const messagesByCustomer =
@@ -2000,7 +2081,20 @@ app.get('/api/customers', async (req, res) => {
         shipments:
           shipmentsByCustomer.get(
             customer._id.toString()
-          ) ?? []
+          ) ?? [],
+
+        // CRM list columns — computed here, never stored on the
+        // customer document. Finance doesn't exist yet (Phase 5), so
+        // revenue/outstanding degrade gracefully rather than being
+        // invented.
+        totalBookings:
+          (bookingsByCustomer.get(customer._id.toString()) ?? []).length,
+
+        totalShipments:
+          (shipmentsByCustomer.get(customer._id.toString()) ?? []).length,
+
+        totalRevenue: 0,
+        outstandingBalance: null
 
       }));
 
@@ -2018,6 +2112,165 @@ app.get('/api/customers', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to list customers'
+    });
+  }
+});
+
+
+// ============================================================
+// CUSTOMER PROFILE (CRM aggregate view)
+// ============================================================
+//
+// Everything here is computed at read time from the existing
+// customers/messages/shipmentHistory/bookings collections — nothing
+// is stored/duplicated onto the customer document itself, so these
+// numbers can never drift out of sync with the underlying records.
+// Same in-memory-join style as GET /api/customers above, just scoped
+// to one customer instead of all of them.
+//
+// totalRevenue/outstandingBalance are hardcoded to 0/null with
+// financeDataAvailable:false — Finance (invoices/payments) doesn't
+// exist yet (Phase 5). This lets the CRM profile page ship its full
+// layout now without inventing numbers, and light up for real once
+// Phase 5 lands, without this route's response shape needing to
+// change again.
+app.get('/api/customers/:customerId/profile', async (req, res) => {
+
+  try {
+
+    const { customerId } = req.params;
+
+    let customerObjectId;
+    try {
+      customerObjectId = new ObjectId(customerId);
+    } catch {
+      return res.status(400).json({ error: 'Invalid customer id' });
+    }
+
+    const customer = await customers().findOne({ _id: customerObjectId });
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const [customerMessages, customerShipments, customerBookings] = await Promise.all([
+
+      messages()
+        .find({ customerId: customerObjectId })
+        .sort({ createdAt: 1 })
+        .toArray(),
+
+      shipmentHistory()
+        .find({ customerId: customerObjectId })
+        .toArray(),
+
+      bookings()
+        .find({ customerId: customerObjectId })
+        .sort({ createdAt: -1 })
+        .toArray()
+
+    ]);
+
+    const bookingsWithResolvedDate = customerBookings.map(booking => ({
+      ...booking,
+      resolvedDate: resolvedDateString(booking)
+    }));
+
+    res.status(200).json({
+      customer: {
+        ...customer,
+        messages: customerMessages,
+        shipments: customerShipments,
+        bookings: bookingsWithResolvedDate,
+        totalBookings: bookingsWithResolvedDate.length,
+        totalShipments: customerShipments.length,
+        totalRevenue: 0,
+        outstandingBalance: null,
+        financeDataAvailable: false
+      }
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error loading customer profile:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to load customer profile'
+    });
+  }
+});
+
+
+// ============================================================
+// DASHBOARD SUMMARY
+// ============================================================
+//
+// Independent, parallel per-card queries (Promise.all), not one
+// mega-aggregation — each card is cheap on its own, and a card whose
+// module hasn't shipped yet (shipments/inventory/finance) just isn't
+// queried at all rather than needing to know about collections that
+// don't exist. Never fakes a number: a metric with no real data
+// source yet is simply left out of the response, and the frontend
+// shows "Available in a later phase" for those instead of a 0 that
+// could be mistaken for a real zero.
+app.get('/api/dashboard/summary', async (req, res) => {
+
+  try {
+
+    const nowSydney = getSydneyNow();
+    const pad = n => String(n).padStart(2, '0');
+    const todayString =
+      `${nowSydney.getUTCFullYear()}-${pad(nowSydney.getUTCMonth() + 1)}-${pad(nowSydney.getUTCDate())}`;
+
+    // ObjectId embeds its creation time in its first 4 bytes, so this
+    // is a reliable "created today" filter even for customers whose
+    // document has no explicit createdAt field set (WhatsApp/manual/
+    // import-created customers don't set one — only website-created
+    // ones do, see findOrCreateCustomer/findOrCreateWebCustomer).
+    const startOfDayUtcSeconds = Math.floor(
+      Date.UTC(nowSydney.getUTCFullYear(), nowSydney.getUTCMonth(), nowSydney.getUTCDate()) / 1000
+    );
+    const startOfDayId = ObjectId.createFromTime(startOfDayUtcSeconds);
+    const startOfNextDayId = ObjectId.createFromTime(startOfDayUtcSeconds + 24 * 60 * 60);
+
+    const [
+      todaysBookingsCount,
+      newCustomersCount,
+      unreadCustomerIds,
+      attentionCount
+    ] = await Promise.all([
+
+      bookings().countDocuments({ requestedDateISO: todayString }),
+
+      customers().countDocuments({
+        _id: { $gte: startOfDayId, $lt: startOfNextDayId }
+      }),
+
+      messages().distinct('customerId', { senderType: 'CUSTOMER', isRead: false }),
+
+      customers().countDocuments({ needsAttention: true })
+
+    ]);
+
+    res.status(200).json({
+      todaysBookings: todaysBookingsCount,
+      newCustomersToday: newCustomersCount,
+      unreadConversations: unreadCustomerIds.length,
+      attentionConversations: attentionCount
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error loading dashboard summary:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to load dashboard summary'
     });
   }
 });

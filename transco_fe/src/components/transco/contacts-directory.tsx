@@ -1,4 +1,5 @@
 import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Bookmark,
   BookmarkPlus,
@@ -13,6 +14,7 @@ import {
   Plus,
   Search,
   Square,
+  SquareUserRound,
   Upload,
   X,
 } from "lucide-react";
@@ -454,13 +456,13 @@ export function ContactsDirectory({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {visible.length === 0 ? (
           <p className="px-4 py-8 text-center text-xs text-muted-foreground">
             No contacts match this search.
           </p>
         ) : (
-          <table className="w-full border-collapse text-xs">
+          <table className="w-full min-w-[1180px] border-collapse text-xs">
             <thead className="sticky top-0 z-10 bg-panel text-left text-[11px] text-muted-foreground shadow-[0_1px_0_0_theme(colors.border)]">
               <tr>
                 <th className="px-2 py-2">
@@ -478,6 +480,11 @@ export function ContactsDirectory({
                 <th className="px-4 py-2 font-medium">Source</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Mode</th>
+                <th className="px-4 py-2 text-right font-medium">Bookings</th>
+                <th className="px-4 py-2 text-right font-medium">Shipments</th>
+                <th className="px-4 py-2 text-right font-medium">Revenue</th>
+                <th className="px-4 py-2 text-right font-medium">Outstanding</th>
+                <th className="whitespace-nowrap px-4 py-2 font-medium">Last Activity</th>
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Notes</th>
                 <th className="px-4 py-2 font-medium" />
@@ -618,6 +625,27 @@ function ContactRow({
         </span>
       </td>
       <td className="px-4 py-2 text-muted-foreground">{MODE_LABELS[conversation.mode]}</td>
+      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+        {conversation.totalBookings ?? 0}
+      </td>
+      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+        {conversation.totalShipments ?? 0}
+      </td>
+      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+        {/* outstandingBalance === null is the "finance not built yet" signal from the backend
+            (see server.js's customer profile/list endpoints) — never show a fake $0. */}
+        {conversation.outstandingBalance === null || conversation.outstandingBalance === undefined
+          ? "—"
+          : `$${conversation.totalRevenue ?? 0}`}
+      </td>
+      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+        {conversation.outstandingBalance === null || conversation.outstandingBalance === undefined
+          ? "—"
+          : `$${conversation.outstandingBalance}`}
+      </td>
+      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+        {formatLastActivity(conversation)}
+      </td>
       <td className="px-4 py-2">
         <input
           value={email}
@@ -639,18 +667,46 @@ function ContactRow({
         />
       </td>
       <td className="px-2 py-2">
-        <button
-          type="button"
-          onClick={onViewProfile}
-          aria-label={`View profile for ${conversation.customerName}`}
-          title="View profile"
-          className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onViewProfile}
+            aria-label={`Quick view for ${conversation.customerName}`}
+            title="Quick view"
+            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+          <Link
+            to="/console/customers/$customerId"
+            params={{ customerId: conversation.id }}
+            aria-label={`Open full CRM profile for ${conversation.customerName}`}
+            title="Open full profile"
+            className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <SquareUserRound className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </td>
     </tr>
   );
+}
+
+/** "3h ago" / "2 days ago" / a short date once it's old enough — same
+ * lastActivity() a conversation row's own list already sorts by
+ * (store.tsx), just formatted for a table cell here. */
+function formatLastActivity(conversation: Conversation): string {
+  const last = conversation.messages[conversation.messages.length - 1];
+  if (!last) return "—";
+  const date = new Date(last.createdAt);
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return diffMins <= 1 ? "Just now" : `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
 function ContactProfileModal({

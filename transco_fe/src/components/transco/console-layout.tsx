@@ -1,5 +1,23 @@
-import { CalendarClock, ChevronDown, Globe, LogOut, MessageCircle, MessageSquareDot, Moon, PauseCircle, PlayCircle, Sun, Users } from "lucide-react";
+import {
+  Bot,
+  CalendarClock,
+  ChevronDown,
+  Globe,
+  LayoutDashboard,
+  LogOut,
+  MessageCircle,
+  MessageSquareDot,
+  Moon,
+  PackageSearch,
+  PauseCircle,
+  PlayCircle,
+  Settings as SettingsIcon,
+  Sun,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
 
 import { cn } from "@/lib/utils";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
@@ -13,13 +31,171 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type ConsoleTab = "conversations" | "bookings" | "contacts";
+/** Single source of truth for the sidebar — every future module
+ * (Phase 2+) gets added here, never as a new hand-written nav button.
+ * Sections whose module hasn't shipped yet still appear (their routes
+ * render a ComingSoonPanel) so the full target navigation is visible
+ * and clickable from day one instead of dead-ending. */
+export interface NavLeaf {
+  label: string;
+  to: string;
+}
+export interface NavSection {
+  label: string;
+  icon: typeof Users;
+  /** A section with exactly one leaf (Dashboard, Settings) renders as a
+   * single direct link instead of an expandable group. */
+  items: NavLeaf[];
+}
+
+export const NAV_SECTIONS: NavSection[] = [
+  { label: "Dashboard", icon: LayoutDashboard, items: [{ label: "Dashboard", to: "/console/dashboard" }] },
+  {
+    label: "CRM",
+    icon: Users,
+    items: [
+      { label: "Customers", to: "/console/customers" },
+      { label: "Leads", to: "/console/leads" },
+      { label: "Conversations", to: "/console/conversations" },
+    ],
+  },
+  {
+    label: "Operations",
+    icon: CalendarClock,
+    items: [
+      { label: "Bookings", to: "/console/bookings" },
+      { label: "Shipments", to: "/console/shipments" },
+      { label: "Tracking", to: "/console/tracking" },
+      { label: "Warehouse", to: "/console/warehouse" },
+    ],
+  },
+  {
+    label: "Inventory",
+    icon: PackageSearch,
+    items: [
+      { label: "Stock", to: "/console/inventory/stock" },
+      { label: "Stock Movements", to: "/console/inventory/movements" },
+      { label: "Suppliers", to: "/console/inventory/suppliers" },
+      { label: "Purchase Orders", to: "/console/inventory/purchase-orders" },
+    ],
+  },
+  {
+    label: "Finance",
+    icon: Wallet,
+    items: [
+      { label: "Invoices", to: "/console/finance/invoices" },
+      { label: "Payments", to: "/console/finance/payments" },
+      { label: "Expenses", to: "/console/finance/expenses" },
+      { label: "Reports", to: "/console/finance/reports" },
+    ],
+  },
+  {
+    label: "AI",
+    icon: Bot,
+    items: [
+      { label: "Agent Transco", to: "/console/ai/agent" },
+      { label: "Bot Controls", to: "/console/ai/bot-controls" },
+    ],
+  },
+  { label: "Settings", icon: SettingsIcon, items: [{ label: "Settings", to: "/console/settings" }] },
+];
+
+function sectionContainsPath(section: NavSection, pathname: string) {
+  return section.items.some((item) => pathname === item.to || pathname.startsWith(`${item.to}/`));
+}
+
+function Sidebar() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Groups start expanded only if they contain the active route; every
+  // other multi-item group starts collapsed so the sidebar reads as
+  // group headers with dropdowns rather than one long flat list.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const section of NAV_SECTIONS) {
+      if (section.items.length > 1) initial[section.label] = sectionContainsPath(section, pathname);
+    }
+    return initial;
+  });
+
+  const toggleSection = (label: string) =>
+    setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }));
+
+  return (
+    <aside className="hidden w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-panel px-2 py-3 md:flex">
+      {NAV_SECTIONS.map((section) => {
+        const Icon = section.icon;
+        const [only] = section.items;
+        if (section.items.length === 1 && only) {
+          const active = pathname === only.to;
+          return (
+            <Link
+              key={section.label}
+              to={only.to}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary",
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {section.label}
+            </Link>
+          );
+        }
+
+        const isOpen = !!openSections[section.label];
+        const groupActive = sectionContainsPath(section, pathname);
+
+        return (
+          <div key={section.label} className="mb-1">
+            <button
+              type="button"
+              onClick={() => toggleSection(section.label)}
+              aria-expanded={isOpen}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors",
+                groupActive
+                  ? "bg-primary/15 text-primary"
+                  : "text-primary/80 hover:bg-primary/10 hover:text-primary",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1 text-left">{section.label}</span>
+              <ChevronDown
+                className={cn("h-3.5 w-3.5 shrink-0 transition-transform", isOpen ? "rotate-180" : "")}
+              />
+            </button>
+            {isOpen && (
+              <div className="mt-0.5 flex flex-col gap-0.5">
+                {section.items.map((item) => {
+                  const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={cn(
+                        "rounded-md px-4 py-1.5 text-sm transition-colors",
+                        active
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-foreground/80 hover:bg-secondary hover:text-foreground",
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </aside>
+  );
+}
 
 export function ConsoleLayout({
   agentName,
   onLogout,
-  activeTab,
-  onTabChange,
   websitePaused,
   whatsappPaused,
   onUpdatePauseState,
@@ -27,8 +203,6 @@ export function ConsoleLayout({
 }: {
   agentName: string;
   onLogout: () => void;
-  activeTab: ConsoleTab;
-  onTabChange: (tab: ConsoleTab) => void;
   websitePaused: boolean;
   whatsappPaused: boolean;
   onUpdatePauseState: (partial: Partial<PauseState>) => void;
@@ -109,47 +283,6 @@ export function ConsoleLayout({
               </span>
             </span>
           </span>
-
-          <nav className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onTabChange("conversations")}
-              className={cn(
-                "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                activeTab === "conversations"
-                  ? "bg-white/15 text-header-foreground"
-                  : "text-header-foreground/65 hover:bg-white/10 hover:text-header-foreground",
-              )}
-            >
-              Conversations
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange("bookings")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                activeTab === "bookings"
-                  ? "bg-white/15 text-header-foreground"
-                  : "text-header-foreground/65 hover:bg-white/10 hover:text-header-foreground",
-              )}
-            >
-              <CalendarClock className="h-3.5 w-3.5" />
-              Bookings
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange("contacts")}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                activeTab === "contacts"
-                  ? "bg-white/15 text-header-foreground"
-                  : "text-header-foreground/65 hover:bg-white/10 hover:text-header-foreground",
-              )}
-            >
-              <Users className="h-3.5 w-3.5" />
-              Contacts
-            </button>
-          </nav>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <DropdownMenu>
@@ -215,7 +348,10 @@ export function ConsoleLayout({
           </button>
         </div>
       </header>
-      <main className="min-h-0 flex-1">{children}</main>
+      <div className="flex min-h-0 flex-1">
+        <Sidebar />
+        <main className="min-h-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }
