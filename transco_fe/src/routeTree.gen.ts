@@ -10,43 +10,337 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ConsoleRouteImport } from './routes/console'
+import { Route as ConsoleRouteRouteImport } from './routes/console/route'
+import { Route as ConsoleIndexRouteImport } from './routes/console/index'
+import { Route as ConsoleBookingsRouteImport } from './routes/console/bookings'
+import { Route as ConsoleConversationsRouteImport } from './routes/console/conversations'
+import { Route as ConsoleCustomersRouteRouteImport } from './routes/console/customers/route'
+import { Route as ConsoleDashboardRouteImport } from './routes/console/dashboard'
+import { Route as ConsoleLeadsRouteImport } from './routes/console.leads'
+import { Route as ConsoleSettingsRouteImport } from './routes/console.settings'
+import { Route as ConsoleShipmentsRouteRouteImport } from './routes/console/shipments/route'
+import { Route as ConsoleTrackingRouteImport } from './routes/console.tracking'
+import { Route as ConsoleWarehouseRouteImport } from './routes/console.warehouse'
+import { Route as ConsoleAiAgentRouteImport } from './routes/console.ai.agent'
+import { Route as ConsoleAiBotControlsRouteImport } from './routes/console.ai.bot-controls'
+import { Route as ConsoleCustomersIndexRouteImport } from './routes/console/customers/index'
+import { Route as ConsoleCustomersCustomerIdRouteImport } from './routes/console/customers/$customerId'
+import { Route as ConsoleFinanceExpensesRouteImport } from './routes/console.finance.expenses'
+import { Route as ConsoleFinanceInvoicesRouteImport } from './routes/console.finance.invoices'
+import { Route as ConsoleFinancePaymentsRouteImport } from './routes/console.finance.payments'
+import { Route as ConsoleFinanceReportsRouteImport } from './routes/console.finance.reports'
+import { Route as ConsoleInventoryMovementsRouteImport } from './routes/console.inventory.movements'
+import { Route as ConsoleInventoryPurchaseOrdersRouteImport } from './routes/console.inventory.purchase-orders'
+import { Route as ConsoleInventoryStockRouteImport } from './routes/console.inventory.stock'
+import { Route as ConsoleInventorySuppliersRouteImport } from './routes/console.inventory.suppliers'
+import { Route as ConsoleShipmentsIndexRouteImport } from './routes/console/shipments/index'
+import { Route as ConsoleShipmentsShipmentIdRouteImport } from './routes/console/shipments/$shipmentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ConsoleRoute = ConsoleRouteImport.update({
+const ConsoleRouteRoute = ConsoleRouteRouteImport.update({
   id: '/console',
   path: '/console',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleBookingsRoute = ConsoleBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleConversationsRoute = ConsoleConversationsRouteImport.update({
+  id: '/conversations',
+  path: '/conversations',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleCustomersRouteRoute = ConsoleCustomersRouteRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleDashboardRoute = ConsoleDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleLeadsRoute = ConsoleLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleSettingsRoute = ConsoleSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleShipmentsRouteRoute = ConsoleShipmentsRouteRouteImport.update({
+  id: '/shipments',
+  path: '/shipments',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleTrackingRoute = ConsoleTrackingRouteImport.update({
+  id: '/tracking',
+  path: '/tracking',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleWarehouseRoute = ConsoleWarehouseRouteImport.update({
+  id: '/warehouse',
+  path: '/warehouse',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleAiAgentRoute = ConsoleAiAgentRouteImport.update({
+  id: '/ai/agent',
+  path: '/ai/agent',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleAiBotControlsRoute = ConsoleAiBotControlsRouteImport.update({
+  id: '/ai/bot-controls',
+  path: '/ai/bot-controls',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleCustomersIndexRoute = ConsoleCustomersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleCustomersRouteRoute,
+} as any)
+const ConsoleCustomersCustomerIdRoute =
+  ConsoleCustomersCustomerIdRouteImport.update({
+    id: '/$customerId',
+    path: '/$customerId',
+    getParentRoute: () => ConsoleCustomersRouteRoute,
+  } as any)
+const ConsoleFinanceExpensesRoute = ConsoleFinanceExpensesRouteImport.update({
+  id: '/finance/expenses',
+  path: '/finance/expenses',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleFinanceInvoicesRoute = ConsoleFinanceInvoicesRouteImport.update({
+  id: '/finance/invoices',
+  path: '/finance/invoices',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleFinancePaymentsRoute = ConsoleFinancePaymentsRouteImport.update({
+  id: '/finance/payments',
+  path: '/finance/payments',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleFinanceReportsRoute = ConsoleFinanceReportsRouteImport.update({
+  id: '/finance/reports',
+  path: '/finance/reports',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleInventoryMovementsRoute =
+  ConsoleInventoryMovementsRouteImport.update({
+    id: '/inventory/movements',
+    path: '/inventory/movements',
+    getParentRoute: () => ConsoleRouteRoute,
+  } as any)
+const ConsoleInventoryPurchaseOrdersRoute =
+  ConsoleInventoryPurchaseOrdersRouteImport.update({
+    id: '/inventory/purchase-orders',
+    path: '/inventory/purchase-orders',
+    getParentRoute: () => ConsoleRouteRoute,
+  } as any)
+const ConsoleInventoryStockRoute = ConsoleInventoryStockRouteImport.update({
+  id: '/inventory/stock',
+  path: '/inventory/stock',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleInventorySuppliersRoute =
+  ConsoleInventorySuppliersRouteImport.update({
+    id: '/inventory/suppliers',
+    path: '/inventory/suppliers',
+    getParentRoute: () => ConsoleRouteRoute,
+  } as any)
+const ConsoleShipmentsIndexRoute = ConsoleShipmentsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleShipmentsRouteRoute,
+} as any)
+const ConsoleShipmentsShipmentIdRoute =
+  ConsoleShipmentsShipmentIdRouteImport.update({
+    id: '/$shipmentId',
+    path: '/$shipmentId',
+    getParentRoute: () => ConsoleShipmentsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/console': typeof ConsoleRoute
+  '/console': typeof ConsoleRouteRouteWithChildren
+  '/console/customers': typeof ConsoleCustomersRouteRouteWithChildren
+  '/console/shipments': typeof ConsoleShipmentsRouteRouteWithChildren
+  '/console/bookings': typeof ConsoleBookingsRoute
+  '/console/conversations': typeof ConsoleConversationsRoute
+  '/console/dashboard': typeof ConsoleDashboardRoute
+  '/console/leads': typeof ConsoleLeadsRoute
+  '/console/settings': typeof ConsoleSettingsRoute
+  '/console/tracking': typeof ConsoleTrackingRoute
+  '/console/warehouse': typeof ConsoleWarehouseRoute
+  '/console/': typeof ConsoleIndexRoute
+  '/console/ai/agent': typeof ConsoleAiAgentRoute
+  '/console/ai/bot-controls': typeof ConsoleAiBotControlsRoute
+  '/console/customers/$customerId': typeof ConsoleCustomersCustomerIdRoute
+  '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
+  '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
+  '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
+  '/console/finance/reports': typeof ConsoleFinanceReportsRoute
+  '/console/inventory/movements': typeof ConsoleInventoryMovementsRoute
+  '/console/inventory/purchase-orders': typeof ConsoleInventoryPurchaseOrdersRoute
+  '/console/inventory/stock': typeof ConsoleInventoryStockRoute
+  '/console/inventory/suppliers': typeof ConsoleInventorySuppliersRoute
+  '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
+  '/console/customers/': typeof ConsoleCustomersIndexRoute
+  '/console/shipments/': typeof ConsoleShipmentsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/console': typeof ConsoleRoute
+  '/console/bookings': typeof ConsoleBookingsRoute
+  '/console/conversations': typeof ConsoleConversationsRoute
+  '/console/dashboard': typeof ConsoleDashboardRoute
+  '/console/leads': typeof ConsoleLeadsRoute
+  '/console/settings': typeof ConsoleSettingsRoute
+  '/console/tracking': typeof ConsoleTrackingRoute
+  '/console/warehouse': typeof ConsoleWarehouseRoute
+  '/console': typeof ConsoleIndexRoute
+  '/console/ai/agent': typeof ConsoleAiAgentRoute
+  '/console/ai/bot-controls': typeof ConsoleAiBotControlsRoute
+  '/console/customers/$customerId': typeof ConsoleCustomersCustomerIdRoute
+  '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
+  '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
+  '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
+  '/console/finance/reports': typeof ConsoleFinanceReportsRoute
+  '/console/inventory/movements': typeof ConsoleInventoryMovementsRoute
+  '/console/inventory/purchase-orders': typeof ConsoleInventoryPurchaseOrdersRoute
+  '/console/inventory/stock': typeof ConsoleInventoryStockRoute
+  '/console/inventory/suppliers': typeof ConsoleInventorySuppliersRoute
+  '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
+  '/console/customers': typeof ConsoleCustomersIndexRoute
+  '/console/shipments': typeof ConsoleShipmentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/console': typeof ConsoleRoute
+  '/console': typeof ConsoleRouteRouteWithChildren
+  '/console/customers': typeof ConsoleCustomersRouteRouteWithChildren
+  '/console/shipments': typeof ConsoleShipmentsRouteRouteWithChildren
+  '/console/bookings': typeof ConsoleBookingsRoute
+  '/console/conversations': typeof ConsoleConversationsRoute
+  '/console/dashboard': typeof ConsoleDashboardRoute
+  '/console/leads': typeof ConsoleLeadsRoute
+  '/console/settings': typeof ConsoleSettingsRoute
+  '/console/tracking': typeof ConsoleTrackingRoute
+  '/console/warehouse': typeof ConsoleWarehouseRoute
+  '/console/': typeof ConsoleIndexRoute
+  '/console/ai/agent': typeof ConsoleAiAgentRoute
+  '/console/ai/bot-controls': typeof ConsoleAiBotControlsRoute
+  '/console/customers/$customerId': typeof ConsoleCustomersCustomerIdRoute
+  '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
+  '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
+  '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
+  '/console/finance/reports': typeof ConsoleFinanceReportsRoute
+  '/console/inventory/movements': typeof ConsoleInventoryMovementsRoute
+  '/console/inventory/purchase-orders': typeof ConsoleInventoryPurchaseOrdersRoute
+  '/console/inventory/stock': typeof ConsoleInventoryStockRoute
+  '/console/inventory/suppliers': typeof ConsoleInventorySuppliersRoute
+  '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
+  '/console/customers/': typeof ConsoleCustomersIndexRoute
+  '/console/shipments/': typeof ConsoleShipmentsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/console'
+  fullPaths:
+    | '/'
+    | '/console'
+    | '/console/customers'
+    | '/console/shipments'
+    | '/console/bookings'
+    | '/console/conversations'
+    | '/console/dashboard'
+    | '/console/leads'
+    | '/console/settings'
+    | '/console/tracking'
+    | '/console/warehouse'
+    | '/console/'
+    | '/console/ai/agent'
+    | '/console/ai/bot-controls'
+    | '/console/customers/$customerId'
+    | '/console/finance/expenses'
+    | '/console/finance/invoices'
+    | '/console/finance/payments'
+    | '/console/finance/reports'
+    | '/console/inventory/movements'
+    | '/console/inventory/purchase-orders'
+    | '/console/inventory/stock'
+    | '/console/inventory/suppliers'
+    | '/console/shipments/$shipmentId'
+    | '/console/customers/'
+    | '/console/shipments/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/console'
-  id: '__root__' | '/' | '/console'
+  to:
+    | '/'
+    | '/console/bookings'
+    | '/console/conversations'
+    | '/console/dashboard'
+    | '/console/leads'
+    | '/console/settings'
+    | '/console/tracking'
+    | '/console/warehouse'
+    | '/console'
+    | '/console/ai/agent'
+    | '/console/ai/bot-controls'
+    | '/console/customers/$customerId'
+    | '/console/finance/expenses'
+    | '/console/finance/invoices'
+    | '/console/finance/payments'
+    | '/console/finance/reports'
+    | '/console/inventory/movements'
+    | '/console/inventory/purchase-orders'
+    | '/console/inventory/stock'
+    | '/console/inventory/suppliers'
+    | '/console/shipments/$shipmentId'
+    | '/console/customers'
+    | '/console/shipments'
+  id:
+    | '__root__'
+    | '/'
+    | '/console'
+    | '/console/customers'
+    | '/console/shipments'
+    | '/console/bookings'
+    | '/console/conversations'
+    | '/console/dashboard'
+    | '/console/leads'
+    | '/console/settings'
+    | '/console/tracking'
+    | '/console/warehouse'
+    | '/console/'
+    | '/console/ai/agent'
+    | '/console/ai/bot-controls'
+    | '/console/customers/$customerId'
+    | '/console/finance/expenses'
+    | '/console/finance/invoices'
+    | '/console/finance/payments'
+    | '/console/finance/reports'
+    | '/console/inventory/movements'
+    | '/console/inventory/purchase-orders'
+    | '/console/inventory/stock'
+    | '/console/inventory/suppliers'
+    | '/console/shipments/$shipmentId'
+    | '/console/customers/'
+    | '/console/shipments/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ConsoleRoute: typeof ConsoleRoute
+  ConsoleRouteRoute: typeof ConsoleRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -62,15 +356,263 @@ declare module '@tanstack/react-router' {
       id: '/console'
       path: '/console'
       fullPath: '/console'
-      preLoaderRoute: typeof ConsoleRouteImport
+      preLoaderRoute: typeof ConsoleRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/console/': {
+      id: '/console/'
+      path: '/'
+      fullPath: '/console/'
+      preLoaderRoute: typeof ConsoleIndexRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/bookings': {
+      id: '/console/bookings'
+      path: '/bookings'
+      fullPath: '/console/bookings'
+      preLoaderRoute: typeof ConsoleBookingsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/conversations': {
+      id: '/console/conversations'
+      path: '/conversations'
+      fullPath: '/console/conversations'
+      preLoaderRoute: typeof ConsoleConversationsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/customers': {
+      id: '/console/customers'
+      path: '/customers'
+      fullPath: '/console/customers'
+      preLoaderRoute: typeof ConsoleCustomersRouteRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/dashboard': {
+      id: '/console/dashboard'
+      path: '/dashboard'
+      fullPath: '/console/dashboard'
+      preLoaderRoute: typeof ConsoleDashboardRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/leads': {
+      id: '/console/leads'
+      path: '/leads'
+      fullPath: '/console/leads'
+      preLoaderRoute: typeof ConsoleLeadsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/settings': {
+      id: '/console/settings'
+      path: '/settings'
+      fullPath: '/console/settings'
+      preLoaderRoute: typeof ConsoleSettingsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/shipments': {
+      id: '/console/shipments'
+      path: '/shipments'
+      fullPath: '/console/shipments'
+      preLoaderRoute: typeof ConsoleShipmentsRouteRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/tracking': {
+      id: '/console/tracking'
+      path: '/tracking'
+      fullPath: '/console/tracking'
+      preLoaderRoute: typeof ConsoleTrackingRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/warehouse': {
+      id: '/console/warehouse'
+      path: '/warehouse'
+      fullPath: '/console/warehouse'
+      preLoaderRoute: typeof ConsoleWarehouseRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/ai/agent': {
+      id: '/console/ai/agent'
+      path: '/ai/agent'
+      fullPath: '/console/ai/agent'
+      preLoaderRoute: typeof ConsoleAiAgentRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/ai/bot-controls': {
+      id: '/console/ai/bot-controls'
+      path: '/ai/bot-controls'
+      fullPath: '/console/ai/bot-controls'
+      preLoaderRoute: typeof ConsoleAiBotControlsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/customers/': {
+      id: '/console/customers/'
+      path: '/'
+      fullPath: '/console/customers/'
+      preLoaderRoute: typeof ConsoleCustomersIndexRouteImport
+      parentRoute: typeof ConsoleCustomersRouteRoute
+    }
+    '/console/customers/$customerId': {
+      id: '/console/customers/$customerId'
+      path: '/$customerId'
+      fullPath: '/console/customers/$customerId'
+      preLoaderRoute: typeof ConsoleCustomersCustomerIdRouteImport
+      parentRoute: typeof ConsoleCustomersRouteRoute
+    }
+    '/console/finance/expenses': {
+      id: '/console/finance/expenses'
+      path: '/finance/expenses'
+      fullPath: '/console/finance/expenses'
+      preLoaderRoute: typeof ConsoleFinanceExpensesRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/finance/invoices': {
+      id: '/console/finance/invoices'
+      path: '/finance/invoices'
+      fullPath: '/console/finance/invoices'
+      preLoaderRoute: typeof ConsoleFinanceInvoicesRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/finance/payments': {
+      id: '/console/finance/payments'
+      path: '/finance/payments'
+      fullPath: '/console/finance/payments'
+      preLoaderRoute: typeof ConsoleFinancePaymentsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/finance/reports': {
+      id: '/console/finance/reports'
+      path: '/finance/reports'
+      fullPath: '/console/finance/reports'
+      preLoaderRoute: typeof ConsoleFinanceReportsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/inventory/movements': {
+      id: '/console/inventory/movements'
+      path: '/inventory/movements'
+      fullPath: '/console/inventory/movements'
+      preLoaderRoute: typeof ConsoleInventoryMovementsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/inventory/purchase-orders': {
+      id: '/console/inventory/purchase-orders'
+      path: '/inventory/purchase-orders'
+      fullPath: '/console/inventory/purchase-orders'
+      preLoaderRoute: typeof ConsoleInventoryPurchaseOrdersRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/inventory/stock': {
+      id: '/console/inventory/stock'
+      path: '/inventory/stock'
+      fullPath: '/console/inventory/stock'
+      preLoaderRoute: typeof ConsoleInventoryStockRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/inventory/suppliers': {
+      id: '/console/inventory/suppliers'
+      path: '/inventory/suppliers'
+      fullPath: '/console/inventory/suppliers'
+      preLoaderRoute: typeof ConsoleInventorySuppliersRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/shipments/': {
+      id: '/console/shipments/'
+      path: '/'
+      fullPath: '/console/shipments/'
+      preLoaderRoute: typeof ConsoleShipmentsIndexRouteImport
+      parentRoute: typeof ConsoleShipmentsRouteRoute
+    }
+    '/console/shipments/$shipmentId': {
+      id: '/console/shipments/$shipmentId'
+      path: '/$shipmentId'
+      fullPath: '/console/shipments/$shipmentId'
+      preLoaderRoute: typeof ConsoleShipmentsShipmentIdRouteImport
+      parentRoute: typeof ConsoleShipmentsRouteRoute
     }
   }
 }
 
+interface ConsoleCustomersRouteRouteChildren {
+  ConsoleCustomersCustomerIdRoute: typeof ConsoleCustomersCustomerIdRoute
+  ConsoleCustomersIndexRoute: typeof ConsoleCustomersIndexRoute
+}
+
+const ConsoleCustomersRouteRouteChildren: ConsoleCustomersRouteRouteChildren = {
+  ConsoleCustomersCustomerIdRoute: ConsoleCustomersCustomerIdRoute,
+  ConsoleCustomersIndexRoute: ConsoleCustomersIndexRoute,
+}
+
+const ConsoleCustomersRouteRouteWithChildren =
+  ConsoleCustomersRouteRoute._addFileChildren(
+    ConsoleCustomersRouteRouteChildren,
+  )
+
+interface ConsoleShipmentsRouteRouteChildren {
+  ConsoleShipmentsShipmentIdRoute: typeof ConsoleShipmentsShipmentIdRoute
+  ConsoleShipmentsIndexRoute: typeof ConsoleShipmentsIndexRoute
+}
+
+const ConsoleShipmentsRouteRouteChildren: ConsoleShipmentsRouteRouteChildren = {
+  ConsoleShipmentsShipmentIdRoute: ConsoleShipmentsShipmentIdRoute,
+  ConsoleShipmentsIndexRoute: ConsoleShipmentsIndexRoute,
+}
+
+const ConsoleShipmentsRouteRouteWithChildren =
+  ConsoleShipmentsRouteRoute._addFileChildren(
+    ConsoleShipmentsRouteRouteChildren,
+  )
+
+interface ConsoleRouteRouteChildren {
+  ConsoleCustomersRouteRoute: typeof ConsoleCustomersRouteRouteWithChildren
+  ConsoleShipmentsRouteRoute: typeof ConsoleShipmentsRouteRouteWithChildren
+  ConsoleBookingsRoute: typeof ConsoleBookingsRoute
+  ConsoleConversationsRoute: typeof ConsoleConversationsRoute
+  ConsoleDashboardRoute: typeof ConsoleDashboardRoute
+  ConsoleLeadsRoute: typeof ConsoleLeadsRoute
+  ConsoleSettingsRoute: typeof ConsoleSettingsRoute
+  ConsoleTrackingRoute: typeof ConsoleTrackingRoute
+  ConsoleWarehouseRoute: typeof ConsoleWarehouseRoute
+  ConsoleIndexRoute: typeof ConsoleIndexRoute
+  ConsoleAiAgentRoute: typeof ConsoleAiAgentRoute
+  ConsoleAiBotControlsRoute: typeof ConsoleAiBotControlsRoute
+  ConsoleFinanceExpensesRoute: typeof ConsoleFinanceExpensesRoute
+  ConsoleFinanceInvoicesRoute: typeof ConsoleFinanceInvoicesRoute
+  ConsoleFinancePaymentsRoute: typeof ConsoleFinancePaymentsRoute
+  ConsoleFinanceReportsRoute: typeof ConsoleFinanceReportsRoute
+  ConsoleInventoryMovementsRoute: typeof ConsoleInventoryMovementsRoute
+  ConsoleInventoryPurchaseOrdersRoute: typeof ConsoleInventoryPurchaseOrdersRoute
+  ConsoleInventoryStockRoute: typeof ConsoleInventoryStockRoute
+  ConsoleInventorySuppliersRoute: typeof ConsoleInventorySuppliersRoute
+}
+
+const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
+  ConsoleCustomersRouteRoute: ConsoleCustomersRouteRouteWithChildren,
+  ConsoleShipmentsRouteRoute: ConsoleShipmentsRouteRouteWithChildren,
+  ConsoleBookingsRoute: ConsoleBookingsRoute,
+  ConsoleConversationsRoute: ConsoleConversationsRoute,
+  ConsoleDashboardRoute: ConsoleDashboardRoute,
+  ConsoleLeadsRoute: ConsoleLeadsRoute,
+  ConsoleSettingsRoute: ConsoleSettingsRoute,
+  ConsoleTrackingRoute: ConsoleTrackingRoute,
+  ConsoleWarehouseRoute: ConsoleWarehouseRoute,
+  ConsoleIndexRoute: ConsoleIndexRoute,
+  ConsoleAiAgentRoute: ConsoleAiAgentRoute,
+  ConsoleAiBotControlsRoute: ConsoleAiBotControlsRoute,
+  ConsoleFinanceExpensesRoute: ConsoleFinanceExpensesRoute,
+  ConsoleFinanceInvoicesRoute: ConsoleFinanceInvoicesRoute,
+  ConsoleFinancePaymentsRoute: ConsoleFinancePaymentsRoute,
+  ConsoleFinanceReportsRoute: ConsoleFinanceReportsRoute,
+  ConsoleInventoryMovementsRoute: ConsoleInventoryMovementsRoute,
+  ConsoleInventoryPurchaseOrdersRoute: ConsoleInventoryPurchaseOrdersRoute,
+  ConsoleInventoryStockRoute: ConsoleInventoryStockRoute,
+  ConsoleInventorySuppliersRoute: ConsoleInventorySuppliersRoute,
+}
+
+const ConsoleRouteRouteWithChildren = ConsoleRouteRoute._addFileChildren(
+  ConsoleRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ConsoleRoute: ConsoleRoute,
+  ConsoleRouteRoute: ConsoleRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

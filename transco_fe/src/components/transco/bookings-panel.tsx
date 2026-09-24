@@ -1,9 +1,35 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, Check, Package, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { CalendarClock, Check, Package, PenLine, RotateCcw, Search, ShipIcon, Trash2, X } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 import { BookingCalendar } from "@/components/transco/booking-calendar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { Booking, BookingStatus } from "@/lib/transco/types";
+import type { Booking, BookingStatus, BookingUpdateInput } from "@/lib/transco/types";
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "unpaid", label: "Unpaid" },
+  { value: "partial", label: "Partial" },
+  { value: "paid", label: "Paid" },
+];
 
 const STATUS_FILTERS: (BookingStatus | "all")[] = ["all", "pending", "confirmed", "completed", "cancelled"];
 
@@ -52,10 +78,12 @@ export function BookingsPanel({
   bookings,
   onDelete,
   onUpdateStatus,
+  onUpdateBooking,
 }: {
   bookings: Booking[];
   onDelete: (bookingId: string) => void;
   onUpdateStatus: (bookingId: string, status: BookingStatus) => void;
+  onUpdateBooking: (bookingId: string, updates: BookingUpdateInput) => void;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "all">("all");
@@ -195,6 +223,7 @@ export function BookingsPanel({
                         highlighted={isToday}
                         onDelete={onDelete}
                         onUpdateStatus={onUpdateStatus}
+                        onUpdateBooking={onUpdateBooking}
                       />
                     ))}
                   </div>
@@ -214,12 +243,15 @@ function BookingCard({
   highlighted,
   onDelete,
   onUpdateStatus,
+  onUpdateBooking,
 }: {
   booking: Booking;
   highlighted: boolean;
   onDelete: (bookingId: string) => void;
   onUpdateStatus: (bookingId: string, status: BookingStatus) => void;
+  onUpdateBooking: (bookingId: string, updates: BookingUpdateInput) => void;
 }) {
+  const [editOpen, setEditOpen] = useState(false);
   const isCompleted = booking.status === "completed";
   const isCancelled = booking.status === "cancelled";
   const isPending = booking.status === "pending";
@@ -261,6 +293,31 @@ function BookingCard({
             <Package className="h-3 w-3 shrink-0" />
             {booking.boxSummary}
           </p>
+        )}
+        {(booking.origin || booking.destination || booking.price != null || booking.shipmentId) && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            {(booking.origin || booking.destination) && (
+              <span>
+                {booking.origin || "?"} → {booking.destination || "?"}
+              </span>
+            )}
+            {booking.price != null && (
+              <span>
+                ${booking.price}
+                {booking.paymentStatus ? ` · ${booking.paymentStatus}` : ""}
+              </span>
+            )}
+            {booking.shipmentId && (
+              <Link
+                to="/console/shipments/$shipmentId"
+                params={{ shipmentId: booking.shipmentId }}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <ShipIcon className="h-3 w-3" />
+                View Shipment
+              </Link>
+            )}
+          </div>
         )}
       </div>
 
@@ -334,6 +391,16 @@ function BookingCard({
 
         <button
           type="button"
+          onClick={() => setEditOpen(true)}
+          aria-label="Edit booking details"
+          title="Edit booking details"
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <PenLine className="h-3.5 w-3.5" />
+        </button>
+
+        <button
+          type="button"
           onClick={() => onDelete(booking.id)}
           aria-label="Delete booking"
           title="Delete booking"
@@ -342,6 +409,217 @@ function BookingCard({
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      <BookingEditSheet
+        booking={booking}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSave={onUpdateBooking}
+      />
     </div>
   );
+}
+
+/** Editor for the optional Phase 2 fields (serviceType/origin/destination/
+ * cargoType/boxCount/weight/cbm/price/paymentStatus/notes) — never touches
+ * status, which is controlled by the buttons above and the existing
+ * status-only PATCH. Local form state is re-seeded from the booking prop
+ * each time the sheet opens. */
+function BookingEditSheet({
+  booking,
+  open,
+  onOpenChange,
+  onSave,
+}: {
+  booking: Booking;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (bookingId: string, updates: BookingUpdateInput) => void;
+}) {
+  const [form, setForm] = useState(() => bookingToFormState(booking));
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) setForm(bookingToFormState(booking));
+    onOpenChange(next);
+  };
+
+  const handleSave = () => {
+    onSave(booking.id, {
+      serviceType: form.serviceType || null,
+      origin: form.origin || null,
+      destination: form.destination || null,
+      cargoType: form.cargoType || null,
+      boxCount: form.boxCount === "" ? null : Number(form.boxCount),
+      weight: form.weight === "" ? null : Number(form.weight),
+      cbm: form.cbm === "" ? null : Number(form.cbm),
+      price: form.price === "" ? null : Number(form.price),
+      paymentStatus: form.paymentStatus || null,
+      notes: form.notes || null,
+    });
+    onOpenChange(false);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Booking Details — {booking.customerName || booking.phoneNumber}</SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="serviceType">Service Type</Label>
+              <Input
+                id="serviceType"
+                value={form.serviceType}
+                onChange={(e) => setForm((f) => ({ ...f, serviceType: e.target.value }))}
+                placeholder="Sea Freight"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cargoType">Cargo Type</Label>
+              <Input
+                id="cargoType"
+                value={form.cargoType}
+                onChange={(e) => setForm((f) => ({ ...f, cargoType: e.target.value }))}
+                placeholder="Personal effects"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="origin">Origin</Label>
+              <Input
+                id="origin"
+                value={form.origin}
+                onChange={(e) => setForm((f) => ({ ...f, origin: e.target.value }))}
+                placeholder="Sydney"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="destination">Destination</Label>
+              <Input
+                id="destination"
+                value={form.destination}
+                onChange={(e) => setForm((f) => ({ ...f, destination: e.target.value }))}
+                placeholder="Colombo"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="boxCount">Boxes</Label>
+              <Input
+                id="boxCount"
+                type="number"
+                min="0"
+                value={form.boxCount}
+                onChange={(e) => setForm((f) => ({ ...f, boxCount: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="weight">Weight (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                min="0"
+                value={form.weight}
+                onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cbm">CBM</Label>
+              <Input
+                id="cbm"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cbm}
+                onChange={(e) => setForm((f) => ({ ...f, cbm: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="price">Price ($)</Label>
+              <Input
+                id="price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.price}
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="paymentStatus">Payment Status</Label>
+              <Select
+                value={form.paymentStatus}
+                onValueChange={(v) => setForm((f) => ({ ...f, paymentStatus: v }))}
+              >
+                <SelectTrigger id="paymentStatus">
+                  <SelectValue placeholder="Not set" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_STATUS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="Staff notes about this booking…"
+              rows={3}
+            />
+          </div>
+
+          {form.price !== "" && (
+            <p className="text-[11px] text-muted-foreground">
+              Price/payment status are staff-entered for now — Finance (Phase 5) will derive these
+              from real invoices and payments instead.
+            </p>
+          )}
+        </div>
+
+        <SheetFooter className="mt-6">
+          <SheetClose asChild>
+            <Button variant="outline" type="button">
+              Cancel
+            </Button>
+          </SheetClose>
+          <Button type="button" onClick={handleSave}>
+            Save Details
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function bookingToFormState(booking: Booking) {
+  return {
+    serviceType: booking.serviceType ?? "",
+    origin: booking.origin ?? "",
+    destination: booking.destination ?? "",
+    cargoType: booking.cargoType ?? "",
+    boxCount: booking.boxCount != null ? String(booking.boxCount) : "",
+    weight: booking.weight != null ? String(booking.weight) : "",
+    cbm: booking.cbm != null ? String(booking.cbm) : "",
+    price: booking.price != null ? String(booking.price) : "",
+    paymentStatus: booking.paymentStatus ?? "",
+    notes: booking.notes ?? "",
+  };
 }

@@ -28,6 +28,7 @@ function ConversationsPage() {
     websitePaused,
     whatsappPaused,
     bookings,
+    shipments,
   } = useConversations();
 
   return (
@@ -59,7 +60,7 @@ function ConversationsPage() {
                 onBack={() => selectConversation(null)}
               />
             </div>
-            <CustomerContextPanel conversation={selectedConversation} bookings={bookings} />
+            <CustomerContextPanel conversation={selectedConversation} bookings={bookings} shipments={shipments} />
           </>
         ) : (
           <div className="grid h-full place-items-center bg-chat-canvas px-6 text-center">

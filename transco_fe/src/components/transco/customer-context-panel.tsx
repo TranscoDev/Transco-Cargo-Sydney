@@ -1,26 +1,37 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { CalendarClock, Mail, Package, Phone, Receipt, SquareUserRound } from "lucide-react";
+import { CalendarClock, Mail, Package, Phone, Receipt, Ship, SquareUserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { CUSTOMER_STATUS_LABELS, type Booking, type Conversation } from "@/lib/transco/types";
+import {
+  CUSTOMER_STATUS_LABELS,
+  SHIPMENT_STATUS_LABELS,
+  type Booking,
+  type Conversation,
+  type Shipment,
+} from "@/lib/transco/types";
 
 /** Right-side context panel for the selected conversation — purely
  * additive to the existing chat view (chat-panel.tsx is untouched).
- * Recent bookings come from the already-loaded global bookings list
- * (useConversations()), filtered client-side by customerId — no extra
- * fetch, no duplicated data. Shipments/outstanding payments don't
- * exist yet (Phase 2/5), so those sections say so rather than showing
- * a fake number. */
+ * Recent bookings and shipments come from the already-loaded global
+ * lists (useConversations()), filtered client-side by customerId — no
+ * extra fetch, no duplicated data. Outstanding payments don't exist yet
+ * (Phase 5), so that section says so rather than showing a fake number. */
 export function CustomerContextPanel({
   conversation,
   bookings,
+  shipments,
 }: {
   conversation: Conversation;
   bookings: Booking[];
+  shipments: Shipment[];
 }) {
   const recentBookings = bookings
     .filter((b) => b.customerId === conversation.id)
+    .slice(0, 3);
+
+  const activeShipments = shipments
+    .filter((s) => s.customerId === conversation.id && s.status !== "delivered")
     .slice(0, 3);
 
   return (
@@ -68,8 +79,26 @@ export function CustomerContextPanel({
         )}
       </Section>
 
-      <Section icon={Package} title="Active Shipments">
-        <EmptyLine text="Available in Phase 2." />
+      <Section icon={Ship} title="Active Shipments">
+        {activeShipments.length === 0 ? (
+          <EmptyLine text="No active shipments." />
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {activeShipments.map((s) => (
+              <Link
+                key={s.id}
+                to="/console/shipments/$shipmentId"
+                params={{ shipmentId: s.id }}
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-xs hover:border-primary/40"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{s.shipmentNumber}</span>
+                  <span className="text-muted-foreground">{SHIPMENT_STATUS_LABELS[s.status]}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section icon={Receipt} title="Outstanding Payments">

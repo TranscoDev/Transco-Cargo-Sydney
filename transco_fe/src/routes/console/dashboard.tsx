@@ -51,7 +51,7 @@ function DashboardPage() {
     { label: "New Customers Today", icon: UserPlus, value: summary?.newCustomersToday ?? null, to: "/console/customers" },
     { label: "Unread Conversations", icon: MessageSquareDot, value: summary?.unreadConversations ?? null, to: "/console/conversations" },
     { label: "Flagged for Attention", icon: AlertTriangle, value: summary?.attentionConversations ?? null, to: "/console/conversations" },
-    { label: "Active Shipments", icon: Package, value: null, unavailableReason: "Available in Phase 2" },
+    { label: "Active Shipments", icon: Package, value: summary?.activeShipments ?? null, to: "/console/shipments" },
     { label: "Revenue", icon: DollarSign, value: null, unavailableReason: "Available in Phase 5" },
     { label: "Payments Received", icon: Wallet, value: null, unavailableReason: "Available in Phase 5" },
     { label: "Outstanding Payments", icon: Receipt, value: null, unavailableReason: "Available in Phase 5" },

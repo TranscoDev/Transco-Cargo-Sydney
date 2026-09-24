@@ -3,6 +3,7 @@ import { getAuthToken } from "./auth";
 import type {
   Booking,
   BookingStatus,
+  BookingUpdateInput,
   CampaignAttachment,
   Conversation,
   ConversationChannel,
@@ -18,7 +19,12 @@ import type {
   Segment,
   SegmentFilter,
   SenderType,
+  Shipment,
+  ShipmentCreateInput,
   ShipmentHistoryEntry,
+  ShipmentHistoryPoint,
+  ShipmentStatus,
+  ShipmentUpdateInput,
 } from "./types";
 
 /**
@@ -85,6 +91,17 @@ export interface BackendBooking {
   createdAt: string;
   boxSummary?: string | null;
   resolvedDate: string;
+  serviceType?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  cargoType?: string | null;
+  boxCount?: number | null;
+  weight?: number | null;
+  cbm?: number | null;
+  price?: number | null;
+  paymentStatus?: string | null;
+  notes?: string | null;
+  shipmentId?: string | null;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -99,6 +116,17 @@ export function mapBooking(b: BackendBooking): Booking {
     createdAt: b.createdAt,
     boxSummary: b.boxSummary,
     resolvedDate: b.resolvedDate,
+    serviceType: b.serviceType,
+    origin: b.origin,
+    destination: b.destination,
+    cargoType: b.cargoType,
+    boxCount: b.boxCount,
+    weight: b.weight,
+    cbm: b.cbm,
+    price: b.price,
+    paymentStatus: b.paymentStatus,
+    notes: b.notes,
+    shipmentId: b.shipmentId,
   };
 }
 
@@ -126,6 +154,58 @@ function mapShipment(s: BackendShipment): ShipmentHistoryEntry {
     receiverPhone: s.receiverPhone,
     receiverEmail: s.receiverEmail,
     importedAt: s.importedAt,
+  };
+}
+
+/** A live, operationally-tracked shipment (Phase 2) — distinct from
+ * BackendShipment above, which is historical Excel-import data only. */
+export interface BackendShipmentRecord {
+  _id: string;
+  shipmentNumber: string;
+  customerId: string;
+  customerName: string | null;
+  phoneNumber: string | null;
+  bookingId?: string | null;
+  serviceType?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  blNumber?: string | null;
+  containerNumber?: string | null;
+  cargo?: string | null;
+  boxCount?: number | null;
+  weight?: number | null;
+  cbm?: number | null;
+  trackingNumber?: string | null;
+  status: ShipmentStatus;
+  warehouseStatus?: string | null;
+  history: ShipmentHistoryPoint[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function mapShipmentRecord(s: BackendShipmentRecord): Shipment {
+  return {
+    id: s._id,
+    shipmentNumber: s.shipmentNumber,
+    customerId: s.customerId,
+    customerName: s.customerName,
+    phoneNumber: s.phoneNumber,
+    bookingId: s.bookingId,
+    serviceType: s.serviceType,
+    origin: s.origin,
+    destination: s.destination,
+    blNumber: s.blNumber,
+    containerNumber: s.containerNumber,
+    cargo: s.cargo,
+    boxCount: s.boxCount,
+    weight: s.weight,
+    cbm: s.cbm,
+    trackingNumber: s.trackingNumber,
+    status: s.status,
+    warehouseStatus: s.warehouseStatus,
+    history: s.history ?? [],
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
   };
 }
 
@@ -169,6 +249,7 @@ export async function fetchConversations(): Promise<Conversation[]> {
 
 interface BackendCustomerProfile extends BackendCustomerWithMessages {
   bookings: BackendBooking[];
+  liveShipments: BackendShipmentRecord[];
   totalBookings: number;
   totalShipments: number;
   totalRevenue: number;
@@ -192,6 +273,7 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
   return {
     ...mapConversation(c),
     bookings: c.bookings.map(mapBooking),
+    liveShipments: c.liveShipments.map(mapShipmentRecord),
     financeDataAvailable: c.financeDataAvailable,
   };
 }
@@ -278,6 +360,100 @@ export async function updateBookingStatus(
   }
 }
 
+/** General field update (Phase 2) — separate endpoint from the
+ * status-only PATCH above, which is untouched. Returns the updated
+ * booking so the caller can reconcile local state without a refetch. */
+export async function updateBooking(
+  bookingId: string,
+  updates: BookingUpdateInput,
+): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update booking (${res.status})`);
+  }
+  const data = (await res.json()) as { booking: BackendBooking };
+  return mapBooking(data.booking);
+}
+
+// ============================================================
+// SHIPMENTS (Phase 2) — live operational tracking
+// ============================================================
+
+export async function fetchShipments(filters?: {
+  status?: ShipmentStatus;
+  customerId?: string;
+}): Promise<Shipment[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.customerId) params.set("customerId", filters.customerId);
+  const query = params.toString();
+  const res = await fetch(`${API_BASE_URL}/api/shipments${query ? `?${query}` : ""}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load shipments (${res.status})`);
+  }
+  const data = (await res.json()) as { shipments: BackendShipmentRecord[] };
+  return data.shipments.map(mapShipmentRecord);
+}
+
+export async function fetchShipment(shipmentId: string): Promise<Shipment> {
+  const res = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load shipment (${res.status})`);
+  }
+  const data = (await res.json()) as { shipment: BackendShipmentRecord };
+  return mapShipmentRecord(data.shipment);
+}
+
+export async function fetchShipmentTimeline(shipmentId: string): Promise<ShipmentHistoryPoint[]> {
+  const res = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}/timeline`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load shipment timeline (${res.status})`);
+  }
+  const data = (await res.json()) as { history: ShipmentHistoryPoint[] };
+  return data.history;
+}
+
+export async function createShipment(input: ShipmentCreateInput): Promise<Shipment> {
+  const res = await fetch(`${API_BASE_URL}/api/shipments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create shipment (${res.status})`);
+  }
+  const data = (await res.json()) as { shipment: BackendShipmentRecord };
+  return mapShipmentRecord(data.shipment);
+}
+
+export async function updateShipment(
+  shipmentId: string,
+  updates: ShipmentUpdateInput,
+): Promise<Shipment> {
+  const res = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to update shipment (${res.status})`);
+  }
+  const data = (await res.json()) as { shipment: BackendShipmentRecord };
+  return mapShipmentRecord(data.shipment);
+}
+
 export async function setCustomerMode(customerId: string, mode: ConversationMode): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/mode`, {
     method: "PATCH",
@@ -307,6 +483,7 @@ export interface DashboardSummary {
   newCustomersToday: number;
   unreadConversations: number;
   attentionConversations: number;
+  activeShipments: number;
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {

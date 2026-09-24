@@ -19,6 +19,12 @@ async function connectToDatabase(uri, dbName = 'transco') {
   await db.collection('shipmentHistory').createIndex({ dedupeKey: 1 }, { unique: true });
   await db.collection('shipmentHistory').createIndex({ customerId: 1 });
 
+  // Live operational shipments (Phase 2) — distinct from shipmentHistory
+  // (historical Excel import records) above.
+  await db.collection('shipments').createIndex({ shipmentNumber: 1 }, { unique: true });
+  await db.collection('shipments').createIndex({ customerId: 1 });
+  await db.collection('shipments').createIndex({ bookingId: 1 });
+
   console.log('Connected to MongoDB');
   return db;
 }
@@ -60,6 +66,13 @@ function shipmentHistory() {
   return getDb().collection('shipmentHistory');
 }
 
+// Live operational shipments (Phase 2 onward) — created from a booking or
+// standalone, tracked through pickup/warehouse/transit/delivery. Never
+// duplicates customer data; references customerId/bookingId only.
+function shipments() {
+  return getDb().collection('shipments');
+}
+
 // A log entry per email promotion send — not used to re-send anything,
 // purely a record for staff of what went out, when, and to how many.
 function campaigns() {
@@ -82,6 +95,7 @@ module.exports = {
   bookings,
   settings,
   shipmentHistory,
+  shipments,
   campaigns,
   segments
 };

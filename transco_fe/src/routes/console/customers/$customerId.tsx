@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Mail, MessageSquare, Package, Phone, Receipt, StickyNote } from "lucide-react";
+import { ArrowLeft, Mail, MessageSquare, Package, Phone, Receipt, Ship, StickyNote } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CUSTOMER_STATUS_LABELS } from "@/lib/transco/types";
+import { CUSTOMER_STATUS_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/transco/types";
 import { fetchCustomerProfile } from "@/lib/transco/api";
 import type { CustomerProfile } from "@/lib/transco/types";
 
@@ -152,15 +152,25 @@ function CustomerProfilePage() {
             </TabsContent>
 
             <TabsContent value="shipments">
-              {(profile.shipments?.length ?? 0) === 0 ? (
-                <EmptyTabState icon={Package} text="No shipments yet." />
+              {profile.liveShipments.length === 0 ? (
+                <EmptyTabState icon={Ship} text="No shipments yet." />
               ) : (
                 <div className="flex flex-col gap-2">
-                  {profile.shipments?.map((s) => (
-                    <div key={s.id} className="rounded-md border border-border bg-panel p-3 text-sm">
-                      <p className="font-medium">{s.receiverName}</p>
-                      <p className="text-xs text-muted-foreground">{s.receiverAddress}</p>
-                    </div>
+                  {profile.liveShipments.map((s) => (
+                    <Link
+                      key={s.id}
+                      to="/console/shipments/$shipmentId"
+                      params={{ shipmentId: s.id }}
+                      className="rounded-md border border-border bg-panel p-3 text-sm hover:border-primary/40"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{s.shipmentNumber}</span>
+                        <Badge variant="outline">{SHIPMENT_STATUS_LABELS[s.status]}</Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {s.origin || "?"} → {s.destination || "?"}
+                      </p>
+                    </Link>
                   ))}
                 </div>
               )}

@@ -187,6 +187,9 @@ export interface Conversation {
  * data yet (they're not, until Phase 5). */
 export interface CustomerProfile extends Conversation {
   bookings: Booking[];
+  /** Live shipments (Phase 2) for this customer — separate from the
+   * inherited `shipments` field (historical import), which is untouched. */
+  liveShipments: Shipment[];
   financeDataAvailable: boolean;
 }
 
@@ -223,4 +226,142 @@ export interface Booking {
    * just a recurring weekday name, so the calendar view can place it on
    * one real cell. */
   resolvedDate: string;
+  /** Optional operations/CRM fields added in Phase 2 — all staff-entered,
+   * all additive. Absent on every booking that predates this phase. */
+  serviceType?: string | null | undefined;
+  origin?: string | null | undefined;
+  destination?: string | null | undefined;
+  cargoType?: string | null | undefined;
+  boxCount?: number | null | undefined;
+  weight?: number | null | undefined;
+  cbm?: number | null | undefined;
+  /** Staff-entered/provisional in Phase 2 — becomes derived from real
+   * invoices/payments once Finance (Phase 5) ships. Same field name and
+   * shape either way, so the UI doesn't need to change twice. */
+  price?: number | null | undefined;
+  paymentStatus?: string | null | undefined;
+  notes?: string | null | undefined;
+  /** Set once a Shipment has been created from this booking. */
+  shipmentId?: string | null | undefined;
+}
+
+/** Fields a staff member can edit on a booking via PATCH
+ * /api/bookings/:id — kept separate from the booking-creation shape and
+ * from the existing status-only PATCH, which is untouched. */
+export interface BookingUpdateInput {
+  serviceType?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  cargoType?: string | null;
+  boxCount?: number | null;
+  weight?: number | null;
+  cbm?: number | null;
+  price?: number | null;
+  paymentStatus?: string | null;
+  notes?: string | null;
+}
+
+/** Candidate operational stages for a live shipment (Phase 2) — a
+ * straight line from booked to delivered. Not enforced as a strict state
+ * machine server-side; staff can move a shipment to any of these. */
+export type ShipmentStatus =
+  | "booked"
+  | "cargo_received"
+  | "at_warehouse"
+  | "loaded"
+  | "in_transit"
+  | "arrived"
+  | "customs"
+  | "ready_for_collection"
+  | "delivered";
+
+export const SHIPMENT_STATUSES: ShipmentStatus[] = [
+  "booked",
+  "cargo_received",
+  "at_warehouse",
+  "loaded",
+  "in_transit",
+  "arrived",
+  "customs",
+  "ready_for_collection",
+  "delivered",
+];
+
+export const SHIPMENT_STATUS_LABELS: Record<ShipmentStatus, string> = {
+  booked: "Booked",
+  cargo_received: "Cargo Received",
+  at_warehouse: "At Warehouse",
+  loaded: "Loaded",
+  in_transit: "In Transit",
+  arrived: "Arrived",
+  customs: "Customs",
+  ready_for_collection: "Ready for Collection",
+  delivered: "Delivered",
+};
+
+export interface ShipmentHistoryPoint {
+  status: ShipmentStatus;
+  at: string;
+  note?: string | null;
+}
+
+/** A live, operationally-tracked shipment (Phase 2) — distinct from
+ * ShipmentHistoryEntry above, which is historical Excel-import data only.
+ * References customerId/bookingId; never duplicates either record. */
+export interface Shipment {
+  id: string;
+  shipmentNumber: string;
+  customerId: string;
+  customerName: string | null;
+  phoneNumber: string | null;
+  bookingId?: string | null | undefined;
+  serviceType?: string | null | undefined;
+  origin?: string | null | undefined;
+  destination?: string | null | undefined;
+  blNumber?: string | null | undefined;
+  containerNumber?: string | null | undefined;
+  cargo?: string | null | undefined;
+  boxCount?: number | null | undefined;
+  weight?: number | null | undefined;
+  cbm?: number | null | undefined;
+  trackingNumber?: string | null | undefined;
+  status: ShipmentStatus;
+  warehouseStatus?: string | null | undefined;
+  history: ShipmentHistoryPoint[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Payload for creating a shipment — bookingId is optional (a shipment
+ * can stand alone, or be created from an existing booking, which then
+ * gets its shipmentId set server-side). */
+export interface ShipmentCreateInput {
+  customerId: string;
+  bookingId?: string | null;
+  serviceType?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  blNumber?: string | null;
+  containerNumber?: string | null;
+  cargo?: string | null;
+  boxCount?: number | null;
+  weight?: number | null;
+  cbm?: number | null;
+  trackingNumber?: string | null;
+}
+
+export interface ShipmentUpdateInput {
+  status?: ShipmentStatus;
+  statusNote?: string | null;
+  warehouseStatus?: string | null;
+  serviceType?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  blNumber?: string | null;
+  containerNumber?: string | null;
+  cargo?: string | null;
+  boxCount?: number | null;
+  weight?: number | null;
+  cbm?: number | null;
+  trackingNumber?: string | null;
 }

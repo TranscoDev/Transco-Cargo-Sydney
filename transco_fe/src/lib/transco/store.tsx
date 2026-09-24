@@ -19,6 +19,7 @@ import {
   fetchConversations,
   fetchPauseState,
   fetchSegments,
+  fetchShipments,
   importCustomersFile,
   mapMessage,
   markConversationRead,
@@ -27,6 +28,7 @@ import {
   sendHumanMessage,
   setCustomerMode,
   setPauseState as setPauseStateRequest,
+  updateBooking as updateBookingRequest,
   updateBookingStatus as updateBookingStatusRequest,
   updateContactInfo as updateContactInfoRequest,
   updateCustomerStatus as updateCustomerStatusRequest,
@@ -48,6 +50,7 @@ import {
 import type {
   Booking,
   BookingStatus,
+  BookingUpdateInput,
   CampaignAttachment,
   Conversation,
   ConversationMode,
@@ -59,6 +62,7 @@ import type {
   MessageStatus,
   Segment,
   SegmentFilter,
+  Shipment,
 } from "./types";
 
 /**
@@ -92,8 +96,15 @@ interface ConversationsApi {
   sending: boolean;
   /** Weekday drop-off bookings collected by the chatbot, newest first. */
   bookings: Booking[];
+  /** Live operational shipments (Phase 2), newest first — loaded once
+   * for the whole console so the conversation context panel doesn't
+   * need its own fetch. */
+  shipments: Shipment[];
   deleteBooking: (bookingId: string) => void;
   updateBookingStatus: (bookingId: string, status: BookingStatus) => void;
+  /** General field update (Phase 2 extended fields) — separate from
+   * updateBookingStatus above, which is untouched. */
+  updateBooking: (bookingId: string, updates: BookingUpdateInput) => void;
   /** True while the website bot is paused — website visitors get a friendly
    * pause notice instead of an AI reply. Independent of whatsappPaused. */
   websitePaused: boolean;
@@ -165,6 +176,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // as a fallback for genuinely running without a reachable backend.
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [websitePaused, setWebsitePausedState] = useState(false);
   const [whatsappPaused, setWhatsappPausedState] = useState(false);
@@ -210,6 +222,21 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.warn("Could not load bookings.", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchShipments()
+      .then((real) => {
+        if (cancelled) return;
+        setShipments(real);
+      })
+      .catch((err) => {
+        console.warn("Could not load shipments.", err);
       });
     return () => {
       cancelled = true;
@@ -305,6 +332,26 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       if (previousStatus) {
         setBookings((prev) =>
           prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus! } : b)),
+        );
+      }
+    });
+  }, []);
+
+  const updateBooking = useCallback((bookingId: string, updates: BookingUpdateInput) => {
+    // Optimistic; reverted on failure the same way updateBookingStatus is.
+    let previous: Booking | undefined;
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id !== bookingId) return b;
+        previous = b;
+        return { ...b, ...updates };
+      }),
+    );
+    updateBookingRequest(bookingId, updates).catch((err) => {
+      console.error("Failed to update booking:", err);
+      if (previous) {
+        setBookings((prevList) =>
+          prevList.map((b) => (b.id === bookingId ? previous! : b)),
         );
       }
     });
@@ -755,8 +802,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateMessageStatus,
       sending,
       bookings,
+      shipments,
       deleteBooking,
       updateBookingStatus,
+      updateBooking,
       websitePaused,
       whatsappPaused,
       updatePauseState,
@@ -771,9 +820,11 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
     }),
     [
       bookings,
+      shipments,
       conversations,
       deleteBooking,
       updateBookingStatus,
+      updateBooking,
       websitePaused,
       whatsappPaused,
       markAsRead,

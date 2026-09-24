@@ -10,7 +10,7 @@ const { ObjectId } = require('mongodb');
 
 const multer = require('multer');
 
-const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory, campaigns, segments } = require('./db');
+const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory, shipments, campaigns, segments } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
@@ -1989,7 +1989,8 @@ app.get('/api/customers', async (req, res) => {
       allCustomers,
       allMessages,
       allShipments,
-      allBookings
+      allBookings,
+      allLiveShipments
     ] = await Promise.all([
 
       customers()
@@ -2009,6 +2010,13 @@ app.get('/api/customers', async (req, res) => {
       // columns) — never stored back onto the customer document
       // itself, so this can never drift out of sync.
       bookings()
+        .find({})
+        .toArray(),
+
+      // Live operational shipments (Phase 2) — what totalShipments below
+      // now actually counts, separate from the historical `shipments`
+      // field (kept as-is for the historical/import display).
+      shipments()
         .find({})
         .toArray()
 
@@ -2067,6 +2075,18 @@ app.get('/api/customers', async (req, res) => {
       }
     }
 
+    const liveShipmentsByCustomer = new Map();
+
+    for (const shipment of allLiveShipments) {
+      const key = shipment.customerId.toString();
+      const bucket = liveShipmentsByCustomer.get(key);
+      if (bucket) {
+        bucket.push(shipment);
+      } else {
+        liveShipmentsByCustomer.set(key, [shipment]);
+      }
+    }
+
 
     const result =
       allCustomers.map(customer => ({
@@ -2091,7 +2111,7 @@ app.get('/api/customers', async (req, res) => {
           (bookingsByCustomer.get(customer._id.toString()) ?? []).length,
 
         totalShipments:
-          (shipmentsByCustomer.get(customer._id.toString()) ?? []).length,
+          (liveShipmentsByCustomer.get(customer._id.toString()) ?? []).length,
 
         totalRevenue: 0,
         outstandingBalance: null
@@ -2153,7 +2173,7 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
-    const [customerMessages, customerShipments, customerBookings] = await Promise.all([
+    const [customerMessages, customerShipments, customerBookings, customerLiveShipments] = await Promise.all([
 
       messages()
         .find({ customerId: customerObjectId })
@@ -2165,6 +2185,13 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
         .toArray(),
 
       bookings()
+        .find({ customerId: customerObjectId })
+        .sort({ createdAt: -1 })
+        .toArray(),
+
+      // Live operational shipments (Phase 2) — separate from the
+      // historical `shipments` field above, which stays as-is.
+      shipments()
         .find({ customerId: customerObjectId })
         .sort({ createdAt: -1 })
         .toArray()
@@ -2181,9 +2208,10 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
         ...customer,
         messages: customerMessages,
         shipments: customerShipments,
+        liveShipments: customerLiveShipments,
         bookings: bookingsWithResolvedDate,
         totalBookings: bookingsWithResolvedDate.length,
-        totalShipments: customerShipments.length,
+        totalShipments: customerLiveShipments.length,
         totalRevenue: 0,
         outstandingBalance: null,
         financeDataAvailable: false
@@ -2240,7 +2268,8 @@ app.get('/api/dashboard/summary', async (req, res) => {
       todaysBookingsCount,
       newCustomersCount,
       unreadCustomerIds,
-      attentionCount
+      attentionCount,
+      activeShipmentsCount
     ] = await Promise.all([
 
       bookings().countDocuments({ requestedDateISO: todayString }),
@@ -2251,7 +2280,11 @@ app.get('/api/dashboard/summary', async (req, res) => {
 
       messages().distinct('customerId', { senderType: 'CUSTOMER', isRead: false }),
 
-      customers().countDocuments({ needsAttention: true })
+      customers().countDocuments({ needsAttention: true }),
+
+      // "Active" = not yet delivered — the one status a shipment reaches
+      // and then stays at, so this is a real live-in-progress count.
+      shipments().countDocuments({ status: { $ne: 'delivered' } })
 
     ]);
 
@@ -2259,7 +2292,8 @@ app.get('/api/dashboard/summary', async (req, res) => {
       todaysBookings: todaysBookingsCount,
       newCustomersToday: newCustomersCount,
       unreadConversations: unreadCustomerIds.length,
-      attentionConversations: attentionCount
+      attentionConversations: attentionCount,
+      activeShipments: activeShipmentsCount
     });
 
   } catch (err) {
@@ -2479,6 +2513,449 @@ app.patch('/api/bookings/:bookingId/status', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to update booking status'
+    });
+  }
+});
+
+
+// ============================================================
+// UPDATE BOOKING (extended CRM/operations fields — Phase 2)
+// ============================================================
+//
+// Separate from PATCH /api/bookings/:bookingId/status above (never
+// removed/replaced) — this is a general-purpose update for the
+// optional fields added on top of the original booking shape.
+// Whitelisted so a caller can never overwrite customerId/createdAt/etc.
+
+const BOOKING_UPDATABLE_FIELDS = [
+  'serviceType', 'origin', 'destination', 'cargoType',
+  'boxCount', 'weight', 'cbm', 'price', 'paymentStatus',
+  'notes', 'shipmentId'
+];
+const BOOKING_NUMERIC_FIELDS = ['boxCount', 'weight', 'cbm', 'price'];
+
+app.patch('/api/bookings/:bookingId', async (req, res) => {
+
+  try {
+
+    const { bookingId } = req.params;
+
+    if (!ObjectId.isValid(bookingId)) {
+      return res.status(400).json({
+        error: 'Invalid booking id'
+      });
+    }
+
+    const updates = {};
+
+    for (const field of BOOKING_UPDATABLE_FIELDS) {
+      if (!(field in (req.body || {}))) continue;
+
+      let value = req.body[field];
+
+      if (BOOKING_NUMERIC_FIELDS.includes(field) && value !== null && value !== '') {
+        const num = Number(value);
+        if (Number.isNaN(num)) {
+          return res.status(400).json({
+            error: `${field} must be a number`
+          });
+        }
+        value = num;
+      } else if (BOOKING_NUMERIC_FIELDS.includes(field) && value === '') {
+        value = null;
+      }
+
+      updates[field] = value;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        error: 'No updatable fields provided'
+      });
+    }
+
+    const updated = await bookings().findOneAndUpdate(
+      { _id: new ObjectId(bookingId) },
+      { $set: updates },
+      { returnDocument: 'after' }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        error: 'Booking not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      booking: { ...updated, resolvedDate: resolvedDateString(updated) }
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error updating booking:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to update booking'
+    });
+  }
+});
+
+
+// ============================================================
+// SHIPMENTS (Phase 2) — live operational tracking, separate from the
+// historical shipmentHistory import. References customerId/bookingId
+// only; never copies the customer or booking document.
+// ============================================================
+
+const SHIPMENT_STATUSES = [
+  'booked', 'cargo_received', 'at_warehouse', 'loaded',
+  'in_transit', 'arrived', 'customs', 'ready_for_collection', 'delivered'
+];
+
+function generateShipmentNumber() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const rand = crypto.randomBytes(3).toString('hex').toUpperCase();
+  return `SHP-${y}${m}${d}-${rand}`;
+}
+
+// Joins in customer name/phone the same in-memory way GET /api/customers
+// joins bookings — a Map lookup, not a $lookup pipeline, matching the
+// rest of this file's style.
+async function attachCustomerInfo(shipmentDocs) {
+  const customerIds = [...new Set(shipmentDocs.map(s => String(s.customerId)))];
+  const customerDocs = customerIds.length
+    ? await customers().find({ _id: { $in: customerIds.map(id => new ObjectId(id)) } }).toArray()
+    : [];
+  const byId = new Map(customerDocs.map(c => [String(c._id), c]));
+
+  return shipmentDocs.map(s => {
+    const customer = byId.get(String(s.customerId));
+    return {
+      ...s,
+      customerName: customer ? customer.name : null,
+      phoneNumber: customer ? customer.phoneNumber : null
+    };
+  });
+}
+
+app.get('/api/shipments', async (req, res) => {
+
+  try {
+
+    const query = {};
+
+    if (req.query.status) {
+      query.status = String(req.query.status);
+    }
+    if (req.query.customerId && ObjectId.isValid(req.query.customerId)) {
+      query.customerId = new ObjectId(req.query.customerId);
+    }
+
+    const allShipments = await shipments()
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const withCustomerInfo = await attachCustomerInfo(allShipments);
+
+    res.status(200).json({
+      shipments: withCustomerInfo
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error listing shipments:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to list shipments'
+    });
+  }
+});
+
+
+app.post('/api/shipments', async (req, res) => {
+
+  try {
+
+    const {
+      customerId, bookingId, serviceType, origin, destination,
+      blNumber, containerNumber, cargo, boxCount, weight, cbm, trackingNumber
+    } = req.body || {};
+
+    if (!customerId || !ObjectId.isValid(customerId)) {
+      return res.status(400).json({
+        error: 'A valid customerId is required'
+      });
+    }
+
+    const customerExists = await customers().findOne({ _id: new ObjectId(customerId) });
+    if (!customerExists) {
+      return res.status(404).json({
+        error: 'Customer not found'
+      });
+    }
+
+    let bookingObjectId = null;
+    if (bookingId) {
+      if (!ObjectId.isValid(bookingId)) {
+        return res.status(400).json({
+          error: 'Invalid bookingId'
+        });
+      }
+      const bookingExists = await bookings().findOne({ _id: new ObjectId(bookingId) });
+      if (!bookingExists) {
+        return res.status(404).json({
+          error: 'Booking not found'
+        });
+      }
+      bookingObjectId = bookingExists._id;
+    }
+
+    const now = new Date().toISOString();
+
+    const shipment = {
+      shipmentNumber: generateShipmentNumber(),
+      customerId: new ObjectId(customerId),
+      bookingId: bookingObjectId,
+      serviceType: serviceType || null,
+      origin: origin || null,
+      destination: destination || null,
+      blNumber: blNumber || null,
+      containerNumber: containerNumber || null,
+      cargo: cargo || null,
+      boxCount: boxCount != null && boxCount !== '' ? Number(boxCount) : null,
+      weight: weight != null && weight !== '' ? Number(weight) : null,
+      cbm: cbm != null && cbm !== '' ? Number(cbm) : null,
+      trackingNumber: trackingNumber || null,
+      status: 'booked',
+      warehouseStatus: null,
+      history: [{ status: 'booked', at: now, note: null }],
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const { insertedId } = await shipments().insertOne(shipment);
+
+    if (bookingObjectId) {
+      await bookings().updateOne(
+        { _id: bookingObjectId },
+        { $set: { shipmentId: String(insertedId) } }
+      );
+    }
+
+    const [withCustomerInfo] = await attachCustomerInfo([{ ...shipment, _id: insertedId }]);
+
+    res.status(201).json({
+      success: true,
+      shipment: withCustomerInfo
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error creating shipment:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to create shipment'
+    });
+  }
+});
+
+
+app.get('/api/shipments/:shipmentId', async (req, res) => {
+
+  try {
+
+    const { shipmentId } = req.params;
+
+    if (!ObjectId.isValid(shipmentId)) {
+      return res.status(400).json({
+        error: 'Invalid shipment id'
+      });
+    }
+
+    const shipment = await shipments().findOne({ _id: new ObjectId(shipmentId) });
+
+    if (!shipment) {
+      return res.status(404).json({
+        error: 'Shipment not found'
+      });
+    }
+
+    const [withCustomerInfo] = await attachCustomerInfo([shipment]);
+
+    res.status(200).json({
+      shipment: withCustomerInfo
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error fetching shipment:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to fetch shipment'
+    });
+  }
+});
+
+
+// Read-only view of just the status history — the "timeline sub-resource"
+// (kept as a real embedded array on the shipment document itself, so
+// there's exactly one place this data lives; this endpoint just reads it).
+app.get('/api/shipments/:shipmentId/timeline', async (req, res) => {
+
+  try {
+
+    const { shipmentId } = req.params;
+
+    if (!ObjectId.isValid(shipmentId)) {
+      return res.status(400).json({
+        error: 'Invalid shipment id'
+      });
+    }
+
+    const shipment = await shipments().findOne(
+      { _id: new ObjectId(shipmentId) },
+      { projection: { history: 1 } }
+    );
+
+    if (!shipment) {
+      return res.status(404).json({
+        error: 'Shipment not found'
+      });
+    }
+
+    res.status(200).json({
+      history: shipment.history || []
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error fetching shipment timeline:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to fetch shipment timeline'
+    });
+  }
+});
+
+
+const SHIPMENT_UPDATABLE_FIELDS = [
+  'serviceType', 'origin', 'destination', 'blNumber', 'containerNumber',
+  'cargo', 'boxCount', 'weight', 'cbm', 'trackingNumber', 'warehouseStatus'
+];
+const SHIPMENT_NUMERIC_FIELDS = ['boxCount', 'weight', 'cbm'];
+
+app.patch('/api/shipments/:shipmentId', async (req, res) => {
+
+  try {
+
+    const { shipmentId } = req.params;
+
+    if (!ObjectId.isValid(shipmentId)) {
+      return res.status(400).json({
+        error: 'Invalid shipment id'
+      });
+    }
+
+    const existing = await shipments().findOne({ _id: new ObjectId(shipmentId) });
+    if (!existing) {
+      return res.status(404).json({
+        error: 'Shipment not found'
+      });
+    }
+
+    const body = req.body || {};
+    const updates = {};
+
+    for (const field of SHIPMENT_UPDATABLE_FIELDS) {
+      if (!(field in body)) continue;
+
+      let value = body[field];
+
+      if (SHIPMENT_NUMERIC_FIELDS.includes(field) && value !== null && value !== '') {
+        const num = Number(value);
+        if (Number.isNaN(num)) {
+          return res.status(400).json({
+            error: `${field} must be a number`
+          });
+        }
+        value = num;
+      } else if (SHIPMENT_NUMERIC_FIELDS.includes(field) && value === '') {
+        value = null;
+      }
+
+      updates[field] = value;
+    }
+
+    const now = new Date().toISOString();
+    let historyEntry = null;
+
+    if (body.status !== undefined) {
+      if (!SHIPMENT_STATUSES.includes(body.status)) {
+        return res.status(400).json({
+          error: `status must be one of: ${SHIPMENT_STATUSES.join(', ')}`
+        });
+      }
+      if (body.status !== existing.status) {
+        updates.status = body.status;
+        historyEntry = { status: body.status, at: now, note: body.statusNote || null };
+      }
+    }
+
+    if (Object.keys(updates).length === 0 && !historyEntry) {
+      return res.status(400).json({
+        error: 'No updatable fields provided'
+      });
+    }
+
+    updates.updatedAt = now;
+
+    const mongoUpdate = { $set: updates };
+    if (historyEntry) {
+      mongoUpdate.$push = { history: historyEntry };
+    }
+
+    const updated = await shipments().findOneAndUpdate(
+      { _id: new ObjectId(shipmentId) },
+      mongoUpdate,
+      { returnDocument: 'after' }
+    );
+
+    const [withCustomerInfo] = await attachCustomerInfo([updated]);
+
+    res.status(200).json({
+      success: true,
+      shipment: withCustomerInfo
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error updating shipment:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to update shipment'
     });
   }
 });
