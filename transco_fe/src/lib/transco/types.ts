@@ -415,6 +415,32 @@ export interface ConsolidationDetail extends Consolidation {
   shipments: Shipment[];
 }
 
+/** The live customs snapshot from pebl-tracker.transcocargo.com.au for one
+ * BL number — the same public tracker customers and the WhatsApp bot
+ * already use, just looked up from inside the console. Null fields mean
+ * PEBL's page didn't have that value (its markup is a plain HTML page,
+ * not a documented API, so this degrades gracefully rather than erroring
+ * if a field is ever missing). */
+export interface PeblTrackingInfo {
+  peblShipmentNumber: string | null;
+  portOfLoading: string | null;
+  portOfDischarge: string | null;
+  estimatedArrivalDate: string | null;
+  estimatedClearanceDate: string | null;
+  estimatedDeliveryDate: string | null;
+}
+
+/** GET /api/tracking/:blNumber — merges the live PEBL lookup with our own
+ * shipment record for that HBL, when one exists. Either half can be null
+ * independently (a shipment not yet cleared by PEBL, or a CRM shipment
+ * from before this batch was imported). */
+export interface TrackingResult {
+  blNumber: string;
+  peblFound: boolean;
+  pebl: PeblTrackingInfo | null;
+  shipment: Shipment | null;
+}
+
 /** A deduped receiver's full profile — every shipment addressed to them,
  * across any sender or batch. Mirrors CustomerProfile's shape/purpose but
  * for the receiving side, which has no `customers` record of its own. */

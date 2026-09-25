@@ -3125,6 +3125,95 @@ app.get('/api/receivers/:receiverId', async (req, res) => {
 
 
 // ============================================================
+// TRACKING (PEBL lookup)
+// ============================================================
+//
+// Proxies the public pebl-tracker.transcocargo.com.au site (the same one
+// customers use, and the same one the WhatsApp bot already checks) so
+// staff can look up a BL/HBL number's live customs status from inside
+// the console instead of opening a separate tab. PEBL has no JSON API —
+// it's a small server-rendered page — so this fetches the HTML and
+// extracts the handful of fields it always contains. If PEBL's markup
+// ever changes, parsePeblHtml will return nulls rather than throw.
+function parsePeblHtml(html) {
+  const pairs = {};
+  const dtDdRe = /<dt>([^<]*)<\/dt>\s*<dd>([^<]*)<\/dd>/g;
+  let m;
+  while ((m = dtDdRe.exec(html))) {
+    pairs[m[1].trim()] = m[2].trim();
+  }
+  const deliveryMatch = html.match(/Estimated delivery date:\s*<strong>([^<]*)<\/strong>/);
+
+  return {
+    peblShipmentNumber: pairs['Shipment #'] || null,
+    portOfLoading: pairs['Port of loading'] || null,
+    portOfDischarge: pairs['Port of discharge'] || null,
+    estimatedArrivalDate: pairs['Estimated arrival date'] || null,
+    estimatedClearanceDate: pairs['Estimated clearance date'] || null,
+    estimatedDeliveryDate: deliveryMatch ? deliveryMatch[1].trim() : null
+  };
+}
+
+app.get('/api/tracking/:blNumber', async (req, res) => {
+
+  try {
+
+    const { blNumber } = req.params;
+
+    // Mirrors PEBL's own client-side validation (see tracker.js) — reject
+    // anything else before it ever leaves this server.
+    if (!/^[A-Za-z0-9-]{1,32}$/.test(blNumber)) {
+      return res.status(400).json({
+        error: 'BL number must be 1-32 letters, numbers, or hyphens'
+      });
+    }
+
+    let pebl = null;
+    let peblFound = false;
+
+    try {
+      const peblResponse = await axios.get(
+        `https://pebl-tracker.transcocargo.com.au/search-bl/${encodeURIComponent(blNumber)}`,
+        { validateStatus: () => true, timeout: 10000 }
+      );
+
+      if (peblResponse.status === 200) {
+        peblFound = true;
+        pebl = parsePeblHtml(peblResponse.data);
+      }
+      // Any other status (404 "No shipment found", 5xx, etc.) just means
+      // not found / unavailable — never surfaced as a hard error to staff.
+    } catch (peblErr) {
+      console.error('PEBL lookup failed:', peblErr.message);
+      // pebl stays null — the response below still returns our own
+      // shipment record (if any) even when PEBL itself is unreachable.
+    }
+
+    const shipmentDoc = await shipments().findOne({ hblNumber: blNumber });
+    const [withInfo] = shipmentDoc ? await attachCustomerInfo([shipmentDoc]) : [null];
+
+    res.status(200).json({
+      blNumber,
+      peblFound,
+      pebl,
+      shipment: withInfo || null
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error looking up tracking:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to look up tracking'
+    });
+  }
+});
+
+
+// ============================================================
 // MARK CUSTOMER MESSAGES AS READ
 // ============================================================
 

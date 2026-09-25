@@ -21,6 +21,7 @@ import type {
   MediaType,
   Message,
   MessageStatus,
+  PeblTrackingInfo,
   ReceiverProfile,
   Segment,
   SegmentFilter,
@@ -33,6 +34,7 @@ import type {
   ShipmentReceiverProfile,
   ShipmentStatus,
   ShipmentUpdateInput,
+  TrackingResult,
 } from "./types";
 
 /**
@@ -584,6 +586,36 @@ export async function fetchReceiver(receiverId: string): Promise<ReceiverProfile
     address: r.address,
     hblNumbers: r.hblNumbers ?? [],
     shipments: r.shipments.map(mapShipmentRecord),
+  };
+}
+
+// ============================================================
+// TRACKING (PEBL lookup)
+// ============================================================
+
+interface BackendTrackingResult {
+  blNumber: string;
+  peblFound: boolean;
+  pebl: PeblTrackingInfo | null;
+  shipment: BackendShipmentRecord | null;
+}
+
+export async function fetchTracking(blNumber: string): Promise<TrackingResult> {
+  const res = await fetch(`${API_BASE_URL}/api/tracking/${encodeURIComponent(blNumber)}`, {
+    headers: authHeaders(),
+  });
+  const data = (await res.json().catch(() => null)) as
+    BackendTrackingResult | { error: string } | null;
+  if (!res.ok) {
+    const message = data && "error" in data ? data.error : undefined;
+    throw new Error(message ?? `Failed to look up tracking (${res.status})`);
+  }
+  const result = data as BackendTrackingResult;
+  return {
+    blNumber: result.blNumber,
+    peblFound: result.peblFound,
+    pebl: result.pebl,
+    shipment: result.shipment ? mapShipmentRecord(result.shipment) : null,
   };
 }
 
