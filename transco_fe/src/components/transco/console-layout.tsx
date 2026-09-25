@@ -77,13 +77,16 @@ export const NAV_SECTIONS: NavSection[] = [
     // "Packaging Stock" (Transco-owned box supplies) is deliberately not
     // called "Inventory" — that word is ambiguous with Warehouse Cargo
     // (customer goods in our custody), a completely separate concept.
-    // Single leaf on purpose — Stock Movements/Suppliers/Purchase Orders
-    // were unbuilt placeholders with nowhere to actually navigate; a
-    // single-item section renders as one direct link (see Sidebar below),
-    // matching what's real today (Current Stock + Packaging Activity).
+    // Two real leaves (not the old Stock Movements/Suppliers/Purchase
+    // Orders placeholders) — a 2+ item section renders as an expandable
+    // group like its siblings (Finance, CRM, ...) instead of one bold
+    // top-level link, matching what's actually built.
     label: "Packaging Stock",
     icon: PackageSearch,
-    items: [{ label: "Packaging Stock", to: "/console/inventory/stock" }],
+    items: [
+      { label: "Current Stock", to: "/console/inventory/stock" },
+      { label: "Packaging Activity", to: "/console/inventory/activity" },
+    ],
   },
   {
     label: "Finance",
