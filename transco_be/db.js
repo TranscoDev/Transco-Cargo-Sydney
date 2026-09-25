@@ -24,6 +24,18 @@ async function connectToDatabase(uri, dbName = 'transco') {
   await db.collection('shipments').createIndex({ shipmentNumber: 1 }, { unique: true });
   await db.collection('shipments').createIndex({ customerId: 1 });
   await db.collection('shipments').createIndex({ bookingId: 1 });
+  // hblNumber only exists on shipments imported from a batch ledger — sparse
+  // so live, manually-created shipments (no HBL) don't collide on null.
+  await db.collection('shipments').createIndex({ hblNumber: 1 }, { unique: true, sparse: true });
+
+  // One document per shipment batch (e.g. "Batch 57", "Batch 58"), imported
+  // from the dashboard tracker sheet — see consolidations() below.
+  await db.collection('consolidations').createIndex({ batchNumber: 1 }, { unique: true });
+
+  // Deduped receiver directory — see receivers() below.
+  await db.collection('receivers').createIndex({ dedupeKey: 1 }, { unique: true });
+
+  await db.collection('invoices').createIndex({ invoiceNumber: 1 }, { unique: true });
 
   console.log('Connected to MongoDB');
   return db;
@@ -73,6 +85,38 @@ function shipments() {
   return getDb().collection('shipments');
 }
 
+// One document per shipment batch (e.g. "Batch 57", "Batch 58") — imported
+// from the dashboard tracker sheet (PE number, ETD/ETA/PEBL dates, batch
+// financial rollup). Shipments reference their batch via consolidationId;
+// a batch can exist before every one of its shipments has been imported.
+function consolidations() {
+  return getDb().collection('consolidations');
+}
+
+// Deduped receiver directory. A receiver never messages the bot and isn't
+// a `customers` record — but the same person can receive shipments from
+// different senders across different batches, so this exists to dedupe
+// them (by phone, falling back to name+address, same convention as
+// customer/shipment-history dedup elsewhere) instead of that person's
+// details being re-typed and re-siloed on every shipment.
+function receivers() {
+  return getDb().collection('receivers');
+}
+
+// One per customer shipment — itemized charges, linked to customerId +
+// shipmentId (and consolidationId when the shipment belongs to a batch).
+function invoices() {
+  return getDb().collection('invoices');
+}
+
+// Payment transactions against an invoice — tender type, amount, date.
+// Also holds historical entries imported from the bank feed/cash log
+// (source: "bank_feed_historical" / "cash_log_historical"), which are
+// read-only reference data, never linked to a live invoice.
+function payments() {
+  return getDb().collection('payments');
+}
+
 // A log entry per email promotion send — not used to re-send anything,
 // purely a record for staff of what went out, when, and to how many.
 function campaigns() {
@@ -96,6 +140,10 @@ module.exports = {
   settings,
   shipmentHistory,
   shipments,
+  consolidations,
+  receivers,
+  invoices,
+  payments,
   campaigns,
   segments
 };

@@ -305,9 +305,33 @@ export interface ShipmentHistoryPoint {
   note?: string | null;
 }
 
+export interface ShipmentBoxBreakdown {
+  tc: number;
+  gb: number;
+  ob: number;
+  wb: number;
+}
+
+/** The deduped receiver this shipment was addressed to (see the
+ * `receivers` collection) — distinct from any embedded per-shipment
+ * snapshot. hblNumbers is every shipment, across any sender or batch,
+ * addressed to this same person — this is what lets the UI show "this
+ * person has 3 shipments" instead of 3 disconnected rows. Null for
+ * shipments with no linked receiver (e.g. manually created, no batch
+ * import behind them). */
+export interface ShipmentReceiverProfile {
+  id: string;
+  name: string;
+  phone: string | null;
+  hblNumbers: string[];
+}
+
 /** A live, operationally-tracked shipment (Phase 2) — distinct from
  * ShipmentHistoryEntry above, which is historical Excel-import data only.
- * References customerId/bookingId; never duplicates either record. */
+ * References customerId/bookingId; never duplicates either record.
+ * hblNumber/batchNumber/consolidationId/boxes/totalCbm/totalBoxes are
+ * only populated on shipments imported from a batch ledger — absent on
+ * shipments created manually via the New Shipment dialog. */
 export interface Shipment {
   id: string;
   shipmentNumber: string;
@@ -315,6 +339,9 @@ export interface Shipment {
   customerName: string | null;
   phoneNumber: string | null;
   bookingId?: string | null | undefined;
+  hblNumber?: string | null | undefined;
+  batchNumber?: number | null | undefined;
+  consolidationId?: string | null | undefined;
   serviceType?: string | null | undefined;
   origin?: string | null | undefined;
   destination?: string | null | undefined;
@@ -322,14 +349,84 @@ export interface Shipment {
   containerNumber?: string | null | undefined;
   cargo?: string | null | undefined;
   boxCount?: number | null | undefined;
+  boxes?: ShipmentBoxBreakdown | null | undefined;
   weight?: number | null | undefined;
   cbm?: number | null | undefined;
+  totalCbm?: number | null | undefined;
+  totalBoxes?: number | null | undefined;
   trackingNumber?: string | null | undefined;
+  receiverProfile?: ShipmentReceiverProfile | null | undefined;
   status: ShipmentStatus;
   warehouseStatus?: string | null | undefined;
   history: ShipmentHistoryPoint[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConsolidationTotals {
+  hbl: number;
+  tc: number;
+  gb: number;
+  ob: number;
+  wb: number;
+  dd: number;
+  totalCbm: number | null;
+  totalBoxes: number | null;
+}
+
+export interface ConsolidationFinancials {
+  grossIncome: number;
+  totalExpenses: number;
+  grossProfit: number;
+}
+
+export interface ConsolidationDates {
+  sydneyCalendarEtd: string | null;
+  sydneyCalendarEta: string | null;
+  peblEta: string | null;
+  peblClearanceDate: string | null;
+  peblDeliveryDate: string | null;
+  transconnectPickupSyd: string | null;
+  transconnectDeliveryMel: string | null;
+}
+
+/** One shipment batch ("Batch 57", "Batch 58") — imported from the
+ * dashboard tracker sheet. importedShipmentCount is computed server-side
+ * at read time (never stored): how many of this batch's shipments
+ * actually exist in the system so far, which is normally smaller than
+ * totals.hbl until the rest of a batch's rows have been imported. */
+export interface Consolidation {
+  id: string;
+  batchNumber: number;
+  label: string;
+  peNumber: string | null;
+  hblRange: { from: string; to: string };
+  totals: ConsolidationTotals;
+  paymentTotals: { zeller: number; eft: number; cash: number };
+  financials: ConsolidationFinancials;
+  financialsNote?: string | null | undefined;
+  dates: ConsolidationDates;
+  importedShipmentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsolidationDetail extends Consolidation {
+  shipments: Shipment[];
+}
+
+/** A deduped receiver's full profile — every shipment addressed to them,
+ * across any sender or batch. Mirrors CustomerProfile's shape/purpose but
+ * for the receiving side, which has no `customers` record of its own. */
+export interface ReceiverProfile {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  identityDocument: { type: string; number: string } | null;
+  address: string | null;
+  hblNumbers: string[];
+  shipments: Shipment[];
 }
 
 /** Payload for creating a shipment — bookingId is optional (a shipment

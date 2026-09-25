@@ -10,7 +10,7 @@ const { ObjectId } = require('mongodb');
 
 const multer = require('multer');
 
-const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory, shipments, campaigns, segments } = require('./db');
+const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory, shipments, consolidations, receivers, campaigns, segments } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
@@ -2635,12 +2635,34 @@ async function attachCustomerInfo(shipmentDocs) {
     : [];
   const byId = new Map(customerDocs.map(c => [String(c._id), c]));
 
+  // Only shipments imported from a batch ledger have a receiverId — a
+  // manually-created live shipment has none, so this map stays empty for
+  // those and receiverProfile below is simply null.
+  const receiverIds = [...new Set(
+    shipmentDocs.map(s => s.receiverId ? String(s.receiverId) : null).filter(Boolean)
+  )];
+  const receiverDocs = receiverIds.length
+    ? await receivers().find({ _id: { $in: receiverIds.map(id => new ObjectId(id)) } }).toArray()
+    : [];
+  const receiverById = new Map(receiverDocs.map(r => [String(r._id), r]));
+
   return shipmentDocs.map(s => {
     const customer = byId.get(String(s.customerId));
+    const receiver = s.receiverId ? receiverById.get(String(s.receiverId)) : null;
     return {
       ...s,
       customerName: customer ? customer.name : null,
-      phoneNumber: customer ? customer.phoneNumber : null
+      phoneNumber: customer ? customer.phoneNumber : null,
+      // Deduped receiver record, distinct from the embedded `receiver`
+      // snapshot already on the shipment — hblNumbers is every shipment
+      // addressed to this same person, which is what lets the UI show
+      // "this person has 3 shipments" instead of 3 disconnected rows.
+      receiverProfile: receiver ? {
+        id: receiver._id,
+        name: receiver.name,
+        phone: receiver.phone,
+        hblNumbers: receiver.hblNumbers || []
+      } : null
     };
   });
 }
@@ -2956,6 +2978,147 @@ app.patch('/api/shipments/:shipmentId', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to update shipment'
+    });
+  }
+});
+
+
+// ============================================================
+// CONSOLIDATIONS (shipment batches — "Batch 57", "Batch 58", ...)
+// ============================================================
+//
+// One document per shipment batch, imported from the dashboard tracker
+// sheet. importedShipmentCount is computed at read time (never stored) —
+// it's how many shipments from this batch actually exist in `shipments`
+// so far, which will be smaller than totals.hbl until the rest of a
+// batch's rows are imported.
+app.get('/api/consolidations', async (req, res) => {
+
+  try {
+
+    const allConsolidations = await consolidations().find({}).sort({ batchNumber: -1 }).toArray();
+
+    const counts = await shipments().aggregate([
+      { $match: { consolidationId: { $ne: null } } },
+      { $group: { _id: '$consolidationId', count: { $sum: 1 } } }
+    ]).toArray();
+    const countById = new Map(counts.map(c => [String(c._id), c.count]));
+
+    const result = allConsolidations.map(c => ({
+      ...c,
+      importedShipmentCount: countById.get(String(c._id)) ?? 0
+    }));
+
+    res.status(200).json({
+      consolidations: result
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error listing consolidations:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to list consolidations'
+    });
+  }
+});
+
+
+app.get('/api/consolidations/:consolidationId', async (req, res) => {
+
+  try {
+
+    const { consolidationId } = req.params;
+
+    if (!ObjectId.isValid(consolidationId)) {
+      return res.status(400).json({
+        error: 'Invalid consolidation id'
+      });
+    }
+
+    const consolidation = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
+
+    if (!consolidation) {
+      return res.status(404).json({
+        error: 'Consolidation not found'
+      });
+    }
+
+    const batchShipments = await shipments()
+      .find({ consolidationId: consolidation._id })
+      .sort({ hblNumber: 1 })
+      .toArray();
+
+    const withInfo = await attachCustomerInfo(batchShipments);
+
+    res.status(200).json({
+      consolidation: { ...consolidation, shipments: withInfo }
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error fetching consolidation:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to fetch consolidation'
+    });
+  }
+});
+
+
+// ============================================================
+// RECEIVERS (deduped directory — see receivers() in db.js)
+// ============================================================
+//
+// A receiver profile page: every shipment addressed to this one deduped
+// person, across any sender/batch — the "scroll down and see the same
+// person, many BL numbers, no duplicates" view.
+app.get('/api/receivers/:receiverId', async (req, res) => {
+
+  try {
+
+    const { receiverId } = req.params;
+
+    if (!ObjectId.isValid(receiverId)) {
+      return res.status(400).json({
+        error: 'Invalid receiver id'
+      });
+    }
+
+    const receiver = await receivers().findOne({ _id: new ObjectId(receiverId) });
+
+    if (!receiver) {
+      return res.status(404).json({
+        error: 'Receiver not found'
+      });
+    }
+
+    const receiverShipments = await shipments()
+      .find({ receiverId: receiver._id })
+      .sort({ hblNumber: 1 })
+      .toArray();
+
+    const withInfo = await attachCustomerInfo(receiverShipments);
+
+    res.status(200).json({
+      receiver: { ...receiver, shipments: withInfo }
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error fetching receiver:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to fetch receiver'
     });
   }
 });

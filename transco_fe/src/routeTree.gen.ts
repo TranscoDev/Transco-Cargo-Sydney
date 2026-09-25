@@ -35,6 +35,8 @@ import { Route as ConsoleInventoryStockRouteImport } from './routes/console.inve
 import { Route as ConsoleInventorySuppliersRouteImport } from './routes/console.inventory.suppliers'
 import { Route as ConsoleShipmentsIndexRouteImport } from './routes/console/shipments/index'
 import { Route as ConsoleShipmentsShipmentIdRouteImport } from './routes/console/shipments/$shipmentId'
+import { Route as ConsoleShipmentsBatchBatchIdRouteImport } from './routes/console/shipments/batch.$batchId'
+import { Route as ConsoleShipmentsReceiverReceiverIdRouteImport } from './routes/console/shipments/receiver.$receiverId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -171,6 +173,18 @@ const ConsoleShipmentsShipmentIdRoute =
     path: '/$shipmentId',
     getParentRoute: () => ConsoleShipmentsRouteRoute,
   } as any)
+const ConsoleShipmentsBatchBatchIdRoute =
+  ConsoleShipmentsBatchBatchIdRouteImport.update({
+    id: '/batch/$batchId',
+    path: '/batch/$batchId',
+    getParentRoute: () => ConsoleShipmentsRouteRoute,
+  } as any)
+const ConsoleShipmentsReceiverReceiverIdRoute =
+  ConsoleShipmentsReceiverReceiverIdRouteImport.update({
+    id: '/receiver/$receiverId',
+    path: '/receiver/$receiverId',
+    getParentRoute: () => ConsoleShipmentsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -199,6 +213,8 @@ export interface FileRoutesByFullPath {
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
+  '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
+  '/console/shipments/receiver/$receiverId': typeof ConsoleShipmentsReceiverReceiverIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -224,6 +240,8 @@ export interface FileRoutesByTo {
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers': typeof ConsoleCustomersIndexRoute
   '/console/shipments': typeof ConsoleShipmentsIndexRoute
+  '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
+  '/console/shipments/receiver/$receiverId': typeof ConsoleShipmentsReceiverReceiverIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -253,6 +271,8 @@ export interface FileRoutesById {
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
+  '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
+  '/console/shipments/receiver/$receiverId': typeof ConsoleShipmentsReceiverReceiverIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -283,6 +303,8 @@ export interface FileRouteTypes {
     | '/console/shipments/$shipmentId'
     | '/console/customers/'
     | '/console/shipments/'
+    | '/console/shipments/batch/$batchId'
+    | '/console/shipments/receiver/$receiverId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -308,6 +330,8 @@ export interface FileRouteTypes {
     | '/console/shipments/$shipmentId'
     | '/console/customers'
     | '/console/shipments'
+    | '/console/shipments/batch/$batchId'
+    | '/console/shipments/receiver/$receiverId'
   id:
     | '__root__'
     | '/'
@@ -336,6 +360,8 @@ export interface FileRouteTypes {
     | '/console/shipments/$shipmentId'
     | '/console/customers/'
     | '/console/shipments/'
+    | '/console/shipments/batch/$batchId'
+    | '/console/shipments/receiver/$receiverId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -527,6 +553,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleShipmentsShipmentIdRouteImport
       parentRoute: typeof ConsoleShipmentsRouteRoute
     }
+    '/console/shipments/batch/$batchId': {
+      id: '/console/shipments/batch/$batchId'
+      path: '/batch/$batchId'
+      fullPath: '/console/shipments/batch/$batchId'
+      preLoaderRoute: typeof ConsoleShipmentsBatchBatchIdRouteImport
+      parentRoute: typeof ConsoleShipmentsRouteRoute
+    }
+    '/console/shipments/receiver/$receiverId': {
+      id: '/console/shipments/receiver/$receiverId'
+      path: '/receiver/$receiverId'
+      fullPath: '/console/shipments/receiver/$receiverId'
+      preLoaderRoute: typeof ConsoleShipmentsReceiverReceiverIdRouteImport
+      parentRoute: typeof ConsoleShipmentsRouteRoute
+    }
   }
 }
 
@@ -548,11 +588,16 @@ const ConsoleCustomersRouteRouteWithChildren =
 interface ConsoleShipmentsRouteRouteChildren {
   ConsoleShipmentsShipmentIdRoute: typeof ConsoleShipmentsShipmentIdRoute
   ConsoleShipmentsIndexRoute: typeof ConsoleShipmentsIndexRoute
+  ConsoleShipmentsBatchBatchIdRoute: typeof ConsoleShipmentsBatchBatchIdRoute
+  ConsoleShipmentsReceiverReceiverIdRoute: typeof ConsoleShipmentsReceiverReceiverIdRoute
 }
 
 const ConsoleShipmentsRouteRouteChildren: ConsoleShipmentsRouteRouteChildren = {
   ConsoleShipmentsShipmentIdRoute: ConsoleShipmentsShipmentIdRoute,
   ConsoleShipmentsIndexRoute: ConsoleShipmentsIndexRoute,
+  ConsoleShipmentsBatchBatchIdRoute: ConsoleShipmentsBatchBatchIdRoute,
+  ConsoleShipmentsReceiverReceiverIdRoute:
+    ConsoleShipmentsReceiverReceiverIdRoute,
 }
 
 const ConsoleShipmentsRouteRouteWithChildren =

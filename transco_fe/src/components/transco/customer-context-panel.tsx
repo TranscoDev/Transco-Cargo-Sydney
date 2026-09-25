@@ -26,9 +26,7 @@ export function CustomerContextPanel({
   bookings: Booking[];
   shipments: Shipment[];
 }) {
-  const recentBookings = bookings
-    .filter((b) => b.customerId === conversation.id)
-    .slice(0, 3);
+  const recentBookings = bookings.filter((b) => b.customerId === conversation.id).slice(0, 3);
 
   const activeShipments = shipments
     .filter((s) => s.customerId === conversation.id && s.status !== "delivered")
@@ -68,7 +66,10 @@ export function CustomerContextPanel({
         ) : (
           <div className="flex flex-col gap-1.5">
             {recentBookings.map((b) => (
-              <div key={b.id} className="rounded-md border border-border bg-panel px-2 py-1.5 text-xs">
+              <div
+                key={b.id}
+                className="rounded-md border border-border bg-panel px-2 py-1.5 text-xs"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-medium capitalize">{b.resolvedDate}</span>
                   <span className="capitalize text-muted-foreground">{b.status}</span>
@@ -92,7 +93,9 @@ export function CustomerContextPanel({
                 className="rounded-md border border-border bg-panel px-2 py-1.5 text-xs hover:border-primary/40"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{s.shipmentNumber}</span>
+                  <span className="font-medium">
+                    {s.hblNumber ? `HBL ${s.hblNumber}` : s.shipmentNumber}
+                  </span>
                   <span className="text-muted-foreground">{SHIPMENT_STATUS_LABELS[s.status]}</span>
                 </div>
               </Link>
@@ -126,7 +129,15 @@ export function CustomerContextPanel({
   );
 }
 
-function Section({ icon: Icon, title, children }: { icon: typeof Package; title: string; children: ReactNode }) {
+function Section({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: typeof Package;
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <div className="mb-4">
       <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

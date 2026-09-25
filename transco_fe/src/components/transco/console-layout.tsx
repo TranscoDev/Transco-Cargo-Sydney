@@ -352,7 +352,11 @@ export function ConsoleLayout({
       </header>
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-h-0 flex-1">{children}</main>
+        {/* min-w-0 is load-bearing here: without it, a wide child (e.g. the
+            Contacts table's min-w-[1180px]) forces this flex item past the
+            viewport width instead of scrolling internally — dragging the
+            sidebar and header along with it. */}
+        <main className="min-h-0 min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

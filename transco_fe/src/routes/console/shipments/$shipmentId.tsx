@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Box, CheckCircle2, Package, Phone, Ship, Truck, User } from "lucide-react";
+import {
+  ArrowLeft,
+  Box,
+  CheckCircle2,
+  Layers,
+  Package,
+  Phone,
+  Ship,
+  Truck,
+  User,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,9 +117,10 @@ function ShipmentDetailPage() {
             <div>
               <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                 <Ship className="h-4 w-4 text-muted-foreground" />
-                {shipment.shipmentNumber}
+                {shipment.hblNumber ? `HBL ${shipment.hblNumber}` : shipment.shipmentNumber}
               </h1>
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {shipment.hblNumber && <span>{shipment.shipmentNumber}</span>}
                 <span className="inline-flex items-center gap-1">
                   <User className="h-3 w-3" />
                   {shipment.customerName || "Unknown customer"}
@@ -123,6 +134,16 @@ function ShipmentDetailPage() {
                 {shipment.bookingId && (
                   <Link to="/console/bookings" className="text-primary hover:underline">
                     View Linked Booking
+                  </Link>
+                )}
+                {shipment.consolidationId && (
+                  <Link
+                    to="/console/shipments/batch/$batchId"
+                    params={{ batchId: shipment.consolidationId }}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <Layers className="h-3 w-3" />
+                    Batch {shipment.batchNumber}
                   </Link>
                 )}
               </div>
@@ -153,7 +174,9 @@ function ShipmentDetailPage() {
             </Card>
             <Card>
               <CardHeader className="p-4 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground">Service Type</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Service Type
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0 text-sm">{shipment.serviceType || "—"}</CardContent>
             </Card>
@@ -165,7 +188,11 @@ function ShipmentDetailPage() {
                 <CardTitle className="text-sm">Status</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3 p-4 pt-0">
-                <Select value={shipment.status} onValueChange={(v) => handleStatusChange(v as ShipmentStatus)} disabled={saving}>
+                <Select
+                  value={shipment.status}
+                  onValueChange={(v) => handleStatusChange(v as ShipmentStatus)}
+                  disabled={saving}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -195,7 +222,13 @@ function ShipmentDetailPage() {
                     onChange={(e) => setTrackingDraft(e.target.value)}
                   />
                 </div>
-                <Button type="button" size="sm" onClick={handleSaveTracking} disabled={saving} className="self-start">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveTracking}
+                  disabled={saving}
+                  className="self-start"
+                >
                   Save
                 </Button>
               </CardContent>
@@ -211,9 +244,15 @@ function ShipmentDetailPage() {
                 ) : (
                   <ol className="flex flex-col gap-3">
                     {[...shipment.history].reverse().map((point, idx) => (
-                      <li key={`${point.status}-${point.at}-${idx}`} className="flex items-start gap-2 text-sm">
+                      <li
+                        key={`${point.status}-${point.at}-${idx}`}
+                        className="flex items-start gap-2 text-sm"
+                      >
                         <CheckCircle2
-                          className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", idx === 0 ? "text-primary" : "text-muted-foreground")}
+                          className={cn(
+                            "mt-0.5 h-3.5 w-3.5 shrink-0",
+                            idx === 0 ? "text-primary" : "text-muted-foreground",
+                          )}
                         />
                         <div>
                           <p className={cn("font-medium", idx === 0 && "text-primary")}>
@@ -235,6 +274,35 @@ function ShipmentDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {shipment.receiverProfile && (
+            <Card className="mb-6">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm">Receiver</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 text-sm">
+                <Link
+                  to="/console/shipments/receiver/$receiverId"
+                  params={{ receiverId: shipment.receiverProfile.id }}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {shipment.receiverProfile.name}
+                </Link>
+                {shipment.receiverProfile.phone && (
+                  <span className="ml-2 text-muted-foreground">
+                    {shipment.receiverProfile.phone}
+                  </span>
+                )}
+                {shipment.receiverProfile.hblNumbers.length > 1 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Also received {shipment.receiverProfile.hblNumbers.length - 1} other shipment
+                    {shipment.receiverProfile.hblNumbers.length - 1 === 1 ? "" : "s"} — see their
+                    profile for the full list.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {(shipment.blNumber || shipment.containerNumber) && (
             <Card>

@@ -45,7 +45,10 @@ import {
  * source — see CustomerStatus in types.ts).
  */
 
-const SOURCE_BADGE: Record<CustomerSource, { label: string; icon: typeof Globe; className: string }> = {
+const SOURCE_BADGE: Record<
+  CustomerSource,
+  { label: string; icon: typeof Globe; className: string }
+> = {
   whatsapp: {
     label: "WhatsApp",
     icon: MessageCircle,
@@ -91,7 +94,11 @@ function matchesSourceFilter(c: Conversation, filter: ContactSourceFilter): bool
   if (filter === "all") return true;
   const sources = sourcesFor(c);
   if (filter === "imported") {
-    return sources.includes("historical") && !sources.includes("whatsapp") && !sources.includes("website");
+    return (
+      sources.includes("historical") &&
+      !sources.includes("whatsapp") &&
+      !sources.includes("website")
+    );
   }
   return sources.includes(filter);
 }
@@ -233,7 +240,7 @@ export function ContactsDirectory({
     return { total: sorted.length, byStatus, withEmail };
   }, [sorted]);
 
-  const profileContact = profileId ? conversations.find((c) => c.id === profileId) ?? null : null;
+  const profileContact = profileId ? (conversations.find((c) => c.id === profileId) ?? null) : null;
 
   const toggleSelected = (id: string) => {
     setSelectedIds((prev) => {
@@ -269,9 +276,24 @@ export function ContactsDirectory({
     <div className="flex h-full min-h-0 flex-col bg-panel">
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">Contacts</h2>
           <div className="flex items-center gap-2">
-            <p className="mr-1 text-[11px] text-muted-foreground">{sorted.length} customers</p>
+            <h2 className="text-sm font-semibold text-foreground">Contacts</h2>
+            <p className="text-[11px] text-muted-foreground">{sorted.length} total</p>
+            {/* Only surfaced when non-zero — these need staff action, unlike
+                Active/Historical which are just the normal steady state and
+                don't need to compete for attention here. */}
+            {stats.byStatus.REVIEW > 0 && (
+              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium text-yellow-700 dark:text-yellow-400 bg-yellow-500/15">
+                {stats.byStatus.REVIEW} needs review
+              </span>
+            )}
+            {stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED > 0 && (
+              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-500/15">
+                {stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED} do not contact / blocked
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
             {onImportCustomers && (
               <button
                 type="button"
@@ -294,27 +316,6 @@ export function ContactsDirectory({
               </button>
             )}
           </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {(
-            [
-              ["total", "Total", stats.total],
-              ["ACTIVE", "Active", stats.byStatus.ACTIVE],
-              ["HISTORICAL", "Historical", stats.byStatus.HISTORICAL],
-              ["REVIEW", "Needs Review", stats.byStatus.REVIEW],
-              ["excluded", "Do Not Contact / Blocked", stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED],
-              ["withEmail", "With Email", stats.withEmail],
-            ] as [string, string, number][]
-          ).map(([key, label, value]) => (
-            <div
-              key={key}
-              className="rounded-md border border-border/60 bg-secondary/30 px-2.5 py-1.5 text-[11px]"
-            >
-              <span className="font-semibold text-foreground">{value}</span>{" "}
-              <span className="text-muted-foreground">{label}</span>
-            </div>
-          ))}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -362,7 +363,7 @@ export function ContactsDirectory({
               onChange={(e) => setHasEmailOnly(e.target.checked)}
               className="h-3 w-3"
             />
-            Has email only
+            Has email only ({stats.withEmail})
           </label>
         </div>
 
@@ -429,7 +430,8 @@ export function ContactsDirectory({
             className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
           >
             <Download className="h-3.5 w-3.5" />
-            Export CSV {selectedIds.size > 0 ? `(${selectedIds.size} selected)` : `(${visible.length} shown)`}
+            Export CSV{" "}
+            {selectedIds.size > 0 ? `(${selectedIds.size} selected)` : `(${visible.length} shown)`}
           </button>
 
           {onSendEmailCampaign && (
@@ -472,18 +474,21 @@ export function ContactsDirectory({
                     aria-label={visibleAllSelected ? "Deselect all visible" : "Select all visible"}
                     className="flex items-center text-muted-foreground hover:text-foreground"
                   >
-                    {visibleAllSelected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
+                    {visibleAllSelected ? (
+                      <CheckSquare className="h-3.5 w-3.5" />
+                    ) : (
+                      <Square className="h-3.5 w-3.5" />
+                    )}
                   </button>
                 </th>
-                <th className="px-4 py-2 font-medium">Name</th>
+                <th className="min-w-[200px] px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">Phone</th>
                 <th className="px-4 py-2 font-medium">Source</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Mode</th>
                 <th className="px-4 py-2 text-right font-medium">Bookings</th>
                 <th className="px-4 py-2 text-right font-medium">Shipments</th>
-                <th className="px-4 py-2 text-right font-medium">Revenue</th>
-                <th className="px-4 py-2 text-right font-medium">Outstanding</th>
+                <th className="px-4 py-2 text-right font-medium">Revenue / Outstanding</th>
                 <th className="whitespace-nowrap px-4 py-2 font-medium">Last Activity</th>
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Notes</th>
@@ -586,43 +591,79 @@ function ContactRow({
 
   const commitEmail = () => {
     const trimmed = email.trim();
-    if (trimmed !== (conversation.email ?? "")) onUpdateContact(conversation.id, { email: trimmed });
+    if (trimmed !== (conversation.email ?? ""))
+      onUpdateContact(conversation.id, { email: trimmed });
   };
 
   const commitNotes = () => {
     const trimmed = notes.trim();
-    if (trimmed !== (conversation.notes ?? "")) onUpdateContact(conversation.id, { notes: trimmed });
+    if (trimmed !== (conversation.notes ?? ""))
+      onUpdateContact(conversation.id, { notes: trimmed });
   };
 
   return (
-    <tr className={cn("border-b border-border/60 hover:bg-secondary/40", selected && "bg-secondary/30")}>
+    <tr
+      className={cn(
+        "border-b border-border/60 hover:bg-secondary/40",
+        selected && "bg-secondary/30",
+      )}
+    >
       <td className="px-2 py-2">
         <button
           type="button"
           onClick={onToggleSelected}
-          aria-label={selected ? `Deselect ${conversation.customerName}` : `Select ${conversation.customerName}`}
+          aria-label={
+            selected
+              ? `Deselect ${conversation.customerName}`
+              : `Select ${conversation.customerName}`
+          }
           className="flex items-center text-muted-foreground hover:text-foreground"
         >
           {selected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
         </button>
       </td>
-      <td className="px-4 py-2">
-        <button
-          type="button"
-          onClick={() => onSelect(conversation.id)}
-          className="font-medium text-foreground underline-offset-2 hover:underline"
-        >
-          {conversation.customerName}
-        </button>
+      <td className="whitespace-nowrap px-4 py-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onSelect(conversation.id)}
+            className="font-medium text-foreground underline-offset-2 hover:underline"
+          >
+            {conversation.customerName}
+          </button>
+          <Link
+            to="/console/customers/$customerId"
+            params={{ customerId: conversation.id }}
+            aria-label={`Open full CRM profile for ${conversation.customerName}`}
+            title="Open full profile"
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <SquareUserRound className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </td>
-      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">{conversation.phoneNumber}</td>
+      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+        {conversation.phoneNumber}
+      </td>
       <td className="px-4 py-2">
         <SourceBadges sources={sourcesFor(conversation)} />
       </td>
       <td className="px-4 py-2">
-        <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px]", STATUS_BADGE[status])}>
-          {CUSTOMER_STATUS_LABELS[status]}
-        </span>
+        {/* Active/Historical are just the steady state — plain text, no
+            pill — so the colored badge only draws the eye for statuses
+            that actually need staff attention (Review/DNC/Blocked). */}
+        {status === "ACTIVE" || status === "HISTORICAL" ? (
+          <span className="text-muted-foreground">{CUSTOMER_STATUS_LABELS[status]}</span>
+        ) : (
+          <span
+            className={cn(
+              "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium",
+              STATUS_BADGE[status],
+            )}
+          >
+            {CUSTOMER_STATUS_LABELS[status]}
+          </span>
+        )}
       </td>
       <td className="px-4 py-2 text-muted-foreground">{MODE_LABELS[conversation.mode]}</td>
       <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
@@ -636,12 +677,7 @@ function ContactRow({
             (see server.js's customer profile/list endpoints) — never show a fake $0. */}
         {conversation.outstandingBalance === null || conversation.outstandingBalance === undefined
           ? "—"
-          : `$${conversation.totalRevenue ?? 0}`}
-      </td>
-      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-        {conversation.outstandingBalance === null || conversation.outstandingBalance === undefined
-          ? "—"
-          : `$${conversation.outstandingBalance}`}
+          : `$${conversation.totalRevenue ?? 0} / $${conversation.outstandingBalance}`}
       </td>
       <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
         {formatLastActivity(conversation)}
@@ -723,14 +759,22 @@ function ContactProfileModal({
   const shipments = conversation.shipments ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <div
         className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold text-foreground">Customer Profile</h3>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-secondary" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-secondary"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -743,12 +787,16 @@ function ContactProfileModal({
           </div>
 
           <div>
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sources</p>
+            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Sources
+            </p>
             <SourceBadges sources={sources} />
           </div>
 
           <div>
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Status</p>
+            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              Status
+            </p>
             {onUpdateStatus ? (
               <select
                 value={status}
@@ -762,7 +810,12 @@ function ContactProfileModal({
                 ))}
               </select>
             ) : (
-              <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px]", STATUS_BADGE[status])}>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded px-1.5 py-0.5 text-[11px]",
+                  STATUS_BADGE[status],
+                )}
+              >
                 {CUSTOMER_STATUS_LABELS[status]}
               </span>
             )}
@@ -782,7 +835,9 @@ function ContactProfileModal({
                     <p className="text-muted-foreground">{s.receiverAddress}</p>
                     {s.receiverPhone && <p className="text-muted-foreground">{s.receiverPhone}</p>}
                     {s.batchNumber && (
-                      <p className="mt-1 text-[10px] text-muted-foreground">Batch #{s.batchNumber}</p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Batch #{s.batchNumber}
+                      </p>
                     )}
                   </li>
                 ))}
@@ -792,7 +847,9 @@ function ContactProfileModal({
 
           {conversation.notes && (
             <div>
-              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Notes</p>
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Notes
+              </p>
               <p className="whitespace-pre-wrap text-foreground">{conversation.notes}</p>
             </div>
           )}
@@ -843,14 +900,22 @@ function AddContactModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-sm rounded-lg border border-border bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold text-foreground">Add Contact</h3>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-secondary" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-secondary"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -924,7 +989,11 @@ function readFileAsAttachment(file: File): Promise<CampaignAttachment> {
       // just the base64 payload, not the data-URL prefix.
       const result = reader.result as string;
       const base64 = result.slice(result.indexOf(",") + 1);
-      resolve({ filename: file.name, contentType: file.type || "application/octet-stream", contentBase64: base64 });
+      resolve({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        contentBase64: base64,
+      });
     };
     reader.readAsDataURL(file);
   });
@@ -958,7 +1027,9 @@ function EmailCampaignModal({
     if (!file) return;
     setAttachmentError(null);
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      setAttachmentError(`"${file.name}" is too large (max 6MB) — try a smaller image or a compressed PDF.`);
+      setAttachmentError(
+        `"${file.name}" is too large (max 6MB) — try a smaller image or a compressed PDF.`,
+      );
       return;
     }
     try {
@@ -968,11 +1039,14 @@ function EmailCampaignModal({
     }
   };
 
-  const excludedCount = recipients.filter((c) => statusFor(c) === "DO_NOT_CONTACT" || statusFor(c) === "BLOCKED").length;
+  const excludedCount = recipients.filter(
+    (c) => statusFor(c) === "DO_NOT_CONTACT" || statusFor(c) === "BLOCKED",
+  ).length;
   const noEmailCount = recipients.filter((c) => !c.email).length;
   const willSendCount = recipients.length - excludedCount - noEmailCount;
 
-  const canSend = subject.trim().length > 0 && body.trim().length > 0 && !sending && willSendCount > 0;
+  const canSend =
+    subject.trim().length > 0 && body.trim().length > 0 && !sending && willSendCount > 0;
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -994,7 +1068,10 @@ function EmailCampaignModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <div
         className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -1003,7 +1080,12 @@ function EmailCampaignModal({
           <h3 className="text-sm font-semibold text-foreground">
             {result ? "Campaign Sent" : "Email Selected Customers"}
           </h3>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-secondary" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-secondary"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1013,8 +1095,12 @@ function EmailCampaignModal({
             <p>
               <span className="font-semibold text-foreground">{result.sent}</span> sent
             </p>
-            <p className="text-muted-foreground">{result.skippedNoEmail} skipped — no email on file</p>
-            <p className="text-muted-foreground">{result.skippedExcludedStatus} skipped — Do Not Contact / Blocked</p>
+            <p className="text-muted-foreground">
+              {result.skippedNoEmail} skipped — no email on file
+            </p>
+            <p className="text-muted-foreground">
+              {result.skippedExcludedStatus} skipped — Do Not Contact / Blocked
+            </p>
             {result.failed > 0 && <p className="text-red-500">{result.failed} failed to send</p>}
             <button
               type="button"
@@ -1068,10 +1154,17 @@ function EmailCampaignModal({
                   <label className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input text-muted-foreground hover:bg-secondary/40">
                     <Paperclip className="h-3.5 w-3.5" />
                     Attach a file
-                    <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden" />
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
                   </label>
                 )}
-                {attachmentError && <p className="mt-1 text-[11px] text-red-500">{attachmentError}</p>}
+                {attachmentError && (
+                  <p className="mt-1 text-[11px] text-red-500">{attachmentError}</p>
+                )}
               </Field>
 
               {error && <p className="text-[11px] text-red-500">{error}</p>}
@@ -1131,14 +1224,22 @@ function SaveSegmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-sm rounded-lg border border-border bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold text-foreground">Save Current Filter as Segment</h3>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-secondary" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-secondary"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1210,7 +1311,10 @@ function ImportCustomersModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <div
         className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -1219,7 +1323,12 @@ function ImportCustomersModal({
           <h3 className="text-sm font-semibold text-foreground">
             {result ? "Import Complete" : "Import Excel / CSV"}
           </h3>
-          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-secondary" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-secondary"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1227,14 +1336,25 @@ function ImportCustomersModal({
         {result ? (
           <div className="space-y-2 overflow-y-auto px-4 py-4 text-xs">
             <p>
-              <span className="font-semibold text-foreground">{result.summary.processed}</span> rows processed
+              <span className="font-semibold text-foreground">{result.summary.processed}</span> rows
+              processed
             </p>
-            <p className="text-muted-foreground">{result.summary.matchedExisting} existing customers matched</p>
-            <p className="text-muted-foreground">{result.summary.createdNew} new customers created</p>
-            <p className="text-muted-foreground">{result.summary.shipmentsLinked} shipment records linked</p>
-            <p className="text-muted-foreground">{result.summary.skippedSection} skipped (pre-flagged junk in sheet)</p>
+            <p className="text-muted-foreground">
+              {result.summary.matchedExisting} existing customers matched
+            </p>
+            <p className="text-muted-foreground">
+              {result.summary.createdNew} new customers created
+            </p>
+            <p className="text-muted-foreground">
+              {result.summary.shipmentsLinked} shipment records linked
+            </p>
+            <p className="text-muted-foreground">
+              {result.summary.skippedSection} skipped (pre-flagged junk in sheet)
+            </p>
             {result.summary.needsReview > 0 && (
-              <p className="text-yellow-600 dark:text-yellow-400">{result.summary.needsReview} rows need review</p>
+              <p className="text-yellow-600 dark:text-yellow-400">
+                {result.summary.needsReview} rows need review
+              </p>
             )}
             {result.reviewRows.length > 0 && (
               <div className="mt-2 rounded-md border border-border/60 px-2.5 py-2">
@@ -1265,14 +1385,19 @@ function ImportCustomersModal({
           <>
             <div className="space-y-3 px-4 py-4 text-xs">
               <p className="text-muted-foreground">
-                For a bulk sheet update from management — matches existing customers by phone number, only creates
-                new ones where there's no match. Safe to re-run the same or an updated sheet; nothing gets
-                duplicated.
+                For a bulk sheet update from management — matches existing customers by phone
+                number, only creates new ones where there's no match. Safe to re-run the same or an
+                updated sheet; nothing gets duplicated.
               </p>
               <label className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-input text-muted-foreground hover:bg-secondary/40">
                 <Upload className="h-4 w-4" />
                 {file ? file.name : "Choose a .xlsx, .xls, or .csv file"}
-                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} className="hidden" />
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
               </label>
               {error && <p className="text-[11px] text-red-500">{error}</p>}
             </div>

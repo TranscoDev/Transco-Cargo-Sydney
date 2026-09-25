@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Mail, MessageSquare, Package, Phone, Receipt, Ship, StickyNote } from "lucide-react";
+import {
+  ArrowLeft,
+  Mail,
+  MessageSquare,
+  Package,
+  Phone,
+  Receipt,
+  Ship,
+  StickyNote,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,15 +85,15 @@ function CustomerProfilePage() {
                 {profile.channel && <span className="capitalize">Channel: {profile.channel}</span>}
               </div>
             </div>
-            <Badge variant="secondary">
-              {CUSTOMER_STATUS_LABELS[profile.status ?? "ACTIVE"]}
-            </Badge>
+            <Badge variant="secondary">{CUSTOMER_STATUS_LABELS[profile.status ?? "ACTIVE"]}</Badge>
           </div>
 
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Card>
               <CardHeader className="p-4 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground">Total Bookings</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Total Bookings
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0 text-2xl font-semibold tabular-nums">
                 {profile.totalBookings ?? 0}
@@ -92,7 +101,9 @@ function CustomerProfilePage() {
             </Card>
             <Card>
               <CardHeader className="p-4 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground">Total Shipments</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Total Shipments
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0 text-2xl font-semibold tabular-nums">
                 {profile.totalShipments ?? 0}
@@ -100,11 +111,15 @@ function CustomerProfilePage() {
             </Card>
             <Card>
               <CardHeader className="p-4 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground">Total Revenue</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Total Revenue
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 {profile.financeDataAvailable ? (
-                  <p className="text-2xl font-semibold tabular-nums">${profile.totalRevenue ?? 0}</p>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    ${profile.totalRevenue ?? 0}
+                  </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">Available in Phase 5</p>
                 )}
@@ -112,11 +127,15 @@ function CustomerProfilePage() {
             </Card>
             <Card>
               <CardHeader className="p-4 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground">Outstanding Balance</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Outstanding Balance
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 {profile.financeDataAvailable ? (
-                  <p className="text-2xl font-semibold tabular-nums">${profile.outstandingBalance ?? 0}</p>
+                  <p className="text-2xl font-semibold tabular-nums">
+                    ${profile.outstandingBalance ?? 0}
+                  </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">Available in Phase 5</p>
                 )}
@@ -139,12 +158,21 @@ function CustomerProfilePage() {
               ) : (
                 <div className="flex flex-col gap-2">
                   {profile.bookings.map((b) => (
-                    <div key={b.id} className="rounded-md border border-border bg-panel p-3 text-sm">
+                    <div
+                      key={b.id}
+                      className="rounded-md border border-border bg-panel p-3 text-sm"
+                    >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium capitalize">{b.requestedDay}, {b.resolvedDate}</span>
-                        <Badge variant="outline" className="capitalize">{b.status}</Badge>
+                        <span className="font-medium capitalize">
+                          {b.requestedDay}, {b.resolvedDate}
+                        </span>
+                        <Badge variant="outline" className="capitalize">
+                          {b.status}
+                        </Badge>
                       </div>
-                      {b.boxSummary && <p className="mt-1 text-xs text-muted-foreground">{b.boxSummary}</p>}
+                      {b.boxSummary && (
+                        <p className="mt-1 text-xs text-muted-foreground">{b.boxSummary}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -164,7 +192,9 @@ function CustomerProfilePage() {
                       className="rounded-md border border-border bg-panel p-3 text-sm hover:border-primary/40"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">{s.shipmentNumber}</span>
+                        <span className="font-medium">
+                          {s.hblNumber ? `HBL ${s.hblNumber}` : s.shipmentNumber}
+                        </span>
                         <Badge variant="outline">{SHIPMENT_STATUS_LABELS[s.status]}</Badge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -193,8 +223,13 @@ function CustomerProfilePage() {
                     Open full conversation
                   </Link>
                   {profile.messages.slice(-5).map((m) => (
-                    <div key={m.id} className="rounded-md border border-border bg-panel p-3 text-sm">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.sender}</p>
+                    <div
+                      key={m.id}
+                      className="rounded-md border border-border bg-panel p-3 text-sm"
+                    >
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {m.sender}
+                      </p>
                       <p className="mt-0.5">{m.body}</p>
                     </div>
                   ))}
@@ -204,7 +239,9 @@ function CustomerProfilePage() {
 
             <TabsContent value="notes">
               {profile.notes ? (
-                <p className="rounded-md border border-border bg-panel p-3 text-sm">{profile.notes}</p>
+                <p className="rounded-md border border-border bg-panel p-3 text-sm">
+                  {profile.notes}
+                </p>
               ) : (
                 <EmptyTabState icon={StickyNote} text="No staff notes yet." />
               )}

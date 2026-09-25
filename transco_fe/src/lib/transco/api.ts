@@ -5,6 +5,11 @@ import type {
   BookingStatus,
   BookingUpdateInput,
   CampaignAttachment,
+  Consolidation,
+  ConsolidationDetail,
+  ConsolidationDates,
+  ConsolidationFinancials,
+  ConsolidationTotals,
   Conversation,
   ConversationChannel,
   ConversationMode,
@@ -16,13 +21,16 @@ import type {
   MediaType,
   Message,
   MessageStatus,
+  ReceiverProfile,
   Segment,
   SegmentFilter,
   SenderType,
   Shipment,
+  ShipmentBoxBreakdown,
   ShipmentCreateInput,
   ShipmentHistoryEntry,
   ShipmentHistoryPoint,
+  ShipmentReceiverProfile,
   ShipmentStatus,
   ShipmentUpdateInput,
 } from "./types";
@@ -157,8 +165,18 @@ function mapShipment(s: BackendShipment): ShipmentHistoryEntry {
   };
 }
 
+interface BackendReceiverProfileRef {
+  id: string;
+  name: string;
+  phone: string | null;
+  hblNumbers: string[];
+}
+
 /** A live, operationally-tracked shipment (Phase 2) — distinct from
- * BackendShipment above, which is historical Excel-import data only. */
+ * BackendShipment above, which is historical Excel-import data only.
+ * hblNumber/batchNumber/consolidationId/boxes/totalCbm/totalBoxes/
+ * receiverProfile are only present on shipments imported from a batch
+ * ledger — absent on shipments created manually via New Shipment. */
 export interface BackendShipmentRecord {
   _id: string;
   shipmentNumber: string;
@@ -166,6 +184,9 @@ export interface BackendShipmentRecord {
   customerName: string | null;
   phoneNumber: string | null;
   bookingId?: string | null;
+  hblNumber?: string | null;
+  batchNumber?: number | null;
+  consolidationId?: string | null;
   serviceType?: string | null;
   origin?: string | null;
   destination?: string | null;
@@ -173,14 +194,25 @@ export interface BackendShipmentRecord {
   containerNumber?: string | null;
   cargo?: string | null;
   boxCount?: number | null;
+  boxes?: ShipmentBoxBreakdown | null;
   weight?: number | null;
   cbm?: number | null;
+  totalCbm?: number | null;
+  totalBoxes?: number | null;
   trackingNumber?: string | null;
+  receiverProfile?: BackendReceiverProfileRef | null;
   status: ShipmentStatus;
   warehouseStatus?: string | null;
   history: ShipmentHistoryPoint[];
   createdAt: string;
   updatedAt: string;
+}
+
+function mapReceiverProfileRef(
+  r?: BackendReceiverProfileRef | null,
+): ShipmentReceiverProfile | null {
+  if (!r) return null;
+  return { id: r.id, name: r.name, phone: r.phone, hblNumbers: r.hblNumbers ?? [] };
 }
 
 export function mapShipmentRecord(s: BackendShipmentRecord): Shipment {
@@ -191,6 +223,9 @@ export function mapShipmentRecord(s: BackendShipmentRecord): Shipment {
     customerName: s.customerName,
     phoneNumber: s.phoneNumber,
     bookingId: s.bookingId,
+    hblNumber: s.hblNumber,
+    batchNumber: s.batchNumber,
+    consolidationId: s.consolidationId,
     serviceType: s.serviceType,
     origin: s.origin,
     destination: s.destination,
@@ -198,9 +233,13 @@ export function mapShipmentRecord(s: BackendShipmentRecord): Shipment {
     containerNumber: s.containerNumber,
     cargo: s.cargo,
     boxCount: s.boxCount,
+    boxes: s.boxes,
     weight: s.weight,
     cbm: s.cbm,
+    totalCbm: s.totalCbm,
+    totalBoxes: s.totalBoxes,
     trackingNumber: s.trackingNumber,
+    receiverProfile: mapReceiverProfileRef(s.receiverProfile),
     status: s.status,
     warehouseStatus: s.warehouseStatus,
     history: s.history ?? [],
@@ -346,10 +385,7 @@ export async function deleteBooking(bookingId: string): Promise<void> {
   }
 }
 
-export async function updateBookingStatus(
-  bookingId: string,
-  status: BookingStatus,
-): Promise<void> {
+export async function updateBookingStatus(bookingId: string, status: BookingStatus): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -452,6 +488,103 @@ export async function updateShipment(
   }
   const data = (await res.json()) as { shipment: BackendShipmentRecord };
   return mapShipmentRecord(data.shipment);
+}
+
+// ============================================================
+// CONSOLIDATIONS (shipment batches) + RECEIVERS
+// ============================================================
+
+interface BackendConsolidation {
+  _id: string;
+  batchNumber: number;
+  label: string;
+  peNumber: string | null;
+  hblRange: { from: string; to: string };
+  totals: ConsolidationTotals;
+  paymentTotals: { zeller: number; eft: number; cash: number };
+  financials: ConsolidationFinancials;
+  financialsNote?: string | null;
+  dates: ConsolidationDates;
+  importedShipmentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapConsolidation(c: BackendConsolidation): Consolidation {
+  return {
+    id: c._id,
+    batchNumber: c.batchNumber,
+    label: c.label,
+    peNumber: c.peNumber,
+    hblRange: c.hblRange,
+    totals: c.totals,
+    paymentTotals: c.paymentTotals,
+    financials: c.financials,
+    financialsNote: c.financialsNote,
+    dates: c.dates,
+    importedShipmentCount: c.importedShipmentCount,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  };
+}
+
+export async function fetchConsolidations(): Promise<Consolidation[]> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load shipment batches (${res.status})`);
+  }
+  const data = (await res.json()) as { consolidations: BackendConsolidation[] };
+  return data.consolidations.map(mapConsolidation);
+}
+
+interface BackendConsolidationDetail extends BackendConsolidation {
+  shipments: BackendShipmentRecord[];
+}
+
+export async function fetchConsolidation(consolidationId: string): Promise<ConsolidationDetail> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations/${consolidationId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load batch (${res.status})`);
+  }
+  const data = (await res.json()) as { consolidation: BackendConsolidationDetail };
+  return {
+    ...mapConsolidation(data.consolidation),
+    shipments: data.consolidation.shipments.map(mapShipmentRecord),
+  };
+}
+
+interface BackendReceiverProfile {
+  _id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  identityDocument: { type: string; number: string } | null;
+  address: string | null;
+  hblNumbers: string[];
+  shipments: BackendShipmentRecord[];
+}
+
+export async function fetchReceiver(receiverId: string): Promise<ReceiverProfile> {
+  const res = await fetch(`${API_BASE_URL}/api/receivers/${receiverId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load receiver (${res.status})`);
+  }
+  const data = (await res.json()) as { receiver: BackendReceiverProfile };
+  const r = data.receiver;
+  return {
+    id: r._id,
+    name: r.name,
+    phone: r.phone,
+    email: r.email,
+    identityDocument: r.identityDocument,
+    address: r.address,
+    hblNumbers: r.hblNumbers ?? [],
+    shipments: r.shipments.map(mapShipmentRecord),
+  };
 }
 
 export async function setCustomerMode(customerId: string, mode: ConversationMode): Promise<void> {
@@ -633,4 +766,3 @@ export async function deleteSegment(segmentId: string): Promise<void> {
     throw new Error(`Failed to delete segment (${res.status})`);
   }
 }
-
