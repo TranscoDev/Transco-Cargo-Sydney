@@ -1849,6 +1849,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 
     const user = {
+      id: record._id.toString(),
       email: record.email,
       name: record.name
     };
@@ -1910,10 +1911,206 @@ app.get('/api/auth/session', (req, res) => {
 
   res.status(200).json({
     user: {
+      id: session.sub,
       email: session.email,
       name: session.name
     }
   });
+});
+
+
+// ============================================================
+// STAFF ACCOUNT MANAGEMENT (Settings page)
+// ============================================================
+//
+// No role/permission tiers exist anywhere in this system — every staff
+// account has identical access, matching how auth already works. This
+// is plain account CRUD, nothing more: change your own password, and
+// (only relevant once there's more than one person) add/remove a staff
+// login. A staff member can never delete their own account (would lock
+// them out mid-session) or the last remaining account (would lock
+// everyone out).
+
+const MIN_PASSWORD_LENGTH = 8;
+
+app.patch('/api/auth/password', async (req, res) => {
+
+  try {
+
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+      return res.status(400).json({
+        error: 'currentPassword and newPassword are required'
+      });
+    }
+
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        error: `New password must be at least ${MIN_PASSWORD_LENGTH} characters`
+      });
+    }
+
+    const record = await users().findOne({ _id: new ObjectId(req.user.sub) });
+
+    if (!record || !verifyPassword(currentPassword, record.passwordHash)) {
+      return res.status(401).json({
+        error: 'Current password is incorrect'
+      });
+    }
+
+    await users().updateOne(
+      { _id: record._id },
+      { $set: { passwordHash: hashPassword(newPassword) } }
+    );
+
+    res.status(200).json({ success: true });
+
+  } catch (err) {
+
+    console.error(
+      'Error changing password:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to change password'
+    });
+  }
+});
+
+
+app.get('/api/staff', async (req, res) => {
+
+  try {
+
+    const staff = await users()
+      .find({}, { projection: { passwordHash: 0 } })
+      .sort({ email: 1 })
+      .toArray();
+
+    res.status(200).json({ staff });
+
+  } catch (err) {
+
+    console.error(
+      'Error listing staff:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to list staff'
+    });
+  }
+});
+
+
+app.post('/api/staff', async (req, res) => {
+
+  try {
+
+    const { email, name, password } = req.body || {};
+
+    if (typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        error: 'A valid email is required'
+      });
+    }
+
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({
+        error: 'Name is required'
+      });
+    }
+
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existing = await users().findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({
+        error: 'A staff account with this email already exists'
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    const { insertedId } = await users().insertOne({
+      email: normalizedEmail,
+      name: name.trim(),
+      passwordHash: hashPassword(password),
+      createdAt: now
+    });
+
+    res.status(201).json({
+      staff: { _id: insertedId, email: normalizedEmail, name: name.trim(), createdAt: now }
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error creating staff account:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to create staff account'
+    });
+  }
+});
+
+
+app.delete('/api/staff/:staffId', async (req, res) => {
+
+  try {
+
+    const { staffId } = req.params;
+
+    if (!ObjectId.isValid(staffId)) {
+      return res.status(400).json({
+        error: 'Invalid staff id'
+      });
+    }
+
+    if (staffId === req.user.sub) {
+      return res.status(400).json({
+        error: "You can't remove your own account while signed in as it"
+      });
+    }
+
+    const totalStaff = await users().countDocuments({});
+    if (totalStaff <= 1) {
+      return res.status(400).json({
+        error: 'Cannot remove the last remaining staff account'
+      });
+    }
+
+    const result = await users().deleteOne({ _id: new ObjectId(staffId) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        error: 'Staff account not found'
+      });
+    }
+
+    res.status(200).json({ success: true });
+
+  } catch (err) {
+
+    console.error(
+      'Error removing staff account:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to remove staff account'
+    });
+  }
 });
 
 

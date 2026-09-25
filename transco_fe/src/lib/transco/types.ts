@@ -422,6 +422,15 @@ export interface ConsolidationDetail extends Consolidation {
  * type. This is usage/demand data — how many boxes of each type moved
  * through real shipments — NOT Transco's own packaging stock, and NOT
  * confirmed box sales (a customer can bring a box from any shop). */
+/** A staff login — no role/permission tiers exist anywhere in this
+ * system, every account has identical access. */
+export interface StaffAccount {
+  id: string;
+  email: string;
+  name: string;
+  createdAt?: string | undefined;
+}
+
 export interface PackagingBoxTotals {
   tc: number;
   gb: number;

@@ -8,6 +8,7 @@ import { API_BASE_URL } from "./config";
 const SESSION_KEY = "transco.session";
 
 export interface StaffUser {
+  id: string;
   email: string;
   name: string;
 }

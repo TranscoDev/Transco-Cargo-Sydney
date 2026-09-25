@@ -35,6 +35,7 @@ import type {
   ShipmentReceiverProfile,
   ShipmentStatus,
   ShipmentUpdateInput,
+  StaffAccount,
   TrackingResult,
 } from "./types";
 
@@ -643,6 +644,70 @@ export async function fetchTracking(blNumber: string): Promise<TrackingResult> {
     pebl: result.pebl,
     shipment: result.shipment ? mapShipmentRecord(result.shipment) : null,
   };
+}
+
+// ============================================================
+// SETTINGS — staff accounts + your own password
+// ============================================================
+
+interface BackendStaffAccount {
+  _id: string;
+  email: string;
+  name: string;
+  createdAt?: string;
+}
+
+function mapStaffAccount(s: BackendStaffAccount): StaffAccount {
+  return { id: s._id, email: s.email, name: s.name, createdAt: s.createdAt };
+}
+
+export async function fetchStaff(): Promise<StaffAccount[]> {
+  const res = await fetch(`${API_BASE_URL}/api/staff`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load staff accounts (${res.status})`);
+  }
+  const data = (await res.json()) as { staff: BackendStaffAccount[] };
+  return data.staff.map(mapStaffAccount);
+}
+
+export async function createStaff(info: {
+  email: string;
+  name: string;
+  password: string;
+}): Promise<StaffAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/staff`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(info),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Failed to create staff account (${res.status})`);
+  }
+  return mapStaffAccount(data.staff as BackendStaffAccount);
+}
+
+export async function deleteStaff(staffId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/staff/${staffId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Failed to remove staff account (${res.status})`);
+  }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/password`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Failed to change password (${res.status})`);
+  }
 }
 
 export async function setCustomerMode(customerId: string, mode: ConversationMode): Promise<void> {
