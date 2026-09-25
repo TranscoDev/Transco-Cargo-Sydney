@@ -21,6 +21,7 @@ import type {
   MediaType,
   Message,
   MessageStatus,
+  PackagingActivityResult,
   PeblTrackingInfo,
   ReceiverProfile,
   Segment,
@@ -587,6 +588,31 @@ export async function fetchReceiver(receiverId: string): Promise<ReceiverProfile
     hblNumbers: r.hblNumbers ?? [],
     shipments: r.shipments.map(mapShipmentRecord),
   };
+}
+
+// ============================================================
+// PACKAGING ACTIVITY (usage analytics — not stock, not sales)
+// ============================================================
+
+export async function fetchPackagingActivity(filters?: {
+  from?: string | undefined;
+  to?: string | undefined;
+  destination?: string | undefined;
+  batchId?: string | undefined;
+}): Promise<PackagingActivityResult> {
+  const params = new URLSearchParams();
+  if (filters?.from) params.set("from", filters.from);
+  if (filters?.to) params.set("to", filters.to);
+  if (filters?.destination) params.set("destination", filters.destination);
+  if (filters?.batchId) params.set("batchId", filters.batchId);
+  const query = params.toString();
+  const res = await fetch(`${API_BASE_URL}/api/packaging/activity${query ? `?${query}` : ""}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to load packaging activity (${res.status})`);
+  }
+  return (await res.json()) as PackagingActivityResult;
 }
 
 // ============================================================

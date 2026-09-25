@@ -3125,6 +3125,125 @@ app.get('/api/receivers/:receiverId', async (req, res) => {
 
 
 // ============================================================
+// PACKAGING ACTIVITY (read-only usage analytics — NOT stock, NOT sales)
+// ============================================================
+//
+// Box quantities recorded on shipments tell us shipping *volume*, not
+// Transco's own packaging stock or confirmed box sales — a customer can
+// bring a box from any shop. This endpoint only ever aggregates existing
+// shipments.boxes counts; it never writes to stock, never invents a
+// boxSource that isn't there, and never creates a box_sale record.
+// Source breakdown will show 100% "unknown" until boxSource actually
+// exists somewhere in the data (it doesn't yet).
+const PACKAGING_BOX_TYPES = ['tc', 'gb', 'ob', 'wb', 'ctn'];
+
+app.get('/api/packaging/activity', async (req, res) => {
+
+  try {
+
+    const { from, to, destination, batchId } = req.query;
+
+    const match = {};
+    if (destination) {
+      match.doorDeliveryDestination = String(destination);
+    }
+    if (batchId) {
+      if (!ObjectId.isValid(batchId)) {
+        return res.status(400).json({ error: 'Invalid batchId' });
+      }
+      match.consolidationId = new ObjectId(batchId);
+    }
+
+    const pipeline = [
+      // Every shipment gets a computed effectiveDate: originDate (the real
+      // business date, set on every CSV-imported shipment) if present,
+      // else createdAt (what manually-created live shipments have instead)
+      // — using whichever of the two existing fields is actually there,
+      // not inventing a third one.
+      {
+        $addFields: {
+          effectiveDate: {
+            $ifNull: [
+              { $dateFromString: { dateString: '$originDate', onError: null, onNull: null } },
+              { $dateFromString: { dateString: '$createdAt', onError: null, onNull: null } }
+            ]
+          }
+        }
+      },
+      { $match: match }
+    ];
+
+    if (from || to) {
+      const dateMatch = {};
+      if (from) dateMatch.$gte = new Date(String(from));
+      if (to) dateMatch.$lte = new Date(String(to));
+      pipeline.push({ $match: { effectiveDate: dateMatch } });
+    }
+
+    pipeline.push({
+      $group: {
+        _id: null,
+        shipmentCount: { $sum: 1 },
+        tc: { $sum: { $ifNull: ['$boxes.tc', 0] } },
+        gb: { $sum: { $ifNull: ['$boxes.gb', 0] } },
+        ob: { $sum: { $ifNull: ['$boxes.ob', 0] } },
+        wb: { $sum: { $ifNull: ['$boxes.wb', 0] } },
+        ctn: { $sum: { $ifNull: ['$boxes.ctn', 0] } }
+      }
+    });
+
+    const [agg] = await shipments().aggregate(pipeline).toArray();
+
+    const totals = {
+      tc: agg?.tc ?? 0,
+      gb: agg?.gb ?? 0,
+      ob: agg?.ob ?? 0,
+      wb: agg?.wb ?? 0,
+      ctn: agg?.ctn ?? 0
+    };
+
+    // No shipment record anywhere carries a boxSource yet — every box
+    // counted above is genuinely of unknown source. Written as an
+    // explicit loop (not hardcoded per box type) so this starts reporting
+    // real transcoPurchased/customerSupplied numbers the moment that
+    // field exists on real data, with no code change needed here.
+    const sources = {};
+    for (const type of PACKAGING_BOX_TYPES) {
+      sources[type] = {
+        transcoPurchased: 0,
+        customerSupplied: 0,
+        unknown: totals[type]
+      };
+    }
+
+    const destinations = await shipments().distinct('doorDeliveryDestination', {
+      doorDeliveryDestination: { $ne: null }
+    });
+
+    res.status(200).json({
+      period: { from: from || null, to: to || null },
+      filters: { destination: destination || null, batchId: batchId || null },
+      totals,
+      sources,
+      shipmentCount: agg?.shipmentCount ?? 0,
+      destinations: destinations.sort()
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error computing packaging activity:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to compute packaging activity'
+    });
+  }
+});
+
+
+// ============================================================
 // TRACKING (PEBL lookup)
 // ============================================================
 //

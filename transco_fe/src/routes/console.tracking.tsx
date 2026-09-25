@@ -188,7 +188,7 @@ function TrackingPage() {
                       params={{ batchId: result.shipment.consolidationId }}
                       className="text-xs text-primary hover:underline"
                     >
-                      Batch {result.shipment.batchNumber}
+                      Shipment {result.shipment.batchNumber}
                     </Link>
                   )}
                 </div>

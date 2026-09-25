@@ -127,7 +127,7 @@ function ShipmentsPage() {
             Shipments
           </h1>
           <p className="text-sm text-muted-foreground">
-            Grouped by shipment batch — open a batch to see every sender and receiver in it.
+            Grouped by shipment — open one to see every sender and receiver in it.
           </p>
         </div>
         <NewShipmentDialog
@@ -150,7 +150,7 @@ function ShipmentsPage() {
               : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
           )}
         >
-          By Batch ({consolidations.length})
+          By Shipment ({consolidations.length})
         </button>
         <button
           type="button"
@@ -216,7 +216,7 @@ function BatchListView({
     return (
       <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border py-12 text-center">
         <Layers className="h-5 w-5 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">No shipment batches imported yet.</p>
+        <p className="text-xs text-muted-foreground">No shipments imported yet.</p>
       </div>
     );
   }
@@ -227,7 +227,7 @@ function BatchListView({
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 font-medium">Batch</th>
+              <th className="px-3 py-2 font-medium">Shipment</th>
               <th className="px-3 py-2 font-medium">PE Number</th>
               <th className="px-3 py-2 font-medium">HBL Range</th>
               <th className="px-3 py-2 font-medium">Imported</th>
@@ -245,7 +245,7 @@ function BatchListView({
                     params={{ batchId: c.id }}
                     className="font-medium text-primary hover:underline"
                   >
-                    Batch {c.batchNumber}
+                    Shipment {c.batchNumber}
                   </Link>
                   <p className="text-xs text-muted-foreground">{c.label}</p>
                 </td>
@@ -274,8 +274,8 @@ function BatchListView({
 
       {unassignedCount > 0 && (
         <p className="mt-3 text-xs text-muted-foreground">
-          {unassignedCount} shipment{unassignedCount === 1 ? "" : "s"} not part of any batch — see
-          "All Shipments".
+          {unassignedCount} record{unassignedCount === 1 ? "" : "s"} not grouped under any shipment
+          — see "All Shipments".
         </p>
       )}
     </>

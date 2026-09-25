@@ -94,7 +94,7 @@ function ReceiverProfilePage() {
               <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">HBL</th>
-                  <th className="px-3 py-2 font-medium">Batch</th>
+                  <th className="px-3 py-2 font-medium">Shipment</th>
                   <th className="px-3 py-2 font-medium">Sender</th>
                   <th className="px-3 py-2 font-medium">Boxes</th>
                   <th className="px-3 py-2 font-medium">Status</th>
@@ -119,7 +119,7 @@ function ReceiverProfilePage() {
                           params={{ batchId: s.consolidationId }}
                           className="hover:underline"
                         >
-                          Batch {s.batchNumber}
+                          Shipment {s.batchNumber}
                         </Link>
                       ) : (
                         "—"

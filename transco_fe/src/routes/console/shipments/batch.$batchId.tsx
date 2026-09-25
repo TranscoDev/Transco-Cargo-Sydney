@@ -56,7 +56,7 @@ function BatchDetailPage() {
           <div className="mb-5">
             <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              Batch {batch.batchNumber}
+              Shipment {batch.batchNumber}
               <span className="text-sm font-normal text-muted-foreground">({batch.label})</span>
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -69,7 +69,7 @@ function BatchDetailPage() {
             <Card>
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Batch Totals
+                  Shipment Totals
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-3 gap-y-4 p-4 pt-0">
@@ -133,14 +133,14 @@ function BatchDetailPage() {
           </div>
 
           <h2 className="mb-2 text-sm font-medium text-foreground">
-            Shipments in this batch ({batch.shipments.length})
+            HBLs ({batch.shipments.length})
           </h2>
 
           {batch.shipments.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border py-12 text-center">
               <Package className="h-5 w-5 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">
-                No shipments from this batch have been imported yet.
+                No HBLs from this shipment have been imported yet.
               </p>
             </div>
           ) : (

@@ -390,11 +390,14 @@ export interface ConsolidationDates {
   transconnectDeliveryMel: string | null;
 }
 
-/** One shipment batch ("Batch 57", "Batch 58") — imported from the
- * dashboard tracker sheet. importedShipmentCount is computed server-side
- * at read time (never stored): how many of this batch's shipments
- * actually exist in the system so far, which is normally smaller than
- * totals.hbl until the rest of a batch's rows have been imported. */
+/** One consolidated shipment batch — displayed to staff as "Shipment 57",
+ * "Shipment 58" (the field/variable names here still say "batch" since
+ * that's what the data actually is; only the user-facing label changed).
+ * Imported from the dashboard tracker sheet. importedShipmentCount is
+ * computed server-side at read time (never stored): how many of this
+ * batch's HBLs actually exist in the system so far, which is normally
+ * smaller than totals.hbl until the rest of a batch's rows have been
+ * imported. */
 export interface Consolidation {
   id: string;
   batchNumber: number;
@@ -413,6 +416,37 @@ export interface Consolidation {
 
 export interface ConsolidationDetail extends Consolidation {
   shipments: Shipment[];
+}
+
+/** Box quantities aggregated from existing shipments, grouped by box
+ * type. This is usage/demand data — how many boxes of each type moved
+ * through real shipments — NOT Transco's own packaging stock, and NOT
+ * confirmed box sales (a customer can bring a box from any shop). */
+export interface PackagingBoxTotals {
+  tc: number;
+  gb: number;
+  ob: number;
+  wb: number;
+  ctn: number;
+}
+
+/** Per box type, how much of that usage is known to be Transco-owned
+ * vs. customer-supplied vs. unrecorded. Every existing shipment has no
+ * boxSource recorded at all today, so this will show 100% "unknown"
+ * until that starts being captured — never inferred from box type. */
+export interface PackagingSourceBreakdown {
+  transcoPurchased: number;
+  customerSupplied: number;
+  unknown: number;
+}
+
+export interface PackagingActivityResult {
+  period: { from: string | null; to: string | null };
+  filters: { destination: string | null; batchId: string | null };
+  totals: PackagingBoxTotals;
+  sources: Record<keyof PackagingBoxTotals, PackagingSourceBreakdown>;
+  shipmentCount: number;
+  destinations: string[];
 }
 
 /** The live customs snapshot from pebl-tracker.transcocargo.com.au for one

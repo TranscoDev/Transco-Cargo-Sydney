@@ -29,10 +29,7 @@ import { Route as ConsoleFinanceExpensesRouteImport } from './routes/console.fin
 import { Route as ConsoleFinanceInvoicesRouteImport } from './routes/console.finance.invoices'
 import { Route as ConsoleFinancePaymentsRouteImport } from './routes/console.finance.payments'
 import { Route as ConsoleFinanceReportsRouteImport } from './routes/console.finance.reports'
-import { Route as ConsoleInventoryMovementsRouteImport } from './routes/console.inventory.movements'
-import { Route as ConsoleInventoryPurchaseOrdersRouteImport } from './routes/console.inventory.purchase-orders'
 import { Route as ConsoleInventoryStockRouteImport } from './routes/console.inventory.stock'
-import { Route as ConsoleInventorySuppliersRouteImport } from './routes/console.inventory.suppliers'
 import { Route as ConsoleShipmentsIndexRouteImport } from './routes/console/shipments/index'
 import { Route as ConsoleShipmentsShipmentIdRouteImport } from './routes/console/shipments/$shipmentId'
 import { Route as ConsoleShipmentsBatchBatchIdRouteImport } from './routes/console/shipments/batch.$batchId'
@@ -139,29 +136,11 @@ const ConsoleFinanceReportsRoute = ConsoleFinanceReportsRouteImport.update({
   path: '/finance/reports',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
-const ConsoleInventoryMovementsRoute =
-  ConsoleInventoryMovementsRouteImport.update({
-    id: '/inventory/movements',
-    path: '/inventory/movements',
-    getParentRoute: () => ConsoleRouteRoute,
-  } as any)
-const ConsoleInventoryPurchaseOrdersRoute =
-  ConsoleInventoryPurchaseOrdersRouteImport.update({
-    id: '/inventory/purchase-orders',
-    path: '/inventory/purchase-orders',
-    getParentRoute: () => ConsoleRouteRoute,
-  } as any)
 const ConsoleInventoryStockRoute = ConsoleInventoryStockRouteImport.update({
   id: '/inventory/stock',
   path: '/inventory/stock',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
-const ConsoleInventorySuppliersRoute =
-  ConsoleInventorySuppliersRouteImport.update({
-    id: '/inventory/suppliers',
-    path: '/inventory/suppliers',
-    getParentRoute: () => ConsoleRouteRoute,
-  } as any)
 const ConsoleShipmentsIndexRoute = ConsoleShipmentsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -206,10 +185,7 @@ export interface FileRoutesByFullPath {
   '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
   '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
-  '/console/inventory/movements': typeof ConsoleInventoryMovementsRoute
-  '/console/inventory/purchase-orders': typeof ConsoleInventoryPurchaseOrdersRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
-  '/console/inventory/suppliers': typeof ConsoleInventorySuppliersRoute
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
@@ -233,10 +209,7 @@ export interface FileRoutesByTo {
   '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
   '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
-  '/console/inventory/movements': typeof ConsoleInventoryMovementsRoute
-  '/console/inventory/purchase-orders': typeof ConsoleInventoryPurchaseOrdersRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
-  '/console/inventory/suppliers': typeof ConsoleInventorySuppliersRoute
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers': typeof ConsoleCustomersIndexRoute
   '/console/shipments': typeof ConsoleShipmentsIndexRoute
@@ -264,10 +237,7 @@ export interface FileRoutesById {
   '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
   '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
-  '/console/inventory/movements': typeof ConsoleInventoryMovementsRoute
-  '/console/inventory/purchase-orders': typeof ConsoleInventoryPurchaseOrdersRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
-  '/console/inventory/suppliers': typeof ConsoleInventorySuppliersRoute
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
@@ -296,10 +266,7 @@ export interface FileRouteTypes {
     | '/console/finance/invoices'
     | '/console/finance/payments'
     | '/console/finance/reports'
-    | '/console/inventory/movements'
-    | '/console/inventory/purchase-orders'
     | '/console/inventory/stock'
-    | '/console/inventory/suppliers'
     | '/console/shipments/$shipmentId'
     | '/console/customers/'
     | '/console/shipments/'
@@ -323,10 +290,7 @@ export interface FileRouteTypes {
     | '/console/finance/invoices'
     | '/console/finance/payments'
     | '/console/finance/reports'
-    | '/console/inventory/movements'
-    | '/console/inventory/purchase-orders'
     | '/console/inventory/stock'
-    | '/console/inventory/suppliers'
     | '/console/shipments/$shipmentId'
     | '/console/customers'
     | '/console/shipments'
@@ -353,10 +317,7 @@ export interface FileRouteTypes {
     | '/console/finance/invoices'
     | '/console/finance/payments'
     | '/console/finance/reports'
-    | '/console/inventory/movements'
-    | '/console/inventory/purchase-orders'
     | '/console/inventory/stock'
-    | '/console/inventory/suppliers'
     | '/console/shipments/$shipmentId'
     | '/console/customers/'
     | '/console/shipments/'
@@ -511,32 +472,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleFinanceReportsRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
-    '/console/inventory/movements': {
-      id: '/console/inventory/movements'
-      path: '/inventory/movements'
-      fullPath: '/console/inventory/movements'
-      preLoaderRoute: typeof ConsoleInventoryMovementsRouteImport
-      parentRoute: typeof ConsoleRouteRoute
-    }
-    '/console/inventory/purchase-orders': {
-      id: '/console/inventory/purchase-orders'
-      path: '/inventory/purchase-orders'
-      fullPath: '/console/inventory/purchase-orders'
-      preLoaderRoute: typeof ConsoleInventoryPurchaseOrdersRouteImport
-      parentRoute: typeof ConsoleRouteRoute
-    }
     '/console/inventory/stock': {
       id: '/console/inventory/stock'
       path: '/inventory/stock'
       fullPath: '/console/inventory/stock'
       preLoaderRoute: typeof ConsoleInventoryStockRouteImport
-      parentRoute: typeof ConsoleRouteRoute
-    }
-    '/console/inventory/suppliers': {
-      id: '/console/inventory/suppliers'
-      path: '/inventory/suppliers'
-      fullPath: '/console/inventory/suppliers'
-      preLoaderRoute: typeof ConsoleInventorySuppliersRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/shipments/': {
@@ -622,10 +562,7 @@ interface ConsoleRouteRouteChildren {
   ConsoleFinanceInvoicesRoute: typeof ConsoleFinanceInvoicesRoute
   ConsoleFinancePaymentsRoute: typeof ConsoleFinancePaymentsRoute
   ConsoleFinanceReportsRoute: typeof ConsoleFinanceReportsRoute
-  ConsoleInventoryMovementsRoute: typeof ConsoleInventoryMovementsRoute
-  ConsoleInventoryPurchaseOrdersRoute: typeof ConsoleInventoryPurchaseOrdersRoute
   ConsoleInventoryStockRoute: typeof ConsoleInventoryStockRoute
-  ConsoleInventorySuppliersRoute: typeof ConsoleInventorySuppliersRoute
 }
 
 const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
@@ -645,10 +582,7 @@ const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleFinanceInvoicesRoute: ConsoleFinanceInvoicesRoute,
   ConsoleFinancePaymentsRoute: ConsoleFinancePaymentsRoute,
   ConsoleFinanceReportsRoute: ConsoleFinanceReportsRoute,
-  ConsoleInventoryMovementsRoute: ConsoleInventoryMovementsRoute,
-  ConsoleInventoryPurchaseOrdersRoute: ConsoleInventoryPurchaseOrdersRoute,
   ConsoleInventoryStockRoute: ConsoleInventoryStockRoute,
-  ConsoleInventorySuppliersRoute: ConsoleInventorySuppliersRoute,
 }
 
 const ConsoleRouteRouteWithChildren = ConsoleRouteRoute._addFileChildren(

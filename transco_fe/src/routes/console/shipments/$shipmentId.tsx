@@ -143,7 +143,7 @@ function ShipmentDetailPage() {
                     className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
                     <Layers className="h-3 w-3" />
-                    Batch {shipment.batchNumber}
+                    Shipment {shipment.batchNumber}
                   </Link>
                 )}
               </div>

@@ -49,7 +49,11 @@ export interface NavSection {
 }
 
 export const NAV_SECTIONS: NavSection[] = [
-  { label: "Dashboard", icon: LayoutDashboard, items: [{ label: "Dashboard", to: "/console/dashboard" }] },
+  {
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    items: [{ label: "Dashboard", to: "/console/dashboard" }],
+  },
   {
     label: "CRM",
     icon: Users,
@@ -70,14 +74,16 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Inventory",
+    // "Packaging Stock" (Transco-owned box supplies) is deliberately not
+    // called "Inventory" — that word is ambiguous with Warehouse Cargo
+    // (customer goods in our custody), a completely separate concept.
+    // Single leaf on purpose — Stock Movements/Suppliers/Purchase Orders
+    // were unbuilt placeholders with nowhere to actually navigate; a
+    // single-item section renders as one direct link (see Sidebar below),
+    // matching what's real today (Current Stock + Packaging Activity).
+    label: "Packaging Stock",
     icon: PackageSearch,
-    items: [
-      { label: "Stock", to: "/console/inventory/stock" },
-      { label: "Stock Movements", to: "/console/inventory/movements" },
-      { label: "Suppliers", to: "/console/inventory/suppliers" },
-      { label: "Purchase Orders", to: "/console/inventory/purchase-orders" },
-    ],
+    items: [{ label: "Packaging Stock", to: "/console/inventory/stock" }],
   },
   {
     label: "Finance",
@@ -97,7 +103,11 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Bot Controls", to: "/console/ai/bot-controls" },
     ],
   },
-  { label: "Settings", icon: SettingsIcon, items: [{ label: "Settings", to: "/console/settings" }] },
+  {
+    label: "Settings",
+    icon: SettingsIcon,
+    items: [{ label: "Settings", to: "/console/settings" }],
+  },
 ];
 
 function sectionContainsPath(section: NavSection, pathname: string) {
@@ -164,7 +174,10 @@ function Sidebar() {
               <Icon className="h-3.5 w-3.5 shrink-0" />
               <span className="flex-1 text-left">{section.label}</span>
               <ChevronDown
-                className={cn("h-3.5 w-3.5 shrink-0 transition-transform", isOpen ? "rotate-180" : "")}
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 transition-transform",
+                  isOpen ? "rotate-180" : "",
+                )}
               />
             </button>
             {isOpen && (
@@ -233,7 +246,7 @@ export function ConsoleLayout({
     confirmAndApply(
       websitePaused
         ? "Resume the website bot? It will start replying automatically again on transcosydney.com.au."
-        : "Pause the website bot? Every website chat will get an automatic \"we're briefly offline\" reply until you resume it here. WhatsApp is unaffected.",
+        : 'Pause the website bot? Every website chat will get an automatic "we\'re briefly offline" reply until you resume it here. WhatsApp is unaffected.',
       { websitePaused: !websitePaused },
     );
 
@@ -241,13 +254,13 @@ export function ConsoleLayout({
     confirmAndApply(
       whatsappPaused
         ? "Resume the WhatsApp bot? It will start replying automatically again."
-        : "Pause the WhatsApp bot? Every WhatsApp conversation will get an automatic \"we're briefly offline\" reply until you resume it here. The website is unaffected.",
+        : 'Pause the WhatsApp bot? Every WhatsApp conversation will get an automatic "we\'re briefly offline" reply until you resume it here. The website is unaffected.',
       { whatsappPaused: !whatsappPaused },
     );
 
   const stopAll = () =>
     confirmAndApply(
-      "Pause BOTH bots — website and WhatsApp? Every conversation on either channel will get an automatic \"we're briefly offline\" reply until you resume them.",
+      'Pause BOTH bots — website and WhatsApp? Every conversation on either channel will get an automatic "we\'re briefly offline" reply until you resume them.',
       { websitePaused: true, whatsappPaused: true },
     );
 
@@ -305,7 +318,13 @@ export function ConsoleLayout({
                 ) : (
                   <PlayCircle className="h-3.5 w-3.5" />
                 )}
-                {allPaused ? "Both Paused" : websitePaused ? "Website Paused" : whatsappPaused ? "WhatsApp Paused" : "Bot Controls"}
+                {allPaused
+                  ? "Both Paused"
+                  : websitePaused
+                    ? "Website Paused"
+                    : whatsappPaused
+                      ? "WhatsApp Paused"
+                      : "Bot Controls"}
                 <ChevronDown className="h-3 w-3 opacity-60" />
               </button>
             </DropdownMenuTrigger>
@@ -321,7 +340,11 @@ export function ConsoleLayout({
                 {whatsappPaused ? "Resume WhatsApp Bot" : "Pause WhatsApp Bot"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={stopAll} disabled={allPaused} className="gap-2 text-amber-700 dark:text-amber-400">
+              <DropdownMenuItem
+                onClick={stopAll}
+                disabled={allPaused}
+                className="gap-2 text-amber-700 dark:text-amber-400"
+              >
                 <PauseCircle className="h-3.5 w-3.5" />
                 Stop All (Website + WhatsApp)
               </DropdownMenuItem>
