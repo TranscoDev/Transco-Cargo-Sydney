@@ -59,6 +59,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Users,
     items: [
       { label: "Customers", to: "/console/customers" },
+      { label: "My Transco", to: "/console/my-transco" },
       { label: "Leads", to: "/console/leads" },
       { label: "Conversations", to: "/console/conversations" },
     ],

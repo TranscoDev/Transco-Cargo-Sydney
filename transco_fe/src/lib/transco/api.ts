@@ -114,6 +114,11 @@ export interface BackendBooking {
   paymentStatus?: string | null;
   notes?: string | null;
   shipmentId?: string | null;
+  bookingCode?: string | null;
+  channel?: string | null;
+  declarationStatus?: Booking["declarationStatus"];
+  warehouseStatus?: Booking["warehouseStatus"];
+  customerNotes?: string | null;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -139,6 +144,11 @@ export function mapBooking(b: BackendBooking): Booking {
     paymentStatus: b.paymentStatus,
     notes: b.notes,
     shipmentId: b.shipmentId,
+    bookingCode: b.bookingCode,
+    channel: b.channel,
+    declarationStatus: b.declarationStatus,
+    warehouseStatus: b.warehouseStatus,
+    customerNotes: b.customerNotes,
   };
 }
 
@@ -417,6 +427,52 @@ export async function updateBooking(
   }
   const data = (await res.json()) as { booking: BackendBooking };
   return mapBooking(data.booking);
+}
+
+/** Sets (or resets) a customer's My Transco password — for a forgotten
+ * password, or a known customer who can't receive a WhatsApp code. Staff
+ * should confirm who they're speaking to first: this also marks the
+ * customer's number as verified (connecting their full history) and signs
+ * out any existing My Transco sessions. */
+export async function setPortalPassword(
+  customerId: string,
+  password: string,
+): Promise<{ customerCode: string; phoneNumber: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/portal-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ password }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    customerCode?: string;
+    phoneNumber?: string;
+  };
+  if (!res.ok || !data.customerCode) {
+    throw new Error(data.error || `Failed to set password (${res.status})`);
+  }
+  return { customerCode: data.customerCode, phoneNumber: data.phoneNumber ?? "" };
+}
+
+/** Assigns the customer's BL (HBL) to a booking — creates the booking's
+ * shipment if it has none yet, optionally inside a batch. The customer
+ * sees it in My Transco straight away. Throws with the backend's own
+ * message (e.g. "BL 203115 is already assigned to another shipment"). */
+export async function assignBookingBl(
+  bookingId: string,
+  hblNumber: string,
+  batchNumber?: number | null,
+): Promise<{ shipmentId: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/bl`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ hblNumber, batchNumber: batchNumber ?? null }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; shipment?: { _id: string } };
+  if (!res.ok || !data.shipment) {
+    throw new Error(data.error || `Failed to assign BL (${res.status})`);
+  }
+  return { shipmentId: data.shipment._id };
 }
 
 // ============================================================

@@ -10,13 +10,14 @@ export const Route = createFileRoute("/console/bookings")({
 });
 
 function BookingsPage() {
-  const { bookings, deleteBooking, updateBookingStatus, updateBooking } = useConversations();
+  const { bookings, deleteBooking, updateBookingStatus, updateBooking, assignBookingBl } = useConversations();
   return (
     <BookingsPanel
       bookings={bookings}
       onDelete={deleteBooking}
       onUpdateStatus={updateBookingStatus}
       onUpdateBooking={updateBooking}
+      onAssignBl={assignBookingBl}
     />
   );
 }

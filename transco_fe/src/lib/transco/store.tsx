@@ -30,6 +30,7 @@ import {
   setCustomerMode,
   setPauseState as setPauseStateRequest,
   updateBooking as updateBookingRequest,
+  assignBookingBl as assignBookingBlRequest,
   updateBookingStatus as updateBookingStatusRequest,
   updateContactInfo as updateContactInfoRequest,
   updateCustomerStatus as updateCustomerStatusRequest,
@@ -106,6 +107,10 @@ interface ConversationsApi {
   /** General field update (Phase 2 extended fields) — separate from
    * updateBookingStatus above, which is untouched. */
   updateBooking: (bookingId: string, updates: BookingUpdateInput) => void;
+  /** Assigns the customer's BL to a booking (creates/links its shipment).
+   * Not optimistic — rejects with the backend's message (e.g. a BL that's
+   * already taken) so the form can show it. */
+  assignBookingBl: (bookingId: string, hblNumber: string, batchNumber?: number | null) => Promise<void>;
   /** True while the website bot is paused — website visitors get a friendly
    * pause notice instead of an AI reply. Independent of whatsappPaused. */
   websitePaused: boolean;
@@ -369,6 +374,16 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       }
     });
   }, []);
+
+  const assignBookingBl = useCallback(
+    async (bookingId: string, hblNumber: string, batchNumber?: number | null) => {
+      const { shipmentId } = await assignBookingBlRequest(bookingId, hblNumber, batchNumber);
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received" } : b)),
+      );
+    },
+    [],
+  );
 
   const patch = useCallback((conversationId: string, fn: (c: Conversation) => Conversation) => {
     setConversations((prev) => prev.map((c) => (c.id === conversationId ? fn(c) : c)));
@@ -819,6 +834,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       deleteBooking,
       updateBookingStatus,
       updateBooking,
+      assignBookingBl,
       websitePaused,
       whatsappPaused,
       updatePauseState,
@@ -838,6 +854,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       deleteBooking,
       updateBookingStatus,
       updateBooking,
+      assignBookingBl,
       websitePaused,
       whatsappPaused,
       markAsRead,
