@@ -37,6 +37,18 @@ async function connectToDatabase(uri, dbName = 'transco') {
 
   await db.collection('invoices').createIndex({ invoiceNumber: 1 }, { unique: true });
 
+  // Customer portal (My Transco). customerCode ("CUS-000128") and
+  // bookingCode ("BK-000245") are human-readable business references
+  // layered on top of _id — sparse, since every record that predates the
+  // portal has neither until one is assigned.
+  await db.collection('customers').createIndex({ customerCode: 1 }, { unique: true, sparse: true });
+  await db.collection('bookings').createIndex({ bookingCode: 1 }, { unique: true, sparse: true });
+  await db.collection('bookings').createIndex({ customerId: 1, createdAt: -1 });
+  // One-time sign-in codes expire on their own (TTL) — never a lingering
+  // table of valid codes.
+  await db.collection('customerOtps').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  await db.collection('customerOtps').createIndex({ phoneNumber: 1, createdAt: -1 });
+
   console.log('Connected to MongoDB');
   return db;
 }
@@ -130,8 +142,31 @@ function segments() {
   return getDb().collection('segments');
 }
 
+// Atomic sequence counters for human-readable codes (one document per
+// sequence: _id "customerCode", "bookingCode").
+function counters() {
+  return getDb().collection('counters');
+}
+
+// Hashed, short-lived customer sign-in codes (see customerAuth.js).
+function customerOtps() {
+  return getDb().collection('customerOtps');
+}
+
+async function nextSequence(name) {
+  const doc = await counters().findOneAndUpdate(
+    { _id: name },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after' }
+  );
+  return doc.seq;
+}
+
 module.exports = {
   connectToDatabase,
+  counters,
+  customerOtps,
+  nextSequence,
   getDb,
   customers,
   messages,

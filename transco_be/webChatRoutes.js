@@ -20,6 +20,8 @@
 
 const express = require('express');
 const { customers, bookings } = require('./db');
+const { detectAccountIntent, handleAccountIntent, ACTION_INTENTS } = require('./portalChat');
+const { hasRealName } = require('./customerTools');
 
 const HANDOFF_MARKER = '[[HANDOFF]]';
 const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
@@ -125,7 +127,11 @@ module.exports = function createWebChatRouter({
   FREIGHT_MODE_MENU_ITEMS,
   PICKUP_DELIVERY_MENU_ITEMS,
   PICKUP_DELIVERY_MENU_ITEMS_INDIA,
-  COUNTRY_MENU_ITEMS
+  COUNTRY_MENU_ITEMS,
+  // My Transco (optional — when absent, the widget behaves exactly as
+  // it always has, for everyone).
+  customerAuth,
+  customerTools
 }) {
   const router = express.Router();
 
@@ -163,16 +169,39 @@ module.exports = function createWebChatRouter({
 
   router.post('/', async (req, res) => {
     try {
-      const { sessionId, message, menuItemId } = req.body || {};
+      const { sessionId, message, menuItemId, action, shipmentId, label } = req.body || {};
 
       if (!sessionId || typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'sessionId is required' });
       }
 
-      // Either a typed message OR a tapped menu item id — never both,
-      // never neither.
+      // Signed-in My Transco customer, if the widget sent a valid
+      // customer token — resolved server-side from the signature only.
+      // Anything invalid/expired just means "not signed in": the public
+      // chat must keep working for everyone.
+      let account = null;
+      if (customerAuth) {
+        try {
+          account = await customerAuth.customerFromRequest(req);
+        } catch (authErr) {
+          console.error('Web chat customer lookup failed:', authErr.message);
+        }
+      }
+
+      // Either a typed message, a tapped menu item id, OR an account
+      // action button (My bookings / Track this shipment / ...) — exactly
+      // one of them.
       let resolvedTap = null;
-      if (menuItemId !== undefined) {
+      let accountAction = null;
+      if (action !== undefined) {
+        if (typeof action !== 'string' || !ACTION_INTENTS.includes(action)) {
+          return res.status(400).json({ error: 'Unrecognized action' });
+        }
+        if (action === 'track_shipment' && typeof shipmentId !== 'string') {
+          return res.status(400).json({ error: 'shipmentId is required' });
+        }
+        accountAction = action;
+      } else if (menuItemId !== undefined) {
         if (typeof menuItemId !== 'string' || !menuItemId.trim()) {
           return res.status(400).json({ error: 'menuItemId must be a non-empty string' });
         }
@@ -186,11 +215,23 @@ module.exports = function createWebChatRouter({
 
       const { customer, isNewCustomer } = await findOrCreateWebCustomer(sessionId);
 
+      // Link this browser's chat transcript to the signed-in customer, so
+      // staff see who they're talking to. The chat stays on its own
+      // website-session record (the account's WhatsApp conversation and
+      // mode are never touched from here).
+      if (account && String(customer.linkedCustomerId || '') !== String(account._id)) {
+        const link = { linkedCustomerId: account._id };
+        if (hasRealName(account)) link.name = account.name;
+        await customers().updateOne({ _id: customer._id }, { $set: link });
+      }
+
       // What the customer "said", for the transcript and for staff to
       // read back later — the tapped item's readable title for a menu
       // tap (e.g. "🎁 Gift Box"), or the typed text otherwise. Mirrors
       // tappedMenuLabel || text on the WhatsApp side.
-      const displayedCustomerText = resolvedTap ? resolvedTap.title : message.trim();
+      const displayedCustomerText = accountAction
+        ? (typeof label === 'string' && label.trim() ? label.trim().slice(0, 80) : accountAction.replace(/_/g, ' '))
+        : resolvedTap ? resolvedTap.title : message.trim();
 
       const incoming = await saveMessage({
         customerId: customer._id,
@@ -279,7 +320,48 @@ module.exports = function createWebChatRouter({
 
       // Either the tapped item's phrase (e.g. "I'd like a price for a
       // Gift Box"), or the customer's own typed text.
-      const outgoingText = resolvedTap ? resolvedTap.phrase : message.trim();
+      const outgoingText = accountAction ? '' : resolvedTap ? resolvedTap.phrase : message.trim();
+
+      // Questions about the customer's OWN bookings/BLs/shipments are
+      // answered from the database (portalChat.js), never by the LLM —
+      // see that file for why. Not an account question -> null, and the
+      // message carries on to Flowise below exactly as before.
+      let accountExtras = null;
+      if (customerTools) {
+        const intent = accountAction || detectAccountIntent(outgoingText);
+        if (intent) {
+          const handled = await handleAccountIntent({
+            intent, shipmentId, account, tools: customerTools, text: outgoingText
+          });
+          if (handled && handled.passThrough) {
+            accountExtras = handled;
+          } else if (handled) {
+            const accountReply = await saveMessage({
+              customerId: customer._id,
+              senderType: 'CHATBOT',
+              content: handled.reply,
+              isRead: true,
+              replyToMessageId: incoming._id,
+              whatsappStatus: null
+            });
+            await broadcastMessageCreated(customer, accountReply);
+            return res.json({
+              reply: handled.reply,
+              media: null,
+              menu: null,
+              cards: handled.cards || [],
+              actions: handled.actions || [],
+              handedOff: false
+            });
+          }
+        }
+      }
+
+      if (accountAction) {
+        // An account button always gets an answer above; there is no
+        // text to hand to Flowise, so never fall through with nothing.
+        return res.status(400).json({ error: 'Unrecognized action' });
+      }
 
       const rawReply = await getFlowiseReply(outgoingText, sessionId);
 
@@ -390,12 +472,19 @@ module.exports = function createWebChatRouter({
         cleanContent = cleanContent.slice(fullMarker.length).trimStart();
         bookingRequested = true;
 
-        const finalName = contactName && contactName.trim();
-        const finalPhone = contactPhone && contactPhone.trim();
+        // A signed-in customer is already known — their account fills in
+        // whatever contact detail the conversation didn't capture, and
+        // the booking belongs to their account (so it shows in My
+        // Transco), not to this anonymous browser session.
+        const finalName = (contactName && contactName.trim()) || (account && hasRealName(account) ? account.name : null);
+        const finalPhone = (contactPhone && contactPhone.trim()) || (account ? account.phoneNumber : null);
 
         if (finalName && finalPhone) {
           const booking = {
-            customerId: customer._id,
+            ...(customerTools ? { bookingCode: await customerTools.newBookingCode() } : {}),
+            customerId: account ? account._id : customer._id,
+            // Made by the signed-in account itself (see customerTools scope()).
+            ...(account ? { createdByAccount: true } : {}),
             customerName: finalName,
             phoneNumber: finalPhone,
             requestedDay: requestedDay.toLowerCase(),
@@ -429,6 +518,12 @@ module.exports = function createWebChatRouter({
           }
 
           bookingCreated = true;
+
+          // The reference is appended by the server from the record just
+          // written — the assistant never makes one up.
+          if (booking.bookingCode) {
+            cleanContent = `${cleanContent}\n\n📋 Booking reference: *${booking.bookingCode}*`;
+          }
         }
       }
 
@@ -488,10 +583,16 @@ module.exports = function createWebChatRouter({
         );
       }
 
+      if (accountExtras && accountExtras.note) {
+        cleanContent = `${cleanContent}\n\n${accountExtras.note}`;
+      }
+
       res.json({
         reply: cleanContent,
         media,
         menu,
+        cards: [],
+        actions: accountExtras ? accountExtras.actions : [],
         handedOff: false
       });
 

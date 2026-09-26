@@ -59,6 +59,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Users,
     items: [
       { label: "Customers", to: "/console/customers" },
+      { label: "My Transco", to: "/console/my-transco" },
       { label: "Leads", to: "/console/leads" },
       { label: "Conversations", to: "/console/conversations" },
     ],
@@ -382,7 +383,11 @@ export function ConsoleLayout({
             Contacts table's min-w-[1180px]) forces this flex item past the
             viewport width instead of scrolling internally — dragging the
             sidebar and header along with it. */}
-        <main className="min-h-0 min-w-0 flex-1">{children}</main>
+        {/* flex-col + overflow: each page's own `flex-1 overflow-y-auto`
+            wrapper scrolls inside here, so a long page (e.g. a batch with
+            20+ HBLs) never scrolls the whole window and drags the sidebar
+            away with it. */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
       </div>
     </div>
   );

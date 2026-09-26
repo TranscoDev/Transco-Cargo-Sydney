@@ -69,6 +69,11 @@ const SOURCE_BADGE: Record<
     icon: Plus,
     className: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
   },
+  portal: {
+    label: "My Transco",
+    icon: SquareUserRound,
+    className: "bg-teal-500/10 text-teal-700 dark:text-teal-400",
+  },
 };
 
 const STATUS_BADGE: Record<CustomerStatus, string> = {
@@ -551,7 +556,10 @@ function SourceBadges({ sources }: { sources: CustomerSource[] }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {sources.map((s) => {
-        const badge = SOURCE_BADGE[s];
+        // A source this page doesn't know yet is skipped, never allowed
+        // to take the whole Customers page down.
+        const badge = SOURCE_BADGE[s] as (typeof SOURCE_BADGE)[CustomerSource] | undefined;
+        if (!badge) return null;
         const Icon = badge.icon;
         return (
           <span
