@@ -139,7 +139,7 @@ function LoginPage() {
           </button>
 
           <p className="mt-4 text-[11px] text-muted-foreground">
-            Demo sign-in: any valid email with a 6+ character password.
+            Staff accounts only — contact your administrator if you can't sign in.
           </p>
         </form>
       </div>
