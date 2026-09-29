@@ -230,10 +230,16 @@ module.exports = function createWebChatRouter({
       // staff see who they're talking to. The chat stays on its own
       // website-session record (the account's WhatsApp conversation and
       // mode are never touched from here).
-      if (account && String(customer.linkedCustomerId || '') !== String(account._id)) {
-        const link = { linkedCustomerId: account._id };
-        if (hasRealName(account)) link.name = account.name;
-        await customers().updateOne({ _id: customer._id }, { $set: link });
+      // Kept in sync on every signed-in message, so a name the customer
+      // changes in My Transco shows up in the console's Conversations too.
+      if (account) {
+        const link = {};
+        if (String(customer.linkedCustomerId || '') !== String(account._id)) link.linkedCustomerId = account._id;
+        if (hasRealName(account) && customer.name !== account.name) link.name = account.name;
+        if (Object.keys(link).length) {
+          await customers().updateOne({ _id: customer._id }, { $set: link });
+          Object.assign(customer, link);
+        }
       }
 
       // What the customer "said", for the transcript and for staff to

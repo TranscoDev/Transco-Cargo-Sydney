@@ -1476,7 +1476,7 @@ async function markNeedsAttention(customer, triggerMessage) {
 
   broadcast('customer.needs_attention', {
     customerId: customer._id,
-    customer,
+    customer: withoutSignInSecrets(customer),
 
     lastMessage: {
       content: triggerMessage.content,
@@ -1491,16 +1491,42 @@ async function markNeedsAttention(customer, triggerMessage) {
 // BROADCAST MESSAGE
 // ============================================================
 
+// A website chat has no real phone number of its own. When the visitor was
+// signed in to My Transco, this is who they really are — shown in the
+// console's Conversations instead of the anonymous session.
+function linkedAccountSummary(account) {
+  if (!account) return null;
+  return {
+    id: String(account._id),
+    name: account.name || null,
+    phoneNumber: account.phoneNumber || null,
+    customerCode: account.customerCode || null
+  };
+}
+
+async function linkedAccountFor(customer) {
+  if (!customer || !customer.linkedCustomerId) return null;
+  const account = await customers().findOne(
+    { _id: customer.linkedCustomerId },
+    { projection: { name: 1, phoneNumber: 1, customerCode: 1 } }
+  );
+  return linkedAccountSummary(account);
+}
+
 async function broadcastMessageCreated(customer, message) {
-  const unreadCount = await messages().countDocuments({
-    customerId: customer._id,
-    senderType: 'CUSTOMER',
-    isRead: false
-  });
+  const [unreadCount, linkedAccount] = await Promise.all([
+    messages().countDocuments({
+      customerId: customer._id,
+      senderType: 'CUSTOMER',
+      isRead: false
+    }),
+    linkedAccountFor(customer)
+  ]);
 
   broadcast('message.created', {
     message,
-    customer,
+    // Every staff console receives this — never include sign-in secrets.
+    customer: { ...withoutSignInSecrets(customer), linkedAccount },
     unreadCount,
 
     lastMessage: {
@@ -2188,6 +2214,17 @@ app.patch('/api/settings/pause-state', async (req, res) => {
 // GET CUSTOMERS
 // ============================================================
 
+// A customer record as it may leave the server: My Transco sign-in
+// secrets and lockout internals are never sent to any browser, staff
+// included (password hash, session version, failed-attempt counters).
+function withoutSignInSecrets(customer) {
+  const {
+    passwordHash, portalTokenVersion, portalLoginFailures, portalLockedUntil,
+    ...safe
+  } = customer;
+  return safe;
+}
+
 app.get('/api/customers', async (req, res) => {
 
   try {
@@ -2295,10 +2332,18 @@ app.get('/api/customers', async (req, res) => {
     }
 
 
+    const customerById = new Map(allCustomers.map(c => [String(c._id), c]));
+
     const result =
       allCustomers.map(customer => ({
 
-        ...customer,
+        ...withoutSignInSecrets(customer),
+
+        hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
+
+        linkedAccount: customer.linkedCustomerId
+          ? linkedAccountSummary(customerById.get(String(customer.linkedCustomerId)))
+          : null,
 
         messages:
           messagesByCustomer.get(
@@ -2412,7 +2457,10 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
 
     res.status(200).json({
       customer: {
-        ...customer,
+        ...withoutSignInSecrets(customer),
+        // For the profile header: "Online account ✓" badge.
+        hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
+        linkedAccount: await linkedAccountFor(customer),
         messages: customerMessages,
         shipments: customerShipments,
         liveShipments: customerLiveShipments,
@@ -4151,13 +4199,13 @@ app.patch(
         {
           customerId: updated._id,
           mode: updated.mode,
-          customer: updated
+          customer: withoutSignInSecrets(updated)
         }
       );
 
 
       res.status(200).json({
-        customer: updated
+        customer: withoutSignInSecrets(updated)
       });
 
     } catch (err) {
@@ -4225,10 +4273,10 @@ app.patch(
 
       broadcast('customer.contact_updated', {
         customerId: updated._id,
-        customer: updated
+        customer: withoutSignInSecrets(updated)
       });
 
-      res.status(200).json({ customer: updated });
+      res.status(200).json({ customer: withoutSignInSecrets(updated) });
 
     } catch (err) {
 
@@ -4287,10 +4335,10 @@ app.patch(
 
       broadcast('customer.contact_updated', {
         customerId: updated._id,
-        customer: updated
+        customer: withoutSignInSecrets(updated)
       });
 
-      res.status(200).json({ customer: updated });
+      res.status(200).json({ customer: withoutSignInSecrets(updated) });
 
     } catch (err) {
 
@@ -4366,11 +4414,11 @@ app.post('/api/customers', async (req, res) => {
 
     broadcast('customer.contact_updated', {
       customerId: result.value._id,
-      customer: result.value
+      customer: withoutSignInSecrets(result.value)
     });
 
     res.status(isNewCustomer ? 201 : 200).json({
-      customer: result.value,
+      customer: withoutSignInSecrets(result.value),
       isNewCustomer
     });
 

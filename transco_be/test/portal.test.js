@@ -860,3 +860,53 @@ test('website country pages: the country reaches the assistant once, never as a 
   const said = (await db.collection('messages').find({ customerId: visitor._id, senderType: 'CUSTOMER' }).toArray()).map(m => m.content);
   assert.deepEqual(said, ['How much for door delivery?', 'And for 2 boxes?', 'What about India?', "I'm shipping to Sri Lanka", 'Door delivery price?', 'Hello again']);
 });
+
+test('staff customer endpoints never send sign-in secrets, and flag online accounts', async () => {
+  const record = await db.collection('customers').findOne({ passwordHash: { $exists: true } });
+  assert.ok(record, 'a customer with a password exists from earlier tests');
+
+  const list = await api('GET', '/api/customers', { token: staffToken });
+  assert.equal(list.status, 200);
+  const raw = JSON.stringify(list.body);
+  assert.ok(!raw.includes('passwordHash'), 'list must not include password hashes');
+  assert.ok(!raw.includes('portalTokenVersion'));
+  const listed = (list.body.customers || list.body).find(c => String(c._id) === String(record._id));
+  assert.equal(listed.hasOnlineAccount, true);
+
+  const profile = await api('GET', `/api/customers/${record._id}/profile`, { token: staffToken });
+  assert.equal(profile.status, 200);
+  assert.ok(!JSON.stringify(profile.body).includes('passwordHash'));
+  assert.equal(profile.body.customer.hasOnlineAccount, true);
+  assert.ok(profile.body.customer.customerCode);
+});
+
+test('a signed-in website chat is recognised in Conversations: real name, phone and customer number, kept in sync', async () => {
+  await clearOtps('61400777004');
+  const me = await signIn('0400777004');
+  await api('PATCH', '/api/portal/me', { token: me.token, body: { name: 'Web Chatter' } });
+  const sessionId = `agentsite-linked-${Date.now()}`;
+
+  flowiseReplyText = 'Hello!';
+  assert.equal((await chat(sessionId, { message: 'hi there' }, me.token)).status, 200);
+
+  const list = await api('GET', '/api/customers', { token: staffToken });
+  const rows = list.body.customers || list.body;
+  const session = rows.find(c => c.sessionId === sessionId);
+  assert.ok(session, 'the website chat appears in Conversations');
+  assert.equal(session.name, 'Web Chatter');
+  assert.equal(session.linkedAccount.phoneNumber, '61400777004');
+  assert.equal(session.linkedAccount.name, 'Web Chatter');
+  assert.ok(session.linkedAccount.customerCode);
+  assert.ok(!JSON.stringify(list.body).includes('passwordHash'));
+
+  // The customer renames themselves in My Transco — the chat follows.
+  await api('PATCH', '/api/portal/me', { token: me.token, body: { name: 'Web Chatter Perera' } });
+  await chat(sessionId, { message: 'one more question' }, me.token);
+  const again = (await api('GET', '/api/customers', { token: staffToken })).body;
+  const renamed = (again.customers || again).find(c => c.sessionId === sessionId);
+  assert.equal(renamed.name, 'Web Chatter Perera');
+
+  // The profile of the chat record points at the real account.
+  const profile = await api('GET', `/api/customers/${session._id}/profile`, { token: staffToken });
+  assert.equal(profile.body.customer.linkedAccount.phoneNumber, '61400777004');
+});
