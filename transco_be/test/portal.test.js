@@ -959,6 +959,35 @@ test('declaration: sender details are remembered only for the account holder, re
   assert.equal((await api('GET', `/api/my-transco/bookings/${new ObjectId()}/declaration`, { token: staffToken })).status, 404);
 });
 
+test('dashboard: counts declarations to check and BLs to assign from real bookings', async () => {
+  const before = (await api('GET', '/api/dashboard/summary', { token: staffToken })).body;
+  assert.equal(typeof before.declarationsToCheck, 'number');
+  assert.equal(typeof before.blsToAssign, 'number');
+  assert.equal(typeof before.conversationsWaiting, 'number');
+  assert.ok(Array.isArray(before.todaysDropOffs));
+
+  // A fresh online booking adds one declaration to check…
+  await clearOtps('61400777002');
+  const me = await signIn('0400777002');
+  const options = await api('GET', '/api/portal/booking-options', { token: me.token });
+  const made = await api('POST', '/api/portal/bookings', {
+    token: me.token,
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], ...decl('Galle'), deliveryType: 'collect', dropOff: nextDropOff(options.body) }
+  });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  let now = (await api('GET', '/api/dashboard/summary', { token: staffToken })).body;
+  assert.equal(now.declarationsToCheck, before.declarationsToCheck + 1);
+
+  // …checking it removes it; boxes received without a BL adds one BL to assign.
+  await api('PATCH', `/api/bookings/${made.body.booking.id}`, { token: staffToken, body: { declarationStatus: 'received', warehouseStatus: 'received' } });
+  now = (await api('GET', '/api/dashboard/summary', { token: staffToken })).body;
+  assert.equal(now.declarationsToCheck, before.declarationsToCheck);
+  assert.equal(now.blsToAssign, before.blsToAssign + 1);
+
+  // Staff only.
+  assert.equal((await api('GET', '/api/dashboard/summary', { token: me.token })).status, 401);
+});
+
 test('staff customer endpoints never send sign-in secrets, and flag online accounts', async () => {
   const record = await db.collection('customers').findOne({ passwordHash: { $exists: true } });
   assert.ok(record, 'a customer with a password exists from earlier tests');

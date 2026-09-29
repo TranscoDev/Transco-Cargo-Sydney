@@ -2519,15 +2519,21 @@ app.get('/api/dashboard/summary', async (req, res) => {
     const startOfDayId = ObjectId.createFromTime(startOfDayUtcSeconds);
     const startOfNextDayId = ObjectId.createFromTime(startOfDayUtcSeconds + 24 * 60 * 60);
 
+    const notCancelled = { status: { $ne: 'cancelled' } };
+
     const [
       todaysBookingsCount,
       newCustomersCount,
       unreadCustomerIds,
       attentionCount,
-      activeShipmentsCount
+      activeShipmentsCount,
+      attentionCustomerIds,
+      declarationsToCheck,
+      blsToAssign,
+      todaysDropOffs
     ] = await Promise.all([
 
-      bookings().countDocuments({ requestedDateISO: todayString }),
+      bookings().countDocuments({ requestedDateISO: todayString, ...notCancelled }),
 
       customers().countDocuments({
         _id: { $gte: startOfDayId, $lt: startOfNextDayId }
@@ -2539,16 +2545,57 @@ app.get('/api/dashboard/summary', async (req, res) => {
 
       // "Active" = not yet delivered — the one status a shipment reaches
       // and then stays at, so this is a real live-in-progress count.
-      shipments().countDocuments({ status: { $ne: 'delivered' } })
+      shipments().countDocuments({ status: { $ne: 'delivered' } }),
+
+      customers().distinct('_id', { needsAttention: true }),
+
+      // Filled online by the customer, not yet checked by staff.
+      bookings().countDocuments({
+        declarationSubmittedAt: { $exists: true, $ne: null },
+        declarationStatus: { $ne: 'received' },
+        ...notCancelled
+      }),
+
+      // Boxes are in our warehouse but the booking has no shipment/BL yet
+      // — the next step staff need to take.
+      bookings().countDocuments({
+        $or: [{ warehouseStatus: 'received' }, { status: 'completed' }],
+        shipmentId: { $in: [null, ''] },
+        ...notCancelled
+      }),
+
+      bookings()
+        .find(
+          { requestedDateISO: todayString, ...notCancelled },
+          { projection: { customerName: 1, phoneNumber: 1, requestedTime: 1, bookingCode: 1, status: 1, boxSummary: 1 } }
+        )
+        .sort({ requestedTime: 1 })
+        .limit(12)
+        .toArray()
 
     ]);
+
+    // A conversation "waiting" = an unread customer message OR flagged
+    // for staff — counted once even if it's both.
+    const waiting = new Set([...unreadCustomerIds, ...attentionCustomerIds].map(String));
 
     res.status(200).json({
       todaysBookings: todaysBookingsCount,
       newCustomersToday: newCustomersCount,
       unreadConversations: unreadCustomerIds.length,
       attentionConversations: attentionCount,
-      activeShipments: activeShipmentsCount
+      activeShipments: activeShipmentsCount,
+      conversationsWaiting: waiting.size,
+      declarationsToCheck,
+      blsToAssign,
+      todaysDropOffs: todaysDropOffs.map(b => ({
+        id: String(b._id),
+        customerName: b.customerName || b.phoneNumber || null,
+        time: b.requestedTime || null,
+        bookingCode: b.bookingCode || null,
+        status: b.status || 'pending',
+        boxSummary: b.boxSummary || null
+      }))
     });
 
   } catch (err) {
