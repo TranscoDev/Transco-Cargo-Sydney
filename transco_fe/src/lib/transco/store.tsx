@@ -640,10 +640,31 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       // Optimistic local update; conversationId doubles as the backend
       // customer._id once a conversation is backed by real data. Errors are
       // logged, not surfaced, so the mock-data demo keeps working standalone.
-      patch(conversationId, (c) => ({ ...c, mode }));
-      setCustomerMode(conversationId, mode).catch((err) => {
-        console.error("Failed to persist mode change:", err);
+      let previous: ConversationMode | undefined;
+      patch(conversationId, (c) => {
+        previous = c.mode;
+        return { ...c, mode };
       });
+      setCustomerMode(conversationId, mode)
+        .then(() => {
+          if (!isLiveRef.current) return;
+          notify.success(
+            mode === "HUMAN" ? "You've taken over this chat" : "Handed back to the bot",
+            mode === "HUMAN" ? "The bot won't reply here until you hand it back." : "The bot will answer this customer again.",
+          );
+        })
+        .catch((err) => {
+          console.error("Failed to persist mode change:", err);
+          // Never leave staff believing the bot is paused when it isn't.
+          if (previous && isLiveRef.current) {
+            const revertTo = previous;
+            patch(conversationId, (c) => ({ ...c, mode: revertTo }));
+            notify.error(
+              mode === "HUMAN" ? "Couldn't take over this chat" : "Couldn't hand back to the bot",
+              "Nothing changed — please try again.",
+            );
+          }
+        });
     },
     [patch],
   );

@@ -4,8 +4,8 @@ export type ConversationMode = "CHATBOT" | "HUMAN";
  * everywhere else (backend, comparisons, storage). Staff just reads
  * better than "Human" in a dashboard built for staff to use. */
 export const MODE_LABELS: Record<ConversationMode, string> = {
-  CHATBOT: "CHATBOT",
-  HUMAN: "STAFF",
+  CHATBOT: "Bot",
+  HUMAN: "Staff",
 };
 
 /** Absent/undefined means "whatsapp" — every conversation that existed
