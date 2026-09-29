@@ -108,7 +108,7 @@ function LoginPage() {
               emailError ? "border-destructive" : "border-input",
             )}
           />
-          {emailError && <p className="mt-1 text-[11px] text-destructive">{emailError}</p>}
+          {emailError && <p className="mt-1 text-xs text-destructive">{emailError}</p>}
 
           <label className="mt-4 block text-xs font-medium text-foreground" htmlFor="password">
             Password
@@ -127,7 +127,7 @@ function LoginPage() {
               passwordError ? "border-destructive" : "border-input",
             )}
           />
-          {passwordError && <p className="mt-1 text-[11px] text-destructive">{passwordError}</p>}
+          {passwordError && <p className="mt-1 text-xs text-destructive">{passwordError}</p>}
 
           <button
             type="submit"
@@ -138,7 +138,7 @@ function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
 
-          <p className="mt-4 text-[11px] text-muted-foreground">
+          <p className="mt-4 text-xs text-muted-foreground">
             Staff accounts only — contact your administrator if you can't sign in.
           </p>
         </form>
