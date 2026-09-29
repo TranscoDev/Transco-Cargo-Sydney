@@ -820,6 +820,20 @@ export interface DashboardSummary {
   unreadConversations: number;
   attentionConversations: number;
   activeShipments: number;
+  /** Unread OR flagged for staff, counted once. Absent on older backends. */
+  conversationsWaiting?: number;
+  /** Declarations the customer filled online that staff haven't checked yet. */
+  declarationsToCheck?: number;
+  /** Boxes received at the warehouse but no shipment/BL yet. */
+  blsToAssign?: number;
+  todaysDropOffs?: {
+    id: string;
+    customerName: string | null;
+    time: string | null;
+    bookingCode: string | null;
+    status: string;
+    boxSummary: string | null;
+  }[];
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
