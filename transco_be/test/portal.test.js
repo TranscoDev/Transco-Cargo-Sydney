@@ -409,7 +409,7 @@ test('scenario 6 + 7: staff assign BLs; each customer sees only their own BL, ev
   const shipmentsA = await api('GET', '/api/portal/shipments', { token: custA.token });
   assert.equal(shipmentsA.body.shipments.length, 1);
   assert.equal(shipmentsA.body.shipments[0].blNumber, '203115');
-  assert.equal(shipmentsA.body.shipments[0].batchLabel, 'Group shipment 57');
+  assert.equal(shipmentsA.body.shipments[0].batchLabel, 'Shipment 57');
   assert.ok(!JSON.stringify(shipmentsA.body).includes('203116'));
   assert.ok(!JSON.stringify(shipmentsA.body).includes('Customer Beta'));
 

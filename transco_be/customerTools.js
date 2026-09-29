@@ -318,7 +318,7 @@ function createCustomerTools({
         (booking && booking.items && booking.items.length ? itemsSummary(booking.items) : null),
       receiverName: shipment.receiver && shipment.receiver.name ? shipment.receiver.name : null,
       // Only the batch's own label — never any other BL or customer in it.
-      batchLabel: batch && batch.batchNumber != null ? `Group shipment ${batch.batchNumber}` : null,
+      batchLabel: batch && batch.batchNumber != null ? `Shipment ${batch.batchNumber}` : null,
       status: hasStatus
         ? { key: shipment.status, label: SHIPMENT_STATUS_LABELS[shipment.status], tone: shipment.status === 'delivered' ? 'done' : 'active' }
         : { key: 'unknown', label: 'Status not updated yet', tone: 'muted' },
