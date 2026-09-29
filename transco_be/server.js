@@ -14,6 +14,8 @@ const { connectToDatabase, customers, messages, users, bookings, settings, shipm
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
+const { createCustomerAuth } = require('./customerAuth');
+const { createCustomerTools } = require('./customerTools');
 
 // Memory storage — files are small (a customer sheet, not a video) and
 // this only ever runs the parse-then-discard import flow, never needs to
@@ -170,7 +172,9 @@ app.use('/uploads', express.static(ATTACHMENT_UPLOAD_DIR));
 // handler, so these must NOT repeat the leading '/api'.
 const PUBLIC_API_PREFIXES = [
   '/auth/login',   // issues the token — can't require one to get one
-  '/web-chat'      // public website chat widget, no staff session
+  '/web-chat',     // public website chat widget, no staff session
+  '/portal/'       // My Transco — applies its own CUSTOMER auth (portalRoutes.js);
+                   // trailing slash so e.g. a future '/portal-x' route isn't public
 ];
 
 function requireAuth(req, res, next) {
@@ -366,6 +370,12 @@ function verifySession(token) {
     return null;
   }
 }
+
+
+// Customer (My Transco) tokens — signed with a key derived from
+// SESSION_SECRET for that purpose only, so they can never pass the staff
+// verifySession() above, and vice versa. See customerAuth.js.
+const customerAuth = createCustomerAuth(SESSION_SECRET);
 
 
 // ============================================================
@@ -2745,6 +2755,19 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
 
     const updates = {};
 
+    // Customer-visible progress stages (My Transco shows these as done
+    // ONLY when staff have recorded them here).
+    for (const field of ['declarationStatus', 'warehouseStatus']) {
+      if (!(field in (req.body || {}))) continue;
+      if (!['received', 'not_received'].includes(req.body[field])) {
+        return res.status(400).json({
+          error: `${field} must be "received" or "not_received"`
+        });
+      }
+      updates[field] = req.body[field];
+      updates[`${field.replace('Status', '')}UpdatedAt`] = new Date();
+    }
+
     for (const field of BOOKING_UPDATABLE_FIELDS) {
       if (!(field in (req.body || {}))) continue;
 
@@ -2769,6 +2792,17 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
       return res.status(400).json({
         error: 'No updatable fields provided'
       });
+    }
+
+    // A booking made through My Transco (or viewed there since) already
+    // has its BK reference; one made before that gets it now, so staff
+    // and customer always talk about the same reference.
+    const existingBooking = await bookings().findOne(
+      { _id: new ObjectId(bookingId) },
+      { projection: { bookingCode: 1 } }
+    );
+    if (existingBooking && !existingBooking.bookingCode) {
+      updates.bookingCode = await customerTools.newBookingCode();
     }
 
     const updated = await bookings().findOneAndUpdate(
@@ -2797,6 +2831,132 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to update booking'
+    });
+  }
+});
+
+
+// ============================================================
+// ASSIGN A CUSTOMER'S BL TO A BOOKING (staff)
+// ============================================================
+//
+// The one step that turns a customer's booking into a trackable
+// shipment: staff enter the BL (HBL) number after the warehouse has
+// received and checked the boxes. Creates the booking's shipment record
+// if it doesn't have one yet (customerId/bookingId copied from the
+// booking itself — staff never re-enter customer details), or updates
+// the existing one. Optionally places it in a batch (consolidation /
+// bulk shipment) by batch number. The customer's My Transco account and
+// signed-in chat read it from here automatically.
+//
+// One BL belongs to exactly one customer shipment — the unique
+// hblNumber index enforces it; a clash is reported, never overwritten.
+
+app.post('/api/bookings/:bookingId/bl', async (req, res) => {
+
+  try {
+
+    const { bookingId } = req.params;
+    if (!ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking id' });
+    }
+
+    const hblNumber = String((req.body || {}).hblNumber || '').trim();
+    if (!/^[A-Za-z0-9-]{1,32}$/.test(hblNumber)) {
+      return res.status(400).json({
+        error: 'BL number must be 1-32 letters, numbers, or hyphens'
+      });
+    }
+
+    const booking = await bookings().findOne({ _id: new ObjectId(bookingId) });
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (!booking.customerId) {
+      return res.status(400).json({ error: 'This booking is not linked to a customer' });
+    }
+
+    let consolidation = null;
+    const batchNumberRaw = (req.body || {}).batchNumber;
+    if (batchNumberRaw !== undefined && batchNumberRaw !== null && batchNumberRaw !== '') {
+      const batchNumber = Number(batchNumberRaw);
+      if (!Number.isInteger(batchNumber) || batchNumber < 1) {
+        return res.status(400).json({ error: 'Batch number must be a whole number' });
+      }
+      consolidation = await consolidations().findOne({ batchNumber });
+      if (!consolidation) {
+        return res.status(404).json({ error: `Batch ${batchNumber} not found` });
+      }
+    }
+
+    const clash = await shipments().findOne({ hblNumber });
+    const existing = await shipments().findOne({ bookingId: booking._id });
+    if (clash && (!existing || String(clash._id) !== String(existing._id))) {
+      return res.status(409).json({
+        error: `BL ${hblNumber} is already assigned to another shipment`
+      });
+    }
+
+    const now = new Date().toISOString();
+    let shipment;
+
+    if (existing) {
+      const set = { hblNumber, updatedAt: now };
+      if (consolidation) set.consolidationId = consolidation._id;
+      shipment = await shipments().findOneAndUpdate(
+        { _id: existing._id },
+        { $set: set },
+        { returnDocument: 'after' }
+      );
+    } else {
+      // Boxes are in hand by the time a BL is assigned — the shipment
+      // starts at "cargo_received", with that recorded in its history.
+      const doc = {
+        shipmentNumber: generateShipmentNumber(),
+        customerId: booking.customerId,
+        bookingId: booking._id,
+        hblNumber,
+        consolidationId: consolidation ? consolidation._id : null,
+        serviceType: booking.serviceType || null,
+        origin: booking.origin || 'Sydney',
+        destination: booking.destination || null,
+        cargo: booking.boxSummary || null,
+        boxCount: booking.boxCount ?? null,
+        status: 'cargo_received',
+        warehouseStatus: null,
+        history: [{ status: 'cargo_received', at: now, note: `BL ${hblNumber} assigned` }],
+        createdAt: now,
+        updatedAt: now
+      };
+      const { insertedId } = await shipments().insertOne(doc);
+      shipment = { ...doc, _id: insertedId };
+    }
+
+    const bookingSet = { shipmentId: String(shipment._id), warehouseStatus: 'received' };
+    if (!booking.bookingCode) bookingSet.bookingCode = await customerTools.newBookingCode();
+    await bookings().updateOne({ _id: booking._id }, { $set: bookingSet });
+
+    const [withCustomerInfo] = await attachCustomerInfo([shipment]);
+    broadcast('shipment.updated', { shipment: withCustomerInfo });
+
+    res.status(existing ? 200 : 201).json({
+      success: true,
+      shipment: withCustomerInfo
+    });
+
+  } catch (err) {
+
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'That BL number is already assigned to another shipment' });
+    }
+
+    console.error(
+      'Error assigning BL:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to assign BL'
     });
   }
 });
@@ -3470,40 +3630,53 @@ function parsePeblHtml(html) {
   };
 }
 
+// Shared by the staff Tracking page (below) and the customer portal /
+// signed-in chat (customerTools.getShipmentTracking). `unavailable` is
+// kept distinct from "not found" so a customer is told the tracker is
+// down rather than that their shipment doesn't exist.
+// Overridable only so tests can point at a local stub.
+const PEBL_TRACKER_BASE_URL = process.env.PEBL_TRACKER_BASE_URL || 'https://pebl-tracker.transcocargo.com.au';
+
+async function lookupPebl(blNumber) {
+  // Mirrors PEBL's own client-side validation (see tracker.js) — reject
+  // anything else before it ever leaves this server.
+  if (!/^[A-Za-z0-9-]{1,32}$/.test(String(blNumber || ''))) {
+    return { found: false, pebl: null, unavailable: false };
+  }
+  try {
+    const peblResponse = await axios.get(
+      `${PEBL_TRACKER_BASE_URL}/search-bl/${encodeURIComponent(blNumber)}`,
+      { validateStatus: () => true, timeout: 10000 }
+    );
+    if (peblResponse.status === 200) {
+      return { found: true, pebl: parsePeblHtml(peblResponse.data), unavailable: false };
+    }
+    if (peblResponse.status >= 500) {
+      return { found: false, pebl: null, unavailable: true };
+    }
+    return { found: false, pebl: null, unavailable: false };
+  } catch (peblErr) {
+    console.error('PEBL lookup failed:', peblErr.message);
+    return { found: false, pebl: null, unavailable: true };
+  }
+}
+
 app.get('/api/tracking/:blNumber', async (req, res) => {
 
   try {
 
     const { blNumber } = req.params;
 
-    // Mirrors PEBL's own client-side validation (see tracker.js) — reject
-    // anything else before it ever leaves this server.
     if (!/^[A-Za-z0-9-]{1,32}$/.test(blNumber)) {
       return res.status(400).json({
         error: 'BL number must be 1-32 letters, numbers, or hyphens'
       });
     }
 
-    let pebl = null;
-    let peblFound = false;
-
-    try {
-      const peblResponse = await axios.get(
-        `https://pebl-tracker.transcocargo.com.au/search-bl/${encodeURIComponent(blNumber)}`,
-        { validateStatus: () => true, timeout: 10000 }
-      );
-
-      if (peblResponse.status === 200) {
-        peblFound = true;
-        pebl = parsePeblHtml(peblResponse.data);
-      }
-      // Any other status (404 "No shipment found", 5xx, etc.) just means
-      // not found / unavailable — never surfaced as a hard error to staff.
-    } catch (peblErr) {
-      console.error('PEBL lookup failed:', peblErr.message);
-      // pebl stays null — the response below still returns our own
-      // shipment record (if any) even when PEBL itself is unreachable.
-    }
+    // Any non-200 (404 "No shipment found", 5xx, unreachable) just means
+    // not found / unavailable — never surfaced as a hard error to staff,
+    // and our own shipment record (if any) is still returned below.
+    const { found: peblFound, pebl } = await lookupPebl(blNumber);
 
     const shipmentDoc = await shipments().findOne({ hblNumber: blNumber });
     const [withInfo] = shipmentDoc ? await attachCustomerInfo([shipmentDoc]) : [null];
@@ -5351,11 +5524,136 @@ app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', origin);
     }
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
   }
   next();
 });
+
+// ============================================================
+// MY TRANSCO (customer portal)
+// ============================================================
+//
+// Customer-scoped data access lives in customerTools.js (shared with the
+// signed-in web chat below); the HTTP surface is portalRoutes.js.
+
+const customerTools = createCustomerTools({
+  getSydneyNow,
+  resolvedDateString,
+  lookupPebl,
+  broadcast,
+  sendBookingEmail,
+  sendStaffBookingWhatsApp,
+  createCalendarEvent
+});
+
+// Sign-in codes go out over WhatsApp — the channel every Transco
+// customer already uses. Outside WhatsApp's 24-hour customer-service
+// window a business may only start a conversation with an approved
+// template, so production needs an AUTHENTICATION template (Meta
+// Business Manager) whose name is set in WHATSAPP_OTP_TEMPLATE. Without
+// it, a plain text message is attempted — which WhatsApp only delivers
+// to someone who has messaged us in the last 24 hours. Returns false
+// (never throws) so the route can tell the customer honestly.
+const { WHATSAPP_OTP_TEMPLATE, WHATSAPP_OTP_TEMPLATE_LANG = 'en' } = process.env;
+
+async function sendOtpMessage(phoneNumber, code) {
+  if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
+    console.warn('WhatsApp is not configured — cannot send a My Transco sign-in code.');
+    return false;
+  }
+  try {
+    if (WHATSAPP_OTP_TEMPLATE) {
+      await axios.post(
+        `${WHATSAPP_API_BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: phoneNumber,
+          type: 'template',
+          template: {
+            name: WHATSAPP_OTP_TEMPLATE,
+            language: { code: WHATSAPP_OTP_TEMPLATE_LANG },
+            components: [
+              { type: 'body', parameters: [{ type: 'text', text: code }] },
+              { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: code }] }
+            ]
+          }
+        },
+        { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      await sendWhatsAppMessage(
+        phoneNumber,
+        `${code} is your My Transco sign-in code. It expires in 10 minutes. Never share this code — Transco staff will never ask you for it.`
+      );
+    }
+    return true;
+  } catch (err) {
+    console.error('My Transco sign-in code send failed:', err.response?.data ?? err.message);
+    return false;
+  }
+}
+
+const createPortalRouter = require('./portalRoutes');
+app.use('/api/portal', createPortalRouter({
+  customerAuth,
+  tools: customerTools,
+  sendOtpMessage,
+  hashPassword,
+  verifyPassword
+}));
+
+// Staff sets (or resets) a customer's My Transco password — for a
+// forgotten password, or a known customer who can't receive a WhatsApp
+// code. Staff confirm who they're talking to first (e.g. they called in
+// from that number), so this also marks the number as proven, which
+// connects the customer's full history. Every existing session for the
+// account is signed out.
+app.post('/api/customers/:customerId/portal-password', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    if (!ObjectId.isValid(customerId)) {
+      return res.status(400).json({ error: 'Invalid customer id' });
+    }
+    const password = (req.body || {}).password;
+    if (typeof password !== 'string' || password.length < 8 || password.length > 200) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    const customer = await customers().findOne({ _id: new ObjectId(customerId) });
+    if (!customer || customer.channel === 'website') {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    const now = new Date();
+    const updated = await customers().findOneAndUpdate(
+      { _id: customer._id },
+      {
+        $set: {
+          passwordHash: hashPassword(password),
+          passwordUpdatedAt: now,
+          passwordSetByStaff: req.user.email || true,
+          phoneVerified: true,
+          phoneVerifiedAt: now,
+          portalLoginFailures: 0,
+          ...(customer.portalJoinedAt ? {} : { portalJoinedAt: now, acquisitionSource: 'staff' })
+        },
+        $unset: { portalLockedUntil: '' },
+        $inc: { portalTokenVersion: 1 },
+        $addToSet: { sources: 'portal' }
+      },
+      { returnDocument: 'after' }
+    );
+    const customerCode = await customerTools.ensureCustomerCode(updated);
+    res.json({ success: true, customerCode, phoneNumber: updated.phoneNumber });
+  } catch (err) {
+    console.error('Error setting portal password:', err.message);
+    res.status(500).json({ error: 'Failed to set password' });
+  }
+});
+
+// Staff view of My Transco accounts (CRM → My Transco). Behind the normal
+// staff auth — '/my-transco' is not in PUBLIC_API_PREFIXES.
+const createStaffPortalRouter = require('./staffPortalRoutes');
+app.use('/api/my-transco', createStaffPortalRouter({ tools: customerTools }));
 
 const createWebChatRouter = require('./webChatRoutes');
 app.use('/api/web-chat', createWebChatRouter({
@@ -5378,7 +5676,9 @@ app.use('/api/web-chat', createWebChatRouter({
   FREIGHT_MODE_MENU_ITEMS,
   PICKUP_DELIVERY_MENU_ITEMS,
   PICKUP_DELIVERY_MENU_ITEMS_INDIA,
-  COUNTRY_MENU_ITEMS
+  COUNTRY_MENU_ITEMS,
+  customerAuth,
+  customerTools
 }));
 
 
@@ -5767,7 +6067,8 @@ const httpServer =
 
 
 initWebSocketServer(
-  httpServer
+  httpServer,
+  { verifySession }
 );
 
 

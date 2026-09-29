@@ -17,6 +17,7 @@ import { Route as ConsoleConversationsRouteImport } from './routes/console/conve
 import { Route as ConsoleCustomersRouteRouteImport } from './routes/console/customers/route'
 import { Route as ConsoleDashboardRouteImport } from './routes/console/dashboard'
 import { Route as ConsoleLeadsRouteImport } from './routes/console.leads'
+import { Route as ConsoleMyTranscoRouteRouteImport } from './routes/console/my-transco/route'
 import { Route as ConsoleSettingsRouteImport } from './routes/console.settings'
 import { Route as ConsoleShipmentsRouteRouteImport } from './routes/console/shipments/route'
 import { Route as ConsoleTrackingRouteImport } from './routes/console.tracking'
@@ -31,6 +32,8 @@ import { Route as ConsoleFinancePaymentsRouteImport } from './routes/console.fin
 import { Route as ConsoleFinanceReportsRouteImport } from './routes/console.finance.reports'
 import { Route as ConsoleInventoryActivityRouteImport } from './routes/console.inventory.activity'
 import { Route as ConsoleInventoryStockRouteImport } from './routes/console.inventory.stock'
+import { Route as ConsoleMyTranscoIndexRouteImport } from './routes/console/my-transco/index'
+import { Route as ConsoleMyTranscoCustomerIdRouteImport } from './routes/console/my-transco/$customerId'
 import { Route as ConsoleShipmentsIndexRouteImport } from './routes/console/shipments/index'
 import { Route as ConsoleShipmentsShipmentIdRouteImport } from './routes/console/shipments/$shipmentId'
 import { Route as ConsoleShipmentsBatchBatchIdRouteImport } from './routes/console/shipments/batch.$batchId'
@@ -74,6 +77,11 @@ const ConsoleDashboardRoute = ConsoleDashboardRouteImport.update({
 const ConsoleLeadsRoute = ConsoleLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleMyTranscoRouteRoute = ConsoleMyTranscoRouteRouteImport.update({
+  id: '/my-transco',
+  path: '/my-transco',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
 const ConsoleSettingsRoute = ConsoleSettingsRouteImport.update({
@@ -148,6 +156,17 @@ const ConsoleInventoryStockRoute = ConsoleInventoryStockRouteImport.update({
   path: '/inventory/stock',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
+const ConsoleMyTranscoIndexRoute = ConsoleMyTranscoIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConsoleMyTranscoRouteRoute,
+} as any)
+const ConsoleMyTranscoCustomerIdRoute =
+  ConsoleMyTranscoCustomerIdRouteImport.update({
+    id: '/$customerId',
+    path: '/$customerId',
+    getParentRoute: () => ConsoleMyTranscoRouteRoute,
+  } as any)
 const ConsoleShipmentsIndexRoute = ConsoleShipmentsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -176,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/console': typeof ConsoleRouteRouteWithChildren
   '/console/customers': typeof ConsoleCustomersRouteRouteWithChildren
+  '/console/my-transco': typeof ConsoleMyTranscoRouteRouteWithChildren
   '/console/shipments': typeof ConsoleShipmentsRouteRouteWithChildren
   '/console/bookings': typeof ConsoleBookingsRoute
   '/console/conversations': typeof ConsoleConversationsRoute
@@ -194,8 +214,10 @@ export interface FileRoutesByFullPath {
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
   '/console/inventory/activity': typeof ConsoleInventoryActivityRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
+  '/console/my-transco/$customerId': typeof ConsoleMyTranscoCustomerIdRoute
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
+  '/console/my-transco/': typeof ConsoleMyTranscoIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
   '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
   '/console/shipments/receiver/$receiverId': typeof ConsoleShipmentsReceiverReceiverIdRoute
@@ -219,8 +241,10 @@ export interface FileRoutesByTo {
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
   '/console/inventory/activity': typeof ConsoleInventoryActivityRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
+  '/console/my-transco/$customerId': typeof ConsoleMyTranscoCustomerIdRoute
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers': typeof ConsoleCustomersIndexRoute
+  '/console/my-transco': typeof ConsoleMyTranscoIndexRoute
   '/console/shipments': typeof ConsoleShipmentsIndexRoute
   '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
   '/console/shipments/receiver/$receiverId': typeof ConsoleShipmentsReceiverReceiverIdRoute
@@ -230,6 +254,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/console': typeof ConsoleRouteRouteWithChildren
   '/console/customers': typeof ConsoleCustomersRouteRouteWithChildren
+  '/console/my-transco': typeof ConsoleMyTranscoRouteRouteWithChildren
   '/console/shipments': typeof ConsoleShipmentsRouteRouteWithChildren
   '/console/bookings': typeof ConsoleBookingsRoute
   '/console/conversations': typeof ConsoleConversationsRoute
@@ -248,8 +273,10 @@ export interface FileRoutesById {
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
   '/console/inventory/activity': typeof ConsoleInventoryActivityRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
+  '/console/my-transco/$customerId': typeof ConsoleMyTranscoCustomerIdRoute
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
+  '/console/my-transco/': typeof ConsoleMyTranscoIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
   '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
   '/console/shipments/receiver/$receiverId': typeof ConsoleShipmentsReceiverReceiverIdRoute
@@ -260,6 +287,7 @@ export interface FileRouteTypes {
     | '/'
     | '/console'
     | '/console/customers'
+    | '/console/my-transco'
     | '/console/shipments'
     | '/console/bookings'
     | '/console/conversations'
@@ -278,8 +306,10 @@ export interface FileRouteTypes {
     | '/console/finance/reports'
     | '/console/inventory/activity'
     | '/console/inventory/stock'
+    | '/console/my-transco/$customerId'
     | '/console/shipments/$shipmentId'
     | '/console/customers/'
+    | '/console/my-transco/'
     | '/console/shipments/'
     | '/console/shipments/batch/$batchId'
     | '/console/shipments/receiver/$receiverId'
@@ -303,8 +333,10 @@ export interface FileRouteTypes {
     | '/console/finance/reports'
     | '/console/inventory/activity'
     | '/console/inventory/stock'
+    | '/console/my-transco/$customerId'
     | '/console/shipments/$shipmentId'
     | '/console/customers'
+    | '/console/my-transco'
     | '/console/shipments'
     | '/console/shipments/batch/$batchId'
     | '/console/shipments/receiver/$receiverId'
@@ -313,6 +345,7 @@ export interface FileRouteTypes {
     | '/'
     | '/console'
     | '/console/customers'
+    | '/console/my-transco'
     | '/console/shipments'
     | '/console/bookings'
     | '/console/conversations'
@@ -331,8 +364,10 @@ export interface FileRouteTypes {
     | '/console/finance/reports'
     | '/console/inventory/activity'
     | '/console/inventory/stock'
+    | '/console/my-transco/$customerId'
     | '/console/shipments/$shipmentId'
     | '/console/customers/'
+    | '/console/my-transco/'
     | '/console/shipments/'
     | '/console/shipments/batch/$batchId'
     | '/console/shipments/receiver/$receiverId'
@@ -399,6 +434,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/console/leads'
       preLoaderRoute: typeof ConsoleLeadsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/my-transco': {
+      id: '/console/my-transco'
+      path: '/my-transco'
+      fullPath: '/console/my-transco'
+      preLoaderRoute: typeof ConsoleMyTranscoRouteRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/settings': {
@@ -499,6 +541,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleInventoryStockRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
+    '/console/my-transco/': {
+      id: '/console/my-transco/'
+      path: '/'
+      fullPath: '/console/my-transco/'
+      preLoaderRoute: typeof ConsoleMyTranscoIndexRouteImport
+      parentRoute: typeof ConsoleMyTranscoRouteRoute
+    }
+    '/console/my-transco/$customerId': {
+      id: '/console/my-transco/$customerId'
+      path: '/$customerId'
+      fullPath: '/console/my-transco/$customerId'
+      preLoaderRoute: typeof ConsoleMyTranscoCustomerIdRouteImport
+      parentRoute: typeof ConsoleMyTranscoRouteRoute
+    }
     '/console/shipments/': {
       id: '/console/shipments/'
       path: '/'
@@ -545,6 +601,21 @@ const ConsoleCustomersRouteRouteWithChildren =
     ConsoleCustomersRouteRouteChildren,
   )
 
+interface ConsoleMyTranscoRouteRouteChildren {
+  ConsoleMyTranscoCustomerIdRoute: typeof ConsoleMyTranscoCustomerIdRoute
+  ConsoleMyTranscoIndexRoute: typeof ConsoleMyTranscoIndexRoute
+}
+
+const ConsoleMyTranscoRouteRouteChildren: ConsoleMyTranscoRouteRouteChildren = {
+  ConsoleMyTranscoCustomerIdRoute: ConsoleMyTranscoCustomerIdRoute,
+  ConsoleMyTranscoIndexRoute: ConsoleMyTranscoIndexRoute,
+}
+
+const ConsoleMyTranscoRouteRouteWithChildren =
+  ConsoleMyTranscoRouteRoute._addFileChildren(
+    ConsoleMyTranscoRouteRouteChildren,
+  )
+
 interface ConsoleShipmentsRouteRouteChildren {
   ConsoleShipmentsShipmentIdRoute: typeof ConsoleShipmentsShipmentIdRoute
   ConsoleShipmentsIndexRoute: typeof ConsoleShipmentsIndexRoute
@@ -567,6 +638,7 @@ const ConsoleShipmentsRouteRouteWithChildren =
 
 interface ConsoleRouteRouteChildren {
   ConsoleCustomersRouteRoute: typeof ConsoleCustomersRouteRouteWithChildren
+  ConsoleMyTranscoRouteRoute: typeof ConsoleMyTranscoRouteRouteWithChildren
   ConsoleShipmentsRouteRoute: typeof ConsoleShipmentsRouteRouteWithChildren
   ConsoleBookingsRoute: typeof ConsoleBookingsRoute
   ConsoleConversationsRoute: typeof ConsoleConversationsRoute
@@ -588,6 +660,7 @@ interface ConsoleRouteRouteChildren {
 
 const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleCustomersRouteRoute: ConsoleCustomersRouteRouteWithChildren,
+  ConsoleMyTranscoRouteRoute: ConsoleMyTranscoRouteRouteWithChildren,
   ConsoleShipmentsRouteRoute: ConsoleShipmentsRouteRouteWithChildren,
   ConsoleBookingsRoute: ConsoleBookingsRoute,
   ConsoleConversationsRoute: ConsoleConversationsRoute,

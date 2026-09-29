@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { Booking, BookingStatus, BookingUpdateInput } from "@/lib/transco/types";
+import type { Booking, BookingStageStatus, BookingStatus, BookingUpdateInput } from "@/lib/transco/types";
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: "unpaid", label: "Unpaid" },
@@ -74,16 +74,20 @@ function groupByDate(bookings: Booking[]): Map<string, Booking[]> {
   return groups;
 }
 
+type AssignBl = (bookingId: string, hblNumber: string, batchNumber?: number | null) => Promise<void>;
+
 export function BookingsPanel({
   bookings,
   onDelete,
   onUpdateStatus,
   onUpdateBooking,
+  onAssignBl,
 }: {
   bookings: Booking[];
   onDelete: (bookingId: string) => void;
   onUpdateStatus: (bookingId: string, status: BookingStatus) => void;
   onUpdateBooking: (bookingId: string, updates: BookingUpdateInput) => void;
+  onAssignBl: AssignBl;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "all">("all");
@@ -104,6 +108,7 @@ export function BookingsPanel({
       if (!q) return true;
       return (
         (b.customerName || "").toLowerCase().includes(q) ||
+        (b.bookingCode || "").toLowerCase().includes(q) ||
         b.phoneNumber.replace(/\s/g, "").toLowerCase().includes(q.replace(/\s/g, ""))
       );
     });
@@ -179,7 +184,7 @@ export function BookingsPanel({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name or phone"
+            placeholder="Search name, phone or BK number"
             aria-label="Search bookings"
             className="h-9 w-full rounded-md border border-input bg-secondary/60 pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:bg-panel"
           />
@@ -224,6 +229,7 @@ export function BookingsPanel({
                         onDelete={onDelete}
                         onUpdateStatus={onUpdateStatus}
                         onUpdateBooking={onUpdateBooking}
+                        onAssignBl={onAssignBl}
                       />
                     ))}
                   </div>
@@ -244,12 +250,14 @@ function BookingCard({
   onDelete,
   onUpdateStatus,
   onUpdateBooking,
+  onAssignBl,
 }: {
   booking: Booking;
   highlighted: boolean;
   onDelete: (bookingId: string) => void;
   onUpdateStatus: (bookingId: string, status: BookingStatus) => void;
   onUpdateBooking: (bookingId: string, updates: BookingUpdateInput) => void;
+  onAssignBl: AssignBl;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const isCompleted = booking.status === "completed";
@@ -286,8 +294,23 @@ function BookingCard({
           >
             {booking.status}
           </span>
+          {booking.channel === "portal" && (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+              My Transco
+            </span>
+          )}
         </div>
-        <p className="truncate text-xs text-muted-foreground">{booking.phoneNumber}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {booking.bookingCode && (
+            <span className="font-medium tabular-nums text-foreground">{booking.bookingCode} · </span>
+          )}
+          {booking.phoneNumber}
+        </p>
+        <p className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+          <span>Declaration {booking.declarationStatus === "received" ? "✓" : "—"}</span>
+          <span>Boxes {booking.warehouseStatus === "received" || booking.status === "completed" ? "✓" : "—"}</span>
+          <span>BL {booking.shipmentId ? "✓" : "—"}</span>
+        </p>
         {booking.boxSummary && (
           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Package className="h-3 w-3 shrink-0" />
@@ -415,6 +438,7 @@ function BookingCard({
         open={editOpen}
         onOpenChange={setEditOpen}
         onSave={onUpdateBooking}
+        onAssignBl={onAssignBl}
       />
     </div>
   );
@@ -430,21 +454,61 @@ function BookingEditSheet({
   open,
   onOpenChange,
   onSave,
+  onAssignBl,
 }: {
   booking: Booking;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (bookingId: string, updates: BookingUpdateInput) => void;
+  onAssignBl: AssignBl;
 }) {
   const [form, setForm] = useState(() => bookingToFormState(booking));
+  const [bl, setBl] = useState(EMPTY_BL_FORM);
 
   const handleOpenChange = (next: boolean) => {
-    if (next) setForm(bookingToFormState(booking));
+    if (next) {
+      setForm(bookingToFormState(booking));
+      setBl(EMPTY_BL_FORM);
+    }
     onOpenChange(next);
   };
 
+  // Separate from "Save Details": assigning a BL creates/updates the
+  // booking's shipment right away, and can fail (e.g. a BL that's
+  // already taken) — so it's its own action with its own feedback.
+  const handleAssignBl = async () => {
+    const hblNumber = bl.hblNumber.trim();
+    if (!/^[A-Za-z0-9-]{1,32}$/.test(hblNumber)) {
+      setBl((s) => ({ ...s, error: "Enter the BL number (letters, numbers or hyphens)." }));
+      return;
+    }
+    const batchNumber = bl.batchNumber.trim() === "" ? null : Number(bl.batchNumber);
+    if (batchNumber !== null && (!Number.isInteger(batchNumber) || batchNumber < 1)) {
+      setBl((s) => ({ ...s, error: "Batch number must be a whole number." }));
+      return;
+    }
+    setBl((s) => ({ ...s, saving: true, error: "", done: "" }));
+    try {
+      await onAssignBl(booking.id, hblNumber, batchNumber);
+      setBl({ ...EMPTY_BL_FORM, done: `BL ${hblNumber} saved — the customer can see it now.` });
+      setForm((f) => ({ ...f, warehouseStatus: "received" }));
+    } catch (err) {
+      setBl((s) => ({ ...s, saving: false, error: err instanceof Error ? err.message : "Failed to assign BL" }));
+    }
+  };
+
   const handleSave = () => {
+    // Only send a stage that actually changed, so opening and saving the
+    // sheet never re-stamps a stage's "updated at" time.
+    const stageUpdates: BookingUpdateInput = {};
+    if (form.declarationStatus !== (booking.declarationStatus ?? "not_received")) {
+      stageUpdates.declarationStatus = form.declarationStatus;
+    }
+    if (form.warehouseStatus !== (booking.warehouseStatus ?? "not_received")) {
+      stageUpdates.warehouseStatus = form.warehouseStatus;
+    }
     onSave(booking.id, {
+      ...stageUpdates,
       serviceType: form.serviceType || null,
       origin: form.origin || null,
       destination: form.destination || null,
@@ -467,6 +531,91 @@ function BookingEditSheet({
         </SheetHeader>
 
         <div className="mt-4 flex flex-col gap-4">
+          {booking.customerNotes && (
+            <p className="rounded-md bg-secondary/60 px-3 py-2 text-xs text-foreground">
+              <span className="font-medium">Customer note:</span> {booking.customerNotes}
+            </p>
+          )}
+
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-xs font-semibold text-foreground">Customer progress</p>
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Shown to the customer in My Transco — a stage only shows as done once it is recorded here.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="declarationStatus">Declaration</Label>
+                <Select
+                  value={form.declarationStatus}
+                  onValueChange={(v) => setForm((f) => ({ ...f, declarationStatus: v as BookingStageStatus }))}
+                >
+                  <SelectTrigger id="declarationStatus">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_received">Not received</SelectItem>
+                    <SelectItem value="received">Received</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="warehouseStatus">Boxes at warehouse</Label>
+                <Select
+                  value={form.warehouseStatus}
+                  onValueChange={(v) => setForm((f) => ({ ...f, warehouseStatus: v as BookingStageStatus }))}
+                >
+                  <SelectTrigger id="warehouseStatus">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_received">Not received</SelectItem>
+                    <SelectItem value="received">Received</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-xs font-semibold text-foreground">
+                {booking.shipmentId ? "Change BL number" : "Assign BL number"}
+              </p>
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                After the boxes are received and checked. Creates this booking's shipment for the same
+                customer — no need to re-enter their details.
+              </p>
+              <div className="grid grid-cols-[1fr_7rem] gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="hblNumber">BL number</Label>
+                  <Input
+                    id="hblNumber"
+                    value={bl.hblNumber}
+                    onChange={(e) => setBl((s) => ({ ...s, hblNumber: e.target.value, error: "", done: "" }))}
+                    placeholder="203115"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="batchNumber">Batch (optional)</Label>
+                  <Input
+                    id="batchNumber"
+                    type="number"
+                    min="1"
+                    value={bl.batchNumber}
+                    onChange={(e) => setBl((s) => ({ ...s, batchNumber: e.target.value, error: "", done: "" }))}
+                    placeholder="57"
+                  />
+                </div>
+              </div>
+              {bl.error && <p className="mt-2 text-[11px] font-medium text-destructive">{bl.error}</p>}
+              {bl.done && (
+                <p className="mt-2 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{bl.done}</p>
+              )}
+              <Button type="button" size="sm" className="mt-2" onClick={handleAssignBl} disabled={bl.saving}>
+                {bl.saving ? "Saving…" : "Save BL"}
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="serviceType">Service Type</Label>
@@ -621,5 +770,9 @@ function bookingToFormState(booking: Booking) {
     price: booking.price != null ? String(booking.price) : "",
     paymentStatus: booking.paymentStatus ?? "",
     notes: booking.notes ?? "",
+    declarationStatus: (booking.declarationStatus ?? "not_received") as BookingStageStatus,
+    warehouseStatus: (booking.warehouseStatus ?? "not_received") as BookingStageStatus,
   };
 }
+
+const EMPTY_BL_FORM = { hblNumber: "", batchNumber: "", saving: false, error: "", done: "" };

@@ -18,7 +18,8 @@ export type ConversationChannel = "whatsapp" | "website";
  * with both). Distinct from ConversationChannel, which is about the
  * conversation view; a customer can have sources with no conversation at
  * all (historical/manual). */
-export type CustomerSource = "whatsapp" | "website" | "historical" | "manual";
+/** "portal" = has a My Transco (website account) sign-in. */
+export type CustomerSource = "whatsapp" | "website" | "historical" | "manual" | "portal";
 
 /** Staff-controlled, independent of source — a WhatsApp customer can still
  * be marked DO_NOT_CONTACT. Absent/undefined (customers created before
@@ -243,7 +244,20 @@ export interface Booking {
   notes?: string | null | undefined;
   /** Set once a Shipment has been created from this booking. */
   shipmentId?: string | null | undefined;
+  /** Human-readable reference ("BK-000245") — the same one the customer
+   * sees in My Transco. Absent on older bookings until first viewed. */
+  bookingCode?: string | null | undefined;
+  /** "portal" for bookings the customer made in My Transco. */
+  channel?: string | null | undefined;
+  /** Customer-visible progress stages, set by staff (My Transco shows a
+   * stage as done only once it's recorded here). */
+  declarationStatus?: BookingStageStatus | null | undefined;
+  warehouseStatus?: BookingStageStatus | null | undefined;
+  /** Anything the customer typed in the booking form's notes box. */
+  customerNotes?: string | null | undefined;
 }
+
+export type BookingStageStatus = "received" | "not_received";
 
 /** Fields a staff member can edit on a booking via PATCH
  * /api/bookings/:id — kept separate from the booking-creation shape and
@@ -259,6 +273,8 @@ export interface BookingUpdateInput {
   price?: number | null;
   paymentStatus?: string | null;
   notes?: string | null;
+  declarationStatus?: BookingStageStatus;
+  warehouseStatus?: BookingStageStatus;
 }
 
 /** Candidate operational stages for a live shipment (Phase 2) — a

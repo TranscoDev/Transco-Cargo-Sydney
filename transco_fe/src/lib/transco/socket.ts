@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./config";
+import { getAuthToken } from "./auth";
 import type { BookingStatus, ConversationMode, MessageStatus } from "./types";
 import type { BackendCustomer, BackendMessage } from "./api";
 
@@ -93,7 +94,17 @@ export function connectConsoleSocket(onEvent: (event: ServerEvent) => void): () 
   let stopped = false;
 
   const connect = () => {
-    socket = new WebSocket(WS_URL);
+    // The event stream is staff-only: the backend refuses a connection
+    // without a valid staff token. Browsers can't send headers on a
+    // WebSocket, so the token rides in the subprotocol list (not the URL,
+    // which would land in access logs). No session yet -> try again
+    // shortly, e.g. right after login.
+    const token = getAuthToken();
+    if (!token) {
+      if (!stopped) retryTimer = window.setTimeout(connect, 3000);
+      return;
+    }
+    socket = new WebSocket(WS_URL, ["transco-staff", token]);
 
     socket.onmessage = (e) => {
       try {

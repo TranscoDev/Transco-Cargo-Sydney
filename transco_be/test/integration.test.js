@@ -115,9 +115,20 @@ async function postWebhook(payload) {
   assert.equal(res.status, 200);
 }
 
-function connectWs() {
+// The staff event stream requires a staff token (sent as the second
+// subprotocol, the same way the console does — see websocket.js).
+let wsStaffToken = null;
+async function connectWs() {
+  if (!wsStaffToken) {
+    const res = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: TEST_STAFF_EMAIL, password: TEST_STAFF_PASSWORD })
+    });
+    wsStaffToken = (await res.json()).token;
+  }
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(WS_URL, ['transco-staff', wsStaffToken]);
     ws.on('open', () => resolve(ws));
     ws.on('error', reject);
   });

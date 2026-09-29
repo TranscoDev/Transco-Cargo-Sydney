@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  KeyRound,
   Mail,
   MessageSquare,
   Package,
@@ -12,10 +13,12 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CUSTOMER_STATUS_LABELS, SHIPMENT_STATUS_LABELS } from "@/lib/transco/types";
-import { fetchCustomerProfile } from "@/lib/transco/api";
+import { fetchCustomerProfile, setPortalPassword } from "@/lib/transco/api";
 import type { CustomerProfile } from "@/lib/transco/types";
 
 // Lives as a sibling of index.tsx (the list) under customers/route.tsx's
@@ -87,6 +90,17 @@ function CustomerProfilePage() {
             </div>
             <Badge variant="secondary">{CUSTOMER_STATUS_LABELS[profile.status ?? "ACTIVE"]}</Badge>
           </div>
+
+          {profile.channel !== "website" && (
+            <Link
+              to="/console/my-transco/$customerId"
+              params={{ customerId: profile.id }}
+              className="mb-2 inline-block text-xs font-medium text-primary hover:underline"
+            >
+              Open My Transco account view →
+            </Link>
+          )}
+          {profile.channel !== "website" && <PortalPasswordCard customerId={profile.id} />}
 
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Card>
@@ -248,6 +262,81 @@ function CustomerProfilePage() {
             </TabsContent>
           </Tabs>
         </>
+      )}
+    </div>
+  );
+}
+
+/** Lets staff set a temporary My Transco password for this customer —
+ * after confirming who they're speaking to (e.g. the customer called from
+ * this number). The customer signs in with their phone number and this
+ * password, and can change it in their profile. */
+function PortalPasswordCard({ customerId }: { customerId: string }) {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState("");
+
+  const save = async () => {
+    if (password.length < 8) {
+      setError("Use at least 8 characters.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const result = await setPortalPassword(customerId, password);
+      setDone(
+        `Password set (${result.customerCode}). Tell the customer to sign in at My Transco with +${result.phoneNumber} and this password — they can change it in their profile.`,
+      );
+      setPassword("");
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to set password");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-5 rounded-lg border border-border bg-panel px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <KeyRound className="h-3.5 w-3.5" />
+          My Transco sign-in
+        </p>
+        {!open && (
+          <Button type="button" size="sm" variant="outline" onClick={() => { setOpen(true); setDone(""); }}>
+            Set password
+          </Button>
+        )}
+      </div>
+      {done && <p className="mt-2 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{done}</p>}
+      {open && (
+        <div className="mt-3">
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Only after confirming you are speaking to this customer (e.g. they called from this number).
+            This connects their full history and signs out any existing sessions.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              type="text"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(""); }}
+              placeholder="Temporary password (8+ characters)"
+              autoComplete="off"
+              className="max-w-xs"
+            />
+            <Button type="button" size="sm" onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => { setOpen(false); setPassword(""); setError(""); }}>
+              Cancel
+            </Button>
+          </div>
+          {error && <p className="mt-2 text-[11px] font-medium text-destructive">{error}</p>}
+        </div>
       )}
     </div>
   );
