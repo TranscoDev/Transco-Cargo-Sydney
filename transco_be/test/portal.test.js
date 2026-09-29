@@ -832,3 +832,31 @@ test('staff can change a customer\'s phone number; history stays; clashes are re
   assert.equal((await api('POST', '/api/portal/auth/login', { body: { countryCode: '94', phone: '0771112233', password: 'email-user-pass' } })).status, 200);
   assert.equal((await api('POST', '/api/portal/auth/login', { body: { countryCode: '61', phone: '0400666001', password: 'email-user-pass' } })).status, 401);
 });
+
+test('website country pages: the country reaches the assistant once, never as a saved message', async () => {
+  const sessionId = `agentsite-country-${Date.now()}`;
+  const ask = async (message, country) => {
+    flowiseRequests = [];
+    const res = await chat(sessionId, country ? { message, country } : { message });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(flowiseRequests.length, 1);
+    return flowiseRequests[0].question;
+  };
+
+  // First question from the Sri Lanka page carries the country…
+  assert.equal(await ask('How much for door delivery?', 'sri_lanka'), "I'm shipping to Sri Lanka. How much for door delivery?");
+  // …follow-ups (or another visit to the same page) don't repeat it.
+  assert.equal(await ask('And for 2 boxes?', 'sri_lanka'), 'And for 2 boxes?');
+  // Switching to the India page tells the assistant once more.
+  assert.equal(await ask('What about India?', 'india'), "I'm shipping to India. What about India?");
+  // Saying the country themselves counts — no doubled phrase afterwards.
+  assert.equal(await ask("I'm shipping to Sri Lanka"), "I'm shipping to Sri Lanka");
+  assert.equal(await ask('Door delivery price?', 'sri_lanka'), 'Door delivery price?');
+  // Unknown values from an old/odd page are ignored, not an error.
+  assert.equal(await ask('Hello again', 'narnia'), 'Hello again');
+
+  // The transcript holds only what the visitor actually typed.
+  const visitor = await db.collection('customers').findOne({ sessionId, channel: 'website' });
+  const said = (await db.collection('messages').find({ customerId: visitor._id, senderType: 'CUSTOMER' }).toArray()).map(m => m.content);
+  assert.deepEqual(said, ['How much for door delivery?', 'And for 2 boxes?', 'What about India?', "I'm shipping to Sri Lanka", 'Door delivery price?', 'Hello again']);
+});
