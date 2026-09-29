@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "./config";
 import { getAuthToken } from "./auth";
+import type { DeclarationPerson } from "./declaration-print";
 
 /**
  * CRM → My Transco: staff view of customers' online accounts
@@ -90,13 +91,18 @@ export interface PortalBooking {
   dropOff: { date: string | null; day: string; time: string | null } | null;
   notes: string | null;
   status: PortalStatus;
-  declaration: { status: "received" | "needed"; formUrl: string };
+  declaration: { status: "received" | "submitted" | "needed"; formUrl: string };
   blNumber: string | null;
   shipmentId: string | null;
   steps: PortalStep[];
   channel: string | null;
   rawStatus: string | null;
   declarationStatus: StageStatus;
+  /** Set when the customer filled the declaration in the online booking form. */
+  declarationSubmittedAt: string | null;
+  sender: DeclarationPerson | null;
+  senderIsAccountHolder: boolean;
+  receiver: DeclarationPerson | null;
   warehouseStatus: StageStatus;
   staffNotes: string | null;
 }
@@ -187,6 +193,62 @@ export function changePortalPhone(
 
 export function unlockPortalAccount(customerId: string): Promise<{ success: true }> {
   return request("POST", `/customers/${customerId}/unlock`);
+}
+
+// ---------------------------------------------------------------
+// Staff edits to a booking after it was made (boxes, delivery, sender,
+// receiver, notes) — see staffUpdateBookingDetails in customerTools.js.
+// ---------------------------------------------------------------
+
+export interface BookingEditData {
+  bookingId: string;
+  bookingCode: string | null;
+  /** null for chat-bot bookings — their boxes are free text, not a list. */
+  country: string | null;
+  countryLabel: string | null;
+  itemTypes: { key: string; label: string }[];
+  items: { type: string; qty: number }[];
+  boxSummary: string | null;
+  deliveryType: string | null;
+  deliveryTypes: { key: string; label: string }[];
+  notes: string;
+  sender: DeclarationPerson | null;
+  senderIsAccountHolder: boolean;
+  receiver: DeclarationPerson | null;
+  staffEdits: { at: string; by: string; changed: string[] }[];
+}
+
+export interface BookingDetailsUpdate {
+  items?: { type: string; qty: number }[];
+  deliveryType?: string;
+  sender?: Omit<DeclarationPerson, "town" | "idNumber">;
+  receiver?: DeclarationPerson;
+  notes?: string;
+}
+
+/** A save refused by the server, naming the field to fix (e.g. "receiver.email"). */
+export class FieldError extends Error {
+  field: string | null;
+  constructor(message: string, field: string | null) {
+    super(message);
+    this.field = field;
+  }
+}
+
+export async function fetchBookingForEdit(bookingId: string): Promise<BookingEditData> {
+  const data = await request<{ booking: BookingEditData }>("GET", `/bookings/${bookingId}/edit`);
+  return data.booking;
+}
+
+export async function saveBookingDetails(bookingId: string, update: BookingDetailsUpdate): Promise<{ changed: string[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/my-transco/bookings/${bookingId}/details`, {
+    method: "PATCH",
+    headers: headers(true),
+    body: JSON.stringify(update),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; field?: string | null; changed?: string[] };
+  if (!res.ok) throw new FieldError(data.error || `Couldn't save (${res.status})`, data.field ?? null);
+  return { changed: data.changed ?? [] };
 }
 
 export const SOURCE_LABELS: Record<string, string> = {

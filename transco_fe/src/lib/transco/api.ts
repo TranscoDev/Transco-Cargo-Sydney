@@ -133,6 +133,8 @@ export interface BackendBooking {
   declarationStatus?: Booking["declarationStatus"];
   warehouseStatus?: Booking["warehouseStatus"];
   customerNotes?: string | null;
+  declarationSubmittedAt?: string | null;
+  receiver?: { fullName?: string; town?: string } | null;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -163,6 +165,8 @@ export function mapBooking(b: BackendBooking): Booking {
     declarationStatus: b.declarationStatus,
     warehouseStatus: b.warehouseStatus,
     customerNotes: b.customerNotes,
+    declarationSubmittedAt: b.declarationSubmittedAt,
+    receiver: b.receiver?.fullName ? { fullName: b.receiver.fullName, town: b.receiver.town ?? null } : null,
   };
 }
 

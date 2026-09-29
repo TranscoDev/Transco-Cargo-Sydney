@@ -270,6 +270,12 @@ export interface Booking {
   warehouseStatus?: BookingStageStatus | null | undefined;
   /** Anything the customer typed in the booking form's notes box. */
   customerNotes?: string | null | undefined;
+  /** Set when the customer filled the declaration (sender + receiver) in
+   * the online booking form — printable from the console. */
+  declarationSubmittedAt?: string | null | undefined;
+  /** Who the boxes are for, from the online declaration (full details
+   * load in the booking details panel). */
+  receiver?: { fullName: string; town: string | null } | null | undefined;
 }
 
 export type BookingStageStatus = "received" | "not_received";

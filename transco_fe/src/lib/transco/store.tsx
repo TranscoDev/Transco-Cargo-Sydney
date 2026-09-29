@@ -787,6 +787,26 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Staff changed the boxes/receiver/delivery after the booking was made.
+        case "booking.details_changed": {
+          const p = event.payload as {
+            _id: string;
+            boxSummary: string | null;
+            boxCount: number | null;
+            destination: string | null;
+            customerNotes: string | null;
+            receiver: { fullName: string; town: string | null } | null;
+          };
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === p._id
+                ? { ...b, boxSummary: p.boxSummary, boxCount: p.boxCount, destination: p.destination, customerNotes: p.customerNotes, receiver: p.receiver }
+                : b,
+            ),
+          );
+          return;
+        }
+
         case "message.read_state_changed": {
           const { customerId, messageIds, isRead } = event.payload as ReadStateChangedPayload;
           const idSet = new Set(messageIds);

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   ArrowLeft,
   Check,
   KeyRound,
@@ -13,6 +15,7 @@ import {
   Package,
   PenLine,
   Phone,
+  Printer,
   Ship,
   ShieldCheck,
   ShieldQuestion,
@@ -30,6 +33,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { assignBookingBl, setPortalPassword, updateBooking } from "@/lib/transco/api";
 import { useConversations } from "@/lib/transco/store";
+import { printDeclaration, type DeclarationPerson } from "@/lib/transco/declaration-print";
+import { Breadcrumbs, LoadingRows, StatusBadge as PageStatusBadge, type StatusTone as PageStatusTone } from "@/components/transco/page-kit";
+import { BookingDetailsEditor } from "@/components/transco/booking-details-editor";
+import { friendlyError, notify } from "@/lib/transco/notify";
 import {
   changePortalPhone,
   CONTACT_LABELS,
@@ -55,9 +62,9 @@ export const Route = createFileRoute("/console/my-transco/$customerId")({
 });
 
 const TONE_BADGE: Record<string, string> = {
-  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  pending: "bg-warning-soft text-warning-foreground",
   active: "bg-primary/15 text-primary",
-  done: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  done: "bg-success-soft text-success-foreground",
   muted: "bg-secondary text-muted-foreground",
 };
 
@@ -67,7 +74,6 @@ function MyTranscoProfilePage() {
   const { customerId } = Route.useParams();
   const [data, setData] = useState<PortalAccountFull | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -85,184 +91,228 @@ function MyTranscoProfilePage() {
   const act = useCallback(
     async (fn: () => Promise<unknown>, message: string) => {
       await fn();
-      setNotice(message);
+      if (message) notify.success(message);
       await load();
     },
     [load],
   );
 
   const c = data?.customer;
-  const needsDeclaration = data?.bookings.filter(
-    (b) => b.status.key !== "cancelled" && b.declarationStatus !== "received" && !b.blNumber,
-  ).length ?? 0;
+  const [tab, setTab] = useState("bookings");
+  // Bookings open in the list; ones with work to do start expanded.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expandedFor, setExpandedFor] = useState<string | null>(null);
+  if (data && expandedFor !== customerId) {
+    setExpandedFor(customerId);
+    setExpanded(new Set(data.bookings.filter((b) => isStaffWork(nextStepFor(b), b)).map((b) => b.id)));
+  }
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const openBooking = (id: string) => {
+    setTab("bookings");
+    setExpanded((prev) => new Set(prev).add(id));
+    setTimeout(() => document.getElementById(`booking-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
+  const todo: { key: string; label: string; text: string; action: string; run: () => void }[] = [];
+  if (data && c) {
+    for (const b of data.bookings) {
+      const n = nextStepFor(b);
+      if (!isStaffWork(n, b) || !n) continue;
+      todo.push({
+        key: b.id,
+        label: b.code ?? "Booking",
+        text: n.kind === "declaration" ? "Check the declaration" : n.kind === "bl" ? "Assign the BL" : "Mark the boxes as received",
+        action: n.kind === "declaration" ? "Mark checked" : "Open",
+        run:
+          n.kind === "declaration"
+            ? () => void act(() => updateBooking(b.id, { declarationStatus: "received" }), `${b.code ?? "Booking"}: declaration checked`)
+            : () => openBooking(b.id),
+      });
+    }
+    if (!c.phoneVerified) todo.push({ key: "verify", label: "Account", text: "Number not verified — they only see what they booked online", action: "Review", run: () => setTab("account") });
+    if (c.locked) todo.push({ key: "locked", label: "Account", text: `Locked out until ${formatDate(c.lockedUntil, true)}`, action: "Review", run: () => setTab("account") });
+  }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
-      <Link
-        to="/console/my-transco"
-        className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to My Transco accounts
-      </Link>
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background">
+      <div className="mx-auto w-full max-w-5xl px-4 py-5 md:px-8 md:py-7">
+        <Breadcrumbs items={[{ label: "Online Accounts", to: "/console/my-transco" }, { label: data?.customer.name || "Customer" }]} />
 
-      {error && (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
-      )}
-      {!data && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {error && <p className="rounded-lg bg-attention-soft px-4 py-3 text-sm text-attention-foreground">{error}</p>}
+        {!data && !error && <LoadingRows rows={4} />}
 
-      {data && c && (
-        <>
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold text-foreground">{c.name || "(no name yet)"}</h1>
-                <span className="rounded-md border border-border bg-panel px-2 py-0.5 text-xs font-semibold tabular-nums text-foreground">
-                  {c.customerCode}
-                </span>
-                {c.phoneVerified ? (
-                  <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
-                    <ShieldCheck className="mr-1 h-3 w-3" /> Number verified
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="bg-amber-500/15 text-amber-700 dark:text-amber-400">
-                    <ShieldQuestion className="mr-1 h-3 w-3" /> Number not verified
-                  </Badge>
-                )}
-                {c.locked && (
-                  <Badge variant="secondary" className="bg-destructive/15 text-destructive">
-                    <Lock className="mr-1 h-3 w-3" /> Locked out
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <Phone className="h-3 w-3" />
-                  {formatPhone(c.phoneNumber)}
-                </span>
-                {c.email && (
-                  <span className="inline-flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    {c.email}
+        {data && c && (
+          <>
+            {/* Who — one calm line */}
+            <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">{c.name || "(no name yet)"}</h1>
+                  <span className="text-sm tabular-nums text-muted-foreground">{c.customerCode}</span>
+                  {c.phoneVerified ? (
+                    <ShieldCheck className="h-4 w-4 text-success" aria-label="Number verified" />
+                  ) : (
+                    <PageStatusBadge tone="neutral">Number not verified</PageStatusBadge>
+                  )}
+                  {c.locked && <PageStatusBadge tone="attention">Locked out</PageStatusBadge>}
+                </div>
+                <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" aria-hidden />
+                    {formatPhone(c.phoneNumber)}
                   </span>
-                )}
-                <span>Joined {formatDate(c.joinedAt)}</span>
-                <span>Last sign-in {formatDate(c.lastSignInAt, true)}</span>
-              </div>
-            </div>
-            <Link
-              to="/console/customers/$customerId"
-              params={{ customerId: c.id }}
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              Open full CRM record →
-            </Link>
-          </div>
-
-          {notice && (
-            <div className="mb-4 flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
-              <Check className="h-3.5 w-3.5" />
-              {notice}
-              <button type="button" className="ml-auto underline" onClick={() => setNotice(null)}>
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {(needsDeclaration > 0 || !c.phoneVerified || c.locked) && (
-            <div className="mb-4 flex flex-col gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-              <p className="flex items-center gap-1.5 font-semibold">
-                <AlertTriangle className="h-3.5 w-3.5" /> Needs attention
-              </p>
-              {needsDeclaration > 0 && <p>• {needsDeclaration} booking(s) still waiting for the declaration form.</p>}
-              {!c.phoneVerified && (
-                <p>
-                  • Number not verified — the customer only sees what they booked online. Verify it once
-                  you've confirmed it's them to show their full history.
+                  {c.email && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5" aria-hidden />
+                      {c.email}
+                    </span>
+                  )}
                 </p>
-              )}
-              {c.locked && <p>• Locked out after too many wrong passwords (until {formatDate(c.lockedUntil, true)}).</p>}
-            </div>
-          )}
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/console/customers/$customerId" params={{ customerId: c.id }}>
+                  Customer profile
+                </Link>
+              </Button>
+            </header>
 
-          <AccountActions customer={c} act={act} />
-
-          <div className="mb-5 mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <MiniStat label="Bookings" value={data.bookings.length} />
-            <MiniStat label="Open bookings" value={data.bookings.filter((b) => ["pending", "confirmed"].includes(b.rawStatus ?? "")).length} />
-            <MiniStat label="BLs" value={data.shipments.filter((s) => s.blNumber).length} />
-            <MiniStat label="Website chats" value={data.chatSessions.length} />
-          </div>
-
-          <Tabs defaultValue="overview">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="bookings">Bookings ({data.bookings.length})</TabsTrigger>
-              <TabsTrigger value="shipments">Shipments ({data.shipments.length})</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="mt-4">
-              <OverviewTab customer={c} act={act} />
-            </TabsContent>
-
-            <TabsContent value="bookings" className="mt-4">
-              {data.bookings.length === 0 ? (
-                <EmptyState icon={Package} text="No bookings yet. Bookings made online or through the chat bot will appear here." />
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {data.bookings.map((b) => (
-                    <BookingPanel key={b.id} booking={b} act={act} />
+            {/* The only "attention" area: what to do for this customer. */}
+            {todo.length > 0 && (
+              <section className="mb-6 rounded-xl border bg-card shadow-xs">
+                <h2 className="px-5 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">To do for {c.name?.split(/\s+/)[0] || "this customer"}</h2>
+                <ul className="mt-2 divide-y">
+                  {todo.map((t) => (
+                    <li key={t.key} className="flex items-center gap-3 px-5 py-3">
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden />
+                      <span className="w-24 shrink-0 text-sm font-medium tabular-nums text-foreground">{t.label}</span>
+                      <span className="min-w-0 flex-1 text-sm text-foreground">{t.text}</span>
+                      <Button type="button" size="sm" variant={t.action === "Mark checked" ? "default" : "outline"} onClick={t.run}>
+                        {t.action}
+                      </Button>
+                    </li>
                   ))}
-                </div>
-              )}
-            </TabsContent>
+                </ul>
+              </section>
+            )}
 
-            <TabsContent value="shipments" className="mt-4">
-              {data.shipments.length === 0 ? (
-                <EmptyState icon={Ship} text="No shipments yet. A shipment is created when a BL is assigned to one of this customer's bookings." />
-              ) : (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {data.shipments.map((s) => (
-                    <Card key={s.id}>
-                      <CardHeader className="p-4 pb-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <CardTitle className="text-sm tabular-nums">{s.blNumber ? `BL ${s.blNumber}` : "Shipment (no BL yet)"}</CardTitle>
-                          <StatusBadge status={s.status} />
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3 p-4 pt-0 text-xs">
-                        <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1">
-                          <Dt>Items</Dt><Dd>{s.items}</Dd>
-                          <Dt>Destination</Dt><Dd>{s.destination}</Dd>
-                          <Dt>Receiver</Dt><Dd>{s.receiverName}</Dd>
-                          <Dt>Group shipment</Dt><Dd>{s.batchLabel}</Dd>
-                          <Dt>Booking</Dt><Dd>{s.bookingCode}</Dd>
-                          <Dt>Last updated</Dt><Dd>{formatDate(s.updatedAt, true)}</Dd>
-                        </dl>
-                        <StepList steps={s.steps} />
-                        <Link
-                          to="/console/shipments/$shipmentId"
-                          params={{ shipmentId: s.id }}
-                          className="inline-block font-medium text-primary hover:underline"
-                        >
-                          Open shipment to change status →
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList>
+                <TabsTrigger value="bookings">Bookings ({data.bookings.length})</TabsTrigger>
+                <TabsTrigger value="shipments">Shipments ({data.shipments.length})</TabsTrigger>
+                <TabsTrigger value="account">Account</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="activity" className="mt-4">
-              <ActivityTab data={data} />
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
+              <TabsContent value="bookings" className="mt-4">
+                {data.bookings.length === 0 ? (
+                  <EmptyState icon={Package} text="No bookings yet. Bookings made online or through the chat bot will appear here." />
+                ) : (
+                  <ul className="overflow-hidden rounded-xl border bg-card shadow-xs">
+                    {data.bookings.map((b, i) => {
+                      const open = expanded.has(b.id);
+                      const st = staffStatus(b.status);
+                      const work = isStaffWork(nextStepFor(b), b);
+                      return (
+                        <li key={b.id} id={`booking-${b.id}`} className={cn(i > 0 && "border-t")}>
+                          <button
+                            type="button"
+                            onClick={() => toggle(b.id)}
+                            aria-expanded={open}
+                            className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-accent/30"
+                          >
+                            <span className="w-2 shrink-0">{work && <span className="block h-2 w-2 rounded-full bg-warning" aria-label="Needs work" />}</span>
+                            <span className="w-24 shrink-0 text-sm font-semibold tabular-nums text-foreground">{b.code ?? "Booking"}</span>
+                            <span className="hidden w-36 shrink-0 text-sm text-muted-foreground sm:block">
+                              {b.dropOff ? `${formatDate(b.dropOff.date)}${b.dropOff.time ? `, ${b.dropOff.time}` : ""}` : "—"}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-sm text-foreground">{b.items || "—"}</span>
+                            <PageStatusBadge tone={st.tone}>{st.label}</PageStatusBadge>
+                            <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
+                          </button>
+                          {open && (
+                            <div className="border-t bg-background/60 p-3">
+                              <BookingPanel booking={b} act={act} />
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </TabsContent>
+
+              <TabsContent value="shipments" className="mt-4">
+                {data.shipments.length === 0 ? (
+                  <EmptyState icon={Ship} text="No shipments yet. A shipment appears when a BL is assigned to one of this customer's bookings." />
+                ) : (
+                  <ul className="overflow-hidden rounded-xl border bg-card shadow-xs">
+                    {data.shipments.map((s, i) => {
+                      const st = staffStatus(s.status);
+                      return (
+                        <li key={s.id} className={cn(i > 0 && "border-t")}>
+                          <Link
+                            to="/console/shipments/$shipmentId"
+                            params={{ shipmentId: s.id }}
+                            className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-accent/30"
+                          >
+                            <span className="w-28 shrink-0 text-sm font-semibold text-foreground">{s.batchLabel || (s.blNumber ? `BL ${s.blNumber}` : "Shipment")}</span>
+                            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                              {[s.blNumber ? `BL ${s.blNumber}` : null, s.items, s.destination].filter(Boolean).join(" · ")}
+                            </span>
+                            <PageStatusBadge tone={st.tone}>{st.label}</PageStatusBadge>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </TabsContent>
+
+              <TabsContent value="account" className="mt-4 flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Joined {formatDate(c.joinedAt)} · Last sign-in {formatDate(c.lastSignInAt, true)}
+                </p>
+                <AccountActions customer={c} act={act} />
+                <OverviewTab customer={c} act={act} />
+              </TabsContent>
+
+              <TabsContent value="activity" className="mt-4">
+                <ActivityTab data={data} />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
     </div>
   );
+}
+
+/** Work a staff member can do now (not just "waiting for the customer"). */
+function isStaffWork(n: Next, b: PortalBooking): boolean {
+  if (!n) return false;
+  if (n.kind === "declaration" || n.kind === "bl") return true;
+  // Boxes: only once the drop-off day has come.
+  if (n.kind === "boxes") return !!b.dropOff?.date && b.dropOff.date <= new Date().toISOString().slice(0, 10);
+  return false;
+}
+
+/** Status in staff words (the customer-facing label says "your drop-off"). */
+function staffStatus(status: PortalStatus): { label: string; tone: PageStatusTone } {
+  const map: Record<string, { label: string; tone: PageStatusTone }> = {
+    pending: { label: "Waiting for drop-off", tone: "neutral" },
+    confirmed: { label: "Confirmed", tone: "neutral" },
+    warehouse_received: { label: "Boxes received", tone: "info" },
+    cancelled: { label: "Cancelled", tone: "neutral" },
+    delivered: { label: "Delivered", tone: "success" },
+  };
+  return map[status.key] ?? { label: status.label, tone: status.tone === "done" ? "success" : "info" };
 }
 
 // ---------------------------------------------------------------
@@ -327,7 +377,7 @@ function AccountActions({ customer: c, act }: { customer: PortalAccountDetail; a
 
         {mode === "password" && (
           <div className="mt-3 rounded-md border border-border p-3">
-            <p className="mb-2 text-[11px] text-muted-foreground">
+            <p className="mb-2 text-xs text-muted-foreground">
               Only after confirming you're speaking to this customer (e.g. they called from {formatPhone(c.phoneNumber)}).
               This also verifies their number and signs out their other sessions. Give them the password
               by phone — they can change it in their profile.
@@ -348,7 +398,7 @@ function AccountActions({ customer: c, act }: { customer: PortalAccountDetail; a
 
         {mode === "phone" && (
           <div className="mt-3 rounded-md border border-border p-3">
-            <p className="mb-2 text-[11px] text-muted-foreground">
+            <p className="mb-2 text-xs text-muted-foreground">
               For a customer who has a new number — only after confirming it's them (e.g. they called, or
               signed in with their email). Their bookings, BLs and chats stay on this account; the new number
               becomes their sign-in and WhatsApp match. Current: {formatPhone(c.phoneNumber)}.
@@ -408,7 +458,7 @@ function AccountActions({ customer: c, act }: { customer: PortalAccountDetail; a
           />
         )}
 
-        {error && <p className="mt-2 text-[11px] font-medium text-destructive">{error}</p>}
+        {error && <p className="mt-2 text-xs font-medium text-destructive">{error}</p>}
       </CardContent>
     </Card>
   );
@@ -557,8 +607,8 @@ function OverviewTab({ customer: c, act }: { customer: PortalAccountDetail; act:
             </Select>
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground">The mobile number is the customer's sign-in and can't be changed here.</p>
-        {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
+        <p className="text-xs text-muted-foreground">The mobile number is the customer's sign-in and can't be changed here.</p>
+        {error && <p className="text-xs font-medium text-destructive">{error}</p>}
         <div className="flex gap-2">
           <Button type="button" size="sm" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save details"}</Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
@@ -582,26 +632,60 @@ function toForm(c: PortalAccountDetail) {
 }
 
 // ---------------------------------------------------------------
-// Bookings (progress + stage controls + BL)
+// Bookings — one clear next step, the booking and its declaration side by
+// side, and "Change boxes or details" for when the customer changes things
+// at drop-off. Stage undo and the customer's view sit quietly at the bottom.
 // ---------------------------------------------------------------
-function BookingPanel({ booking: b, act }: { booking: PortalBooking; act: Act }) {
+type Next =
+  | { kind: "declaration"; text: string }
+  | { kind: "boxes"; text: string }
+  | { kind: "bl"; text: string }
+  | { kind: "done"; text: string }
+  | null;
+
+function nextStepFor(b: PortalBooking): Next {
+  if (b.status.key === "cancelled") return null;
+  const boxesIn = b.warehouseStatus === "received" || b.rawStatus === "completed";
+  if (b.declarationSubmittedAt && b.declarationStatus !== "received") {
+    return { kind: "declaration", text: "Check the declaration with the customer (names, NIC, what's in the boxes)." };
+  }
+  if (!boxesIn) {
+    const when = b.dropOff ? `${formatDate(b.dropOff.date)}${b.dropOff.time ? `, ${b.dropOff.time}` : ""}` : null;
+    return { kind: "boxes", text: when ? `Waiting for the boxes — drop-off ${when}.` : "Waiting for the boxes to arrive." };
+  }
+  if (!b.blNumber) return { kind: "bl", text: "Boxes are in — give this booking its BL." };
+  return { kind: "done", text: `All set — BL ${b.blNumber} assigned.` };
+}
+
+function BookingPanel({ booking: b, act, embedded = true }: { booking: PortalBooking; act: Act; embedded?: boolean }) {
   const [bl, setBl] = useState("");
-  const [batch, setBatch] = useState("");
+  const [shipmentNo, setShipmentNo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
   const cancelled = b.status.key === "cancelled";
+  const next = nextStepFor(b);
+  const boxesIn = b.warehouseStatus === "received" || b.rawStatus === "completed";
 
-  const setStage = async (field: "declarationStatus" | "warehouseStatus", value: StageStatus) => {
+  const run = async (fn: () => Promise<unknown>, message: string) => {
     setBusy(true);
     setError("");
     try {
-      await act(() => updateBooking(b.id, { [field]: value }), `${b.code ?? "Booking"}: ${field === "declarationStatus" ? "declaration" : "boxes"} marked ${value === "received" ? "received" : "not received"}.`);
+      await act(fn, message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
+      setError(friendlyError(err, "Couldn't save that. Nothing was changed — please try again."));
     } finally {
       setBusy(false);
     }
   };
+
+  const setStage = (field: "declarationStatus" | "warehouseStatus", value: StageStatus) =>
+    run(
+      () => updateBooking(b.id, { [field]: value }),
+      field === "declarationStatus"
+        ? value === "received" ? "Declaration checked" : "Declaration marked as not checked"
+        : value === "received" ? "Boxes marked as received" : "Boxes marked as not received",
+    );
 
   const saveBl = async () => {
     const hbl = bl.trim();
@@ -609,96 +693,218 @@ function BookingPanel({ booking: b, act }: { booking: PortalBooking; act: Act })
       setError("Enter the BL number (letters, numbers or hyphens).");
       return;
     }
-    const batchNumber = batch.trim() === "" ? null : Number(batch);
-    if (batchNumber !== null && (!Number.isInteger(batchNumber) || batchNumber < 1)) {
-      setError("Batch number must be a whole number.");
+    const num = shipmentNo.trim() === "" ? null : Number(shipmentNo);
+    if (num !== null && (!Number.isInteger(num) || num < 1)) {
+      setError("The shipment number must be a whole number, e.g. 57.");
       return;
     }
-    setBusy(true);
-    setError("");
-    try {
-      await act(() => assignBookingBl(b.id, hbl, batchNumber), `BL ${hbl} saved on ${b.code ?? "the booking"} — the customer can see it now.`);
-      setBl("");
-      setBatch("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assign BL");
-    } finally {
-      setBusy(false);
-    }
+    await run(() => assignBookingBl(b.id, hbl, num), `BL ${hbl} assigned — the customer can see it now`);
+    setBl("");
+    setShipmentNo("");
   };
 
+  const print = () =>
+    printDeclaration(b.id).catch((err: unknown) => notify.error("Couldn't open the declaration", friendlyError(err, "Please try again.")));
+
+  const channel = b.channel === "portal" ? "Booked online" : b.channel === "website" ? "Website chat" : b.channel === "whatsapp" ? "WhatsApp" : null;
+
   return (
-    <Card className={cn(cancelled && "opacity-60")}>
-      <CardHeader className="p-4 pb-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-sm tabular-nums">{b.code ?? "Booking"}</CardTitle>
-          <StatusBadge status={b.status} />
-          <Badge variant="secondary" className="text-[10px] uppercase">
-            {b.channel === "portal" ? "Booked online" : b.channel === "website" ? "Website chat" : b.channel === "whatsapp" ? "WhatsApp" : b.channel ?? "—"}
-          </Badge>
-          <span className="ml-auto text-[11px] text-muted-foreground">Made {formatDate(b.createdAt, true)}</span>
+    <section className={cn("overflow-hidden rounded-xl border bg-card", !embedded && "shadow-xs", cancelled && "opacity-65")}>
+      {/* Header — hidden inside the list, whose row already shows code + status */}
+      {embedded ? (
+        <p className="px-5 pt-3 text-xs text-muted-foreground">{channelNote(b)}Made {formatDate(b.createdAt, true)}</p>
+      ) : (
+      <header className="flex flex-wrap items-center gap-2 px-5 pt-4">
+        <h3 className="text-base font-semibold tabular-nums text-foreground">{b.code ?? "Booking"}</h3>
+        <PageStatusBadge tone={toneOf(b.status.tone)}>{b.status.label}</PageStatusBadge>
+        {channel && <span className="text-sm text-muted-foreground">· {channel}</span>}
+        <span className="ml-auto text-xs text-muted-foreground">Made {formatDate(b.createdAt, true)}</span>
+      </header>
+      )}
+
+      {/* Next step */}
+      {next && (
+        <div
+          className={cn(
+            "mx-5 mt-3 rounded-lg px-4 py-3",
+            next.kind === "done" ? "bg-success-soft" : next.kind === "boxes" ? "bg-info-soft" : "bg-warning-soft",
+          )}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p
+              className={cn(
+                "text-sm",
+                next.kind === "done" ? "text-success-foreground" : next.kind === "boxes" ? "text-info-foreground" : "text-warning-foreground",
+              )}
+            >
+              <span className="font-semibold">{next.kind === "done" ? "✓ " : "Next step: "}</span>
+              {next.text}
+            </p>
+            {next.kind === "declaration" && (
+              <Button type="button" size="sm" disabled={busy} onClick={() => void setStage("declarationStatus", "received")}>
+                <Check className="mr-1.5 h-4 w-4" /> Mark declaration checked
+              </Button>
+            )}
+            {next.kind === "boxes" && (
+              <Button type="button" size="sm" disabled={busy} onClick={() => void setStage("warehouseStatus", "received")}>
+                <Package className="mr-1.5 h-4 w-4" /> Mark boxes received
+              </Button>
+            )}
+            {next.kind === "done" && b.shipmentId && (
+              <Button asChild type="button" size="sm" variant="outline" className="bg-card">
+                <Link to="/console/shipments/$shipmentId" params={{ shipmentId: b.shipmentId }}>
+                  <Ship className="mr-1.5 h-4 w-4" /> Open shipment
+                </Link>
+              </Button>
+            )}
+          </div>
+          {next.kind === "bl" && (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_8rem_auto]">
+              <Input className="bg-card" value={bl} onChange={(e) => { setBl(e.target.value); setError(""); }} placeholder="BL number, e.g. 203115" autoComplete="off" aria-label="BL number" />
+              <Input className="bg-card" type="number" min="1" value={shipmentNo} onChange={(e) => setShipmentNo(e.target.value)} placeholder="Shipment no." aria-label="Shipment number (optional), e.g. 57" />
+              <Button type="button" onClick={saveBl} disabled={busy}>Assign BL</Button>
+            </div>
+          )}
         </div>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 p-4 pt-0 text-xs lg:grid-cols-3">
-        <dl className="grid grid-cols-[6.5rem_1fr] content-start gap-x-3 gap-y-1">
-          <Dt>Items</Dt><Dd>{b.items}</Dd>
-          <Dt>Service</Dt><Dd>{b.service}</Dd>
-          <Dt>Destination</Dt><Dd>{[b.destination, b.country].filter(Boolean).join(", ")}</Dd>
-          <Dt>Delivery</Dt><Dd>{b.delivery}</Dd>
-          <Dt>Drop-off</Dt><Dd>{b.dropOff ? `${formatDate(b.dropOff.date)} · ${b.dropOff.time ?? ""}` : null}</Dd>
-          <Dt>BL</Dt><Dd>{b.blNumber}</Dd>
-          {b.notes && (<><Dt>Customer note</Dt><Dd>{b.notes}</Dd></>)}
-          {b.staffNotes && (<><Dt>Staff notes</Dt><Dd>{b.staffNotes}</Dd></>)}
-        </dl>
+      )}
+      {error && <p className="mx-5 mt-2 rounded-lg bg-attention-soft px-3 py-2 text-sm text-attention-foreground">{error}</p>}
+
+      {/* Booking + declaration */}
+      <div className="grid grid-cols-1 gap-6 px-5 py-4 lg:grid-cols-2">
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Booking</h4>
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-sm">
+            <Dt>Boxes</Dt><Dd>{b.items}</Dd>
+            <Dt>Service</Dt><Dd>{b.service}</Dd>
+            <Dt>Destination</Dt><Dd>{[b.destination, b.country].filter(Boolean).join(", ")}</Dd>
+            <Dt>Delivery</Dt><Dd>{b.delivery}</Dd>
+            <Dt>Drop-off</Dt><Dd>{b.dropOff ? `${formatDate(b.dropOff.date)}${b.dropOff.time ? ` · ${b.dropOff.time}` : ""}` : null}</Dd>
+            <Dt>BL</Dt><Dd>{b.blNumber}</Dd>
+            {b.notes && (<><Dt>Customer note</Dt><Dd>{b.notes}</Dd></>)}
+            {b.staffNotes && (<><Dt>Staff notes</Dt><Dd>{b.staffNotes}</Dd></>)}
+          </dl>
+        </div>
 
         <div>
-          <p className="mb-2 font-semibold text-foreground">What the customer sees</p>
-          <StepList steps={b.steps} />
-        </div>
-
-        {!cancelled && (
-          <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px]">Declaration</Label>
-                <Select value={b.declarationStatus} onValueChange={(v) => void setStage("declarationStatus", v as StageStatus)} disabled={busy}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="not_received">Not received</SelectItem>
-                    <SelectItem value="received">Received</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px]">Boxes at warehouse</Label>
-                <Select value={b.warehouseStatus} onValueChange={(v) => void setStage("warehouseStatus", v as StageStatus)} disabled={busy}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="not_received">Not received</SelectItem>
-                    <SelectItem value="received">Received</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Declaration</h4>
+            {b.declarationStatus === "received" ? (
+              <PageStatusBadge tone="success">Checked</PageStatusBadge>
+            ) : b.declarationSubmittedAt ? (
+              <PageStatusBadge tone="info">Filled online · to check</PageStatusBadge>
+            ) : (
+              <PageStatusBadge tone="neutral">Not filled online</PageStatusBadge>
+            )}
+          </div>
+          {b.sender || b.receiver ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <PersonSummary title={b.sender && !b.senderIsAccountHolder ? "Sender (someone else)" : "Sender"} person={b.sender} />
+              <PersonSummary title="Receiver" person={b.receiver} withId />
             </div>
-            <div>
-              <Label className="text-[11px]">{b.blNumber ? "Change BL number" : "Assign BL number"}</Label>
-              <div className="mt-1 grid grid-cols-[1fr_4.5rem_auto] gap-2">
-                <Input className="h-8 text-xs" value={bl} onChange={(e) => { setBl(e.target.value); setError(""); }} placeholder="BL e.g. 203115" autoComplete="off" />
-                <Input className="h-8 text-xs" type="number" min="1" value={batch} onChange={(e) => setBatch(e.target.value)} placeholder="Batch" aria-label="Batch number (optional)" />
+          ) : (
+            <p className="text-sm text-muted-foreground">No sender or receiver details yet — add them with Change details, or fill in the printed form.</p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {!cancelled && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+                <PenLine className="mr-1.5 h-4 w-4" /> Change boxes or details
+              </Button>
+            )}
+            <Button type="button" size="sm" variant="outline" onClick={print}>
+              <Printer className="mr-1.5 h-4 w-4" /> Print declaration
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quiet footer: undo stages + the customer's view */}
+      {!cancelled && (
+        <footer className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t bg-secondary/30 px-5 py-2.5 text-sm">
+          <StageToggle label="Declaration" done={b.declarationStatus === "received"} doneText="Checked" todoText="Not checked" busy={busy} onChange={(v) => void setStage("declarationStatus", v)} />
+          <StageToggle label="Boxes" done={boxesIn} doneText="Received" todoText="Not received" busy={busy || b.rawStatus === "completed"} onChange={(v) => void setStage("warehouseStatus", v)} />
+          {b.blNumber && next?.kind !== "bl" && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Change BL</summary>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Input className="h-8 w-40" value={bl} onChange={(e) => setBl(e.target.value)} placeholder="New BL number" aria-label="New BL number" />
+                <Input className="h-8 w-28" type="number" min="1" value={shipmentNo} onChange={(e) => setShipmentNo(e.target.value)} placeholder="Shipment no." aria-label="Shipment number" />
                 <Button type="button" size="sm" className="h-8" onClick={saveBl} disabled={busy}>Save BL</Button>
               </div>
+            </details>
+          )}
+          <details className="ml-auto text-sm">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">What the customer sees</summary>
+            <div className="mt-2">
+              <StepList steps={b.steps} />
             </div>
-            {b.shipmentId && (
-              <Link to="/console/shipments/$shipmentId" params={{ shipmentId: b.shipmentId }} className="font-medium text-primary hover:underline">
-                Open shipment →
-              </Link>
-            )}
-            {error && <p className="text-[11px] font-medium text-destructive">{error}</p>}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </details>
+        </footer>
+      )}
+
+      <BookingDetailsEditor bookingId={b.id} open={editing} onOpenChange={setEditing} onSaved={() => void act(async () => undefined, "")} />
+    </section>
   );
+}
+
+/** "Declaration: Checked ✓ · Undo" — a quiet way to change a stage back. */
+function StageToggle({
+  label,
+  done,
+  doneText,
+  todoText,
+  busy,
+  onChange,
+}: {
+  label: string;
+  done: boolean;
+  doneText: string;
+  todoText: string;
+  busy: boolean;
+  onChange: (v: StageStatus) => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="text-muted-foreground">{label}:</span>
+      <span className={cn("font-medium", done ? "text-success-foreground" : "text-muted-foreground")}>{done ? `✓ ${doneText}` : todoText}</span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onChange(done ? "not_received" : "received")}
+        className="text-xs font-medium text-primary hover:underline disabled:opacity-40 disabled:no-underline"
+      >
+        {done ? "Undo" : `Mark ${doneText.toLowerCase()}`}
+      </button>
+    </span>
+  );
+}
+
+function PersonSummary({ title, person, withId = false }: { title: string; person: DeclarationPerson | null; withId?: boolean }) {
+  return (
+    <div className="rounded-lg bg-secondary/40 px-3 py-2.5 text-sm">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">{title}</p>
+      {person ? (
+        <>
+          <p className="font-semibold text-foreground">{person.fullName}</p>
+          <p className="text-muted-foreground">{[person.address, person.town].filter(Boolean).join(", ")}</p>
+          <p className="text-muted-foreground">
+            {person.mobile}
+            {person.email ? ` · ${person.email}` : ""}
+          </p>
+          {withId && person.idNumber && <p className="mt-0.5 text-foreground">Passport / NIC: <span className="font-medium tabular-nums">{person.idNumber}</span></p>}
+        </>
+      ) : (
+        <p className="text-muted-foreground">—</p>
+      )}
+    </div>
+  );
+}
+
+function channelNote(b: PortalBooking) {
+  return b.channel === "portal" ? "Booked online · " : b.channel === "website" ? "Booked in website chat · " : b.channel === "whatsapp" ? "Booked on WhatsApp · " : "";
+}
+
+function toneOf(tone: string): PageStatusTone {
+  return tone === "done" ? "success" : tone === "active" ? "info" : tone === "pending" ? "pending" : "neutral";
 }
 
 // ---------------------------------------------------------------
@@ -789,9 +995,9 @@ function StepList({ steps }: { steps: PortalStep[] }) {
         <li key={s.key} className="flex items-center gap-2">
           <span
             className={cn(
-              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold",
-              s.done && "border-emerald-600 bg-emerald-600 text-white",
-              !s.done && s.attention && "border-amber-500 bg-amber-500/15 text-amber-700",
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-xs font-bold",
+              s.done && "border-success bg-success text-white",
+              !s.done && s.attention && "border-warning bg-warning-soft text-warning-foreground",
               !s.done && !s.attention && s.current && "border-primary text-primary",
               !s.done && !s.attention && !s.current && "border-border text-transparent",
             )}
@@ -799,7 +1005,7 @@ function StepList({ steps }: { steps: PortalStep[] }) {
           >
             {s.done ? "✓" : s.attention ? "!" : "•"}
           </span>
-          <span className={cn(s.done ? "text-foreground" : s.attention ? "font-medium text-amber-700 dark:text-amber-400" : s.current ? "font-medium text-foreground" : "text-muted-foreground")}>
+          <span className={cn(s.done ? "text-foreground" : s.attention ? "font-medium text-warning-foreground" : s.current ? "font-medium text-foreground" : "text-muted-foreground")}>
             {s.label}
             {s.attention && " — still needed"}
             {s.current && !s.done && !s.attention && " (next)"}
@@ -807,15 +1013,6 @@ function StepList({ steps }: { steps: PortalStep[] }) {
         </li>
       ))}
     </ol>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-border bg-panel px-3 py-2">
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
-      <div className="text-xl font-semibold tabular-nums text-foreground">{value}</div>
-    </div>
   );
 }
 
