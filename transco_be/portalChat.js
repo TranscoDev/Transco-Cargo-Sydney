@@ -79,6 +79,7 @@ const T = {
     declarationNone: "You don't have any open bookings, so there's no declaration to complete right now.",
     declarationHeader: 'Declaration status for your bookings:',
     declReceived: '✓ Received',
+    declSubmitted: '✓ Submitted with your booking',
     declNeeded: '⚠ Still needed',
     declarationWhy: 'The declaration lists what is in your boxes — customs needs it before your shipment can travel.',
     openForm: 'Open declaration form',
@@ -119,6 +120,7 @@ const T = {
     declarationNone: 'ඔයාට open bookings නැති නිසා දැන් declaration එකක් fill කරන්න ඕන නෑ.',
     declarationHeader: 'ඔයාගේ bookings වල declaration තත්ත්වය:',
     declReceived: '✓ ලැබුණා',
+    declSubmitted: '✓ Booking එකත් එක්ක යැව්වා',
     declNeeded: '⚠ තවම ඕන',
     declarationWhy: 'Declaration එකේ තියෙන්නේ ඔයාගේ පෙට්ටි වල මොනවද තියෙන්නේ කියලා — shipment එක යවන්න කලින් customs වලට ඒක ඕන.',
     openForm: 'Declaration form එක open කරන්න',
@@ -159,6 +161,7 @@ const T = {
     declarationNone: 'உங்களுக்கு open bookings இல்லாததால், இப்போது declaration நிரப்பத் தேவையில்லை.',
     declarationHeader: 'உங்கள் bookings இன் declaration நிலை:',
     declReceived: '✓ பெறப்பட்டது',
+    declSubmitted: '✓ Booking உடன் சமர்ப்பிக்கப்பட்டது',
     declNeeded: '⚠ இன்னும் தேவை',
     declarationWhy: 'Declaration இல் உங்கள் பெட்டிகளில் என்ன உள்ளது என்பது இருக்கும் — shipment அனுப்புவதற்கு முன் customs க்கு அது தேவை.',
     openForm: 'Declaration form ஐத் திற',
@@ -307,7 +310,7 @@ async function handleAccountIntent({ intent, shipmentId, account, tools, text })
       const docs = await tools.getCustomerDocuments(customerId);
       if (docs.declarations.length === 0) return { reply: t.declarationNone };
       const lines = docs.declarations.slice(0, 5).map(d =>
-        `${d.bookingCode || 'Booking'}${d.items ? ` (${d.items})` : ''}: ${d.status === 'received' ? t.declReceived : t.declNeeded}`
+        `${d.bookingCode || 'Booking'}${d.items ? ` (${d.items})` : ''}: ${d.status === 'received' ? t.declReceived : d.status === 'submitted' ? t.declSubmitted : t.declNeeded}`
       );
       const needsForm = docs.declarations.some(d => d.status === 'needed');
       return {

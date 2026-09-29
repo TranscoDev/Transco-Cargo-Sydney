@@ -120,6 +120,15 @@ async function signIn(localPhone, countryCode = '61', source) {
   return { token: verified.body.token, profile: verified.body.profile, needsName: verified.body.needsName, phoneNumber: intl };
 }
 
+// Sender + receiver details every online booking now carries (they are
+// the declaration). The town is the booking's destination.
+function decl(town, overrides = {}) {
+  return {
+    sender: { isMe: true, fullName: 'Alpha Sender', address: '1 Test St, Seven Hills NSW 2147', mobile: '+61 400 000 001', email: 'sender@example.com', ...(overrides.sender || {}) },
+    receiver: { fullName: 'Rita Receiver', address: '12 Temple Rd', town, mobile: '+94 77 123 4567', email: 'rita@example.com', idNumber: '199012345678', ...(overrides.receiver || {}) }
+  };
+}
+
 function nextDropOff(options) {
   const d = options.dropOffDates.find(x => !x.full);
   return { date: d.date, time: d.slots[0] };
@@ -338,7 +347,7 @@ test('scenario 5 + 11: a booking belongs to the signed-in customer and its refer
 
   const invalid = await api('POST', '/api/portal/bookings', {
     token: custA.token,
-    body: { country: 'sri_lanka', service: 'sea', items: [], destination: 'Kandy', deliveryType: 'door', dropOff: nextDropOff(options.body) }
+    body: { country: 'sri_lanka', service: 'sea', items: [], ...decl('Kandy'), deliveryType: 'door', dropOff: nextDropOff(options.body) }
   });
   assert.equal(invalid.status, 400);
 
@@ -347,7 +356,7 @@ test('scenario 5 + 11: a booking belongs to the signed-in customer and its refer
     body: {
       country: 'sri_lanka', service: 'sea',
       items: [{ type: 'tea_chest', qty: 2 }],
-      destination: 'Kandy', deliveryType: 'door',
+      ...decl('Kandy'), deliveryType: 'door',
       dropOff: nextDropOff(options.body),
       // A browser-supplied owner must be ignored.
       customerId: String(new ObjectId())
@@ -369,7 +378,7 @@ test('scenario 5 + 11: a booking belongs to the signed-in customer and its refer
     token: custB.token,
     body: {
       country: 'sri_lanka', service: 'air', items: [{ type: 'gift_box', qty: 1 }],
-      destination: 'Colombo', deliveryType: 'collect', dropOff: nextDropOff(options.body)
+      ...decl('Colombo'), deliveryType: 'collect', dropOff: nextDropOff(options.body)
     }
   });
   assert.equal(createdB.status, 201);
@@ -419,14 +428,16 @@ test('scenario 6 + 7: staff assign BLs; each customer sees only their own BL, ev
   assert.equal(steps.warehouse_received, true);
   assert.equal(steps.bl_assigned, true);
   assert.equal(steps.in_transit, false);
-  assert.equal(steps.declaration, false);
+  // Submitted online with the booking — the customer's part is done.
+  assert.equal(steps.declaration, true);
+  assert.equal(bookingNow.body.booking.declaration.status, 'submitted');
 
   const shipmentBId = (await api('GET', '/api/portal/shipments', { token: custB.token })).body.shipments[0].id;
   assert.equal((await api('GET', `/api/portal/shipments/${shipmentBId}`, { token: custA.token })).status, 404);
   assert.equal((await api('GET', `/api/portal/shipments/${shipmentBId}/tracking`, { token: custA.token })).status, 404);
 });
 
-test('staff can record the declaration as received, and only then is it shown as done', async () => {
+test('staff can record the declaration as received after checking it', async () => {
   const res = await api('PATCH', `/api/bookings/${bookingA.id}`, { token: staffToken, body: { declarationStatus: 'received' } });
   assert.equal(res.status, 200);
   const bad = await api('PATCH', `/api/bookings/${bookingA.id}`, { token: staffToken, body: { declarationStatus: 'maybe' } });
@@ -442,7 +453,7 @@ test('a booking can no longer be cancelled online once a BL is assigned; a fresh
   const options = await api('GET', '/api/portal/booking-options', { token: custA.token });
   const fresh = await api('POST', '/api/portal/bookings', {
     token: custA.token,
-    body: { country: 'india', service: 'sea', items: [{ type: 'general', qty: 1 }], destination: 'Chennai', deliveryType: 'collect', dropOff: nextDropOff(options.body) }
+    body: { country: 'india', service: 'sea', items: [{ type: 'general', qty: 1 }], ...decl('Chennai'), deliveryType: 'collect', dropOff: nextDropOff(options.body) }
   });
   assert.equal(fresh.status, 201);
   const cancelled = await api('POST', `/api/portal/bookings/${fresh.body.booking.id}/cancel`, { token: custA.token });
@@ -538,7 +549,7 @@ test('password sign-up: a new number gets an account straight away and can book'
   const options = await api('GET', '/api/portal/booking-options', { token: reg.body.token });
   const created = await api('POST', '/api/portal/bookings', {
     token: reg.body.token,
-    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], destination: 'Jaffna', deliveryType: 'door', dropOff: nextDropOff(options.body) }
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], ...decl('Jaffna'), deliveryType: 'door', dropOff: nextDropOff(options.body) }
   });
   assert.equal(created.status, 201);
   const list = await api('GET', '/api/portal/bookings', { token: reg.body.token });
@@ -861,6 +872,93 @@ test('website country pages: the country reaches the assistant once, never as a 
   assert.deepEqual(said, ['How much for door delivery?', 'And for 2 boxes?', 'What about India?', "I'm shipping to Sri Lanka", 'Door delivery price?', 'Hello again']);
 });
 
+test('declaration: sender details are remembered only for the account holder, receivers are suggested next time, staff can print it', async () => {
+  await clearOtps('61400777001');
+  const me = await signIn('0400777001');
+  await api('PATCH', '/api/portal/me', { token: me.token, body: { name: 'Decla Ration', email: 'decla@example.com' } });
+
+  // First booking: nothing saved yet, so the form is pre-filled from the profile.
+  let options = await api('GET', '/api/portal/booking-options', { token: me.token });
+  assert.equal(options.body.declaration.senderSaved, false);
+  assert.equal(options.body.declaration.sender.fullName, 'Decla Ration');
+  assert.equal(options.body.declaration.sender.email, 'decla@example.com');
+  assert.equal(options.body.declaration.sender.mobile, '+61400777001');
+  assert.deepEqual(options.body.declaration.receivers, []);
+
+  // Every field is required — a missing receiver email is refused and named.
+  const noEmail = await api('POST', '/api/portal/bookings', {
+    token: me.token,
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], ...decl('Kandy', { receiver: { email: '' } }), deliveryType: 'collect', dropOff: nextDropOff(options.body) }
+  });
+  assert.equal(noEmail.status, 400);
+  assert.equal(noEmail.body.field, 'receiver.email');
+  const badId = await api('POST', '/api/portal/bookings', {
+    token: me.token,
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], ...decl('Kandy', { receiver: { idNumber: '12' } }), deliveryType: 'collect', dropOff: nextDropOff(options.body) }
+  });
+  assert.equal(badId.body.field, 'receiver.idNumber');
+
+  // Collect from warehouse: no separate delivery location — the receiver's town is the destination.
+  const first = await api('POST', '/api/portal/bookings', {
+    token: me.token,
+    body: {
+      country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'collect', dropOff: nextDropOff(options.body),
+      ...decl('Kandy', { sender: { fullName: 'Decla Ration Perera', address: '5 Home St, Blacktown NSW 2148' } })
+    }
+  });
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  assert.equal(first.body.booking.destination, 'Kandy');
+  assert.equal(first.body.booking.declaration.status, 'submitted');
+  assert.equal(first.body.booking.declaration.receiver.fullName, 'Rita Receiver');
+  // The customer's own view never echoes the receiver's ID number back.
+  assert.ok(!JSON.stringify(first.body).includes('199012345678'));
+
+  // Second booking: the account holder's details are now the saved ones, and the receiver is suggested.
+  options = await api('GET', '/api/portal/booking-options', { token: me.token });
+  assert.equal(options.body.declaration.senderSaved, true);
+  assert.equal(options.body.declaration.sender.fullName, 'Decla Ration Perera');
+  assert.equal(options.body.declaration.receivers.length, 1);
+  const saved = options.body.declaration.receivers[0];
+  assert.equal(saved.idNumber, '199012345678');
+  assert.equal(saved.country, 'sri_lanka');
+
+  // Someone else sends this time: their details must not replace the saved ones.
+  // Same receiver again (by ID number) updates the entry instead of duplicating it.
+  const second = await api('POST', '/api/portal/bookings', {
+    token: me.token,
+    body: {
+      country: 'sri_lanka', service: 'sea', items: [{ type: 'gift_box', qty: 1 }], deliveryType: 'door', dropOff: nextDropOff(options.body),
+      ...decl('Kandy', { sender: { isMe: false, fullName: 'Cousin Sender', email: 'cousin@example.com' }, receiver: { address: '14 New Temple Rd' } })
+    }
+  });
+  assert.equal(second.status, 201, JSON.stringify(second.body));
+  options = await api('GET', '/api/portal/booking-options', { token: me.token });
+  assert.equal(options.body.declaration.sender.fullName, 'Decla Ration Perera');
+  assert.equal(options.body.declaration.receivers.length, 1);
+  assert.equal(options.body.declaration.receivers[0].address, '14 New Temple Rd');
+
+  // Staff: full details on the customer page and a print endpoint; customers can't reach it.
+  const record = await db.collection('customers').findOne({ phoneNumber: '61400777001' });
+  const detail = await api('GET', `/api/my-transco/customers/${record._id}`, { token: staffToken });
+  const staffBooking = detail.body.bookings.find(b => b.id === second.body.booking.id);
+  assert.equal(staffBooking.sender.fullName, 'Cousin Sender');
+  assert.equal(staffBooking.senderIsAccountHolder, false);
+  assert.equal(staffBooking.receiver.idNumber, '199012345678');
+  assert.ok(staffBooking.declarationSubmittedAt);
+
+  assert.equal((await api('GET', `/api/my-transco/bookings/${second.body.booking.id}/declaration`, { token: me.token })).status, 401);
+  const print = await api('GET', `/api/my-transco/bookings/${second.body.booking.id}/declaration`, { token: staffToken });
+  assert.equal(print.status, 200, JSON.stringify(print.body));
+  assert.equal(print.body.declaration.bookingCode, second.body.booking.code);
+  assert.equal(print.body.declaration.sender.fullName, 'Cousin Sender');
+  assert.equal(print.body.declaration.receiver.town, 'Kandy');
+  assert.equal(print.body.declaration.delivery, 'Door delivery');
+  assert.deepEqual(print.body.declaration.items, [{ label: 'Gift Box', qty: 1 }]);
+  assert.equal(print.body.declaration.customer.phoneNumber, '61400777001');
+  assert.equal(print.body.declaration.customer.id, String(record._id));
+  assert.equal((await api('GET', `/api/my-transco/bookings/${new ObjectId()}/declaration`, { token: staffToken })).status, 404);
+});
+
 test('staff customer endpoints never send sign-in secrets, and flag online accounts', async () => {
   const record = await db.collection('customers').findOne({ passwordHash: { $exists: true } });
   assert.ok(record, 'a customer with a password exists from earlier tests');
@@ -878,6 +976,57 @@ test('staff customer endpoints never send sign-in secrets, and flag online accou
   assert.ok(!JSON.stringify(profile.body).includes('passwordHash'));
   assert.equal(profile.body.customer.hasOnlineAccount, true);
   assert.ok(profile.body.customer.customerCode);
+});
+
+test('staff can edit a booking after drop-off (boxes, receiver), with validation and a change record', async () => {
+  await clearOtps('61400777003');
+  const me = await signIn('0400777003');
+  const options = await api('GET', '/api/portal/booking-options', { token: me.token });
+  const made = await api('POST', '/api/portal/bookings', {
+    token: me.token,
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], ...decl('Kandy'), deliveryType: 'collect', dropOff: nextDropOff(options.body) }
+  });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const id = made.body.booking.id;
+
+  // Customers can't reach the staff edit endpoints.
+  assert.equal((await api('GET', `/api/my-transco/bookings/${id}/edit`, { token: me.token })).status, 401);
+  assert.equal((await api('PATCH', `/api/my-transco/bookings/${id}/details`, { token: me.token, body: { items: [] } })).status, 401);
+
+  const edit = await api('GET', `/api/my-transco/bookings/${id}/edit`, { token: staffToken });
+  assert.equal(edit.status, 200);
+  assert.equal(edit.body.booking.country, 'sri_lanka');
+  assert.ok(edit.body.booking.itemTypes.some(t => t.key === 'gift_box'));
+  assert.deepEqual(edit.body.booking.items, [{ type: 'tea_chest', qty: 1 }]);
+
+  // Bad input is refused and nothing changes.
+  const bad = await api('PATCH', `/api/my-transco/bookings/${id}/details`, { token: staffToken, body: { items: [{ type: 'tv_huge', qty: 1 }] } });
+  assert.equal(bad.status, 400);
+  const badPerson = await api('PATCH', `/api/my-transco/bookings/${id}/details`, { token: staffToken, body: { receiver: { ...decl('Kandy').receiver, idNumber: '1' } } });
+  assert.equal(badPerson.body.field, 'receiver.idNumber');
+
+  // The customer brought 2 tea chests + a gift box, and a different town.
+  const saved = await api('PATCH', `/api/my-transco/bookings/${id}/details`, {
+    token: staffToken,
+    body: { items: [{ type: 'tea_chest', qty: 2 }, { type: 'gift_box', qty: 1 }], receiver: { ...decl('Galle').receiver, fullName: 'Rita Receiver-Perera' }, deliveryType: 'door' }
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(saved.body.changed.sort(), ['boxes', 'delivery', 'receiver']);
+
+  const stored = await db.collection('bookings').findOne({ _id: new ObjectId(id) });
+  assert.equal(stored.boxSummary, '2 Tea Chests, 1 Gift Box');
+  assert.equal(stored.boxCount, 3);
+  assert.equal(stored.destination, 'Galle');
+  assert.equal(stored.receiver.fullName, 'Rita Receiver-Perera');
+  assert.equal(stored.staffEdits.length, 1);
+  assert.deepEqual(stored.staffEdits[0].changed.sort(), ['boxes', 'delivery', 'receiver']);
+
+  // The printout and the customer's own view both show the new details.
+  const print = await api('GET', `/api/my-transco/bookings/${id}/declaration`, { token: staffToken });
+  assert.equal(print.body.declaration.receiver.town, 'Galle');
+  assert.equal(print.body.declaration.itemsText, '2 Tea Chests, 1 Gift Box');
+  const mine = await api('GET', `/api/portal/bookings/${id}`, { token: me.token });
+  assert.equal(mine.body.booking.items, '2 Tea Chests, 1 Gift Box');
 });
 
 test('a signed-in website chat is recognised in Conversations: real name, phone and customer number, kept in sync', async () => {

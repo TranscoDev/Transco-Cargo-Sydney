@@ -57,6 +57,14 @@ const DELIVERY_LABELS = {
   collect: 'Collect from the destination warehouse'
 };
 
+// Declaration details collected in the booking form (they replace the
+// external declaration form for bookings made online). Every field is
+// required. The account's own sender details are remembered on the
+// customer record; receivers are kept as a small address book so a
+// repeat receiver is one tap next time.
+const MAX_SAVED_RECEIVERS = 20;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Same hours the bot quotes (calculate_price_LATEST.js): Saturday
 // 11am-3pm walk-in, Tue-Fri 5-6pm by appointment with a daily cap.
 const DROP_OFF_SLOTS = {
@@ -117,6 +125,63 @@ function hasVerifiedPhone(customer) {
 function toObjectId(id) {
   if (typeof id !== 'string' || !ObjectId.isValid(id)) return null;
   return new ObjectId(id);
+}
+
+function cleanText(value, max) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/[ \t]+/g, ' ').slice(0, max);
+}
+
+// One person on the declaration. `withId` adds the Passport/NIC number
+// (receivers only). Returns { error, field } or { value }.
+function validatePerson(raw, who, { withId = false } = {}) {
+  const p = raw || {};
+  const fullName = cleanText(p.fullName, 80);
+  if (fullName.length < 2) return { error: `Please enter the ${who}'s full name as on their passport or NIC.`, field: `${who}.fullName` };
+  const address = cleanText(p.address, 200).replace(/\s*\n\s*/g, ', ');
+  if (address.length < 5) return { error: `Please enter the ${who}'s full address.`, field: `${who}.address` };
+  const mobile = cleanText(p.mobile, 24);
+  const digits = mobile.replace(/[^\d]/g, '');
+  if (!/^\+?[\d\s()-]+$/.test(mobile) || digits.length < 7 || digits.length > 15) {
+    return { error: `Please enter the ${who}'s mobile number (digits only, with country code if outside Australia).`, field: `${who}.mobile` };
+  }
+  const email = cleanText(p.email, 120).toLowerCase();
+  if (!EMAIL_RE.test(email)) return { error: `Please enter the ${who}'s email address.`, field: `${who}.email` };
+  const value = { fullName, address, mobile, email };
+  if (withId) {
+    const town = cleanText(p.town, 60);
+    if (town.length < 2) return { error: "Please enter the receiver's town or city.", field: `${who}.town` };
+    const idNumber = cleanText(p.idNumber, 20).replace(/\s/g, '').toUpperCase();
+    if (!/^[A-Z0-9]{5,20}$/.test(idNumber)) return { error: "Please enter the receiver's passport or NIC number (letters and numbers only).", field: `${who}.idNumber` };
+    value.town = town;
+    value.idNumber = idNumber;
+  }
+  return { value };
+}
+
+// Box list for a country — shared by the customer booking form and staff
+// edits. Returns { error } or { value: [{ type, qty }] } (types merged).
+function validateItems(country, rawItems) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 10) {
+    return { error: 'Please add at least one item.' };
+  }
+  const items = [];
+  for (const raw of rawItems) {
+    const type = raw && raw.type;
+    const qty = Number(raw && raw.qty);
+    if (!ITEM_TYPES[country].includes(type)) return { error: 'One of the items is not a type we can book online.' };
+    if (!Number.isInteger(qty) || qty < 1 || qty > 30) return { error: 'Each item quantity must be between 1 and 30.' };
+    const existing = items.find(i => i.type === type);
+    if (existing) existing.qty += qty; else items.push({ type, qty });
+  }
+  if (items.reduce((n, i) => n + i.qty, 0) > 30) {
+    return { error: 'For more than 30 items, please call us on 0434 842 023 so we can plan it with you.' };
+  }
+  return { value: items };
+}
+
+function samePerson(a, b) {
+  return (a.idNumber && a.idNumber === b.idNumber) || (a.fullName.toLowerCase() === b.fullName.toLowerCase() && a.mobile.replace(/\D/g, '') === b.mobile.replace(/\D/g, ''));
 }
 
 function createCustomerTools({
@@ -230,7 +295,9 @@ function createCustomerTools({
 
     const steps = [
       { key: 'booking_created', label: 'Booking created', done: Boolean(booking) || Boolean(shipment) },
-      { key: 'declaration', label: 'Declaration form', done: Boolean(booking && booking.declarationStatus === 'received') },
+      // Done once the customer has submitted it online with the booking
+      // (declarationSubmittedAt), or staff recorded a paper/external one.
+      { key: 'declaration', label: 'Declaration form', done: Boolean(booking && (booking.declarationStatus === 'received' || booking.declarationSubmittedAt)) },
       {
         key: 'warehouse_received',
         label: 'Boxes received at our warehouse',
@@ -297,8 +364,11 @@ function createCustomerTools({
       notes: booking.customerNotes || null,
       status: bookingStatus(booking, shipment),
       declaration: {
-        status: booking.declarationStatus === 'received' ? 'received' : 'needed',
-        formUrl: DECLARATION_FORM_URL
+        status: booking.declarationStatus === 'received' ? 'received' : booking.declarationSubmittedAt ? 'submitted' : 'needed',
+        formUrl: DECLARATION_FORM_URL,
+        // The customer's own entries, shown back to them on the booking.
+        sender: booking.sender ? { fullName: booking.sender.fullName } : null,
+        receiver: booking.receiver ? { fullName: booking.receiver.fullName, town: booking.receiver.town } : null
       },
       blNumber: shipment ? (shipment.hblNumber || shipment.blNumber || null) : null,
       shipmentId: shipment ? String(shipment._id) : null,
@@ -480,6 +550,193 @@ function createCustomerTools({
     };
   }
 
+  // ---------- declaration details ----------
+
+  // What the booking form pre-fills: the account's saved sender details
+  // (or, before the first booking, what their profile already holds),
+  // plus their saved receivers, most recently used first.
+  function declarationDefaults(customer) {
+    const saved = customer.senderDetails;
+    const address = customer.address || {};
+    const profileAddress = [address.line1, address.suburb, [address.state, address.postcode].filter(Boolean).join(' ')]
+      .filter(Boolean).join(', ');
+    const sender = saved
+      ? { fullName: saved.fullName, address: saved.address, mobile: saved.mobile, email: saved.email }
+      : {
+          fullName: hasRealName(customer) ? customer.name : '',
+          address: profileAddress,
+          mobile: customer.phoneNumber ? `+${customer.phoneNumber}` : '',
+          email: customer.email || ''
+        };
+    const receivers = (customer.savedReceivers || [])
+      .slice()
+      .sort((a, b) => new Date(b.lastUsedAt || 0) - new Date(a.lastUsedAt || 0))
+      .map(r => ({
+        id: r.id, country: r.country, fullName: r.fullName, address: r.address,
+        town: r.town, mobile: r.mobile, email: r.email, idNumber: r.idNumber
+      }));
+    return { sender, senderSaved: Boolean(saved), receivers };
+  }
+
+  // STAFF ONLY (mounted behind staff auth in staffPortalRoutes.js): every
+  // detail needed to print a booking's declaration form. Works for any
+  // booking; older ones without online declaration details come back
+  // with sender/receiver null so the printout leaves those to be filled
+  // in by hand.
+  async function getDeclarationForPrint(bookingId) {
+    const _id = toObjectId(bookingId);
+    if (!_id) return null;
+    const booking = await bookings().findOne({ _id });
+    if (!booking) return null;
+    const [customer, shipment] = await Promise.all([
+      booking.customerId ? customers().findOne({ _id: booking.customerId }, { projection: { customerCode: 1, name: 1, phoneNumber: 1 } }) : null,
+      shipments().findOne({ bookingId: booking._id }, { projection: { hblNumber: 1, blNumber: 1 } })
+    ]);
+    const country = COUNTRIES[booking.country] ? COUNTRIES[booking.country].label : null;
+    return {
+      bookingId: String(booking._id),
+      bookingCode: booking.bookingCode || null,
+      createdAt: booking.createdAt || null,
+      country,
+      service: SERVICE_LABELS[booking.serviceType] || null,
+      delivery: DELIVERY_LABELS[booking.deliveryType] || null,
+      destination: booking.destination || null,
+      items: (booking.items || []).map(i => ({ label: (ITEM_LABELS[i.type] || [i.type])[0], qty: i.qty })),
+      itemsText: booking.items && booking.items.length ? itemsSummary(booking.items) : (booking.boxSummary || null),
+      boxCount: booking.boxCount || null,
+      dropOff: booking.requestedDay ? { date: safeResolvedDate(booking), time: booking.requestedTime || null } : null,
+      notes: booking.customerNotes || null,
+      sender: booking.sender || null,
+      senderIsAccountHolder: booking.senderIsAccountHolder !== false,
+      receiver: booking.receiver || null,
+      declarationSubmittedAt: booking.declarationSubmittedAt || null,
+      declarationStatus: booking.declarationStatus === 'received' ? 'received' : 'not_received',
+      blNumber: shipment ? (shipment.hblNumber || shipment.blNumber || null) : null,
+      channel: booking.channel || null,
+      status: booking.status || null,
+      customer: customer
+        ? { id: String(customer._id), customerCode: customer.customerCode || null, name: hasRealName(customer) ? customer.name : null, phoneNumber: customer.phoneNumber || null }
+        : { id: null, customerCode: null, name: booking.customerName || null, phoneNumber: booking.phoneNumber || null }
+    };
+  }
+
+  // ---------- staff edits (STAFF ONLY — mounted behind staff auth) ----------
+
+  // What the staff "Edit booking" panel needs: the raw editable fields plus
+  // the box types allowed for this booking's country. Bookings made by the
+  // chat bot have no country/items — their boxes stay free text (editable
+  // in the older Edit booking sheet) and only the declaration is editable.
+  async function getBookingForStaffEdit(bookingId) {
+    const _id = toObjectId(bookingId);
+    if (!_id) return null;
+    const b = await bookings().findOne({ _id });
+    if (!b) return null;
+    const country = COUNTRIES[b.country] ? b.country : null;
+    return {
+      bookingId: String(b._id),
+      bookingCode: b.bookingCode || null,
+      country,
+      countryLabel: country ? COUNTRIES[country].label : null,
+      itemTypes: country ? ITEM_TYPES[country].map(t => ({ key: t, label: ITEM_LABELS[t][0] })) : [],
+      items: b.items || [],
+      boxSummary: b.boxSummary || null,
+      deliveryType: DELIVERY_LABELS[b.deliveryType] ? b.deliveryType : null,
+      deliveryTypes: Object.entries(DELIVERY_LABELS).map(([key, label]) => ({ key, label })),
+      notes: b.customerNotes || '',
+      sender: b.sender || null,
+      senderIsAccountHolder: b.senderIsAccountHolder !== false,
+      receiver: b.receiver || null,
+      staffEdits: (b.staffEdits || []).slice(-10).reverse()
+    };
+  }
+
+  // Staff change a booking after it was made (the customer changed their
+  // boxes at drop-off, a name was misspelt, …). Same validation as the
+  // customer form; only the parts sent are changed. Every edit is recorded
+  // (who, when, what) so there's a trail of changes to the declaration.
+  async function staffUpdateBookingDetails(bookingId, body, staffEmail) {
+    const _id = toObjectId(bookingId);
+    if (!_id) return { notFound: true };
+    const b = await bookings().findOne({ _id });
+    if (!b) return { notFound: true };
+    const input = body || {};
+    const set = {};
+    const changed = [];
+
+    if ('items' in input) {
+      if (!COUNTRIES[b.country]) return { error: 'This booking was made in the chat, so its boxes are edited as text in "Edit booking".' };
+      const checked = validateItems(b.country, input.items);
+      if (checked.error) return { error: checked.error, field: 'items' };
+      set.items = checked.value;
+      set.boxSummary = itemsSummary(checked.value);
+      set.boxCount = checked.value.reduce((n, i) => n + i.qty, 0);
+      changed.push('boxes');
+    }
+    if ('deliveryType' in input) {
+      if (!DELIVERY_LABELS[input.deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
+      set.deliveryType = input.deliveryType;
+      changed.push('delivery');
+    }
+    if ('sender' in input) {
+      const s = validatePerson(input.sender, 'sender');
+      if (s.error) return s;
+      set.sender = s.value;
+      changed.push('sender');
+    }
+    if ('receiver' in input) {
+      const r = validatePerson(input.receiver, 'receiver', { withId: true });
+      if (r.error) return r;
+      set.receiver = r.value;
+      set.destination = r.value.town;
+      changed.push('receiver');
+    }
+    if ('notes' in input) {
+      set.customerNotes = typeof input.notes === 'string' && input.notes.trim() ? input.notes.trim().slice(0, 300) : null;
+      changed.push('notes');
+    }
+    if (!changed.length) return { error: 'Nothing to save.' };
+
+    const now = new Date();
+    await bookings().updateOne(
+      { _id },
+      {
+        $set: { ...set, staffEditedAt: now },
+        $push: { staffEdits: { $each: [{ at: now, by: staffEmail || 'staff', changed }], $slice: -50 } }
+      }
+    );
+    const updated = await bookings().findOne({ _id });
+    broadcast('booking.details_changed', {
+      _id: String(_id),
+      boxSummary: updated.boxSummary || null,
+      boxCount: updated.boxCount || null,
+      destination: updated.destination || null,
+      deliveryType: updated.deliveryType || null,
+      customerNotes: updated.customerNotes || null,
+      receiver: updated.receiver ? { fullName: updated.receiver.fullName, town: updated.receiver.town } : null
+    });
+    return { ok: true, changed };
+  }
+
+  // After a booking: remember the account holder's own sender details
+  // (never someone else's) and add/refresh the receiver in their list.
+  async function rememberDeclarationDetails(customer, { sender, senderIsMe, receiver, country }) {
+    const set = {};
+    if (senderIsMe) set.senderDetails = { ...sender, updatedAt: new Date() };
+
+    const list = (customer.savedReceivers || []).slice();
+    const existing = list.find(r => r.country === country && samePerson(r, receiver));
+    const entry = { ...receiver, country, lastUsedAt: new Date() };
+    if (existing) {
+      Object.assign(existing, entry);
+    } else {
+      list.push({ id: new ObjectId().toHexString(), ...entry });
+    }
+    list.sort((a, b) => new Date(b.lastUsedAt || 0) - new Date(a.lastUsedAt || 0));
+    set.savedReceivers = list.slice(0, MAX_SAVED_RECEIVERS);
+
+    await customers().updateOne({ _id: customer._id }, { $set: set });
+  }
+
   // ---------- booking options / creation ----------
 
   function sydneyToday() {
@@ -550,27 +807,21 @@ function createCustomerTools({
     const service = body.service;
     if (!COUNTRIES[country].services.includes(service)) return { error: 'Please choose a shipping service.' };
 
-    if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > 10) {
-      return { error: 'Please add at least one item.' };
-    }
-    const items = [];
-    for (const raw of body.items) {
-      const type = raw && raw.type;
-      const qty = Number(raw && raw.qty);
-      if (!ITEM_TYPES[country].includes(type)) return { error: 'One of the items is not a type we can book online.' };
-      if (!Number.isInteger(qty) || qty < 1 || qty > 30) return { error: 'Each item quantity must be between 1 and 30.' };
-      const existing = items.find(i => i.type === type);
-      if (existing) existing.qty += qty; else items.push({ type, qty });
-    }
-    if (items.reduce((n, i) => n + i.qty, 0) > 30) {
-      return { error: 'For more than 30 items, please call us on 0434 842 023 so we can plan it with you.' };
-    }
+    const itemsCheck = validateItems(country, body.items);
+    if (itemsCheck.error) return { error: itemsCheck.error };
+    const items = itemsCheck.value;
 
-    const destination = typeof body.destination === 'string' ? body.destination.trim().replace(/\s+/g, ' ') : '';
-    if (destination.length < 2 || destination.length > 80) return { error: 'Please tell us the destination town or city.' };
+    const senderCheck = validatePerson(body.sender, 'sender');
+    if (senderCheck.error) return senderCheck;
+    const receiverCheck = validatePerson(body.receiver, 'receiver', { withId: true });
+    if (receiverCheck.error) return receiverCheck;
 
     const deliveryType = body.deliveryType;
     if (!DELIVERY_LABELS[deliveryType]) return { error: 'Please choose door delivery or collection.' };
+
+    // The receiver's town, whichever delivery option — a collection
+    // booking no longer asks for a separate delivery location.
+    const destination = receiverCheck.value.town;
 
     const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
     if (items.some(i => i.type === 'other') && notes.length < 3) {
@@ -587,6 +838,9 @@ function createCustomerTools({
     return {
       value: {
         country, serviceType: service, items, destination, deliveryType,
+        sender: senderCheck.value,
+        senderIsMe: body.sender.isMe !== false,
+        receiver: receiverCheck.value,
         customerNotes: notes || null,
         requestedDay: dateOption.day,
         requestedTime: dropOff.time,
@@ -599,8 +853,8 @@ function createCustomerTools({
   // comes from the backend sequence — the caller (UI or chat) only ever
   // displays what this returns.
   async function createBooking(customer, input) {
-    const { error, value } = await validateBookingInput(input);
-    if (error) return { error };
+    const { error, field, value } = await validateBookingInput(input);
+    if (error) return { error, field };
 
     const bookingCode = await newBookingCode();
     const origin = 'Sydney';
@@ -622,6 +876,12 @@ function createCustomerTools({
       items: value.items,
       boxCount: value.items.reduce((n, i) => n + i.qty, 0),
       customerNotes: value.customerNotes,
+      sender: value.sender,
+      senderIsAccountHolder: value.senderIsMe,
+      receiver: value.receiver,
+      // Filled online with the booking; staff still mark it "received"
+      // once they've checked it at drop-off.
+      declarationSubmittedAt: new Date(),
       declarationStatus: 'not_received',
       warehouseStatus: 'not_received',
       channel: 'portal',
@@ -634,6 +894,15 @@ function createCustomerTools({
 
     const { insertedId } = await bookings().insertOne(booking);
     booking._id = insertedId;
+
+    try {
+      await rememberDeclarationDetails(customer, {
+        sender: value.sender, senderIsMe: value.senderIsMe, receiver: value.receiver, country: value.country
+      });
+    } catch (err) {
+      // Only a convenience for next time — never undoes a real booking.
+      console.error('Saving declaration details failed:', err.message);
+    }
 
     // Same staff notifications as a chat-bot booking — best-effort, a
     // failed email/WhatsApp/calendar call never undoes a real booking.
@@ -683,6 +952,10 @@ function createCustomerTools({
     getSummary,
     getCustomerDocuments,
     getBookingOptions,
+    declarationDefaults,
+    getDeclarationForPrint,
+    getBookingForStaffEdit,
+    staffUpdateBookingDetails,
     createBooking,
     cancelBooking,
     newBookingCode
