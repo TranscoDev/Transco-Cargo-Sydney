@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/components/transco/page-kit";
+import { shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
 import { createShipment, fetchConsolidations, fetchShipments } from "@/lib/transco/api";
 import {
@@ -35,18 +37,6 @@ import {
 export const Route = createFileRoute("/console/shipments/")({
   component: ShipmentsPage,
 });
-
-const STATUS_BADGE: Record<ShipmentStatus, string> = {
-  booked: "bg-secondary text-muted-foreground",
-  cargo_received: "bg-human-soft text-human-foreground",
-  at_warehouse: "bg-human-soft text-human-foreground",
-  loaded: "bg-primary/15 text-primary",
-  in_transit: "bg-primary text-primary-foreground",
-  arrived: "bg-primary/15 text-primary",
-  customs: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  ready_for_collection: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  delivered: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-};
 
 const AUD = new Intl.NumberFormat("en-AU", {
   style: "currency",
@@ -119,15 +109,16 @@ function ShipmentsPage() {
   }, [shipments, query, statusFilter]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background">
+      <div className="mx-auto w-full max-w-6xl px-4 py-5 md:px-8 md:py-7">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Ship className="h-4 w-4 text-muted-foreground" />
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
+            <Ship className="h-5 w-5 text-muted-foreground" aria-hidden />
             Shipments
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Grouped by shipment — open one to see every sender and receiver in it.
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Customer cargo from warehouse intake to delivery. Open a shipment (e.g. Shipment 57) to see every sender and receiver in it, or a BL to update its status.
           </p>
         </div>
         <NewShipmentDialog
@@ -139,30 +130,28 @@ function ShipmentsPage() {
         />
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-1.5">
+      <div className="mb-5 inline-flex items-center gap-1 rounded-lg bg-secondary p-1">
         <button
           type="button"
           onClick={() => setView("batches")}
+          aria-pressed={view === "batches"}
           className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
-            view === "batches"
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
+            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            view === "batches" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
           )}
         >
-          By Shipment ({consolidations.length})
+          By shipment ({consolidations.length})
         </button>
         <button
           type="button"
           onClick={() => setView("all")}
+          aria-pressed={view === "all"}
           className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
-            view === "all"
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
+            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            view === "all" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
           )}
         >
-          All Shipments ({shipments.length})
+          All BLs ({shipments.length})
         </button>
       </div>
 
@@ -185,6 +174,7 @@ function ShipmentsPage() {
           onStatusFilterChange={setStatusFilter}
         />
       )}
+      </div>
     </div>
   );
 }
@@ -200,46 +190,35 @@ function BatchListView({
   error: string | null;
   unassignedCount: number;
 }) {
-  if (error) {
-    return (
-      <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-        {error}
-      </p>
-    );
-  }
-
-  if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
-  }
-
+  if (error) return <ErrorState title="Couldn't load shipments" onRetry={() => window.location.reload()} />;
+  if (loading) return <LoadingRows rows={5} />;
   if (consolidations.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border py-12 text-center">
-        <Layers className="h-5 w-5 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">No shipments imported yet.</p>
+      <div className="rounded-xl border bg-card">
+        <EmptyState icon={Layers} title="No shipments yet" description="Shipments appear here once they're imported from the shipment tracker." />
       </div>
     );
   }
 
   return (
     <>
-      <div className="overflow-auto rounded-md border border-border">
+      <div className="overflow-auto rounded-xl border bg-card shadow-xs">
         <table className="w-full min-w-[900px] text-left text-sm">
-          <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 font-medium">Shipment</th>
-              <th className="px-3 py-2 font-medium">PE Number</th>
-              <th className="px-3 py-2 font-medium">HBL Range</th>
-              <th className="px-3 py-2 font-medium">Imported</th>
-              <th className="px-3 py-2 font-medium">Gross Income</th>
-              <th className="px-3 py-2 font-medium">Gross Profit</th>
-              <th className="px-3 py-2 font-medium">PEBL ETA</th>
+              <th className="px-4 py-3 font-medium">Shipment</th>
+              <th className="px-4 py-3 font-medium">PE Number</th>
+              <th className="px-4 py-3 font-medium">HBL Range</th>
+              <th className="px-4 py-3 font-medium">Imported</th>
+              <th className="px-4 py-3 font-medium">Gross Income</th>
+              <th className="px-4 py-3 font-medium">Gross Profit</th>
+              <th className="px-4 py-3 font-medium">PEBL ETA</th>
             </tr>
           </thead>
           <tbody>
             {consolidations.map((c) => (
-              <tr key={c.id} className="border-t border-border hover:bg-secondary/30">
-                <td className="px-3 py-2">
+              <tr key={c.id} className="border-t border-border transition-colors hover:bg-accent/30">
+                <td className="px-4 py-3">
                   <Link
                     to="/console/shipments/batch/$batchId"
                     params={{ batchId: c.id }}
@@ -249,21 +228,21 @@ function BatchListView({
                   </Link>
                   <p className="text-xs text-muted-foreground">{c.label}</p>
                 </td>
-                <td className="px-3 py-2">{c.peNumber || "—"}</td>
-                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                <td className="px-4 py-3">{c.peNumber || "—"}</td>
+                <td className="px-4 py-3 tabular-nums text-muted-foreground">
                   {c.hblRange.from}–{c.hblRange.to}
                 </td>
-                <td className="px-3 py-2 tabular-nums">
+                <td className="px-4 py-3 tabular-nums">
                   {c.importedShipmentCount} / {c.totals.hbl}
                   {c.importedShipmentCount < c.totals.hbl && (
                     <span className="ml-1.5 text-xs text-muted-foreground">imported so far</span>
                   )}
                 </td>
-                <td className="px-3 py-2 tabular-nums">{AUD.format(c.financials.grossIncome)}</td>
-                <td className="px-3 py-2 tabular-nums text-emerald-600 dark:text-emerald-400">
+                <td className="px-4 py-3 tabular-nums">{AUD.format(c.financials.grossIncome)}</td>
+                <td className="px-4 py-3 tabular-nums text-success-foreground">
                   {AUD.format(c.financials.grossProfit)}
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
+                <td className="px-4 py-3 text-xs text-muted-foreground">
                   {c.dates.peblEta || "—"}
                 </td>
               </tr>
@@ -275,7 +254,7 @@ function BatchListView({
       {unassignedCount > 0 && (
         <p className="mt-3 text-xs text-muted-foreground">
           {unassignedCount} record{unassignedCount === 1 ? "" : "s"} not grouped under any shipment
-          — see "All Shipments".
+          — see "All BLs".
         </p>
       )}
     </>
@@ -303,105 +282,82 @@ function AllShipmentsView({
 }) {
   return (
     <>
-      {error && (
-        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {error}
-        </p>
-      )}
-
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onStatusFilterChange("all")}
-          className={cn(
-            "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
-            statusFilter === "all"
-              ? "bg-primary text-primary-foreground"
-              : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
-          )}
-        >
-          All ({totalCount})
-        </button>
-        {SHIPMENT_STATUSES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onStatusFilterChange(s)}
-            className={cn(
-              "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
-              statusFilter === s
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
-            )}
-          >
-            {SHIPMENT_STATUS_LABELS[s]}
-          </button>
-        ))}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="Search BL, customer, shipment or tracking"
+            aria-label="Search shipments"
+            className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v as ShipmentStatus | "all")}>
+          <SelectTrigger className="h-10 w-52 bg-card" aria-label="Filter by status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses ({totalCount})</SelectItem>
+            {SHIPMENT_STATUSES.map((st) => (
+              <SelectItem key={st} value={st}>
+                {SHIPMENT_STATUS_LABELS[st]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="relative mb-5 max-w-sm">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Search shipment #, customer, HBL, BL, tracking"
-          aria-label="Search shipments"
-          className="h-9 w-full rounded-md border border-input bg-secondary/60 pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:bg-panel"
-        />
-      </div>
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+
+      {error ? (
+        <ErrorState title="Couldn't load shipments" onRetry={() => window.location.reload()} />
+      ) : loading ? (
+        <LoadingRows rows={6} />
       ) : shipments.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border py-12 text-center">
-          <Package className="h-5 w-5 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground">
-            {totalCount === 0
-              ? "No shipments yet. Create one from a booking or standalone."
-              : "No shipments match this filter."}
-          </p>
+        <div className="rounded-xl border bg-card">
+          {totalCount === 0 ? (
+            <EmptyState icon={Package} title="No shipments yet" description="A BL appears here when a booking is given one." />
+          ) : (
+            <EmptyState icon={Search} title="No BLs found" description="Try changing your search or status filter." />
+          )}
         </div>
       ) : (
-        <div className="overflow-auto rounded-md border border-border">
+        <div className="overflow-auto rounded-xl border bg-card shadow-xs">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">Shipment #</th>
-                <th className="px-3 py-2 font-medium">HBL</th>
-                <th className="px-3 py-2 font-medium">Customer</th>
-                <th className="px-3 py-2 font-medium">Route</th>
-                <th className="px-3 py-2 font-medium">Boxes</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Updated</th>
+                <th className="px-4 py-3 font-medium">Shipment</th>
+                <th className="px-4 py-3 font-medium">BL</th>
+                <th className="px-4 py-3 font-medium">Customer</th>
+                <th className="px-4 py-3 font-medium">Route</th>
+                <th className="px-4 py-3 font-medium">Boxes</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Updated</th>
               </tr>
             </thead>
             <tbody>
               {shipments.map((s) => (
-                <tr key={s.id} className="border-t border-border hover:bg-secondary/30">
-                  <td className="px-3 py-2">
+                <tr key={s.id} className="border-t border-border transition-colors hover:bg-accent/30">
+                  <td className="px-4 py-3">
                     <Link
                       to="/console/shipments/$shipmentId"
                       params={{ shipmentId: s.id }}
                       className="font-medium text-primary hover:underline"
                     >
-                      {s.shipmentNumber}
+                      {s.batchNumber ? `Shipment ${s.batchNumber}` : s.shipmentNumber}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.hblNumber || "—"}</td>
-                  <td className="px-3 py-2">{s.customerName || "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="px-4 py-3 font-medium tabular-nums text-foreground">{s.hblNumber || "—"}</td>
+                  <td className="px-4 py-3">{s.customerName || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
                     {s.origin || "?"} → {s.destination || "?"}
                   </td>
-                  <td className="px-3 py-2 tabular-nums">{s.boxCount ?? s.totalBoxes ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    <Badge
-                      className={cn("font-medium", STATUS_BADGE[s.status])}
-                      variant="secondary"
-                    >
-                      {SHIPMENT_STATUS_LABELS[s.status]}
-                    </Badge>
+                  <td className="px-4 py-3 tabular-nums">{s.boxCount ?? s.totalBoxes ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge tone={shipmentStatus(s.status).tone}>{shipmentStatus(s.status).label}</StatusBadge>
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
                     {new Date(s.updatedAt).toLocaleDateString("en-AU", {
                       day: "numeric",
                       month: "short",
