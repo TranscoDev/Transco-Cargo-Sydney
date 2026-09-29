@@ -12,6 +12,7 @@ import {
 import { createMessage, getMockConversations, simulatedInbound } from "./mock-data";
 import { logout as clearSession } from "./auth";
 import {
+  contactNumber,
   createManualContact,
   createSegment as createSegmentRequest,
   deleteBooking as deleteBookingRequest,
@@ -172,6 +173,7 @@ function toSummary(c: Conversation): ConversationSummary {
     unreadCount: c.messages.filter((m) => m.sender === "CUSTOMER" && m.read === false).length,
     needsAttention: c.needsAttention === true,
     needsAttentionMessage: c.needsAttentionMessage,
+    linkedAccount: c.linkedAccount ?? null,
   };
 }
 
@@ -647,7 +649,9 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
                 {
                   id: customer._id,
                   customerName: customer.name,
-                  phoneNumber: customer.phoneNumber,
+                  phoneNumber: contactNumber(customer),
+                  channel: customer.channel,
+                  linkedAccount: customer.linkedAccount ?? null,
                   mode: customer.mode,
                   messages: [mapped],
                 },
@@ -662,6 +666,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
             const next = [...prev];
             next[idx] = {
               ...conversation,
+              // A website visitor may sign in (or rename themselves) mid-chat.
+              customerName: customer.name || conversation.customerName,
+              phoneNumber: contactNumber({ ...customer, channel: customer.channel ?? conversation.channel }),
+              linkedAccount: customer.linkedAccount ?? conversation.linkedAccount ?? null,
               mode: customer.mode,
               messages: [...conversation.messages, mapped],
             };

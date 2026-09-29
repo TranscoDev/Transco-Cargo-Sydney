@@ -180,6 +180,16 @@ export interface Conversation {
   totalShipments?: number | undefined;
   totalRevenue?: number | undefined;
   outstandingBalance?: number | null | undefined;
+  /** Website chats only: the My Transco account the visitor was signed in
+   * to — who they really are (their phoneNumber shown is this account's). */
+  linkedAccount?: LinkedAccount | null | undefined;
+}
+
+export interface LinkedAccount {
+  id: string;
+  name: string | null;
+  phoneNumber: string | null;
+  customerCode: string | null;
 }
 
 /** GET /api/customers/:id/profile — the CRM detail view. A superset of
@@ -192,6 +202,10 @@ export interface CustomerProfile extends Conversation {
    * inherited `shipments` field (historical import), which is untouched. */
   liveShipments: Shipment[];
   financeDataAvailable: boolean;
+  /** Friendly customer number (CUS-000123) — null until first assigned. */
+  customerCode: string | null;
+  /** Has a My Transco (customer website) account. */
+  hasOnlineAccount: boolean;
 }
 
 export interface ConversationSummary {
@@ -205,6 +219,7 @@ export interface ConversationSummary {
   unreadCount: number;
   needsAttention?: boolean | undefined;
   needsAttentionMessage?: NeedsAttentionMessage | undefined;
+  linkedAccount?: LinkedAccount | null | undefined;
 }
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";

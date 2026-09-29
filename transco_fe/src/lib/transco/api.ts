@@ -18,6 +18,7 @@ import type {
   CustomerStatus,
   EmailCampaignResult,
   ImportResult,
+  LinkedAccount,
   MediaType,
   Message,
   MessageStatus,
@@ -75,6 +76,19 @@ export interface BackendCustomer {
   totalShipments?: number;
   totalRevenue?: number;
   outstandingBalance?: number | null;
+  /** Website chats: the My Transco account the visitor was signed in to. */
+  linkedAccount?: LinkedAccount | null;
+}
+
+/**
+ * What to show as a conversation's number. A website chat has no phone of
+ * its own (its stored "number" is an internal session id): show the signed-in
+ * customer's real number, or say plainly that they weren't signed in.
+ */
+export function contactNumber(c: { channel?: ConversationChannel | undefined; phoneNumber: string; linkedAccount?: LinkedAccount | null | undefined }): string {
+  if (c.linkedAccount?.phoneNumber) return c.linkedAccount.phoneNumber;
+  if (c.channel === "website") return "Not signed in";
+  return c.phoneNumber;
 }
 
 export interface BackendShipment {
@@ -266,7 +280,8 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
   return {
     id: c._id,
     customerName: c.name,
-    phoneNumber: c.phoneNumber,
+    phoneNumber: contactNumber(c),
+    linkedAccount: c.linkedAccount ?? null,
     mode: c.mode,
     channel: c.channel,
     messages: c.messages.map(mapMessage),
@@ -308,6 +323,9 @@ interface BackendCustomerProfile extends BackendCustomerWithMessages {
   totalRevenue: number;
   outstandingBalance: number | null;
   financeDataAvailable: boolean;
+  customerCode?: string | null;
+  hasOnlineAccount?: boolean;
+  phoneVerified?: boolean;
 }
 
 /** GET /api/customers/:id/profile — the CRM detail view. Separate from
@@ -328,6 +346,8 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
     bookings: c.bookings.map(mapBooking),
     liveShipments: c.liveShipments.map(mapShipmentRecord),
     financeDataAvailable: c.financeDataAvailable,
+    customerCode: c.customerCode ?? null,
+    hasOnlineAccount: c.hasOnlineAccount === true,
   };
 }
 

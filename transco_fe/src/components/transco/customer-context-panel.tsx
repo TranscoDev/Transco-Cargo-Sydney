@@ -26,10 +26,12 @@ export function CustomerContextPanel({
   bookings: Booking[];
   shipments: Shipment[];
 }) {
-  const recentBookings = bookings.filter((b) => b.customerId === conversation.id).slice(0, 3);
+  // A signed-in website chat belongs to the customer's real account.
+  const owners = new Set([conversation.id, conversation.linkedAccount?.id].filter(Boolean));
+  const recentBookings = bookings.filter((b) => owners.has(b.customerId)).slice(0, 3);
 
   const activeShipments = shipments
-    .filter((s) => s.customerId === conversation.id && s.status !== "delivered")
+    .filter((s) => owners.has(s.customerId) && s.status !== "delivered")
     .slice(0, 3);
 
   return (
@@ -39,7 +41,7 @@ export function CustomerContextPanel({
         <div className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Phone className="h-3 w-3" />
-            {conversation.phoneNumber}
+            {conversation.linkedAccount ? `+${conversation.phoneNumber}` : conversation.phoneNumber}
           </span>
           {conversation.email && (
             <span className="inline-flex items-center gap-1.5">
@@ -50,9 +52,9 @@ export function CustomerContextPanel({
         </div>
         <span
           className={cn(
-            "mt-2 inline-flex items-center rounded px-1.5 py-0.5 text-[11px]",
+            "mt-2 inline-flex items-center rounded px-1.5 py-0.5 text-xs",
             conversation.status === "DO_NOT_CONTACT" || conversation.status === "BLOCKED"
-              ? "bg-destructive/15 text-destructive"
+              ? "bg-attention-soft text-attention-foreground"
               : "bg-secondary text-secondary-foreground",
           )}
         >
@@ -94,7 +96,7 @@ export function CustomerContextPanel({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">
-                    {s.hblNumber ? `HBL ${s.hblNumber}` : s.shipmentNumber}
+                    {[s.batchNumber ? `Shipment ${s.batchNumber}` : null, s.hblNumber ? `BL ${s.hblNumber}` : null].filter(Boolean).join(" · ") || "Shipment"}
                   </span>
                   <span className="text-muted-foreground">{SHIPMENT_STATUS_LABELS[s.status]}</span>
                 </div>
@@ -111,7 +113,7 @@ export function CustomerContextPanel({
       <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-4">
         <Link
           to="/console/customers/$customerId"
-          params={{ customerId: conversation.id }}
+          params={{ customerId: conversation.linkedAccount?.id ?? conversation.id }}
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-primary hover:bg-secondary"
         >
           <SquareUserRound className="h-3.5 w-3.5" />
@@ -140,7 +142,7 @@ function Section({
 }) {
   return (
     <div className="mb-4">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <Icon className="h-3 w-3" />
         {title}
       </div>
