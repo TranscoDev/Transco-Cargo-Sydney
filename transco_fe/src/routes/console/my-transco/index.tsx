@@ -79,12 +79,12 @@ function MyTranscoAccountsPage() {
   }, [data, query, filter]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
             <UserRound className="h-4 w-4 text-muted-foreground" />
-            My Transco accounts
+            Online Accounts
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
             Customers who have an online account on the Transco website — their details, sign-in
@@ -98,7 +98,7 @@ function MyTranscoAccountsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-attention/20 bg-attention-soft px-4 py-3 text-sm text-attention-foreground">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
           <button type="button" onClick={load} className="ml-auto underline">
@@ -150,7 +150,7 @@ function MyTranscoAccountsPage() {
               type="button"
               onClick={() => setFilter(f.key)}
               className={cn(
-                "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                 filter === f.key ? "bg-primary text-primary-foreground" : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
               )}
             >
@@ -170,9 +170,9 @@ function MyTranscoAccountsPage() {
           </p>
         </div>
       ) : data ? (
-        <div className="overflow-auto rounded-md border border-border bg-panel">
+        <div className="overflow-auto rounded-xl border bg-card shadow-xs bg-panel">
           <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Customer</th>
                 <th className="px-3 py-2 font-medium">Phone</th>
@@ -202,17 +202,17 @@ function MyTranscoAccountsPage() {
                     >
                       {c.name || "(no name yet)"}
                     </Link>
-                    <div className="text-[11px] tabular-nums text-muted-foreground">{c.customerCode || "—"}</div>
+                    <div className="text-xs tabular-nums text-muted-foreground">{c.customerCode || "—"}</div>
                   </td>
                   <td className="px-3 py-2 tabular-nums text-muted-foreground">{formatPhone(c.phoneNumber)}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
                       {c.phoneVerified ? (
-                        <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                        <Badge variant="secondary" className="bg-success-soft text-success-foreground">
                           <ShieldCheck className="mr-1 h-3 w-3" /> Verified
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                        <Badge variant="secondary" className="bg-warning-soft text-warning-foreground">
                           <ShieldQuestion className="mr-1 h-3 w-3" /> Not verified
                         </Badge>
                       )}
@@ -226,9 +226,9 @@ function MyTranscoAccountsPage() {
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {c.bookings.total}
-                    {c.bookings.open > 0 && <span className="text-[11px] text-muted-foreground"> ({c.bookings.open} open)</span>}
+                    {c.bookings.open > 0 && <span className="text-xs text-muted-foreground"> ({c.bookings.open} open)</span>}
                     {c.bookings.needsDeclaration > 0 && (
-                      <div className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                      <div className="text-xs font-medium text-warning-foreground">
                         {c.bookings.needsDeclaration} need declaration
                       </div>
                     )}
@@ -271,11 +271,11 @@ function StatCard({
         active ? "border-primary ring-1 ring-primary/30" : "border-border",
       )}
     >
-      <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <div className={cn("mt-1 text-2xl font-semibold tabular-nums", highlight ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+      <div className={cn("mt-1 text-2xl font-semibold tabular-nums", highlight ? "text-warning-foreground" : "text-foreground")}>
         {value}
       </div>
     </button>

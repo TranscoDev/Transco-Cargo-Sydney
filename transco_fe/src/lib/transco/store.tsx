@@ -67,6 +67,15 @@ import type {
   SegmentFilter,
   Shipment,
 } from "./types";
+import { notify } from "./notify";
+
+/** Toast after a booking status change succeeds. */
+const BOOKING_STATUS_DONE: Record<BookingStatus, string> = {
+  confirmed: "Booking confirmed",
+  completed: "Marked as done — boxes dropped off",
+  cancelled: "Booking cancelled",
+  pending: "Booking reopened",
+};
 
 /**
  * Conversation/message state layer, backed by the real transco_be API and
@@ -327,8 +336,9 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       removed = prev.find((b) => b.id === bookingId);
       return prev.filter((b) => b.id !== bookingId);
     });
-    deleteBookingRequest(bookingId).catch((err) => {
+    deleteBookingRequest(bookingId).then(() => notify.success("Booking deleted")).catch((err) => {
       console.error("Failed to delete booking:", err);
+      notify.error("Couldn't delete this booking", "It has been put back. Please try again.");
       if (removed) {
         setBookings((prev) =>
           prev.some((b) => b.id === bookingId) ? prev : [removed!, ...prev],
@@ -339,22 +349,34 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
 
   const updateBookingStatus = useCallback((bookingId: string, status: BookingStatus) => {
     // Optimistic; reverted on failure the same way deleteBooking is above.
-    let previousStatus: BookingStatus | undefined;
-    setBookings((prev) =>
-      prev.map((b) => {
-        if (b.id !== bookingId) return b;
-        previousStatus = b.status;
-        return { ...b, status };
-      }),
-    );
-    updateBookingStatusRequest(bookingId, status).catch((err) => {
-      console.error("Failed to update booking status:", err);
-      if (previousStatus) {
-        setBookings((prev) =>
-          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus! } : b)),
-        );
-      }
-    });
+    // The success toast offers Undo (e.g. an accidental "Mark done"), which
+    // simply applies the previous status again — without offering another undo.
+    const apply = (next: BookingStatus, offerUndo: boolean) => {
+      let previousStatus: BookingStatus | undefined;
+      setBookings((prev) =>
+        prev.map((b) => {
+          if (b.id !== bookingId) return b;
+          previousStatus = b.status;
+          return { ...b, status: next };
+        }),
+      );
+      updateBookingStatusRequest(bookingId, next)
+        .then(() => {
+          const back = previousStatus;
+          if (offerUndo && back && back !== next) notify.success(BOOKING_STATUS_DONE[next], undefined, () => apply(back, false));
+          else notify.success(offerUndo ? BOOKING_STATUS_DONE[next] : "Change undone");
+        })
+        .catch((err) => {
+          console.error("Failed to update booking status:", err);
+          notify.error("Couldn't update this booking", "Nothing was changed. Please try again.");
+          if (previousStatus) {
+            setBookings((prev) =>
+              prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus! } : b)),
+            );
+          }
+        });
+    };
+    apply(status, true);
   }, []);
 
   const updateBooking = useCallback((bookingId: string, updates: BookingUpdateInput) => {
@@ -367,8 +389,30 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         return { ...b, ...updates };
       }),
     );
-    updateBookingRequest(bookingId, updates).catch((err) => {
+    updateBookingRequest(bookingId, updates).then(() => {
+      // A one-field stage change (Mark checked / boxes received) gets Undo.
+      const stageOnly = Object.keys(updates).length === 1 && (updates.declarationStatus || updates.warehouseStatus);
+      const undo = stageOnly && previous
+        ? () => {
+            const field = updates.declarationStatus ? "declarationStatus" : "warehouseStatus";
+            const was = (previous![field] ?? "not_received") as BookingUpdateInput["declarationStatus"];
+            setBookings((list) => list.map((b) => (b.id === bookingId ? { ...b, [field]: was } : b)));
+            updateBookingRequest(bookingId, { [field]: was })
+              .then(() => notify.success("Change undone"))
+              .catch(() => notify.error("Couldn't undo that", "Please change it back from Edit booking."));
+          }
+        : undefined;
+      notify.success(
+        updates.declarationStatus === "received" ? "Declaration checked"
+          : updates.declarationStatus === "not_received" ? "Declaration marked as not checked"
+          : updates.warehouseStatus === "received" ? "Boxes marked as received"
+          : "Booking updated",
+        undefined,
+        undo,
+      );
+    }).catch((err) => {
       console.error("Failed to update booking:", err);
+      notify.error("Couldn't save this booking", "Your changes were not saved. Please try again.");
       if (previous) {
         setBookings((prevList) =>
           prevList.map((b) => (b.id === bookingId ? previous! : b)),
@@ -380,6 +424,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const assignBookingBl = useCallback(
     async (bookingId: string, hblNumber: string, batchNumber?: number | null) => {
       const { shipmentId } = await assignBookingBlRequest(bookingId, hblNumber, batchNumber);
+      notify.success(`BL ${hblNumber} assigned`, "The customer can see it in My Transco now.");
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received" } : b)),
       );
@@ -400,6 +445,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       }));
       updateContactInfoRequest(conversationId, info).catch((err) => {
         console.error("Failed to persist contact info:", err);
+        notify.error("Couldn't save the customer's details", "Please try again.");
       });
     },
     [patch],

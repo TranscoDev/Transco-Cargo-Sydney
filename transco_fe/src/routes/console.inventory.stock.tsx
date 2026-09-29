@@ -9,9 +9,9 @@ export const Route = createFileRoute("/console/inventory/stock")({
 
 function CurrentStockPage() {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
       <div className="mb-6">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
           <Archive className="h-4 w-4 text-muted-foreground" />
           Current Stock
         </h1>

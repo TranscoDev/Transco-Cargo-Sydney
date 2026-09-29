@@ -28,7 +28,7 @@ const TIER_LABELS: Record<Tier, string> = {
 const TIER_BADGE: Record<Tier, string> = {
   lead: "bg-secondary text-muted-foreground",
   active: "bg-primary/15 text-primary",
-  loyal: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  loyal: "bg-warning-soft text-warning-foreground",
 };
 
 function LeadsPage() {
@@ -49,9 +49,9 @@ function LeadsPage() {
   const visible = filter === "all" ? tiered : tiered.filter((t) => t.tier === filter);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
       <div className="mb-5">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
           <Users className="h-4 w-4 text-muted-foreground" />
           Leads
         </h1>
@@ -99,9 +99,9 @@ function LeadsPage() {
         </button>
       )}
 
-      <div className="overflow-auto rounded-md border border-border">
+      <div className="overflow-auto rounded-xl border bg-card shadow-xs">
         <table className="w-full min-w-[700px] text-left text-sm">
-          <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Phone</th>
@@ -171,7 +171,7 @@ function TierCard({
         className={cn(
           "grid h-9 w-9 shrink-0 place-items-center rounded-md",
           highlight
-            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+            ? "bg-warning-soft text-warning-foreground"
             : "bg-secondary text-muted-foreground",
         )}
       >
@@ -180,7 +180,7 @@ function TierCard({
       <div>
         <p className="text-2xl font-semibold tabular-nums text-foreground">{count}</p>
         <p className="text-xs font-medium text-foreground">{label}</p>
-        <p className="text-[11px] text-muted-foreground">{sublabel}</p>
+        <p className="text-xs text-muted-foreground">{sublabel}</p>
       </div>
     </button>
   );

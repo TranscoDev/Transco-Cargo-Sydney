@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
+import { CheckCircle2, Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
+import { EmptyState } from "./page-kit";
 
 import { cn } from "@/lib/utils";
 import type { ConversationSummary } from "@/lib/transco/types";
@@ -13,7 +14,7 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "UNREAD", label: "Unread" },
   { key: "HUMAN", label: "Staff" },
-  { key: "ATTENTION", label: "⚠️ Attention" },
+  { key: "ATTENTION", label: "Needs staff" },
 ];
 
 const channels: { key: Channel; label: string; Icon: typeof MessageCircle }[] = [
@@ -80,11 +81,11 @@ export function ContactList({
     <div className="flex h-full min-h-0 flex-col bg-panel">
       <div className="border-b border-border px-3 py-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-          <h2 className="truncate text-sm font-semibold text-foreground">Conversations</h2>
-          <p className="shrink-0 text-[11px] text-muted-foreground">
+          <h1 className="truncate text-base font-semibold text-foreground">Conversations</h1>
+          <p className="shrink-0 text-xs text-muted-foreground">
             {unreadTotal} unread · {humanTotal} staff
             {attentionTotal > 0 && (
-              <span className="font-medium text-destructive"> · {attentionTotal} flagged</span>
+              <span className="font-medium text-attention-foreground"> · {attentionTotal} need staff</span>
             )}
           </p>
         </div>
@@ -107,11 +108,11 @@ export function ContactList({
                 aria-label={label}
                 aria-current={active}
                 className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-colors",
+                  "flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors",
                   paused
                     ? active
-                      ? "bg-amber-500/25 text-amber-800 shadow-sm dark:text-amber-300"
-                      : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
+                      ? "bg-warning-soft text-warning-foreground shadow-sm ring-1 ring-warning/40"
+                      : "bg-warning-soft/60 text-warning-foreground hover:bg-warning-soft"
                     : active
                       ? "bg-panel text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground",
@@ -142,13 +143,13 @@ export function ContactList({
               type="button"
               onClick={() => setStatus(f.key)}
               className={cn(
-                "rounded px-2 py-1 text-[11px] font-medium transition-colors",
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                 status === f.key
                   ? f.key === "ATTENTION"
-                    ? "bg-destructive text-destructive-foreground"
+                    ? "bg-attention-soft text-attention-foreground ring-1 ring-attention/40"
                     : "bg-accent text-accent-foreground"
                   : f.key === "ATTENTION" && attentionTotal > 0
-                    ? "text-destructive hover:bg-destructive/10"
+                    ? "text-attention-foreground hover:bg-attention-soft"
                     : "text-muted-foreground hover:bg-secondary",
               )}
             >
@@ -160,9 +161,12 @@ export function ContactList({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {visible.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-muted-foreground">
-            No conversations match this view.
-          </p>
+          <EmptyState
+            compact
+            icon={query ? Search : CheckCircle2}
+            title={query ? "No conversations found" : "Nothing here right now"}
+            description={query ? "Try a different name or number." : "You're all caught up in this view."}
+          />
         ) : (
           visible.map((c) => (
             <ContactCard

@@ -4,6 +4,7 @@ import { MessagesSquare } from "lucide-react";
 import { ChatPanel } from "@/components/transco/chat-panel";
 import { ContactList } from "@/components/transco/contact-list";
 import { CustomerContextPanel } from "@/components/transco/customer-context-panel";
+import { EmptyState } from "@/components/transco/page-kit";
 import { useConversations } from "@/lib/transco/store";
 
 // Unchanged from the old /console "conversations" tab (ConsoleBody) —
@@ -63,14 +64,12 @@ function ConversationsPage() {
             <CustomerContextPanel conversation={selectedConversation} bookings={bookings} shipments={shipments} />
           </>
         ) : (
-          <div className="grid h-full place-items-center bg-chat-canvas px-6 text-center">
-            <div>
-              <MessagesSquare className="mx-auto h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 text-sm font-medium text-foreground">Select a conversation</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Yellow-highlighted chats are currently handled by staff.
-              </p>
-            </div>
+          <div className="grid h-full place-items-center bg-chat-canvas px-6">
+            <EmptyState
+              icon={MessagesSquare}
+              title="Choose a conversation"
+              description="Pick a chat on the left to read it and reply. Chats highlighted in yellow are being handled by staff; the bot answers the rest."
+            />
           </div>
         )}
       </div>

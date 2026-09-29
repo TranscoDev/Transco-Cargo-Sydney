@@ -257,9 +257,9 @@ export function MessageComposer({
           </button>
         </div>
       )}
-      {attachError && <p className="mt-1.5 text-[10px] text-destructive">⚠️ {attachError}</p>}
-      {sendingFile && <p className="mt-1.5 text-[10px] text-muted-foreground">Sending…</p>}
-      <p className="mt-1.5 text-[10px] text-muted-foreground">
+      {attachError && <p className="mt-1.5 text-xs text-destructive">⚠️ {attachError}</p>}
+      {sendingFile && <p className="mt-1.5 text-xs text-muted-foreground">Sending…</p>}
+      <p className="mt-1.5 text-xs text-muted-foreground">
         {isHuman
           ? "Enter to send · Shift+Enter for a new line"
           : "This conversation is handled by the chatbot. Switch to Staff to reply."}

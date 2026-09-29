@@ -40,15 +40,15 @@ function TrackingPage() {
   const nothingFound = result && !result.peblFound && !result.shipment;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
       <div className="mb-5">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
           <MapPin className="h-4 w-4 text-muted-foreground" />
           Tracking
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Look up a BL/HBL number's live customs status straight from PEBL, without leaving the
-          console — same source the WhatsApp bot uses to answer customers.
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Enter a customer's BL number to see where their shipment is. The answer comes live from the shipping line (PEBL) — the same
+          source the bot uses to answer customers.
         </p>
       </div>
 
@@ -60,28 +60,28 @@ function TrackingPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Enter BL / HBL number, e.g. 203143"
             aria-label="BL number"
-            className="h-10 w-full rounded-md border border-input bg-secondary/60 pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:bg-panel"
+            className="h-10 w-full rounded-lg border border-input bg-card pl-8 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
           />
         </div>
         <button
           type="submit"
           disabled={loading || !query.trim()}
-          className="h-10 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+          className="h-10 shrink-0 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
         >
           {loading ? "Tracking…" : "Track"}
         </button>
       </form>
 
       {error && (
-        <p className="mb-4 max-w-2xl rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="mb-4 max-w-2xl rounded-lg border border-attention/20 bg-attention-soft px-4 py-3 text-sm text-attention-foreground">
           {error}
         </p>
       )}
 
       {!searched && !error && (
-        <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border py-16 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-xl border bg-card py-16 text-center">
           <Ship className="h-5 w-5 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground">
+          <p className="max-w-sm text-sm text-muted-foreground">
             Enter a BL number above to see its customs status and CRM record.
           </p>
         </div>
@@ -127,14 +127,14 @@ function TrackingPage() {
                     value={result.pebl.estimatedClearanceDate}
                   />
                   <div className="mt-1 rounded-md bg-secondary/40 px-3 py-2">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Estimated Delivery
                     </p>
                     <p className="text-lg font-semibold text-foreground">
                       {result.pebl.estimatedDeliveryDate || "—"}
                     </p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Live from pebl-tracker.transcocargo.com.au — estimates only, may vary.
                   </p>
                 </div>

@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/transco/page-kit";
 import {
   CUSTOMER_STATUSES,
   CUSTOMER_STATUS_LABELS,
@@ -52,7 +54,7 @@ const SOURCE_BADGE: Record<
   whatsapp: {
     label: "WhatsApp",
     icon: MessageCircle,
-    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    className: "bg-success-soft text-success-foreground",
   },
   website: {
     label: "Website",
@@ -62,7 +64,7 @@ const SOURCE_BADGE: Record<
   historical: {
     label: "Historical",
     icon: Package,
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    className: "bg-warning-soft text-warning-foreground",
   },
   manual: {
     label: "Manual",
@@ -70,7 +72,7 @@ const SOURCE_BADGE: Record<
     className: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
   },
   portal: {
-    label: "My Transco",
+    label: "Online account",
     icon: SquareUserRound,
     className: "bg-teal-500/10 text-teal-700 dark:text-teal-400",
   },
@@ -78,10 +80,10 @@ const SOURCE_BADGE: Record<
 
 const STATUS_BADGE: Record<CustomerStatus, string> = {
   ACTIVE: "bg-secondary text-muted-foreground",
-  HISTORICAL: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  REVIEW: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
-  DO_NOT_CONTACT: "bg-orange-500/15 text-orange-700 dark:text-orange-400",
-  BLOCKED: "bg-red-500/15 text-red-600 dark:text-red-400",
+  HISTORICAL: "bg-secondary text-secondary-foreground",
+  REVIEW: "bg-warning-soft text-warning-foreground",
+  DO_NOT_CONTACT: "bg-attention-soft text-attention-foreground",
+  BLOCKED: "bg-attention-soft text-attention-foreground",
 };
 
 /** Old records predate the sources[] field — derive a sensible source list
@@ -279,46 +281,43 @@ export function ContactsDirectory({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
-      <div className="border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-foreground">Contacts</h2>
-            <p className="text-[11px] text-muted-foreground">{sorted.length} total</p>
-            {/* Only surfaced when non-zero — these need staff action, unlike
-                Active/Historical which are just the normal steady state and
-                don't need to compete for attention here. */}
-            {stats.byStatus.REVIEW > 0 && (
-              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium text-yellow-700 dark:text-yellow-400 bg-yellow-500/15">
-                {stats.byStatus.REVIEW} needs review
-              </span>
-            )}
-            {stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED > 0 && (
-              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-500/15">
-                {stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED} do not contact / blocked
-              </span>
-            )}
+      <div className="border-b border-border px-4 py-4 md:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Customers</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Everyone we've talked to or shipped for. Click a name to see their profile, bookings and shipments.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <StatusBadge tone="neutral">{sorted.length} customers</StatusBadge>
+              {/* Only surfaced when non-zero — these need staff action, unlike
+                  Active/Historical which are just the normal steady state. */}
+              {stats.byStatus.REVIEW > 0 && <StatusBadge tone="pending">{stats.byStatus.REVIEW} need review</StatusBadge>}
+              {stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED > 0 && (
+                <StatusBadge tone="attention">
+                  {stats.byStatus.DO_NOT_CONTACT + stats.byStatus.BLOCKED} do not contact / blocked
+                </StatusBadge>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {onImportCustomers && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setImportOpen(true)}
-                title="For a bulk sheet update — for one contact, use Add Contact instead"
-                className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
+                title="For a bulk sheet update — for one customer, use Add customer instead"
               >
-                <Upload className="h-3.5 w-3.5" />
+                <Upload className="mr-1.5 h-4 w-4" />
                 Import Excel
-              </button>
+              </Button>
             )}
             {onAddContact && (
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add Contact
-              </button>
+              <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add customer
+              </Button>
             )}
           </div>
         </div>
@@ -337,7 +336,7 @@ export function ContactsDirectory({
               type="button"
               onClick={() => setFilter(key)}
               className={cn(
-                "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                 filter === key
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
@@ -351,7 +350,7 @@ export function ContactsDirectory({
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as CustomerStatus | "any")}
             aria-label="Filter by status"
-            className="h-7 rounded-full border border-input bg-secondary/60 px-2 text-[11px] text-foreground outline-none focus:border-ring"
+            className="h-7 rounded-full border border-input bg-secondary/60 px-2 text-xs text-foreground outline-none focus:border-ring"
           >
             <option value="any">Any status</option>
             {CUSTOMER_STATUSES.map((s) => (
@@ -361,7 +360,7 @@ export function ContactsDirectory({
             ))}
           </select>
 
-          <label className="inline-flex items-center gap-1.5 rounded-full bg-secondary/60 px-2.5 py-1 text-[11px] text-muted-foreground">
+          <label className="inline-flex items-center gap-1.5 rounded-full bg-secondary/60 px-2.5 py-1 text-xs text-muted-foreground">
             <input
               type="checkbox"
               checked={hasEmailOnly}
@@ -374,11 +373,11 @@ export function ContactsDirectory({
 
         {(segments.length > 0 || onSaveSegment) && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground">Segments:</span>
+            <span className="text-xs text-muted-foreground">Segments:</span>
             {segments.map((s) => (
               <span
                 key={s.id}
-                className="inline-flex items-center gap-1 rounded-full bg-secondary/60 pl-2.5 pr-1 py-1 text-[11px] text-muted-foreground"
+                className="inline-flex items-center gap-1 rounded-full bg-secondary/60 pl-2.5 pr-1 py-1 text-xs text-muted-foreground"
               >
                 <button
                   type="button"
@@ -408,7 +407,7 @@ export function ContactsDirectory({
               <button
                 type="button"
                 onClick={() => setSaveSegmentOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-dashed border-input px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-secondary/60"
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-input px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary/60"
               >
                 <BookmarkPlus className="h-3 w-3" />
                 Save current filter
@@ -432,7 +431,7 @@ export function ContactsDirectory({
           <button
             type="button"
             onClick={() => downloadCsv(exportRows)}
-            className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
+            className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
           >
             <Download className="h-3.5 w-3.5" />
             Export CSV{" "}
@@ -444,7 +443,7 @@ export function ContactsDirectory({
               type="button"
               onClick={() => setEmailModalOpen(true)}
               disabled={selectedIds.size === 0}
-              className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
             >
               <Mail className="h-3.5 w-3.5" />
               Email Selected {selectedIds.size > 0 && `(${selectedIds.size})`}
@@ -455,7 +454,7 @@ export function ContactsDirectory({
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
               Clear selection
             </button>
@@ -469,8 +468,8 @@ export function ContactsDirectory({
             No contacts match this search.
           </p>
         ) : (
-          <table className="w-full min-w-[1180px] border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-panel text-left text-[11px] text-muted-foreground shadow-[0_1px_0_0_theme(colors.border)]">
+          <table className="w-full min-w-[1080px] border-collapse text-sm">
+            <thead className="sticky top-0 z-10 bg-panel text-left text-xs text-muted-foreground shadow-[0_1px_0_0_theme(colors.border)]">
               <tr>
                 <th className="px-2 py-2">
                   <button
@@ -486,18 +485,17 @@ export function ContactsDirectory({
                     )}
                   </button>
                 </th>
-                <th className="min-w-[200px] px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Phone</th>
-                <th className="px-4 py-2 font-medium">Source</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 font-medium">Mode</th>
-                <th className="px-4 py-2 text-right font-medium">Bookings</th>
-                <th className="px-4 py-2 text-right font-medium">Shipments</th>
-                <th className="px-4 py-2 text-right font-medium">Revenue / Outstanding</th>
-                <th className="whitespace-nowrap px-4 py-2 font-medium">Last Activity</th>
-                <th className="px-4 py-2 font-medium">Email</th>
-                <th className="px-4 py-2 font-medium">Notes</th>
-                <th className="px-4 py-2 font-medium" />
+                <th className="min-w-[200px] px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Phone</th>
+                <th className="px-4 py-3 font-medium">Source</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Mode</th>
+                <th className="px-4 py-3 text-right font-medium">Bookings</th>
+                <th className="px-4 py-3 text-right font-medium">Shipments</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Last Activity</th>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Notes</th>
+                <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -565,7 +563,7 @@ function SourceBadges({ sources }: { sources: CustomerSource[] }) {
           <span
             key={s}
             className={cn(
-              "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]",
+              "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs",
               badge.className,
             )}
           >
@@ -616,7 +614,7 @@ function ContactRow({
         selected && "bg-secondary/30",
       )}
     >
-      <td className="px-2 py-2">
+      <td className="px-2 py-3">
         <button
           type="button"
           onClick={onToggleSelected}
@@ -630,33 +628,39 @@ function ContactRow({
           {selected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
         </button>
       </td>
-      <td className="whitespace-nowrap px-4 py-2">
+      <td className="whitespace-nowrap px-4 py-3">
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onSelect(conversation.id)}
-            className="font-medium text-foreground underline-offset-2 hover:underline"
-          >
-            {conversation.customerName}
-          </button>
+          {/* The name opens the customer's profile (the usual first stop
+              when a customer calls or walks in); the chat icon opens their
+              conversation. */}
           <Link
             to="/console/customers/$customerId"
             params={{ customerId: conversation.id }}
-            aria-label={`Open full CRM profile for ${conversation.customerName}`}
-            title="Open full profile"
-            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            title="Open customer profile"
+            className="font-medium text-foreground underline-offset-2 hover:underline"
           >
-            <SquareUserRound className="h-3.5 w-3.5" />
+            {conversation.customerName}
           </Link>
+          {conversation.messages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onSelect(conversation.id)}
+              aria-label={`Open conversation with ${conversation.customerName}`}
+              title="Open conversation"
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </td>
-      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
         {conversation.phoneNumber}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <SourceBadges sources={sourcesFor(conversation)} />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         {/* Active/Historical are just the steady state — plain text, no
             pill — so the colored badge only draws the eye for statuses
             that actually need staff attention (Review/DNC/Blocked). */}
@@ -665,7 +669,7 @@ function ContactRow({
         ) : (
           <span
             className={cn(
-              "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium",
+              "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
               STATUS_BADGE[status],
             )}
           >
@@ -673,24 +677,17 @@ function ContactRow({
           </span>
         )}
       </td>
-      <td className="px-4 py-2 text-muted-foreground">{MODE_LABELS[conversation.mode]}</td>
-      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+      <td className="px-4 py-3 text-muted-foreground">{MODE_LABELS[conversation.mode]}</td>
+      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
         {conversation.totalBookings ?? 0}
       </td>
-      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+      <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
         {conversation.totalShipments ?? 0}
       </td>
-      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-        {/* outstandingBalance === null is the "finance not built yet" signal from the backend
-            (see server.js's customer profile/list endpoints) — never show a fake $0. */}
-        {conversation.outstandingBalance === null || conversation.outstandingBalance === undefined
-          ? "—"
-          : `$${conversation.totalRevenue ?? 0} / $${conversation.outstandingBalance}`}
-      </td>
-      <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
+      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
         {formatLastActivity(conversation)}
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -700,7 +697,7 @@ function ContactRow({
           className="h-7 w-40 rounded border border-transparent bg-transparent px-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground hover:border-input focus:border-ring focus:bg-secondary/60"
         />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -710,7 +707,7 @@ function ContactRow({
           className="h-7 w-56 rounded border border-transparent bg-transparent px-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground hover:border-input focus:border-ring focus:bg-secondary/60"
         />
       </td>
-      <td className="px-2 py-2">
+      <td className="px-2 py-3">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -795,14 +792,14 @@ function ContactProfileModal({
           </div>
 
           <div>
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Sources
             </p>
             <SourceBadges sources={sources} />
           </div>
 
           <div>
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Status
             </p>
             {onUpdateStatus ? (
@@ -820,7 +817,7 @@ function ContactProfileModal({
             ) : (
               <span
                 className={cn(
-                  "inline-flex items-center rounded px-1.5 py-0.5 text-[11px]",
+                  "inline-flex items-center rounded px-1.5 py-0.5 text-xs",
                   STATUS_BADGE[status],
                 )}
               >
@@ -830,7 +827,7 @@ function ContactProfileModal({
           </div>
 
           <div>
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Shipment History {shipments.length > 0 && `(${shipments.length})`}
             </p>
             {shipments.length === 0 ? (
@@ -843,8 +840,8 @@ function ContactProfileModal({
                     <p className="text-muted-foreground">{s.receiverAddress}</p>
                     {s.receiverPhone && <p className="text-muted-foreground">{s.receiverPhone}</p>}
                     {s.batchNumber && (
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        Batch #{s.batchNumber}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Shipment {s.batchNumber}
                       </p>
                     )}
                   </li>
@@ -855,7 +852,7 @@ function ContactProfileModal({
 
           {conversation.notes && (
             <div>
-              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Notes
               </p>
               <p className="whitespace-pre-wrap text-foreground">{conversation.notes}</p>
@@ -917,7 +914,7 @@ function AddContactModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h3 className="text-sm font-semibold text-foreground">Add Contact</h3>
+          <h3 className="text-sm font-semibold text-foreground">Add customer</h3>
           <button
             type="button"
             onClick={onClose}
@@ -961,14 +958,14 @@ function AddContactModal({
             />
           </Field>
 
-          {error && <p className="text-[11px] text-red-500">{error}</p>}
+          {error && <p className="text-xs text-attention-foreground">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
           >
             Cancel
           </button>
@@ -976,9 +973,9 @@ function AddContactModal({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? "Adding…" : "Add Contact"}
+            {saving ? "Adding…" : "Add customer"}
           </button>
         </div>
       </div>
@@ -1109,11 +1106,11 @@ function EmailCampaignModal({
             <p className="text-muted-foreground">
               {result.skippedExcludedStatus} skipped — Do Not Contact / Blocked
             </p>
-            {result.failed > 0 && <p className="text-red-500">{result.failed} failed to send</p>}
+            {result.failed > 0 && <p className="text-attention-foreground">{result.failed} failed to send</p>}
             <button
               type="button"
               onClick={onClose}
-              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
             >
               Done
             </button>
@@ -1171,18 +1168,18 @@ function EmailCampaignModal({
                   </label>
                 )}
                 {attachmentError && (
-                  <p className="mt-1 text-[11px] text-red-500">{attachmentError}</p>
+                  <p className="mt-1 text-xs text-attention-foreground">{attachmentError}</p>
                 )}
               </Field>
 
-              {error && <p className="text-[11px] text-red-500">{error}</p>}
+              {error && <p className="text-xs text-attention-foreground">{error}</p>}
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
               >
                 Cancel
               </button>
@@ -1190,7 +1187,7 @@ function EmailCampaignModal({
                 type="button"
                 onClick={handleSend}
                 disabled={!canSend}
-                className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? "Sending…" : `Send to ${willSendCount}`}
               </button>
@@ -1262,14 +1259,14 @@ function SaveSegmentModal({
               autoFocus
             />
           </Field>
-          {error && <p className="text-[11px] text-red-500">{error}</p>}
+          {error && <p className="text-xs text-attention-foreground">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
           >
             Cancel
           </button>
@@ -1277,7 +1274,7 @@ function SaveSegmentModal({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save Segment"}
           </button>
@@ -1366,7 +1363,7 @@ function ImportCustomersModal({
             )}
             {result.reviewRows.length > 0 && (
               <div className="mt-2 rounded-md border border-border/60 px-2.5 py-2">
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Needs review
                 </p>
                 <ul className="space-y-1">
@@ -1384,7 +1381,7 @@ function ImportCustomersModal({
             <button
               type="button"
               onClick={onClose}
-              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
             >
               Done
             </button>
@@ -1407,14 +1404,14 @@ function ImportCustomersModal({
                   className="hidden"
                 />
               </label>
-              {error && <p className="text-[11px] text-red-500">{error}</p>}
+              {error && <p className="text-xs text-attention-foreground">{error}</p>}
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary"
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
               >
                 Cancel
               </button>
@@ -1422,7 +1419,7 @@ function ImportCustomersModal({
                 type="button"
                 onClick={handleImport}
                 disabled={!file || importing}
-                className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {importing ? "Importing…" : "Import"}
               </button>
@@ -1437,7 +1434,7 @@ function ImportCustomersModal({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </label>
   );

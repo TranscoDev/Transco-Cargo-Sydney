@@ -92,7 +92,7 @@ export function BookingCalendar({
 
       <div className="grid grid-cols-7 gap-1 text-center">
         {WEEKDAY_LABELS.map((w, i) => (
-          <span key={i} className="text-[10px] font-medium text-muted-foreground">
+          <span key={i} className="text-xs font-medium text-muted-foreground">
             {w}
           </span>
         ))}
@@ -107,7 +107,7 @@ export function BookingCalendar({
               type="button"
               onClick={() => onSelectDate(isSelected ? null : cell.key)}
               className={cn(
-                "relative flex h-8 flex-col items-center justify-center rounded-md text-[11px] transition-colors",
+                "relative flex h-8 flex-col items-center justify-center rounded-md text-xs transition-colors",
                 isSelected
                   ? "bg-primary text-primary-foreground"
                   : isToday
@@ -134,23 +134,23 @@ export function BookingCalendar({
       {selectedDate && (
         <div className="rounded-md border border-border/60 bg-secondary/20 px-2.5 py-2">
           <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-[11px] font-medium text-foreground">
+            <p className="text-xs font-medium text-foreground">
               {selectedDayBookings.length} booking{selectedDayBookings.length === 1 ? "" : "s"}
             </p>
             <button
               type="button"
               onClick={() => onSelectDate(null)}
-              className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
               Clear
             </button>
           </div>
           {selectedDayBookings.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">Nothing booked this day.</p>
+            <p className="text-xs text-muted-foreground">Nothing booked this day.</p>
           ) : (
             <ul className="space-y-1">
               {selectedDayBookings.map((b) => (
-                <li key={b.id} className="flex items-center justify-between text-[11px]">
+                <li key={b.id} className="flex items-center justify-between text-xs">
                   <span className="truncate text-foreground">{b.customerName || b.phoneNumber}</span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">{b.requestedTime}</span>
                 </li>
