@@ -124,8 +124,14 @@ async function signIn(localPhone, countryCode = '61', source) {
 // the declaration). The town is the booking's destination.
 function decl(town, overrides = {}) {
   return {
-    sender: { isMe: true, fullName: 'Alpha Sender', address: '1 Test St, Seven Hills NSW 2147', mobile: '+61 400 000 001', email: 'sender@example.com', ...(overrides.sender || {}) },
-    receiver: { fullName: 'Rita Receiver', address: '12 Temple Rd', town, mobile: '+94 77 123 4567', email: 'rita@example.com', idNumber: '199012345678', ...(overrides.receiver || {}) }
+    sender: { isMe: true, fullName: 'Alpha Sender', address: '1 Test St, Seven Hills NSW 2147', mobile: '+61 400 000 001', email: 'sender@example.com', idNumber: 'N1234567', ...(overrides.sender || {}) },
+    receiver: { fullName: 'Rita Receiver', address: '12 Temple Rd', town, mobile: '+94 77 123 4567', email: 'rita@example.com', idNumber: '199012345678', ...(overrides.receiver || {}) },
+    // The rest of the declaration, collected with every online booking.
+    contents: [{ description: 'Clothes', condition: 'used', qty: 10 }],
+    insurance: false,
+    declarationAccepted: true,
+    signedName: 'Alpha Sender',
+    ...(overrides.signOff || {})
   };
 }
 
@@ -161,7 +167,8 @@ before(async () => {
       RESEND_API_KEY: '',
       GOOGLE_SERVICE_ACCOUNT_JSON: '',
       SESSION_SECRET: 'portal-test-secret',
-      PORTAL_AUTH_IP_LIMIT: '1000'
+      PORTAL_AUTH_IP_LIMIT: '1000',
+      WALKIN_IP_LIMIT: '1000'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -422,15 +429,21 @@ test('scenario 6 + 7: staff assign BLs; each customer sees only their own BL, ev
   assert.ok(!JSON.stringify(shipmentsA.body).includes('203116'));
   assert.ok(!JSON.stringify(shipmentsA.body).includes('Customer Beta'));
 
+  // Home shows the customer's own latest BL as soon as staff assign it.
+  const summaryA = await api('GET', '/api/portal/summary', { token: custA.token });
+  assert.equal(summaryA.body.latestBl.blNumber, '203115');
+  assert.equal(summaryA.body.latestBl.batchLabel, 'Shipment 57');
+  assert.ok(!JSON.stringify(summaryA.body).includes('203116'));
+
   const bookingNow = await api('GET', `/api/portal/bookings/${bookingA.id}`, { token: custA.token });
   assert.equal(bookingNow.body.booking.blNumber, '203115');
   const steps = Object.fromEntries(bookingNow.body.booking.steps.map(s => [s.key, s.done]));
   assert.equal(steps.warehouse_received, true);
   assert.equal(steps.bl_assigned, true);
   assert.equal(steps.in_transit, false);
-  // Submitted online with the booking — the customer's part is done.
+  // A declaration is confirmed once its BL is assigned.
   assert.equal(steps.declaration, true);
-  assert.equal(bookingNow.body.booking.declaration.status, 'submitted');
+  assert.equal(bookingNow.body.booking.declaration.status, 'received');
 
   const shipmentBId = (await api('GET', '/api/portal/shipments', { token: custB.token })).body.shipments[0].id;
   assert.equal((await api('GET', `/api/portal/shipments/${shipmentBId}`, { token: custA.token })).status, 404);
@@ -953,7 +966,7 @@ test('declaration: sender details are remembered only for the account holder, re
   assert.equal(print.body.declaration.sender.fullName, 'Cousin Sender');
   assert.equal(print.body.declaration.receiver.town, 'Kandy');
   assert.equal(print.body.declaration.delivery, 'Door delivery');
-  assert.deepEqual(print.body.declaration.items, [{ label: 'Gift Box', qty: 1 }]);
+  assert.deepEqual(print.body.declaration.items, [{ type: 'gift_box', label: 'Gift Box', qty: 1 }]);
   assert.equal(print.body.declaration.customer.phoneNumber, '61400777001');
   assert.equal(print.body.declaration.customer.id, String(record._id));
   assert.equal((await api('GET', `/api/my-transco/bookings/${new ObjectId()}/declaration`, { token: staffToken })).status, 404);
@@ -1166,4 +1179,318 @@ test('chat answers schedule questions from the shipping calendar, not the AI', a
   const visitor = await db.collection('customers').findOne({ sessionId, channel: 'website' });
   const botMessages = await db.collection('messages').find({ customerId: visitor._id, senderType: 'CHATBOT' }).toArray();
   assert.ok(botMessages.some(m => /Shipping calendar — Sri Lanka/.test(m.content)));
+});
+
+// ---------- walk-in drop-offs (Saturday customers without a booking) ----------
+
+function walkInForm(overrides = {}) {
+  return {
+    country: 'sri_lanka',
+    service: 'sea',
+    sender: { fullName: 'Walk In Sender', address: 'Unit 3, 18 Sorrell Street, Parramatta NSW 2150', mobile: '0477 642 088', email: 'walkin@example.com', idNumber: 'n10388128' },
+    receiver: { fullName: 'Walk In Receiver', address: '83/B/2/1, Mathgamuwa', town: 'Kadugannawa', mobile: '+94 76 107 2332', email: 'receiver@example.com', idNumber: 'N10388128' },
+    items: [{ type: 'tea_chest', qty: 1 }],
+    deliveryType: 'collect',
+    contents: [{ description: 'Chocolate', condition: 'new', qty: 5 }, { description: 'Clothes', condition: 'used', qty: 10 }],
+    insurance: false,
+    declarationAccepted: true,
+    signedName: 'Walk In Sender',
+    signatureImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    ...overrides
+  };
+}
+
+test('walk-in form: checks the details and needs the sender Passport/NIC for Sri Lanka', async () => {
+  const noId = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, idNumber: '' } }) });
+  assert.equal(noId.status, 400);
+  assert.equal(noId.body.field, 'sender.idNumber');
+
+  const noDeclaration = await api('POST', '/api/public/dropoff', { body: walkInForm({ declarationAccepted: false }) });
+  assert.equal(noDeclaration.status, 400);
+  assert.equal(noDeclaration.body.field, 'declarationAccepted');
+
+  const noContents = await api('POST', '/api/public/dropoff', { body: walkInForm({ contents: [] }) });
+  assert.equal(noContents.status, 400);
+  assert.equal(noContents.body.field, 'contents');
+
+  const badSignature = await api('POST', '/api/public/dropoff', { body: walkInForm({ signatureImage: 'javascript:alert(1)' }) });
+  assert.equal(badSignature.status, 400);
+
+  // India doesn't need the sender's Passport/NIC.
+  const india = await api('POST', '/api/public/dropoff', {
+    body: walkInForm({ country: 'india', items: [{ type: 'general', qty: 1 }], sender: { ...walkInForm().sender, idNumber: '' } })
+  });
+  assert.equal(india.status, 201, JSON.stringify(india.body));
+});
+
+test('walk-in form: a submission is a claim only — no customer is linked or created until staff finalise', async () => {
+  const countBefore = await db.collection('customers').countDocuments({ phoneNumber: '61477642088' });
+  const res = await api('POST', '/api/public/dropoff', { body: walkInForm() });
+  assert.equal(res.status, 201, JSON.stringify(res.body));
+  assert.match(res.body.bookingCode, /^BK-\d{6}$/);
+  // Nothing personal comes back to the (public) page.
+  assert.deepEqual(Object.keys(res.body).sort(), ['bookingCode', 'submittedAt']);
+
+  const b = await db.collection('bookings').findOne({ bookingCode: res.body.bookingCode });
+  assert.equal(b.channel, 'walk_in');
+  assert.equal(b.customerId, null);
+  assert.equal(b.status, 'pending');
+  assert.equal(b.walkIn.status, 'submitted');
+  assert.equal(b.sender.idNumber, 'N10388128');
+  assert.equal(b.contents.length, 2);
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61477642088' }), countBefore);
+
+  // In the staff list, without the signature image.
+  const list = await api('GET', '/api/bookings', { token: staffToken });
+  const listed = list.body.bookings.find(x => x.bookingCode === res.body.bookingCode);
+  assert.ok(listed);
+  assert.equal(listed.signature.image, undefined);
+  assert.equal(listed.signature.name, 'Walk In Sender');
+
+  // An unconfirmed walk-in (no customer yet) never breaks the staff lists.
+  const customersList = await api('GET', '/api/customers', { token: staffToken });
+  assert.equal(customersList.status, 200, JSON.stringify(customersList.body));
+
+  // Walk-ins never use up an appointment slot.
+  const count = await api('GET', `/api/bookings/count?day=${b.requestedDay}`, { token: staffToken });
+  const appointments = await db.collection('bookings').countDocuments({ requestedDay: b.requestedDay, status: { $nin: ['cancelled', 'completed'] }, channel: { $ne: 'walk_in' } });
+  assert.equal(count.body.count, appointments);
+});
+
+test('walk-in finalise: staff only; links/creates the customer by phone and records office-use figures', async () => {
+  const res = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, mobile: '+61 400 555 777', email: 'newwalkin@example.com' } }) });
+  const b = await db.collection('bookings').findOne({ bookingCode: res.body.bookingCode });
+
+  const anonymous = await api('POST', `/api/walk-ins/${b._id}/finalise`, { body: {} });
+  assert.equal(anonymous.status, 401);
+
+  // The declaration is confirmed once its BL is assigned — no BL, no finalise,
+  // and nothing changes (no customer is created either).
+  const noBl = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { weight: 10, contentValues: [70, 50] } });
+  assert.equal(noBl.status, 400);
+  assert.equal(noBl.body.field, 'hblNumber');
+  assert.equal((await db.collection('bookings').findOne({ _id: b._id })).walkIn.status, 'submitted');
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400555777' }), 0);
+
+  // Values are a staff field: the customer never sends them, and every
+  // item needs one before confirming.
+  assert.equal(b.contents[0].value, null);
+  const noValues = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-001' } });
+  assert.equal(noValues.status, 400);
+  assert.equal(noValues.body.field, 'contentValues');
+  const oneValue = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-001', contentValues: [70, ''] } });
+  assert.equal(oneValue.status, 400);
+  assert.equal(oneValue.body.index, 1);
+  assert.equal((await db.collection('bookings').findOne({ _id: b._id })).walkIn.status, 'submitted');
+
+  // A BL already used by someone else is refused, again changing nothing.
+  const taken = await db.collection('shipments').insertOne({ shipmentNumber: 'SHP-TEST-TAKEN', hblNumber: 'WALKIN-TAKEN', customerId: new ObjectId(), status: 'cargo_received' });
+  const clash = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-TAKEN', contentValues: [70, 50] } });
+  assert.equal(clash.status, 409);
+  assert.equal((await db.collection('bookings').findOne({ _id: b._id })).walkIn.status, 'submitted');
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400555777' }), 0);
+  await db.collection('shipments').deleteOne({ _id: taken.insertedId });
+
+  const done = await api('POST', `/api/walk-ins/${b._id}/finalise`, {
+    token: staffToken,
+    body: { hblNumber: 'WALKIN-001', contentValues: [70, 50], weight: 28.5, cbm: 0.12, officeUse: { freight: 75, pickup: 0, doorToDoor: 0, discount: 5 }, collectionCentre: 'Wattala' }
+  });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.ok(done.body.customerId);
+  assert.equal(done.body.hblNumber, 'WALKIN-001');
+
+  const after = await db.collection('bookings').findOne({ _id: b._id });
+  const shipment = await db.collection('shipments').findOne({ bookingId: b._id });
+  assert.equal(shipment.hblNumber, 'WALKIN-001');
+  assert.equal(String(shipment.customerId), String(after.customerId));
+  assert.equal(after.shipmentId, String(shipment._id));
+  assert.equal(after.status, 'completed');
+  assert.equal(after.warehouseStatus, 'received');
+  assert.equal(after.declarationStatus, 'received');
+  assert.equal(after.walkIn.status, 'finalised');
+  assert.equal(after.officeUse.total, 70);
+  assert.equal(after.price, 70);
+  assert.equal(after.weight, 28.5);
+
+  const customer = await db.collection('customers').findOne({ phoneNumber: '61400555777' });
+  assert.ok(customer, 'a new customer was created for the new number');
+  assert.equal(String(after.customerId), String(customer._id));
+  assert.equal(customer.name, 'Walk In Sender');
+  assert.ok(customer.sources.includes('walk_in'));
+  assert.equal(customer.savedReceivers[0].fullName, 'Walk In Receiver');
+  assert.deepEqual(after.contents.map(c => c.value), [70, 50]);
+
+  // Confirming makes them a My Transco account (sign in with a WhatsApp
+  // code), with the details staff checked; it shows in Online Accounts.
+  assert.ok(customer.portalJoinedAt, 'a My Transco account was created');
+  assert.match(customer.customerCode, /^CUS-\d{6}$/);
+  assert.equal(customer.email, 'newwalkin@example.com');
+  assert.equal(customer.address.line1, 'Unit 3, 18 Sorrell Street, Parramatta NSW 2150');
+  assert.equal(customer.senderDetails.idNumber, 'N10388128');
+  const accounts = await api('GET', '/api/my-transco/customers', { token: staffToken });
+  assert.ok(JSON.stringify(accounts.body).includes(String(customer._id)));
+  // ...and they find it in My Transco after signing in with their number.
+  const walkInAccount = await signIn('0400555777');
+  const portalSummary = await api('GET', '/api/portal/summary', { token: walkInAccount.token });
+  assert.equal(portalSummary.body.latestBl.blNumber, 'WALKIN-001');
+  const defaults = await api('GET', '/api/portal/booking-options', { token: walkInAccount.token });
+  assert.equal(defaults.body.declaration.sender.idNumber, 'N10388128');
+  assert.equal(defaults.body.declaration.receivers[0].fullName, 'Walk In Receiver');
+
+  // Next time from the same phone, staff see "Returning".
+  const again1 = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, mobile: '+61 400 555 777' } }) });
+  assert.equal((await db.collection('bookings').findOne({ bookingCode: again1.body.bookingCode })).walkIn.returning, true);
+  assert.equal((await db.collection('bookings').findOne({ _id: b._id })).walkIn.returning, false);
+
+  // Finalising again (e.g. fixing a figure) needs no BL now, keeps the
+  // charges and doesn't make a second customer.
+  const again = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { weight: 30 } });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.equal(again.body.hblNumber, 'WALKIN-001');
+  assert.equal((await db.collection('bookings').findOne({ _id: b._id })).officeUse.total, 70);
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400555777' }), 1);
+
+  // An existing customer (same phone) is linked, not duplicated.
+  const existing = await db.collection('customers').insertOne({ phoneNumber: '61400555888', name: '61400555888', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
+  const res2 = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, mobile: '0400 555 888' } }) });
+  const b2 = await db.collection('bookings').findOne({ bookingCode: res2.body.bookingCode });
+  const done2 = await api('POST', `/api/walk-ins/${b2._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-002', contentValues: [10, 0] } });
+  assert.equal(done2.status, 200, JSON.stringify(done2.body));
+  assert.equal(done2.body.customerId, String(existing.insertedId));
+  const linked = await db.collection('customers').findOne({ _id: existing.insertedId });
+  assert.equal(linked.name, 'Walk In Sender', 'a phone-number-only name is replaced with the real one');
+
+  // Everything the printout needs, signature included.
+  const print = await api('GET', `/api/my-transco/bookings/${b._id}/declaration`, { token: staffToken });
+  assert.equal(print.status, 200);
+  const d = print.body.declaration;
+  assert.equal(d.serviceKey, 'sea');
+  assert.equal(d.items[0].type, 'tea_chest');
+  assert.equal(d.contents[1].condition, 'used');
+  assert.equal(d.insurance, false);
+  assert.match(d.signature.image, /^data:image\/png;base64,/);
+  assert.equal(d.officeUse.total, 70);
+  assert.equal(d.walkIn.status, 'finalised');
+  assert.equal(d.blNumber, 'WALKIN-001');
+  assert.equal(d.declarationStatus, 'received');
+
+  // The filled original form as a PDF (staff only).
+  const pdfNoAuth = await fetch(`${BASE_URL}/api/forms/${b._id}/declaration.pdf`);
+  assert.equal(pdfNoAuth.status, 401);
+  const pdfRes = await fetch(`${BASE_URL}/api/forms/${b._id}/declaration.pdf`, { headers: { Authorization: `Bearer ${staffToken}` } });
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers.get('content-type'), 'application/pdf');
+  assert.match(pdfRes.headers.get('content-disposition'), /Shipping-Declaration-BL-WALKIN-001\.pdf/);
+  assert.equal(Buffer.from(await pdfRes.arrayBuffer()).subarray(0, 4).toString(), '%PDF');
+
+  // "Send email" only after a BL; here email isn't set up, so it says so
+  // honestly and records nothing.
+  const unconfirmed = await api('POST', '/api/public/dropoff', { body: walkInForm() });
+  const unconfirmedId = (await db.collection('bookings').findOne({ bookingCode: unconfirmed.body.bookingCode }))._id;
+  const tooEarly = await api('POST', `/api/forms/${unconfirmedId}/send-email`, { token: staffToken });
+  assert.equal(tooEarly.status, 400);
+  const noEmailSetup = await api('POST', `/api/forms/${b._id}/send-email`, { token: staffToken });
+  assert.equal(noEmailSetup.status, 503);
+  assert.equal((await db.collection('bookings').findOne({ _id: b._id })).formEmails, undefined);
+});
+
+test('assigning a BL to any booking confirms its declaration', async () => {
+  const c = await db.collection('customers').insertOne({ phoneNumber: '61400555999', name: 'BL Rule', mode: 'CHATBOT', status: 'ACTIVE' });
+  const bk = await db.collection('bookings').insertOne({
+    customerId: c.insertedId, customerName: 'BL Rule', phoneNumber: '61400555999', requestedDay: 'saturday', requestedTime: '11:00',
+    status: 'completed', declarationSubmittedAt: new Date(), declarationStatus: 'not_received', createdAt: new Date()
+  });
+  const res = await api('POST', `/api/bookings/${bk.insertedId}/bl`, { token: staffToken, body: { hblNumber: 'BLRULE-1' } });
+  assert.equal(res.status, 201, JSON.stringify(res.body));
+  const after = await db.collection('bookings').findOne({ _id: bk.insertedId });
+  assert.equal(after.declarationStatus, 'received');
+  assert.equal(after.warehouseStatus, 'received');
+});
+
+test('staff edits keep the walk-in sender Passport/NIC and home phone', async () => {
+  const res = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, homePhone: '02 9600 1234' } }) });
+  const b = await db.collection('bookings').findOne({ bookingCode: res.body.bookingCode });
+  const edit = await api('PATCH', `/api/my-transco/bookings/${b._id}/details`, {
+    token: staffToken,
+    body: { sender: { fullName: 'Walk In Sender Fixed', address: b.sender.address, mobile: b.sender.mobile, email: b.sender.email } }
+  });
+  assert.equal(edit.status, 200, JSON.stringify(edit.body));
+  const after = await db.collection('bookings').findOne({ _id: b._id });
+  assert.equal(after.sender.fullName, 'Walk In Sender Fixed');
+  assert.equal(after.sender.idNumber, 'N10388128');
+  assert.equal(after.sender.homePhone, '02 9600 1234');
+});
+
+test('My Transco bookings collect the full declaration; at drop-off staff only value items and assign the BL', async () => {
+  const acct = await signIn('0400555321');
+  const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  const base = { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'collect', dropOff: nextDropOff(options.body) };
+
+  // The whole declaration is needed to book.
+  const noItems = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, ...decl('Kandy'), contents: [] } });
+  assert.equal(noItems.status, 400);
+  assert.equal(noItems.body.field, 'contents');
+  const noNic = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, ...decl('Kandy', { sender: { idNumber: '' } }) } });
+  assert.equal(noNic.body.field, 'sender.idNumber');
+  const noTick = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, ...decl('Kandy', { signOff: { declarationAccepted: false } }) } });
+  assert.equal(noTick.body.field, 'declarationAccepted');
+  const noInsurance = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, ...decl('Kandy', { signOff: { insurance: undefined } }) } });
+  assert.equal(noInsurance.body.field, 'insurance');
+
+  const made = await api('POST', '/api/portal/bookings', {
+    token: acct.token,
+    body: { ...base, ...decl('Kandy', { sender: { homePhone: '02 9600 0000' }, signOff: { insurance: true, contents: [{ description: 'Tea', condition: 'new', qty: 4 }, { description: 'Shoes', condition: 'used', qty: 2 }] } }) }
+  });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const b = await db.collection('bookings').findOne({ _id: new ObjectId(made.body.booking.id) });
+  assert.equal(b.contents.length, 2);
+  assert.equal(b.contents[0].value, null, 'the customer never enters values');
+  assert.equal(b.insurance, true);
+  assert.equal(b.sender.idNumber, 'N1234567');
+  assert.equal(b.sender.homePhone, '02 9600 0000');
+  assert.equal(b.signature.name, 'Alpha Sender');
+
+  // Staff confirm it at drop-off like a walk-in: values + BL.
+  const before = await db.collection('customers').findOne({ _id: b.customerId });
+  const noValues = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'ONLINE-001' } });
+  assert.equal(noValues.body.field, 'contentValues');
+  const done = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'ONLINE-001', contentValues: [40, 30], weight: 22 } });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  const after = await db.collection('bookings').findOne({ _id: b._id });
+  assert.equal(after.status, 'completed');
+  assert.equal(after.staffConfirm.status, 'finalised');
+  assert.equal(after.walkIn, undefined);
+  assert.equal(String(after.customerId), String(b.customerId), 'stays on the account that booked');
+  const customerAfter = await db.collection('customers').findOne({ _id: b.customerId });
+  assert.equal(customerAfter.name, before.name, 'an online booking never rewrites the account');
+
+  const print = await api('GET', `/api/my-transco/bookings/${b._id}/declaration`, { token: staffToken });
+  assert.equal(print.body.declaration.confirm.status, 'finalised');
+  assert.equal(print.body.declaration.blNumber, 'ONLINE-001');
+  assert.equal(print.body.declaration.insurance, true);
+
+  // The customer sees the BL in My Transco.
+  const summary = await api('GET', '/api/portal/summary', { token: acct.token });
+  assert.equal(summary.body.latestBl.blNumber, 'ONLINE-001');
+
+  // At the counter the customer adds/takes out items or changes their
+  // mind on insurance — staff edit it in the same panel; it's logged.
+  const edited = await api('POST', `/api/walk-ins/${b._id}/finalise`, {
+    token: staffToken,
+    body: { contents: [{ description: 'Tea', condition: 'new', qty: 6, value: 45 }, { description: 'Biscuits', condition: 'new', qty: 3, value: 12 }], insurance: false }
+  });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  const afterEdit = await db.collection('bookings').findOne({ _id: b._id });
+  assert.deepEqual(afterEdit.contents.map(c => [c.description, c.qty, c.value]), [['Tea', 6, 45], ['Biscuits', 3, 12]]);
+  assert.equal(afterEdit.insurance, false);
+  assert.deepEqual(afterEdit.staffEdits[afterEdit.staffEdits.length - 1].changed, ['items inside', 'insurance']);
+  const noValue = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { contents: [{ description: 'Tea', condition: 'new', qty: 6 }] } });
+  assert.equal(noValue.body.field, 'contentValues');
+  const empty = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { contents: [] } });
+  assert.equal(empty.status, 400);
+
+  // An older booking with no declaration can't be "confirmed" this way.
+  const old = await db.collection('bookings').insertOne({ customerId: b.customerId, customerName: 'Old', phoneNumber: '61400555321', requestedDay: 'saturday', requestedTime: '11:00', status: 'pending', createdAt: new Date() });
+  const notConfirmable = await api('POST', `/api/walk-ins/${old.insertedId}/finalise`, { token: staffToken, body: { hblNumber: 'OLD-1' } });
+  assert.equal(notConfirmable.status, 404);
 });

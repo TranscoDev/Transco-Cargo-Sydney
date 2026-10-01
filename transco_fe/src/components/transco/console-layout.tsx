@@ -17,6 +17,7 @@ import {
   PackageSearch,
   PauseCircle,
   PlayCircle,
+  QrCode,
   Receipt,
   Settings as SettingsIcon,
   Ship,
@@ -55,8 +56,8 @@ export interface NavLeaf {
   label: string;
   to: string;
   icon: LucideIcon;
-  /** Shows the live "waiting" conversation count. */
-  badge?: "conversations";
+  /** Shows a live count: waiting conversations, or walk-ins to confirm. */
+  badge?: "conversations" | "walkIns";
 }
 export interface NavGroup {
   label: string;
@@ -79,6 +80,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
+      // Customers who came without a booking and filled the QR form.
+      { label: "Walk-ins (QR)", to: "/console/walk-ins", icon: QrCode, badge: "walkIns" },
       { label: "Shipping calendar", to: "/console/schedule", icon: CalendarDays },
       { label: "Tracking", to: "/console/tracking", icon: MapPin },
       // "Packaging" = Transco-owned box supplies used on shipments — not
@@ -114,6 +117,20 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+/** Shown when conversations/customers couldn't be loaded — never fake data. */
+function LoadErrorBanner() {
+  const { loadError, retryLoad } = useConversations();
+  if (!loadError) return null;
+  return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-b border-attention/30 bg-attention-soft px-4 py-2.5 text-sm text-attention-foreground md:px-8">
+      <span><span className="font-semibold">{loadError}</span> Lists may be empty until it loads. Nothing has been lost.</span>
+      <button type="button" onClick={retryLoad} className="rounded-md border border-attention/40 bg-card px-3 py-1 font-medium text-foreground hover:bg-secondary">
+        Try again
+      </button>
+    </div>
+  );
+}
+
 function isActive(pathname: string, to: string) {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
@@ -124,9 +141,16 @@ function useWaitingConversations() {
   return summaries.filter((c) => c.unreadCount > 0 || c.needsAttention).length;
 }
 
+/** Walk-in forms (QR) waiting for staff to check the boxes and confirm. */
+function useWalkInsToConfirm() {
+  const { bookings } = useConversations();
+  return bookings.filter((b) => b.channel === "walk_in" && b.walkInStatus !== "finalised" && b.status !== "cancelled").length;
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const waiting = useWaitingConversations();
+  const walkIns = useWalkInsToConfirm();
   const laterGroup = NAV_GROUPS.find((g) => g.later);
   const [laterOpen, setLaterOpen] = useState(
     () => !!laterGroup?.items.some((i) => isActive(pathname, i.to)),
@@ -181,7 +205,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             <ul className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const active = isActive(pathname, item.to);
-                const count = item.badge === "conversations" ? waiting : 0;
+                const count = item.badge === "conversations" ? waiting : item.badge === "walkIns" ? walkIns : 0;
                 return (
                   <li key={item.to}>
                     <Link
@@ -433,7 +457,10 @@ export function ConsoleLayout({
             wrapper scrolls inside here, so a long page (e.g. a batch with
             20+ HBLs) never scrolls the whole window and drags the sidebar
             away with it. */}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</main>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+          <LoadErrorBanner />
+          {children}
+        </main>
       </div>
       <Toaster position="bottom-right" theme={theme} />
     </div>

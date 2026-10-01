@@ -262,8 +262,17 @@ export interface Booking {
   /** Human-readable reference ("BK-000245") — the same one the customer
    * sees in My Transco. Absent on older bookings until first viewed. */
   bookingCode?: string | null | undefined;
-  /** "portal" for bookings the customer made in My Transco. */
+  /** "portal" for bookings the customer made in My Transco; "walk_in" for
+   * the drop-off form a customer filled on their phone at the counter. */
   channel?: string | null | undefined;
+  /** Walk-ins only: "submitted" until staff check the boxes and Finalise. */
+  walkInStatus?: "submitted" | "finalised" | null | undefined;
+  /** Walk-ins only: the phone number was already a customer when the form came in. */
+  walkInReturning?: boolean | null | undefined;
+  /** The full declaration (incl. what's inside) was filled online or on the QR form. */
+  declarationComplete?: boolean | undefined;
+  /** Staff checked the boxes, valued the items and assigned the BL. */
+  staffConfirmed?: boolean | undefined;
   /** Customer-visible progress stages, set by staff (My Transco shows a
    * stage as done only once it's recorded here). */
   declarationStatus?: BookingStageStatus | null | undefined;

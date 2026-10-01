@@ -4,6 +4,7 @@ import {
   CalendarClock,
   ChevronRight,
   ClipboardCheck,
+  Copy,
   History,
   KeyRound,
   Mail,
@@ -30,7 +31,7 @@ import { fetchCustomerProfile, setPortalPassword } from "@/lib/transco/api";
 import { notify, friendlyError } from "@/lib/transco/notify";
 import { bookingStatus, SENDER_LABEL, shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
-import type { Booking, CustomerProfile } from "@/lib/transco/types";
+import type { Booking, CustomerProfile, Shipment } from "@/lib/transco/types";
 
 // Lives as a sibling of index.tsx (the list) under customers/route.tsx's
 // Outlet — see that file's comment for why this can't just be a flat
@@ -161,6 +162,10 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
           )}
         </div>
       </header>
+
+      {/* The BL number is how we identify a customer's shipment — the
+          newest one up front, earlier ones underneath. */}
+      <LatestBl shipments={p.liveShipments} />
 
       {/* Current activity + next step */}
       <section className="mb-8 rounded-xl border bg-card p-5 shadow-xs">
@@ -313,6 +318,70 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
         <BookingDetailsSheet bookingId={openBooking} open onOpenChange={(o) => !o && setOpenBooking(null)} />
       )}
     </>
+  );
+}
+
+/** Newest BL first (shipments arrive newest first); only ones with a BL. */
+function LatestBl({ shipments }: { shipments: Shipment[] }) {
+  const withBl = shipments.filter((s) => s.hblNumber);
+  const latest = withBl[0];
+  if (!latest) {
+    return (
+      <section className="mb-6 flex items-center gap-3 rounded-xl border border-dashed bg-card px-5 py-4">
+        <Ship className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+        <p className="text-sm text-muted-foreground">No BL number yet — it appears here as soon as one is assigned.</p>
+      </section>
+    );
+  }
+  const earlier = withBl.slice(1);
+  const st = shipmentStatus(latest.status);
+  const copy = () => {
+    void navigator.clipboard
+      .writeText(latest.hblNumber ?? "")
+      .then(() => notify.success(`BL ${latest.hblNumber} copied`))
+      .catch(() => notify.error("Couldn't copy", "Select the number and copy it instead."));
+  };
+  return (
+    <section className="mb-6 rounded-xl border-2 border-primary/40 bg-card p-5 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Latest BL number</p>
+          <p className="mt-1 select-all text-3xl font-bold tracking-tight tabular-nums text-foreground">{latest.hblNumber}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+            {latest.batchNumber ? <span className="font-medium text-foreground">Shipment {latest.batchNumber}</span> : null}
+            {[latest.origin, latest.destination].filter(Boolean).length > 0 && <span>· {[latest.origin, latest.destination].filter(Boolean).join(" → ")}</span>}
+            {latest.createdAt && <span>· assigned {fmtDay(latest.createdAt.slice(0, 10))}</span>}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={copy}>
+            <Copy className="mr-2 h-4 w-4" aria-hidden /> Copy
+          </Button>
+          <Button asChild>
+            <Link to="/console/shipments/$shipmentId" params={{ shipmentId: latest.id }}>
+              Open shipment
+            </Link>
+          </Button>
+        </div>
+      </div>
+      {earlier.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+          <span className="text-xs font-medium text-muted-foreground">Earlier BLs</span>
+          {earlier.map((s) => (
+            <Link
+              key={s.id}
+              to="/console/shipments/$shipmentId"
+              params={{ shipmentId: s.id }}
+              className="rounded-md border bg-secondary px-2 py-0.5 text-xs font-medium tabular-nums text-foreground transition-colors hover:border-primary/50"
+            >
+              {s.hblNumber}
+              {s.batchNumber ? <span className="text-muted-foreground"> · Shipment {s.batchNumber}</span> : null}
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

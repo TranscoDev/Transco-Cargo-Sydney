@@ -135,6 +135,9 @@ export interface BackendBooking {
   customerNotes?: string | null;
   declarationSubmittedAt?: string | null;
   receiver?: { fullName?: string; town?: string } | null;
+  walkIn?: { status?: "submitted" | "finalised"; returning?: boolean } | null;
+  contents?: unknown[] | null;
+  staffConfirm?: { status?: string } | null;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -167,7 +170,49 @@ export function mapBooking(b: BackendBooking): Booking {
     customerNotes: b.customerNotes,
     declarationSubmittedAt: b.declarationSubmittedAt,
     receiver: b.receiver?.fullName ? { fullName: b.receiver.fullName, town: b.receiver.town ?? null } : null,
+    walkInStatus: b.walkIn?.status ?? null,
+    walkInReturning: b.walkIn?.returning ?? null,
+    declarationComplete: Boolean(b.declarationSubmittedAt && Array.isArray(b.contents) && b.contents.length),
+    staffConfirmed: b.walkIn?.status === "finalised" || b.staffConfirm?.status === "finalised",
   };
+}
+
+/** Staff finalise a walk-in at the counter (see transco_be/walkInRoutes.js). */
+export interface WalkInFinaliseInput {
+  /** Required the first time — the declaration is confirmed once its BL is assigned. */
+  hblNumber?: string;
+  /** The bulk shipment it goes in, e.g. 57 (optional). */
+  batchNumber?: number | null;
+  /** Staff's value (AUD) for each item, in the customer's list order — required. */
+  contentValues?: number[];
+  /** The full item list, as edited by staff at the counter (each with its value). */
+  contents?: { description: string; condition: "new" | "used"; qty: number; value: number }[];
+  /** The customer's insurance answer, if staff changed it at the counter. */
+  insurance?: boolean;
+  weight?: number | null;
+  cbm?: number | null;
+  officeUse?: {
+    freight: number | null;
+    pickup: number | null;
+    doorToDoor: number | null;
+    discount: number | null;
+    total: number | null;
+  };
+  collectionCentre?: string | null;
+}
+
+export async function finaliseWalkIn(
+  bookingId: string,
+  input: WalkInFinaliseInput,
+): Promise<{ customerId: string | null; hblNumber: string | null; firstTime: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/api/walk-ins/${bookingId}/finalise`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; customerId?: string | null; hblNumber?: string | null; firstTime?: boolean };
+  if (!res.ok) throw new Error(data.error || `Could not finalise (${res.status})`);
+  return { customerId: data.customerId ?? null, hblNumber: data.hblNumber ?? null, firstTime: Boolean(data.firstTime) };
 }
 
 export function mapMessage(m: BackendMessage): Message {

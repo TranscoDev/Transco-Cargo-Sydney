@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { createMessage, getMockConversations, simulatedInbound } from "./mock-data";
+import { createMessage, simulatedInbound } from "./mock-data";
 import { logout as clearSession } from "./auth";
 import {
   contactNumber,
@@ -23,7 +23,9 @@ import {
   fetchSegments,
   fetchShipments,
   importCustomersFile,
+  mapBooking,
   mapMessage,
+  type BackendBooking,
   markConversationRead,
   sendEmailCampaign as sendEmailCampaignRequest,
   sendAttachment as sendAttachmentRequest,
@@ -121,6 +123,9 @@ interface ConversationsApi {
    * Not optimistic — rejects with the backend's message (e.g. a BL that's
    * already taken) so the form can show it. */
   assignBookingBl: (bookingId: string, hblNumber: string, batchNumber?: number | null) => Promise<void>;
+  /** Set when conversations couldn't be loaded (shown as a banner with Try again). */
+  loadError: string | null;
+  retryLoad: () => void;
   /** True while the website bot is paused — website visitors get a friendly
    * pause notice instead of an AI reply. Independent of whatsappPaused. */
   websitePaused: boolean;
@@ -212,35 +217,40 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // original local-only mock simulation for a backend-less demo.
   const isLiveRef = useRef(false);
 
+  // Set when the conversations couldn't be loaded — the console shows a
+  // clear "couldn't load" banner with Try again. Never sample/demo
+  // customers: in a live CRM staff could mistake them for real ones.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const retryLoad = useCallback(() => setLoadAttempt((n) => n + 1), []);
+
   useEffect(() => {
     let cancelled = false;
     fetchConversations()
       .then((real) => {
         if (cancelled) return;
         isLiveRef.current = true;
+        setLoadError(null);
         setConversations(real);
       })
       .catch((err) => {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "";
         // A reachable backend that rejects the request (expired/invalid
-        // session — e.g. the server's session secret rotated) must never
-        // be papered over with fabricated demo customers. Only a
-        // genuinely unreachable backend (no server running at all, the
-        // standalone-demo case) falls back to mock data.
+        // session — e.g. the server's session secret rotated) signs out.
         if (message.includes("(401)")) {
           console.warn("Session is no longer valid — signing out.", err);
           clearSession();
           window.location.href = "/";
           return;
         }
-        console.warn("Could not reach the backend; showing local demo data instead.", err);
-        setConversations(getMockConversations());
+        console.warn("Could not load conversations.", err);
+        setLoadError("Couldn't load conversations and customers from the server.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -424,9 +434,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const assignBookingBl = useCallback(
     async (bookingId: string, hblNumber: string, batchNumber?: number | null) => {
       const { shipmentId } = await assignBookingBlRequest(bookingId, hblNumber, batchNumber);
-      notify.success(`BL ${hblNumber} assigned`, "The customer can see it in My Transco now.");
+      notify.success(`BL ${hblNumber} assigned`, "Declaration confirmed. The customer can see it in My Transco now.");
+      // A declaration is confirmed once its BL is assigned.
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received" } : b)),
+        prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received", declarationStatus: "received" } : b)),
       );
     },
     [],
@@ -820,25 +831,51 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         }
 
         case "booking.created": {
-          const b = event.payload as BookingCreatedPayload;
+          // Same mapping as the list load, so a booking that arrives live
+          // (a walk-in form, an online booking) shows everything at once.
+          const b = event.payload as BookingCreatedPayload & BackendBooking;
           setBookings((prev) => {
             if (prev.some((existing) => existing.id === b._id)) return prev;
-            return [
-              {
-                id: b._id,
-                customerId: b.customerId,
-                customerName: b.customerName,
-                phoneNumber: b.phoneNumber,
-                requestedDay: b.requestedDay,
-                requestedTime: b.requestedTime,
-                status: b.status,
-                createdAt: b.createdAt,
-                boxSummary: b.boxSummary,
-                resolvedDate: b.resolvedDate,
-              },
-              ...prev,
-            ];
+            return [mapBooking(b), ...prev];
           });
+          return;
+        }
+
+        // Staff finalised a walk-in at the counter: now linked to the
+        // customer, received, with weight/CBM/price.
+        case "booking.walk_in_finalised": {
+          const p = event.payload as {
+            _id: string;
+            customerId: string | null;
+            customerName: string;
+            phoneNumber: string;
+            weight: number | null;
+            cbm: number | null;
+            price: number | null;
+            shipmentId: string | null;
+            status: BookingStatus;
+          };
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === p._id
+                ? {
+                    ...b,
+                    customerId: p.customerId ?? b.customerId,
+                    customerName: p.customerName,
+                    phoneNumber: p.phoneNumber,
+                    weight: p.weight,
+                    cbm: p.cbm,
+                    price: p.price,
+                    shipmentId: p.shipmentId ?? b.shipmentId,
+                    status: p.status,
+                    warehouseStatus: "received",
+                    declarationStatus: "received",
+                    walkInStatus: b.channel === "walk_in" ? "finalised" : b.walkInStatus,
+                    staffConfirmed: true,
+                  }
+                : b,
+            ),
+          );
           return;
         }
 
@@ -930,6 +967,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       updateBooking,
       assignBookingBl,
+      loadError,
+      retryLoad,
       websitePaused,
       whatsappPaused,
       updatePauseState,
@@ -950,6 +989,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       updateBooking,
       assignBookingBl,
+      loadError,
+      retryLoad,
       websitePaused,
       whatsappPaused,
       markAsRead,

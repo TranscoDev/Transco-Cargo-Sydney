@@ -132,9 +132,12 @@ function cleanText(value, max) {
   return value.trim().replace(/[ \t]+/g, ' ').slice(0, max);
 }
 
-// One person on the declaration. `withId` adds the Passport/NIC number
-// (receivers only). Returns { error, field } or { value }.
-function validatePerson(raw, who, { withId = false } = {}) {
+// One person on the declaration. `withId` adds the town + Passport/NIC
+// number (receivers). `idNumber` ('required' | 'optional') asks a sender
+// for their Passport/NIC too, and `homePhone` adds the optional "Home"
+// number from the paper form (both used by the walk-in drop-off form).
+// Returns { error, field } or { value }.
+function validatePerson(raw, who, { withId = false, idNumber = null, homePhone = false } = {}) {
   const p = raw || {};
   const fullName = cleanText(p.fullName, 80);
   if (fullName.length < 2) return { error: `Please enter the ${who}'s full name as on their passport or NIC.`, field: `${who}.fullName` };
@@ -155,6 +158,22 @@ function validatePerson(raw, who, { withId = false } = {}) {
     if (!/^[A-Z0-9]{5,20}$/.test(idNumber)) return { error: "Please enter the receiver's passport or NIC number (letters and numbers only).", field: `${who}.idNumber` };
     value.town = town;
     value.idNumber = idNumber;
+  } else if (idNumber) {
+    const id = cleanText(p.idNumber, 20).replace(/\s/g, '').toUpperCase();
+    if (id || idNumber === 'required') {
+      if (!/^[A-Z0-9]{5,20}$/.test(id)) return { error: `Please enter the ${who}'s passport or NIC number (letters and numbers only).`, field: `${who}.idNumber` };
+      value.idNumber = id;
+    }
+  }
+  if (homePhone) {
+    const home = cleanText(p.homePhone, 24);
+    if (home) {
+      const homeDigits = home.replace(/[^\d]/g, '');
+      if (!/^\+?[\d\s()-]+$/.test(home) || homeDigits.length < 7 || homeDigits.length > 15) {
+        return { error: `Please check the ${who}'s home phone number, or leave it empty.`, field: `${who}.homePhone` };
+      }
+      value.homePhone = home;
+    }
   }
   return { value };
 }
@@ -178,6 +197,51 @@ function validateItems(country, rawItems) {
     return { error: 'For more than 30 items, please call us on 0434 842 023 so we can plan it with you.' };
   }
   return { value: items };
+}
+
+// ---------- the rest of the declaration (walk-in form + online booking) ----------
+
+const MAX_CONTENT_ROWS = 60;
+const MAX_SIGNATURE_CHARS = 250000; // a phone-drawn PNG is ~10-60k
+
+function oneLine(value, max) {
+  return cleanText(String(value || '').replace(/\s*\n\s*/g, ', '), max);
+}
+
+// The customer's own list of what's inside: description, new/used and
+// quantity. The value (AUD) is a staff field — added at Confirm, never
+// asked of the customer.
+function validateContents(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return { error: "Please add at least one item you're sending.", field: 'contents' };
+  if (raw.length > MAX_CONTENT_ROWS) return { error: `Please list up to ${MAX_CONTENT_ROWS} items. For more, ask our staff.`, field: 'contents' };
+  const rows = [];
+  for (const r of raw) {
+    const description = oneLine(r && r.description, 60);
+    if (description.length < 2) return { error: 'Please describe each item (for example "Chocolate").', field: 'contents' };
+    const condition = r && r.condition === 'used' ? 'used' : r && r.condition === 'new' ? 'new' : null;
+    if (!condition) return { error: `Please say whether "${description}" is new or used.`, field: 'contents' };
+    const qty = Number(r && r.qty);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 999) return { error: `Please enter how many "${description}" (1-999).`, field: 'contents' };
+    rows.push({ description, condition, qty, value: null });
+  }
+  return { value: rows };
+}
+
+// Insurance answer, the prohibited-goods declaration, typed name and the
+// optional finger-drawn signature. Returns { error, field } or { value }.
+function validateSignOff(body) {
+  if (typeof body.insurance !== 'boolean') return { error: 'Please answer whether you want your goods insured.', field: 'insurance' };
+  if (body.declarationAccepted !== true) return { error: 'Please tick the declaration to confirm there are no prohibited goods.', field: 'declarationAccepted' };
+  const signedName = oneLine(body.signedName, 80);
+  if (signedName.length < 2) return { error: 'Please type your full name to sign.', field: 'signedName' };
+  let signatureImage = null;
+  if (body.signatureImage !== undefined && body.signatureImage !== null && body.signatureImage !== '') {
+    if (typeof body.signatureImage !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(body.signatureImage) || body.signatureImage.length > MAX_SIGNATURE_CHARS) {
+      return { error: 'The signature could not be saved. Please clear it and sign again, or leave it empty.', field: 'signatureImage' };
+    }
+    signatureImage = body.signatureImage;
+  }
+  return { value: { insurance: body.insurance, signedName, signatureImage } };
 }
 
 function samePerson(a, b) {
@@ -525,11 +589,17 @@ function createCustomerTools({
   }
 
   async function getSummary(customerId) {
-    const [recentBookings, recentShipments] = await Promise.all([
+    const [recentBookings, recentShipments, bls] = await Promise.all([
       getCustomerBookings(customerId, { limit: 3 }),
-      getCustomerShipments(customerId, { limit: 3 })
+      getCustomerShipments(customerId, { limit: 3 }),
+      getCustomerBLs(customerId)
     ]);
+    // The BL number is how a customer's shipment is identified — the
+    // newest one (shown big on the home screen) and a few earlier ones.
+    const blCard = s => ({ shipmentId: s.id, blNumber: s.blNumber, batchLabel: s.batchLabel, status: s.status, destination: s.destination });
     return {
+      latestBl: bls[0] ? blCard(bls[0]) : null,
+      earlierBls: bls.slice(1, 6).map(blCard),
       latestBooking: recentBookings[0] || null,
       latestShipment: recentShipments[0] || null,
       needsDeclaration: recentBookings.filter(b => b.status.key !== 'cancelled' && b.declaration.status === 'needed' && !b.blNumber).length
@@ -561,7 +631,7 @@ function createCustomerTools({
     const profileAddress = [address.line1, address.suburb, [address.state, address.postcode].filter(Boolean).join(' ')]
       .filter(Boolean).join(', ');
     const sender = saved
-      ? { fullName: saved.fullName, address: saved.address, mobile: saved.mobile, email: saved.email }
+      ? { fullName: saved.fullName, address: saved.address, mobile: saved.mobile, email: saved.email, idNumber: saved.idNumber || '', homePhone: saved.homePhone || '' }
       : {
           fullName: hasRealName(customer) ? customer.name : '',
           address: profileAddress,
@@ -573,7 +643,7 @@ function createCustomerTools({
       .sort((a, b) => new Date(b.lastUsedAt || 0) - new Date(a.lastUsedAt || 0))
       .map(r => ({
         id: r.id, country: r.country, fullName: r.fullName, address: r.address,
-        town: r.town, mobile: r.mobile, email: r.email, idNumber: r.idNumber
+        town: r.town, mobile: r.mobile, email: r.email, idNumber: r.idNumber, homePhone: r.homePhone || ''
       }));
     return { sender, senderSaved: Boolean(saved), receivers };
   }
@@ -601,7 +671,40 @@ function createCustomerTools({
       service: SERVICE_LABELS[booking.serviceType] || null,
       delivery: DELIVERY_LABELS[booking.deliveryType] || null,
       destination: booking.destination || null,
-      items: (booking.items || []).map(i => ({ label: (ITEM_LABELS[i.type] || [i.type])[0], qty: i.qty })),
+      // Raw keys too, so the printout can tick the right boxes on the
+      // original paper form (service, package type, delivery).
+      countryKey: COUNTRIES[booking.country] ? booking.country : null,
+      serviceKey: booking.serviceType || null,
+      deliveryKey: booking.deliveryType || null,
+      items: (booking.items || []).map(i => ({ type: i.type, label: (ITEM_LABELS[i.type] || [i.type])[0], qty: i.qty })),
+      // From the walk-in form: the customer's own item list, insurance
+      // answer and signature; office-use figures staff add at Finalise.
+      contents: booking.contents || [],
+      insurance: typeof booking.insurance === 'boolean' ? booking.insurance : null,
+      signature: booking.signature
+        ? { name: booking.signature.name || null, image: booking.signature.image || null, signedAt: booking.signature.signedAt || null }
+        : null,
+      weight: booking.weight ?? null,
+      cbm: booking.cbm ?? null,
+      officeUse: booking.officeUse || null,
+      collectionCentre: booking.collectionCentre || null,
+      walkIn: booking.walkIn
+        ? { status: booking.walkIn.status, submittedAt: booking.walkIn.submittedAt || null, finalisedAt: booking.walkIn.finalisedAt || null, finalisedBy: booking.walkIn.finalisedBy || null, returning: Boolean(booking.walkIn.returning) }
+        : null,
+      // Staff's drop-off confirmation (values + BL), for walk-ins and for
+      // bookings whose full declaration was filled online. Null when there's
+      // no declaration to confirm (e.g. older bookings made in the chat).
+      confirm: booking.walkIn
+        ? { status: booking.walkIn.status, finalisedAt: booking.walkIn.finalisedAt || null, finalisedBy: booking.walkIn.finalisedBy || null }
+        : booking.declarationSubmittedAt && Array.isArray(booking.contents) && booking.contents.length
+          ? {
+              status: booking.staffConfirm && booking.staffConfirm.status === 'finalised' ? 'finalised' : 'submitted',
+              finalisedAt: booking.staffConfirm ? booking.staffConfirm.finalisedAt || null : null,
+              finalisedBy: booking.staffConfirm ? booking.staffConfirm.finalisedBy || null : null
+            }
+          : null,
+      // "Send email" history (office inbox) — newest last.
+      formEmails: (booking.formEmails || []).map(e => ({ at: e.at, by: e.by || null })),
       itemsText: booking.items && booking.items.length ? itemsSummary(booking.items) : (booking.boxSummary || null),
       boxCount: booking.boxCount || null,
       dropOff: booking.requestedDay ? { date: safeResolvedDate(booking), time: booking.requestedTime || null } : null,
@@ -677,14 +780,16 @@ function createCustomerTools({
       set.deliveryType = input.deliveryType;
       changed.push('delivery');
     }
+    // Merged over what's stored, so fields this editor doesn't show (the
+    // sender's Passport/NIC, home phones from the walk-in form) are kept.
     if ('sender' in input) {
-      const s = validatePerson(input.sender, 'sender');
+      const s = validatePerson({ ...(b.sender || {}), ...(input.sender || {}) }, 'sender', { idNumber: 'optional', homePhone: true });
       if (s.error) return s;
       set.sender = s.value;
       changed.push('sender');
     }
     if ('receiver' in input) {
-      const r = validatePerson(input.receiver, 'receiver', { withId: true });
+      const r = validatePerson({ ...(b.receiver || {}), ...(input.receiver || {}) }, 'receiver', { withId: true, homePhone: true });
       if (r.error) return r;
       set.receiver = r.value;
       set.destination = r.value.town;
@@ -751,7 +856,8 @@ function createCustomerTools({
   async function weekdayLoad(dates) {
     if (!dates.length) return new Map();
     const rows = await bookings().aggregate([
-      { $match: { requestedDateISO: { $in: dates }, status: { $nin: ['cancelled', 'completed'] } } },
+      // Walk-ins came without an appointment, so they never use up a slot.
+      { $match: { requestedDateISO: { $in: dates }, status: { $nin: ['cancelled', 'completed'] }, channel: { $ne: 'walk_in' } } },
       { $group: { _id: '$requestedDateISO', count: { $sum: 1 } } }
     ]).toArray();
     return new Map(rows.map(r => [r._id, r.count]));
@@ -811,10 +917,16 @@ function createCustomerTools({
     if (itemsCheck.error) return { error: itemsCheck.error };
     const items = itemsCheck.value;
 
-    const senderCheck = validatePerson(body.sender, 'sender');
+    // The full declaration is collected with the booking, so at drop-off
+    // staff only check the boxes, value the items and assign the BL.
+    const senderCheck = validatePerson(body.sender, 'sender', { idNumber: country === 'sri_lanka' ? 'required' : 'optional', homePhone: true });
     if (senderCheck.error) return senderCheck;
-    const receiverCheck = validatePerson(body.receiver, 'receiver', { withId: true });
+    const receiverCheck = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true });
     if (receiverCheck.error) return receiverCheck;
+    const contentsCheck = validateContents(body.contents);
+    if (contentsCheck.error) return contentsCheck;
+    const signOff = validateSignOff(body);
+    if (signOff.error) return signOff;
 
     const deliveryType = body.deliveryType;
     if (!DELIVERY_LABELS[deliveryType]) return { error: 'Please choose door delivery or collection.' };
@@ -841,6 +953,10 @@ function createCustomerTools({
         sender: senderCheck.value,
         senderIsMe: body.sender.isMe !== false,
         receiver: receiverCheck.value,
+        contents: contentsCheck.value,
+        insurance: signOff.value.insurance,
+        signedName: signOff.value.signedName,
+        signatureImage: signOff.value.signatureImage,
         customerNotes: notes || null,
         requestedDay: dateOption.day,
         requestedTime: dropOff.time,
@@ -879,8 +995,12 @@ function createCustomerTools({
       sender: value.sender,
       senderIsAccountHolder: value.senderIsMe,
       receiver: value.receiver,
-      // Filled online with the booking; staff still mark it "received"
-      // once they've checked it at drop-off.
+      contents: value.contents,
+      insurance: value.insurance,
+      declarationAccepted: true,
+      signature: { name: value.signedName, image: value.signatureImage, signedAt: new Date() },
+      // Filled online with the booking; confirmed by staff at drop-off
+      // when they value the items and assign the BL.
       declarationSubmittedAt: new Date(),
       declarationStatus: 'not_received',
       warehouseStatus: 'not_received',
@@ -907,7 +1027,8 @@ function createCustomerTools({
     // Same staff notifications as a chat-bot booking — best-effort, a
     // failed email/WhatsApp/calendar call never undoes a real booking.
     try {
-      broadcast('booking.created', { ...booking, resolvedDate: value.requestedDateISO });
+      // (The drawn signature only loads when the booking is opened or printed.)
+      broadcast('booking.created', { ...booking, signature: { name: booking.signature.name }, resolvedDate: value.requestedDateISO });
       await sendBookingEmail(booking);
       await sendStaffBookingWhatsApp(booking);
       const calendarEventId = await createCalendarEvent(booking);
@@ -958,7 +1079,9 @@ function createCustomerTools({
     staffUpdateBookingDetails,
     createBooking,
     cancelBooking,
-    newBookingCode
+    newBookingCode,
+    itemsSummary,
+    rememberDeclarationDetails
   };
 }
 
@@ -966,6 +1089,16 @@ module.exports = {
   createCustomerTools,
   hasRealName,
   hasVerifiedPhone,
+  validatePerson,
+  validateItems,
+  validateContents,
+  validateSignOff,
+  cleanText,
+  COUNTRIES,
+  SERVICE_LABELS,
+  ITEM_TYPES,
+  ITEM_LABELS,
+  DELIVERY_LABELS,
   DECLARATION_FORM_URL,
   SHIPMENT_STATUS_LABELS
 };

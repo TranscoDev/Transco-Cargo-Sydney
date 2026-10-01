@@ -2283,6 +2283,8 @@ app.get('/api/customers', async (req, res) => {
     const bookingsByCustomer = new Map();
 
     for (const booking of allBookings) {
+      // A walk-in isn't linked to a customer until staff confirm it.
+      if (!booking.customerId) continue;
       const key = booking.customerId.toString();
       const bucket = bookingsByCustomer.get(key);
       if (bucket) {
@@ -2298,6 +2300,8 @@ app.get('/api/customers', async (req, res) => {
 
 
     for (const message of allMessages) {
+
+      if (!message.customerId) continue;
 
       const key =
         message.customerId.toString();
@@ -2323,6 +2327,7 @@ app.get('/api/customers', async (req, res) => {
     const shipmentsByCustomer = new Map();
 
     for (const shipment of allShipments) {
+      if (!shipment.customerId) continue;
       const key = shipment.customerId.toString();
       const bucket = shipmentsByCustomer.get(key);
       if (bucket) {
@@ -2335,6 +2340,7 @@ app.get('/api/customers', async (req, res) => {
     const liveShipmentsByCustomer = new Map();
 
     for (const shipment of allLiveShipments) {
+      if (!shipment.customerId) continue;
       const key = shipment.customerId.toString();
       const bucket = liveShipmentsByCustomer.get(key);
       if (bucket) {
@@ -2468,6 +2474,17 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
       resolvedDate: resolvedDateString(booking)
     }));
 
+    // Which bulk shipment each BL is in ("Shipment 57"), for the profile.
+    const batchIds = [...new Set(customerLiveShipments.map(s => s.consolidationId && String(s.consolidationId)).filter(Boolean))];
+    const batchDocs = batchIds.length
+      ? await consolidations().find({ _id: { $in: batchIds.map(id => new ObjectId(id)) } }, { projection: { batchNumber: 1 } }).toArray()
+      : [];
+    const batchNumberById = new Map(batchDocs.map(b => [String(b._id), b.batchNumber ?? null]));
+    const liveShipmentsWithBatch = customerLiveShipments.map(s => ({
+      ...s,
+      batchNumber: s.batchNumber ?? (s.consolidationId ? batchNumberById.get(String(s.consolidationId)) ?? null : null)
+    }));
+
     res.status(200).json({
       customer: {
         ...withoutSignInSecrets(customer),
@@ -2476,7 +2493,7 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
         linkedAccount: await linkedAccountFor(customer),
         messages: customerMessages,
         shipments: customerShipments,
-        liveShipments: customerLiveShipments,
+        liveShipments: liveShipmentsWithBatch,
         bookings: bookingsWithResolvedDate,
         totalBookings: bookingsWithResolvedDate.length,
         totalShipments: customerLiveShipments.length,
@@ -2633,8 +2650,10 @@ app.get('/api/bookings', async (req, res) => {
 
   try {
 
+    // A walk-in's drawn signature is only needed when one booking is
+    // opened or printed — not in the whole list.
     const allBookings = await bookings()
-      .find({})
+      .find({}, { projection: { 'signature.image': 0 } })
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -2688,7 +2707,9 @@ app.get('/api/bookings/count', async (req, res) => {
 
     const count = await bookings().countDocuments({
       requestedDay: day,
-      status: { $nin: ['cancelled', 'completed'] }
+      status: { $nin: ['cancelled', 'completed'] },
+      // Walk-ins came without an appointment — they never use up a slot.
+      channel: { $ne: 'walk_in' }
     });
 
     res.status(200).json({
@@ -2960,6 +2981,84 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
 // One BL belongs to exactly one customer shipment — the unique
 // hblNumber index enforces it; a clash is reported, never overwritten.
 
+// Shared by this route and the walk-in Finalise step (walkInRoutes.js).
+// Returns { status, error } when the BL can't be assigned, otherwise
+// { shipment, existing }. With dryRun it only checks (format, clash,
+// shipment number) and writes nothing — so a caller can check BEFORE
+// changing anything else, never leaving a half-done record behind.
+async function assignBlToBooking(booking, { hblNumber: rawBl, batchNumber: batchNumberRaw } = {}, { dryRun = false } = {}) {
+  const hblNumber = String(rawBl || '').trim();
+  if (!/^[A-Za-z0-9-]{1,32}$/.test(hblNumber)) {
+    return { status: 400, error: 'BL number must be 1-32 letters, numbers, or hyphens' };
+  }
+  if (!dryRun && !booking.customerId) {
+    return { status: 400, error: 'This booking is not linked to a customer' };
+  }
+
+  let consolidation = null;
+  if (batchNumberRaw !== undefined && batchNumberRaw !== null && batchNumberRaw !== '') {
+    const batchNumber = Number(batchNumberRaw);
+    if (!Number.isInteger(batchNumber) || batchNumber < 1) {
+      return { status: 400, error: 'Shipment number must be a whole number, e.g. 57' };
+    }
+    consolidation = await consolidations().findOne({ batchNumber });
+    if (!consolidation) {
+      return { status: 404, error: `Shipment ${batchNumber} not found` };
+    }
+  }
+
+  const clash = await shipments().findOne({ hblNumber });
+  const existing = await shipments().findOne({ bookingId: booking._id });
+  if (clash && (!existing || String(clash._id) !== String(existing._id))) {
+    return { status: 409, error: `BL ${hblNumber} is already assigned to another shipment` };
+  }
+  if (dryRun) return { ok: true, hblNumber };
+
+  const now = new Date().toISOString();
+  let shipment;
+
+  if (existing) {
+    const set = { hblNumber, updatedAt: now };
+    if (consolidation) set.consolidationId = consolidation._id;
+    shipment = await shipments().findOneAndUpdate(
+      { _id: existing._id },
+      { $set: set },
+      { returnDocument: 'after' }
+    );
+  } else {
+    // Boxes are in hand by the time a BL is assigned — the shipment
+    // starts at "cargo_received", with that recorded in its history.
+    const doc = {
+      shipmentNumber: generateShipmentNumber(),
+      customerId: booking.customerId,
+      bookingId: booking._id,
+      hblNumber,
+      consolidationId: consolidation ? consolidation._id : null,
+      serviceType: booking.serviceType || null,
+      origin: booking.origin || 'Sydney',
+      destination: booking.destination || null,
+      cargo: booking.boxSummary || null,
+      boxCount: booking.boxCount ?? null,
+      status: 'cargo_received',
+      warehouseStatus: null,
+      history: [{ status: 'cargo_received', at: now, note: `BL ${hblNumber} assigned` }],
+      createdAt: now,
+      updatedAt: now
+    };
+    const { insertedId } = await shipments().insertOne(doc);
+    shipment = { ...doc, _id: insertedId };
+  }
+
+  // A declaration is confirmed once its BL is assigned.
+  const bookingSet = { shipmentId: String(shipment._id), warehouseStatus: 'received', declarationStatus: 'received' };
+  if (!booking.bookingCode) bookingSet.bookingCode = await customerTools.newBookingCode();
+  await bookings().updateOne({ _id: booking._id }, { $set: bookingSet });
+
+  const [withCustomerInfo] = await attachCustomerInfo([shipment]);
+  broadcast('shipment.updated', { shipment: withCustomerInfo });
+  return { shipment: withCustomerInfo, existing: Boolean(existing) };
+}
+
 app.post('/api/bookings/:bookingId/bl', async (req, res) => {
 
   try {
@@ -2969,87 +3068,17 @@ app.post('/api/bookings/:bookingId/bl', async (req, res) => {
       return res.status(400).json({ error: 'Invalid booking id' });
     }
 
-    const hblNumber = String((req.body || {}).hblNumber || '').trim();
-    if (!/^[A-Za-z0-9-]{1,32}$/.test(hblNumber)) {
-      return res.status(400).json({
-        error: 'BL number must be 1-32 letters, numbers, or hyphens'
-      });
-    }
-
     const booking = await bookings().findOne({ _id: new ObjectId(bookingId) });
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    if (!booking.customerId) {
-      return res.status(400).json({ error: 'This booking is not linked to a customer' });
-    }
 
-    let consolidation = null;
-    const batchNumberRaw = (req.body || {}).batchNumber;
-    if (batchNumberRaw !== undefined && batchNumberRaw !== null && batchNumberRaw !== '') {
-      const batchNumber = Number(batchNumberRaw);
-      if (!Number.isInteger(batchNumber) || batchNumber < 1) {
-        return res.status(400).json({ error: 'Batch number must be a whole number' });
-      }
-      consolidation = await consolidations().findOne({ batchNumber });
-      if (!consolidation) {
-        return res.status(404).json({ error: `Batch ${batchNumber} not found` });
-      }
-    }
+    const result = await assignBlToBooking(booking, req.body || {});
+    if (result.error) return res.status(result.status).json({ error: result.error });
 
-    const clash = await shipments().findOne({ hblNumber });
-    const existing = await shipments().findOne({ bookingId: booking._id });
-    if (clash && (!existing || String(clash._id) !== String(existing._id))) {
-      return res.status(409).json({
-        error: `BL ${hblNumber} is already assigned to another shipment`
-      });
-    }
-
-    const now = new Date().toISOString();
-    let shipment;
-
-    if (existing) {
-      const set = { hblNumber, updatedAt: now };
-      if (consolidation) set.consolidationId = consolidation._id;
-      shipment = await shipments().findOneAndUpdate(
-        { _id: existing._id },
-        { $set: set },
-        { returnDocument: 'after' }
-      );
-    } else {
-      // Boxes are in hand by the time a BL is assigned — the shipment
-      // starts at "cargo_received", with that recorded in its history.
-      const doc = {
-        shipmentNumber: generateShipmentNumber(),
-        customerId: booking.customerId,
-        bookingId: booking._id,
-        hblNumber,
-        consolidationId: consolidation ? consolidation._id : null,
-        serviceType: booking.serviceType || null,
-        origin: booking.origin || 'Sydney',
-        destination: booking.destination || null,
-        cargo: booking.boxSummary || null,
-        boxCount: booking.boxCount ?? null,
-        status: 'cargo_received',
-        warehouseStatus: null,
-        history: [{ status: 'cargo_received', at: now, note: `BL ${hblNumber} assigned` }],
-        createdAt: now,
-        updatedAt: now
-      };
-      const { insertedId } = await shipments().insertOne(doc);
-      shipment = { ...doc, _id: insertedId };
-    }
-
-    const bookingSet = { shipmentId: String(shipment._id), warehouseStatus: 'received' };
-    if (!booking.bookingCode) bookingSet.bookingCode = await customerTools.newBookingCode();
-    await bookings().updateOne({ _id: booking._id }, { $set: bookingSet });
-
-    const [withCustomerInfo] = await attachCustomerInfo([shipment]);
-    broadcast('shipment.updated', { shipment: withCustomerInfo });
-
-    res.status(existing ? 200 : 201).json({
+    res.status(result.existing ? 200 : 201).json({
       success: true,
-      shipment: withCustomerInfo
+      shipment: result.shipment
     });
 
   } catch (err) {
@@ -3068,7 +3097,6 @@ app.post('/api/bookings/:bookingId/bl', async (req, res) => {
     });
   }
 });
-
 
 // ============================================================
 // SHIPMENTS (Phase 2) — live operational tracking, separate from the
@@ -5769,6 +5797,33 @@ app.use('/api/public', scheduleRouters.publicRouter);
 app.use('/api/schedule', scheduleRouters.staffRouter);
 // Both chat channels answer schedule questions from those same dates.
 const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
+
+// One email through Resend (same account as the booking emails).
+// Resolves false when email isn't set up; throws if Resend refuses it.
+async function sendEmail({ to, subject, html, attachments }) {
+  if (!RESEND_API_KEY || !to) return false;
+  await axios.post(
+    'https://api.resend.com/emails',
+    { from: 'Transco Cargo Sydney <onboarding@resend.dev>', to, subject, html, ...(attachments && attachments.length ? { attachments } : {}) },
+    { headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' } }
+  );
+  return true;
+}
+
+// Walk-in drop-offs: the customer fills the declaration on their phone
+// (public), staff finalise it at the counter (behind staff auth).
+const walkInRouters = require('./walkInRoutes')({
+  tools: customerTools,
+  assignBl: assignBlToBooking,
+  getSydneyNow,
+  broadcast,
+  withoutSignInSecrets,
+  sendEmail,
+  staffEmail: STAFF_NOTIFICATION_EMAIL
+});
+app.use('/api/public', walkInRouters.publicRouter);
+app.use('/api/walk-ins', walkInRouters.staffRouter);
+app.use('/api/forms', walkInRouters.formsRouter);
 
 const createWebChatRouter = require('./webChatRoutes');
 app.use('/api/web-chat', createWebChatRouter({

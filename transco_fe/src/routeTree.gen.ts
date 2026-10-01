@@ -22,6 +22,7 @@ import { Route as ConsoleScheduleRouteImport } from './routes/console.schedule'
 import { Route as ConsoleSettingsRouteImport } from './routes/console.settings'
 import { Route as ConsoleShipmentsRouteRouteImport } from './routes/console/shipments/route'
 import { Route as ConsoleTrackingRouteImport } from './routes/console.tracking'
+import { Route as ConsoleWalkInsRouteImport } from './routes/console.walk-ins'
 import { Route as ConsoleWarehouseRouteImport } from './routes/console.warehouse'
 import { Route as ConsoleAiAgentRouteImport } from './routes/console.ai.agent'
 import { Route as ConsoleAiBotControlsRouteImport } from './routes/console.ai.bot-controls'
@@ -103,6 +104,11 @@ const ConsoleShipmentsRouteRoute = ConsoleShipmentsRouteRouteImport.update({
 const ConsoleTrackingRoute = ConsoleTrackingRouteImport.update({
   id: '/tracking',
   path: '/tracking',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleWalkInsRoute = ConsoleWalkInsRouteImport.update({
+  id: '/walk-ins',
+  path: '/walk-ins',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
 const ConsoleWarehouseRoute = ConsoleWarehouseRouteImport.update({
@@ -210,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/console/schedule': typeof ConsoleScheduleRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/tracking': typeof ConsoleTrackingRoute
+  '/console/walk-ins': typeof ConsoleWalkInsRoute
   '/console/warehouse': typeof ConsoleWarehouseRoute
   '/console/': typeof ConsoleIndexRoute
   '/console/ai/agent': typeof ConsoleAiAgentRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/console/schedule': typeof ConsoleScheduleRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/tracking': typeof ConsoleTrackingRoute
+  '/console/walk-ins': typeof ConsoleWalkInsRoute
   '/console/warehouse': typeof ConsoleWarehouseRoute
   '/console': typeof ConsoleIndexRoute
   '/console/ai/agent': typeof ConsoleAiAgentRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/console/schedule': typeof ConsoleScheduleRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/tracking': typeof ConsoleTrackingRoute
+  '/console/walk-ins': typeof ConsoleWalkInsRoute
   '/console/warehouse': typeof ConsoleWarehouseRoute
   '/console/': typeof ConsoleIndexRoute
   '/console/ai/agent': typeof ConsoleAiAgentRoute
@@ -305,6 +314,7 @@ export interface FileRouteTypes {
     | '/console/schedule'
     | '/console/settings'
     | '/console/tracking'
+    | '/console/walk-ins'
     | '/console/warehouse'
     | '/console/'
     | '/console/ai/agent'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/console/schedule'
     | '/console/settings'
     | '/console/tracking'
+    | '/console/walk-ins'
     | '/console/warehouse'
     | '/console'
     | '/console/ai/agent'
@@ -365,6 +376,7 @@ export interface FileRouteTypes {
     | '/console/schedule'
     | '/console/settings'
     | '/console/tracking'
+    | '/console/walk-ins'
     | '/console/warehouse'
     | '/console/'
     | '/console/ai/agent'
@@ -481,6 +493,13 @@ declare module '@tanstack/react-router' {
       path: '/tracking'
       fullPath: '/console/tracking'
       preLoaderRoute: typeof ConsoleTrackingRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/walk-ins': {
+      id: '/console/walk-ins'
+      path: '/walk-ins'
+      fullPath: '/console/walk-ins'
+      preLoaderRoute: typeof ConsoleWalkInsRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/warehouse': {
@@ -666,6 +685,7 @@ interface ConsoleRouteRouteChildren {
   ConsoleScheduleRoute: typeof ConsoleScheduleRoute
   ConsoleSettingsRoute: typeof ConsoleSettingsRoute
   ConsoleTrackingRoute: typeof ConsoleTrackingRoute
+  ConsoleWalkInsRoute: typeof ConsoleWalkInsRoute
   ConsoleWarehouseRoute: typeof ConsoleWarehouseRoute
   ConsoleIndexRoute: typeof ConsoleIndexRoute
   ConsoleAiAgentRoute: typeof ConsoleAiAgentRoute
@@ -689,6 +709,7 @@ const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleScheduleRoute: ConsoleScheduleRoute,
   ConsoleSettingsRoute: ConsoleSettingsRoute,
   ConsoleTrackingRoute: ConsoleTrackingRoute,
+  ConsoleWalkInsRoute: ConsoleWalkInsRoute,
   ConsoleWarehouseRoute: ConsoleWarehouseRoute,
   ConsoleIndexRoute: ConsoleIndexRoute,
   ConsoleAiAgentRoute: ConsoleAiAgentRoute,

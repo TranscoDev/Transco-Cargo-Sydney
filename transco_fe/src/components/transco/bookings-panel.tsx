@@ -98,7 +98,16 @@ export type BookingFilter = "all" | "declarations" | "bls";
 type View = "today" | "upcoming" | "attention" | "past";
 
 function needsDeclarationCheck(b: Booking) {
-  return !!b.declarationSubmittedAt && b.declarationStatus !== "received" && b.status !== "cancelled";
+  // A full declaration (filled when booking) is checked in the Confirm panel instead.
+  return !!b.declarationSubmittedAt && b.declarationStatus !== "received" && b.status !== "cancelled" && b.channel !== "walk_in" && !b.declarationComplete;
+}
+/** Booked online with the full declaration — at drop-off staff only check, value and assign the BL. */
+function needsDropOffConfirm(b: Booking) {
+  return b.channel !== "walk_in" && !!b.declarationComplete && !b.staffConfirmed && b.status !== "cancelled";
+}
+/** A walk-in form the customer sent from their phone, not yet checked by staff. */
+function needsFinalise(b: Booking) {
+  return b.channel === "walk_in" && b.walkInStatus !== "finalised" && b.status !== "cancelled";
 }
 function needsBl(b: Booking) {
   return (b.warehouseStatus === "received" || b.status === "completed") && !b.shipmentId && b.status !== "cancelled";
@@ -131,14 +140,15 @@ export function BookingsPanel({
   }, [initialFilter]);
 
   const counts = useMemo(() => {
-    let todayN = 0, upcoming = 0, declarations = 0, bls = 0;
+    let todayN = 0, upcoming = 0, declarations = 0, bls = 0, walkIns = 0;
     for (const b of bookings) {
       if (b.status !== "cancelled" && b.resolvedDate === today) todayN += 1;
       if (b.status !== "cancelled" && b.resolvedDate > today) upcoming += 1;
       if (needsDeclarationCheck(b)) declarations += 1;
       if (needsBl(b)) bls += 1;
+      if (needsFinalise(b)) walkIns += 1;
     }
-    return { today: todayN, upcoming, attention: declarations + bls, declarations, bls };
+    return { today: todayN, upcoming, attention: walkIns + declarations + bls, declarations, bls, walkIns };
   }, [bookings, today]);
 
   const byTime = (a: Booking, b: Booking) => a.requestedTime.localeCompare(b.requestedTime);
@@ -174,11 +184,12 @@ export function BookingsPanel({
     emptyText = "Future bookings will appear here.";
   } else if (view === "attention") {
     groups = [
+      { key: "walkins", heading: "Walk-ins to confirm", items: bookings.filter(needsFinalise).sort((a, b) => a.resolvedDate.localeCompare(b.resolvedDate) || byTime(a, b)) },
       { key: "decl", heading: "Declarations to check", items: bookings.filter(needsDeclarationCheck).sort((a, b) => a.resolvedDate.localeCompare(b.resolvedDate)) },
       { key: "bls", heading: "BLs to assign", items: bookings.filter(needsBl).sort((a, b) => a.resolvedDate.localeCompare(b.resolvedDate)) },
     ].filter((g) => g.items.length);
     emptyTitle = "All clear";
-    emptyText = "No declarations to check and no BLs to assign.";
+    emptyText = "No walk-ins to confirm, no declarations to check and no BLs to assign.";
   } else {
     const g = groupByDate(bookings.filter((b) => b.resolvedDate < today || b.status === "cancelled"));
     groups = [...g.keys()].sort().reverse().map((d) => ({ key: d, heading: dayLabel(d), items: g.get(d)!.sort(byTime) }));
@@ -345,9 +356,11 @@ function shortDay(dateKey: string) {
 }
 
 /** The one next thing to do for this booking (null = nothing left). */
-function nextAction(b: Booking): { label: string; kind: "confirm" | "done" | "bl" | "restore" } | null {
+function nextAction(b: Booking): { label: string; kind: "confirm" | "done" | "bl" | "restore" | "finalise" } | null {
   if (b.status === "cancelled") return { label: "Restore", kind: "restore" };
+  if (needsFinalise(b)) return { label: "Confirm", kind: "finalise" };
   if (b.status === "pending") return { label: "Confirm", kind: "confirm" };
+  if (b.status === "confirmed" && needsDropOffConfirm(b)) return { label: "Check boxes & BL", kind: "finalise" };
   if (b.status === "confirmed") return { label: "Mark done", kind: "done" };
   if (!b.shipmentId) return { label: "Assign BL", kind: "bl" };
   return null;
@@ -391,8 +404,10 @@ function BookingCard({
     if (next.kind === "confirm") onUpdateStatus(booking.id, "confirmed");
     else if (next.kind === "done") onUpdateStatus(booking.id, "completed");
     else if (next.kind === "restore") onUpdateStatus(booking.id, "pending");
+    else if (next.kind === "finalise") setDetailsOpen(true);
     else setEditOpen(true);
   };
+  const walkInToFinalise = needsFinalise(booking);
 
   const printIt = () =>
     printDeclaration(booking.id).catch((err: unknown) => notify.error("Couldn't open the declaration", friendlyError(err, "Please try again.")));
@@ -427,8 +442,16 @@ function BookingCard({
               {booking.customerName || booking.phoneNumber}
             </button>
             {booking.bookingCode && <span className="text-sm tabular-nums text-muted-foreground">{booking.bookingCode}</span>}
-            <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+            {walkInToFinalise ? (
+              <StatusBadge tone="attention">Walk-in · to confirm</StatusBadge>
+            ) : (
+              <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
+            )}
             {booking.channel === "portal" && <span className="text-xs text-muted-foreground">· booked online</span>}
+            {booking.channel !== "walk_in" && booking.declarationComplete && (
+              <span className="text-xs font-medium text-success-foreground">· Declaration ✓</span>
+            )}
+            {booking.channel === "walk_in" && !walkInToFinalise && <span className="text-xs text-muted-foreground">· walk-in</span>}
           </div>
           {details && <p className="mt-0.5 truncate text-sm text-muted-foreground">{details}</p>}
         </div>
@@ -494,6 +517,12 @@ function BookingCard({
         </div>
       </div>
 
+      {walkInToFinalise && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-attention/25 bg-attention-soft/60 px-4 py-2">
+          <p className="text-sm text-attention-foreground">Walk-in form sent from the customer's phone — check the boxes with them, then assign the BL to confirm it.</p>
+        </div>
+      )}
+
       {/* Only when there's something to do about the declaration. */}
       {declarationToCheck && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-xl border-t border-warning/25 bg-warning-soft/60 px-4 py-2">
@@ -510,7 +539,7 @@ function BookingCard({
         </div>
       )}
 
-      <BookingDetailsSheet bookingId={booking.id} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <BookingDetailsSheet bookingId={booking.id} open={detailsOpen} onOpenChange={setDetailsOpen} onAssignBl={() => setEditOpen(true)} />
 
       <BookingDetailsEditor bookingId={booking.id} open={changeDetailsOpen} onOpenChange={setChangeDetailsOpen} />
 
