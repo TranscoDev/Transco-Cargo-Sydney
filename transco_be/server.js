@@ -173,6 +173,7 @@ app.use('/uploads', express.static(ATTACHMENT_UPLOAD_DIR));
 const PUBLIC_API_PREFIXES = [
   '/auth/login',   // issues the token — can't require one to get one
   '/web-chat',     // public website chat widget, no staff session
+  '/public/',      // read-only website data (e.g. the shipping calendar) — see scheduleRoutes.js
   '/portal/'       // My Transco — applies its own CUSTOMER auth (portalRoutes.js);
                    // trailing slash so e.g. a future '/portal-x' route isn't public
 ];
@@ -1792,6 +1793,18 @@ app.post('/webhook', async (req, res) => {
     if (customer.mode === 'CHATBOT') {
 
       await sendTypingIndicator(message.id);
+
+      // Schedule questions are answered from the shipping calendar staff
+      // keep in the console — the same dates the website shows — not by
+      // the AI, so the two can never disagree.
+      const scheduleReply = await scheduleAnswerer.answerScheduleQuestion({
+        text,
+        country: customer.webCountry || null
+      });
+      if (scheduleReply) {
+        await sendAndTrackOutbound(customer, 'CHATBOT', scheduleReply, inboundMessage._id, isNewCustomer);
+        return;
+      }
 
       const reply =
         await getFlowiseReply(
@@ -5750,6 +5763,13 @@ app.post('/api/customers/:customerId/portal-password', async (req, res) => {
 const createStaffPortalRouter = require('./staffPortalRoutes');
 app.use('/api/my-transco', createStaffPortalRouter({ tools: customerTools }));
 
+// Shipping calendar: public read for the website, staff management in the console.
+const scheduleRouters = require('./scheduleRoutes')({ getSydneyNow });
+app.use('/api/public', scheduleRouters.publicRouter);
+app.use('/api/schedule', scheduleRouters.staffRouter);
+// Both chat channels answer schedule questions from those same dates.
+const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
+
 const createWebChatRouter = require('./webChatRoutes');
 app.use('/api/web-chat', createWebChatRouter({
   getFlowiseReply,
@@ -5773,7 +5793,8 @@ app.use('/api/web-chat', createWebChatRouter({
   PICKUP_DELIVERY_MENU_ITEMS_INDIA,
   COUNTRY_MENU_ITEMS,
   customerAuth,
-  customerTools
+  customerTools,
+  answerScheduleQuestion: scheduleAnswerer.answerScheduleQuestion
 }));
 
 

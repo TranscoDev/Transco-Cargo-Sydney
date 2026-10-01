@@ -1088,3 +1088,82 @@ test('a signed-in website chat is recognised in Conversations: real name, phone 
   const profile = await api('GET', `/api/customers/${session._id}/profile`, { token: staffToken });
   assert.equal(profile.body.customer.linkedAccount.phoneNumber, '61400777004');
 });
+
+test('shipping calendar: staff manage dates, the website reads upcoming ones without signing in', async () => {
+  const iso = (days) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+
+  // Staff only for management.
+  assert.equal((await api('GET', '/api/schedule?country=sri_lanka')).status, 401);
+  assert.equal((await api('POST', '/api/schedule', { body: { country: 'sri_lanka', cutoff: iso(10) } })).status, 401);
+
+  const add = (body) => api('POST', '/api/schedule', { token: staffToken, body });
+  const a = await add({ country: 'sri_lanka', cutoff: iso(10), seaArrival: iso(45), airArrival: iso(20) });
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const b = await add({ country: 'sri_lanka', cutoff: iso(40), seaArrival: iso(75), airArrival: null, note: 'Christmas run' });
+  assert.equal(b.status, 201);
+  await add({ country: 'sri_lanka', cutoff: iso(-5), seaArrival: iso(30) }); // already past
+  await add({ country: 'india', cutoff: iso(12), seaArrival: iso(50) });
+
+  // Validation and duplicates.
+  assert.equal((await add({ country: 'sri_lanka', cutoff: iso(10) })).status, 409);
+  const early = await add({ country: 'sri_lanka', cutoff: iso(20), seaArrival: iso(5) });
+  assert.equal(early.status, 400);
+  assert.equal(early.body.field, 'seaArrival');
+  assert.equal((await add({ country: 'nowhere', cutoff: iso(20) })).status, 400);
+  assert.equal((await add({ country: 'sri_lanka', cutoff: '2026-02-31' })).status, 400);
+
+  // Website: no sign-in, upcoming only, soonest first, just this country.
+  const pub = await api('GET', '/api/public/schedule?country=sri_lanka');
+  assert.equal(pub.status, 200);
+  assert.deepEqual(pub.body.dates.map(d => d.cutoff), [iso(10), iso(40)]);
+  assert.equal(pub.body.dates[0].airArrival, iso(20));
+  assert.equal(pub.body.dates[1].airArrival, null);
+  assert.equal(pub.body.dates[1].note, 'Christmas run');
+
+  // Edit + delete.
+  const edited = await api('PATCH', `/api/schedule/${a.body.date.id}`, { token: staffToken, body: { airArrival: iso(22) } });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.date.airArrival, iso(22));
+  assert.equal((await api('DELETE', `/api/schedule/${b.body.date.id}`, { token: staffToken })).status, 204);
+  const after = await api('GET', '/api/public/schedule?country=sri_lanka');
+  assert.deepEqual(after.body.dates.map(d => d.cutoff), [iso(10)]);
+
+  // Staff list includes the recent past (for reference).
+  const staffList = await api('GET', '/api/schedule?country=sri_lanka', { token: staffToken });
+  assert.ok(staffList.body.dates.some(d => d.cutoff === iso(-5)));
+});
+
+test('chat answers schedule questions from the shipping calendar, not the AI', async () => {
+  // Uses the calendar entries added in the previous test (Sri Lanka + India).
+  const sessionId = `agentsite-schedule-${Date.now()}`;
+
+  flowiseRequests = [];
+  const sl = await chat(sessionId, { message: 'What is your shipping schedule?', country: 'sri_lanka' });
+  assert.equal(sl.status, 200, JSON.stringify(sl.body));
+  assert.equal(flowiseRequests.length, 0, 'the AI is not asked');
+  assert.match(sl.body.reply, /Shipping calendar — Sri Lanka/);
+  assert.match(sl.body.reply, /Next cutoff:/);
+  assert.match(sl.body.reply, /Sea freight arrives/);
+  assert.match(sl.body.reply, /Air freight arrives/);
+  assert.doesNotMatch(sl.body.reply, /India/);
+
+  // A country named in the question wins over the page.
+  const india = await chat(sessionId, { message: 'when is the next shipment to India?', country: 'sri_lanka' });
+  assert.match(india.body.reply, /Shipping calendar — India/);
+
+  // Asked in Sinhala → answered in Sinhala.
+  const si = await chat(sessionId, { message: 'ඔබේ shipping කාලසටහන මොකක්ද?', country: 'sri_lanka' });
+  assert.match(si.body.reply, /Shipping දින දර්ශනය/);
+  assert.equal(flowiseRequests.length, 0);
+
+  // Not schedule questions → the AI, as before.
+  flowiseReplyText = 'AI reply';
+  await chat(sessionId, { message: 'When will my shipment arrive?', country: 'sri_lanka' });
+  await chat(sessionId, { message: 'How much for 2 tea chests?', country: 'sri_lanka' });
+  assert.equal(flowiseRequests.length, 2);
+
+  // The answer is in the transcript staff see.
+  const visitor = await db.collection('customers').findOne({ sessionId, channel: 'website' });
+  const botMessages = await db.collection('messages').find({ customerId: visitor._id, senderType: 'CHATBOT' }).toArray();
+  assert.ok(botMessages.some(m => /Shipping calendar — Sri Lanka/.test(m.content)));
+});

@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bot,
   CalendarClock,
+  CalendarDays,
   ChevronDown,
   Clock3,
   Globe,
@@ -78,6 +79,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
+      { label: "Shipping calendar", to: "/console/schedule", icon: CalendarDays },
       { label: "Tracking", to: "/console/tracking", icon: MapPin },
       // "Packaging" = Transco-owned box supplies used on shipments — not
       // customer cargo (that would be Warehouse).

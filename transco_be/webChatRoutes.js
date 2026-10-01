@@ -142,7 +142,9 @@ module.exports = function createWebChatRouter({
   // My Transco (optional — when absent, the widget behaves exactly as
   // it always has, for everyone).
   customerAuth,
-  customerTools
+  customerTools,
+  // Schedule questions answered from the shipping calendar (optional).
+  answerScheduleQuestion
 }) {
   const router = express.Router();
 
@@ -378,6 +380,28 @@ module.exports = function createWebChatRouter({
         // An account button always gets an answer above; there is no
         // text to hand to Flowise, so never fall through with nothing.
         return res.status(400).json({ error: 'Unrecognized action' });
+      }
+
+      // Schedule questions: answered from the shipping calendar (the same
+      // dates the website shows), not by the AI. Done before the country
+      // context below, so the AI still gets that on the next real question.
+      if (answerScheduleQuestion) {
+        const scheduleReply = await answerScheduleQuestion({
+          text: outgoingText,
+          country: (Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) && country) || customer.webCountry || null
+        });
+        if (scheduleReply) {
+          const saved = await saveMessage({
+            customerId: customer._id,
+            senderType: 'CHATBOT',
+            content: scheduleReply,
+            isRead: true,
+            replyToMessageId: incoming._id,
+            whatsappStatus: null
+          });
+          await broadcastMessageCreated(customer, saved);
+          return res.json({ reply: scheduleReply, media: null, menu: null, cards: [], actions: [], handedOff: false });
+        }
       }
 
       // Which country this visitor has already told the assistant about:
