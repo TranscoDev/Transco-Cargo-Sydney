@@ -15,7 +15,6 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 
-import { BookingDetailsSheet } from "@/components/transco/booking-details-sheet";
 import {
   EmptyState,
   ErrorState,
@@ -32,6 +31,7 @@ import { notify, friendlyError } from "@/lib/transco/notify";
 import { bookingStatus, SENDER_LABEL, shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
 import type { Booking, CustomerProfile, Shipment } from "@/lib/transco/types";
+import { formatPhone, telHref } from "@/lib/transco/phone";
 
 // Lives as a sibling of index.tsx (the list) under customers/route.tsx's
 // Outlet — see that file's comment for why this can't just be a flat
@@ -83,7 +83,7 @@ function CustomerProfilePage() {
 function Profile({ profile: p }: { profile: CustomerProfile }) {
   const navigate = useNavigate();
   const { selectConversation } = useConversations();
-  const [openBooking, setOpenBooking] = useState<string | null>(null);
+  const setOpenBooking = (bookingId: string) => void navigate({ to: "/console/bookings/$bookingId", params: { bookingId } });
 
   const today = new Date().toISOString().slice(0, 10);
   const activity = useMemo(() => {
@@ -135,8 +135,8 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
               {p.status && p.status !== "ACTIVE" && <StatusBadge tone="neutral">{p.status === "HISTORICAL" ? "Past customer" : "Needs review"}</StatusBadge>}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <a href={`tel:+${p.phoneNumber.replace(/^\+/, "")}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
-                <Phone className="h-3.5 w-3.5" aria-hidden />+{p.phoneNumber.replace(/^\+/, "")}
+              <a href={telHref(p.phoneNumber)} className="inline-flex items-center gap-1.5 hover:text-foreground">
+                <Phone className="h-3.5 w-3.5" aria-hidden />{formatPhone(p.phoneNumber)}
               </a>
               {p.email && (
                 <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
@@ -314,9 +314,6 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
 
       {p.channel !== "website" && <PortalPasswordCard customerId={p.id} />}
 
-      {openBooking && (
-        <BookingDetailsSheet bookingId={openBooking} open onOpenChange={(o) => !o && setOpenBooking(null)} />
-      )}
     </>
   );
 }
@@ -439,7 +436,7 @@ function PortalPasswordCard({ customerId }: { customerId: string }) {
     try {
       const result = await setPortalPassword(customerId, password);
       setDone(
-        `Tell the customer to sign in at My Transco with +${result.phoneNumber} and this password — they can change it in their profile.`,
+        `Tell the customer to sign in at My Transco with ${formatPhone(result.phoneNumber)} and this password — they can change it in their profile.`,
       );
       notify.success("Sign-in password set", result.customerCode ?? undefined);
       setPassword("");

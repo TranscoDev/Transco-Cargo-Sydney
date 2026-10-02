@@ -6,6 +6,7 @@ import { ModeTag } from "./mode-tag";
 import { ChannelTag } from "./channel-tag";
 import { MessageStatusIcon } from "./message-status";
 import { UnreadBadge } from "./unread-badge";
+import { formatPhone } from "@/lib/transco/phone";
 
 function initials(name: string) {
   return name
@@ -115,7 +116,7 @@ export function ContactCard({
           {conversation.linkedAccount && (
             <span
               className="inline-flex items-center gap-1 rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success-foreground"
-              title={`Signed in to My Transco · +${conversation.linkedAccount.phoneNumber ?? ""}`}
+              title={`Signed in to My Transco · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}
             >
               ✓ Signed in{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
             </span>

@@ -262,9 +262,7 @@ export const LANGUAGE_LABELS: Record<string, string> = { en: "English", si: "Sin
 
 export const CONTACT_LABELS: Record<string, string> = { whatsapp: "WhatsApp", phone: "Phone call", email: "Email" };
 
-export function formatPhone(digits: string): string {
-  return digits ? `+${digits}` : "";
-}
+export { formatPhone } from "./phone";
 
 export function formatDate(value: string | null | undefined, withTime = false): string {
   if (!value) return "—";

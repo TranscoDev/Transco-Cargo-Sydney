@@ -9,6 +9,7 @@ import type { Conversation, ConversationMode, Message } from "@/lib/transco/type
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 import { ModeSwitch } from "./mode-switch";
+import { formatPhone } from "@/lib/transco/phone";
 
 function groupByDay(messages: Message[]) {
   const groups: { label: string; items: Message[] }[] = [];
@@ -107,7 +108,7 @@ export function ChatPanel({
             <p className="flex items-center gap-3 truncate text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <Phone className="h-3 w-3 shrink-0" aria-hidden />
-                {conversation.linkedAccount ? `+${conversation.phoneNumber}` : conversation.phoneNumber}
+                {formatPhone(conversation.phoneNumber)}
               </span>
               {conversation.linkedAccount && (
                 <span className="rounded bg-success-soft px-1.5 font-medium text-success-foreground">

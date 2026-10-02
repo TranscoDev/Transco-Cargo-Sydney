@@ -5,7 +5,9 @@ import { getAuthToken } from "./auth";
  * A booking's declaration: the details (GET /api/my-transco/bookings/:id/
  * declaration — staff only; see getDeclarationForPrint in
  * transco_be/customerTools.js), the filled ORIGINAL paper form as a PDF
- * (GET /api/forms/:id/declaration.pdf — see transco_be/formsPdf.js), and
+ * (GET /api/forms/:id/forms.pdf — every form the booking gets: the
+ * declaration, plus the UPB customs form and delivery agreement for Sri
+ * Lanka or the packing list for India; see transco_be/formsPdf.js), and
  * "Send email" (the forms to the office inbox, once the BL is assigned).
  *
  * The PDF is made by the backend so the printout and the emailed forms
@@ -22,6 +24,18 @@ export interface DeclarationPerson {
   town?: string;
   idNumber?: string;
   homePhone?: string;
+}
+
+export interface DangerousGoods {
+  /** True only when all five "NO …" lines were ticked. */
+  noProhibited: boolean;
+  /** Each "NO …" line: true = confirmed not in the boxes, false = may be in them (staff to check). */
+  notInBoxes?: boolean[];
+  medications: boolean;
+  lithium: boolean;
+  lithiumDetails: string;
+  liquids: boolean;
+  liquidsDetails: string;
 }
 
 export interface DeclarationContentRow {
@@ -54,6 +68,9 @@ export interface DeclarationPrintData {
   declarationSubmittedAt: string | null;
   declarationStatus: "received" | "not_received";
   blNumber: string | null;
+  /** The customer's BL record, and which shipment (container) it's in. */
+  shipmentId: string | null;
+  batchNumber: number | null;
   channel: string | null;
   status: string | null;
   contents: DeclarationContentRow[];
@@ -72,6 +89,10 @@ export interface DeclarationPrintData {
   } | null;
   /** Staff confirmation at drop-off (values + BL) — walk-ins and bookings with a full online declaration. */
   confirm: { status: "submitted" | "finalised"; finalisedAt: string | null; finalisedBy: string | null } | null;
+  /** Air Freight: the customer's Dangerous Goods Checklist answers. */
+  dangerousGoods: DangerousGoods | null;
+  /** Air Freight + lithium: the configuration staff chose for the transport document. */
+  lithiumDoc: { configs: string[]; phone: string } | null;
   /** "Send email" history (office inbox), oldest first. */
   formEmails: { at: string; by: string | null }[];
   customer: { id: string | null; customerCode: string | null; name: string | null; phoneNumber: string | null };
@@ -100,7 +121,11 @@ export async function fetchDeclaration(bookingId: string): Promise<DeclarationPr
     collectionCentre: d.collectionCentre ?? null,
     walkIn: d.walkIn ?? null,
     formEmails: d.formEmails ?? [],
+    shipmentId: d.shipmentId ?? null,
+    batchNumber: d.batchNumber ?? null,
     confirm: d.confirm ?? null,
+    dangerousGoods: d.dangerousGoods ?? null,
+    lithiumDoc: d.lithiumDoc ?? null,
     countryKey: d.countryKey ?? null,
     serviceKey: d.serviceKey ?? null,
     deliveryKey: d.deliveryKey ?? null,
@@ -115,9 +140,9 @@ export async function fetchDeclaration(bookingId: string): Promise<DeclarationPr
 export async function printDeclaration(bookingId: string): Promise<void> {
   const win = window.open("", "_blank");
   if (!win) throw new Error("Your browser blocked the print window — allow pop-ups for this site and try again.");
-  win.document.write('<p style="font:14px system-ui;padding:24px">Loading the declaration form…</p>');
+  win.document.write('<p style="font:14px system-ui;padding:24px">Loading the forms…</p>');
   try {
-    const res = await fetch(`${API_BASE_URL}/api/forms/${bookingId}/declaration.pdf`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/api/forms/${bookingId}/forms.pdf`, { headers: authHeaders() });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(data.error || `Could not make the form (${res.status})`);
@@ -131,6 +156,45 @@ export async function printDeclaration(bookingId: string): Promise<void> {
     win.close();
     throw err;
   }
+}
+
+/** A form this booking gets (key used by fetchFormPdf). */
+export interface BookingForm {
+  key: string;
+  title: string;
+}
+
+/** Which forms this booking gets — Sri Lanka: declaration, UPB, delivery agreement; India: declaration, packing list. */
+export async function fetchFormsList(bookingId: string): Promise<BookingForm[]> {
+  const res = await fetch(`${API_BASE_URL}/api/forms/${bookingId}/list`, { headers: authHeaders() });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; forms?: BookingForm[] };
+  if (!res.ok || !data.forms) throw new Error(data.error || `Could not load the forms (${res.status})`);
+  return data.forms;
+}
+
+/** One filled form ("all" = every form in one PDF), as a PDF blob for the preview. */
+export async function fetchFormPdf(bookingId: string, key: string): Promise<Blob> {
+  const url = key === "all" ? `${API_BASE_URL}/api/forms/${bookingId}/forms.pdf` : `${API_BASE_URL}/api/forms/${bookingId}/forms/${encodeURIComponent(key)}`;
+  const res = await fetch(url, { headers: authHeaders() });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Could not make the form (${res.status})`);
+  }
+  return res.blob();
+}
+
+/** Air Freight: staff update the dangerous goods answers and/or the lithium battery document. */
+export async function saveDangerousGoods(
+  bookingId: string,
+  body: { dangerousGoods?: DangerousGoods; lithiumDoc?: { configs: string[]; phone: string } },
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/forms/${bookingId}/dangerous-goods`, {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(data.error || `Could not save (${res.status})`);
 }
 
 /** "Send email": the filled forms to the office inbox (never the customer). */

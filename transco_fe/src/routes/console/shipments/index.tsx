@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,7 +26,9 @@ import { cn } from "@/lib/utils";
 import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/components/transco/page-kit";
 import { shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
-import { createShipment, fetchConsolidations, fetchShipments } from "@/lib/transco/api";
+import { createConsolidation, fetchConsolidations, fetchShipments } from "@/lib/transco/api";
+import { forgetShipmentList } from "@/components/transco/shipment-picker";
+import { notify } from "@/lib/transco/notify";
 import {
   SHIPMENT_STATUSES,
   SHIPMENT_STATUS_LABELS,
@@ -45,7 +48,6 @@ const AUD = new Intl.NumberFormat("en-AU", {
 });
 
 function ShipmentsPage() {
-  const { conversations, bookings } = useConversations();
   const [view, setView] = useState<"batches" | "all">("batches");
 
   const [consolidations, setConsolidations] = useState<Consolidation[]>([]);
@@ -124,9 +126,8 @@ function ShipmentsPage() {
         <NewShipmentDialog
           open={createOpen}
           onOpenChange={setCreateOpen}
-          customers={conversations}
-          bookings={bookings}
-          onCreated={loadShipments}
+          nextNumber={(consolidations.reduce((m, c) => Math.max(m, c.batchNumber), 0) || 0) + 1}
+          onCreated={() => loadBatches()}
         />
       </div>
 
@@ -373,61 +374,58 @@ function AllShipmentsView({
   );
 }
 
+/**
+ * Start a new shipment (container) — e.g. Shipment 59. No customers here:
+ * they join it when staff assign their BL and pick this shipment. The
+ * number is the next one after the newest shipment (staff can change it).
+ */
 function NewShipmentDialog({
   open,
   onOpenChange,
-  customers,
-  bookings,
+  nextNumber,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  customers: { id: string; customerName: string; phoneNumber: string }[];
-  bookings: { id: string; customerId: string; customerName: string; resolvedDate: string }[];
-  onCreated: () => void;
+  nextNumber: number;
+  onCreated: (batchNumber: number) => void;
 }) {
-  const [customerId, setCustomerId] = useState("");
-  const [bookingId, setBookingId] = useState("");
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [serviceType, setServiceType] = useState("");
-  const [boxCount, setBoxCount] = useState("");
+  const [number, setNumber] = useState(String(nextNumber));
+  const [peNumber, setPeNumber] = useState("");
+  const [departure, setDeparture] = useState("");
+  const [arrival, setArrival] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableBookings = bookings.filter((b) => !customerId || b.customerId === customerId);
-
   const reset = () => {
-    setCustomerId("");
-    setBookingId("");
-    setOrigin("");
-    setDestination("");
-    setServiceType("");
-    setBoxCount("");
+    setNumber(String(nextNumber));
+    setPeNumber("");
+    setDeparture("");
+    setArrival("");
     setError(null);
   };
 
   const handleCreate = async () => {
-    if (!customerId) {
-      setError("Select a customer first.");
+    const n = Number(number);
+    if (!Number.isInteger(n) || n < 1) {
+      setError("The shipment number must be a whole number, e.g. 59.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await createShipment({
-        customerId,
-        bookingId: bookingId || null,
-        origin: origin || null,
-        destination: destination || null,
-        serviceType: serviceType || null,
-        boxCount: boxCount === "" ? null : Number(boxCount),
+      const created = await createConsolidation({
+        batchNumber: n,
+        peNumber: peNumber.trim() || null,
+        departureDate: departure || null,
+        arrivalDate: arrival || null,
       });
-      reset();
+      forgetShipmentList();
+      notify.success(`Shipment ${created.batchNumber} created`, "Pick it when you assign a customer's BL — they join it then.");
       onOpenChange(false);
-      onCreated();
+      onCreated(created.batchNumber);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create shipment");
+      setError(err instanceof Error ? err.message : "Could not create the shipment");
     } finally {
       setSaving(false);
     }
@@ -437,7 +435,7 @@ function NewShipmentDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) reset();
+        if (next) reset();
         onOpenChange(next);
       }}
     >
@@ -449,97 +447,39 @@ function NewShipmentDialog({
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>New Shipment</DialogTitle>
+          <DialogTitle>New shipment</DialogTitle>
+          <DialogDescription>
+            Start the next container. Customers are added when you assign their BL and choose this shipment.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="shipment-customer">Customer</Label>
-            <Select
-              value={customerId}
-              onValueChange={(v) => {
-                setCustomerId(v);
-                setBookingId("");
-              }}
-            >
-              <SelectTrigger id="shipment-customer">
-                <SelectValue placeholder="Select a customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.customerName || c.phoneNumber}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="shipment-booking">Link to Booking (optional)</Label>
-            <Select value={bookingId} onValueChange={setBookingId} disabled={!customerId}>
-              <SelectTrigger id="shipment-booking">
-                <SelectValue placeholder={customerId ? "None" : "Select a customer first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableBookings.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.resolvedDate} — {b.customerName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="shipment-origin">Origin</Label>
-              <Input
-                id="shipment-origin"
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                placeholder="Sydney"
-              />
+              <Label htmlFor="shipment-number">Shipment number</Label>
+              <Input id="shipment-number" inputMode="numeric" value={number} onChange={(e) => setNumber(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="shipment-destination">Destination</Label>
-              <Input
-                id="shipment-destination"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                placeholder="Colombo"
-              />
+              <Label htmlFor="shipment-pe">PE number (optional)</Label>
+              <Input id="shipment-pe" value={peNumber} onChange={(e) => setPeNumber(e.target.value)} placeholder="Add later if not known" />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="shipment-service">Service Type</Label>
-              <Input
-                id="shipment-service"
-                value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                placeholder="Sea Freight"
-              />
+              <Label htmlFor="shipment-departure">Leaves Sydney (optional)</Label>
+              <Input id="shipment-departure" type="date" value={departure} onChange={(e) => setDeparture(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="shipment-boxes">Boxes</Label>
-              <Input
-                id="shipment-boxes"
-                type="number"
-                min="0"
-                value={boxCount}
-                onChange={(e) => setBoxCount(e.target.value)}
-              />
+              <Label htmlFor="shipment-arrival">Arrives (optional)</Label>
+              <Input id="shipment-arrival" type="date" value={arrival} onChange={(e) => setArrival(e.target.value)} />
             </div>
           </div>
-
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs font-medium text-attention-foreground">{error}</p>}
         </div>
 
         <DialogFooter>
           <Button type="button" onClick={handleCreate} disabled={saving}>
-            {saving ? "Creating…" : "Create Shipment"}
+            {saving ? "Creating…" : `Create Shipment ${Number(number) || ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>

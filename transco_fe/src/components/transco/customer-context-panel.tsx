@@ -10,6 +10,7 @@ import {
   type Conversation,
   type Shipment,
 } from "@/lib/transco/types";
+import { formatPhone } from "@/lib/transco/phone";
 
 /** Right-side context panel for the selected conversation — purely
  * additive to the existing chat view (chat-panel.tsx is untouched).
@@ -41,7 +42,7 @@ export function CustomerContextPanel({
         <div className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <Phone className="h-3 w-3" />
-            {conversation.linkedAccount ? `+${conversation.phoneNumber}` : conversation.phoneNumber}
+            {formatPhone(conversation.phoneNumber)}
           </span>
           {conversation.email && (
             <span className="inline-flex items-center gap-1.5">

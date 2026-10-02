@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CalendarClock, CalendarDays, Check, Eye, MoreHorizontal, PenLine, Printer, RotateCcw, Scale, Search, ShipIcon, Trash2, X } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 
 import { BookingCalendar } from "@/components/transco/booking-calendar";
 import { Button } from "@/components/ui/button";
@@ -32,12 +32,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Booking, BookingStageStatus, BookingStatus, BookingUpdateInput } from "@/lib/transco/types";
-import { printDeclaration } from "@/lib/transco/declaration-print";
-import { BookingDetailsSheet } from "@/components/transco/booking-details-sheet";
+import { PrintPreviewDialog } from "@/components/transco/forms-print";
+import { ShipmentPicker } from "@/components/transco/shipment-picker";
 import { BookingDetailsEditor } from "@/components/transco/booking-details-editor";
 import { EmptyState, StatusBadge } from "@/components/transco/page-kit";
 import { bookingStatus } from "@/lib/transco/status";
 import { friendlyError, notify } from "@/lib/transco/notify";
+import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -156,7 +157,7 @@ export function BookingsPanel({
   const matches = (b: Booking) =>
     (b.customerName || "").toLowerCase().includes(q) ||
     (b.bookingCode || "").toLowerCase().includes(q) ||
-    b.phoneNumber.replace(/\s/g, "").toLowerCase().includes(q.replace(/\s/g, "")) ||
+    phoneMatches(b.phoneNumber, q) ||
     (b.receiver?.fullName || "").toLowerCase().includes(q);
 
   // What to show, as ordered groups of { heading, bookings }.
@@ -382,7 +383,9 @@ function BookingCard({
   onAssignBl: AssignBl;
 }) {
   const [editOpen, setEditOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // The booking opens as a full page (lots of drop-off work happens there).
+  const navigate = useNavigate();
+  const openBooking = () => void navigate({ to: "/console/bookings/$bookingId", params: { bookingId: booking.id } });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changeDetailsOpen, setChangeDetailsOpen] = useState(false);
   const isCancelled = booking.status === "cancelled";
@@ -396,7 +399,7 @@ function BookingCard({
   const openDetailsFromCard = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     if (!e.currentTarget.contains(target) || target.closest("button, a, input, [role='dialog'], [role='alertdialog'], [role='menu']")) return;
-    setDetailsOpen(true);
+    openBooking();
   };
 
   const runNext = () => {
@@ -404,18 +407,19 @@ function BookingCard({
     if (next.kind === "confirm") onUpdateStatus(booking.id, "confirmed");
     else if (next.kind === "done") onUpdateStatus(booking.id, "completed");
     else if (next.kind === "restore") onUpdateStatus(booking.id, "pending");
-    else if (next.kind === "finalise") setDetailsOpen(true);
+    else if (next.kind === "finalise") openBooking();
     else setEditOpen(true);
   };
   const walkInToFinalise = needsFinalise(booking);
 
-  const printIt = () =>
-    printDeclaration(booking.id).catch((err: unknown) => notify.error("Couldn't open the declaration", friendlyError(err, "Please try again.")));
+  // Every print goes through a preview first.
+  const [previewAll, setPreviewAll] = useState(false);
+  const printIt = () => setPreviewAll(true);
 
   const details = [
     booking.boxSummary,
     booking.receiver ? `To ${booking.receiver.fullName}${booking.receiver.town ? `, ${booking.receiver.town}` : ""}` : null,
-    booking.phoneNumber,
+    formatPhone(booking.phoneNumber),
   ].filter(Boolean).join(" · ");
 
   return (
@@ -436,10 +440,10 @@ function BookingCard({
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <button
               type="button"
-              onClick={() => setDetailsOpen(true)}
+              onClick={() => openBooking()}
               className="truncate text-left text-base font-semibold text-foreground hover:underline"
             >
-              {booking.customerName || booking.phoneNumber}
+              {booking.customerName || formatPhone(booking.phoneNumber)}
             </button>
             {booking.bookingCode && <span className="text-sm tabular-nums text-muted-foreground">{booking.bookingCode}</span>}
             {walkInToFinalise ? (
@@ -481,11 +485,11 @@ function BookingCard({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => setDetailsOpen(true)}>
+              <DropdownMenuItem onClick={() => openBooking()}>
                 <Eye className="mr-2 h-4 w-4" /> View details
               </DropdownMenuItem>
               <DropdownMenuItem onClick={printIt}>
-                <Printer className="mr-2 h-4 w-4" /> Print declaration
+                <Printer className="mr-2 h-4 w-4" /> Print forms
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setChangeDetailsOpen(true)}>
                 <PenLine className="mr-2 h-4 w-4" /> Change boxes or details
@@ -539,7 +543,8 @@ function BookingCard({
         </div>
       )}
 
-      <BookingDetailsSheet bookingId={booking.id} open={detailsOpen} onOpenChange={setDetailsOpen} onAssignBl={() => setEditOpen(true)} />
+      {previewAll && <PrintPreviewDialog bookingId={booking.id} form={{ key: "all", title: "All forms" }} onClose={() => setPreviewAll(false)} />}
+
 
       <BookingDetailsEditor bookingId={booking.id} open={changeDetailsOpen} onOpenChange={setChangeDetailsOpen} />
 
@@ -724,13 +729,10 @@ function BookingEditSheet({
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="batchNumber">Shipment no. (optional)</Label>
-                  <Input
+                  <ShipmentPicker
                     id="batchNumber"
-                    type="number"
-                    min="1"
                     value={bl.batchNumber}
-                    onChange={(e) => setBl((s) => ({ ...s, batchNumber: e.target.value, error: "", done: "" }))}
-                    placeholder="57"
+                    onChange={(v) => setBl((s) => ({ ...s, batchNumber: v, error: "", done: "" }))}
                   />
                 </div>
               </div>

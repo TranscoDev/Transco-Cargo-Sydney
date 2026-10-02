@@ -5,6 +5,7 @@ import { Star, User, UserCheck, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useConversations } from "@/lib/transco/store";
 import { cn } from "@/lib/utils";
+import { formatPhone } from "@/lib/transco/phone";
 
 export const Route = createFileRoute("/console/leads")({
   component: LeadsPage,
@@ -122,7 +123,7 @@ function LeadsPage() {
                     {c.customerName}
                   </Link>
                 </td>
-                <td className="px-3 py-2 text-muted-foreground">{c.phoneNumber}</td>
+                <td className="px-3 py-2 text-muted-foreground">{formatPhone(c.phoneNumber)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{c.totalShipments ?? 0}</td>
                 <td className="px-3 py-2">
                   <Badge className={cn("font-medium", TIER_BADGE[tier])} variant="secondary">

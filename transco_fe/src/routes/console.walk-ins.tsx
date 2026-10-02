@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Check, ExternalLink, QrCode, Search } from "lucide-react";
 
-import { BookingDetailsSheet } from "@/components/transco/booking-details-sheet";
 import { EmptyState, PageHeader, PageShell, StatusBadge } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 import { useConversations } from "@/lib/transco/store";
 import type { Booking } from "@/lib/transco/types";
 
@@ -47,7 +47,8 @@ function WalkInsPage() {
   );
   const [view, setView] = useState<View>(counts.confirm > 0 ? "confirm" : "today");
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const open = (bookingId: string) => void navigate({ to: "/console/bookings/$bookingId", params: { bookingId } });
 
   const blByShipment = useMemo(() => new Map(shipments.map((s) => [s.id, s.hblNumber ?? null])), [shipments]);
 
@@ -57,7 +58,7 @@ function WalkInsPage() {
     .filter((b) => {
       if (!q) return true;
       const bl = b.shipmentId ? blByShipment.get(b.shipmentId) ?? "" : "";
-      return [b.customerName, b.phoneNumber, b.bookingCode, b.receiver?.fullName, bl].some((v) => (v ?? "").toLowerCase().includes(q));
+      return phoneMatches(b.phoneNumber, q) || [b.customerName, b.bookingCode, b.receiver?.fullName, bl].some((v) => (v ?? "").toLowerCase().includes(q));
     })
     .sort((a, b) => (b.resolvedDate + b.requestedTime).localeCompare(a.resolvedDate + a.requestedTime));
 
@@ -155,7 +156,7 @@ function WalkInsPage() {
               </div>
               <ul className="flex flex-col gap-2">
                 {items.map((b) => (
-                  <WalkInRow key={b.id} booking={b} bl={b.shipmentId ? blByShipment.get(b.shipmentId) ?? null : null} onOpen={() => setOpen(b.id)} />
+                  <WalkInRow key={b.id} booking={b} bl={b.shipmentId ? blByShipment.get(b.shipmentId) ?? null : null} onOpen={() => open(b.id)} />
                 ))}
               </ul>
             </section>
@@ -163,7 +164,6 @@ function WalkInsPage() {
         </div>
       )}
 
-      {open && <BookingDetailsSheet bookingId={open} open onOpenChange={(o) => !o && setOpen(null)} />}
     </PageShell>
   );
 }
@@ -180,7 +180,7 @@ function WalkInRow({ booking: b, bl, onOpen }: { booking: Booking; bl: string | 
         <span className="w-12 shrink-0 text-center text-base font-semibold tabular-nums text-foreground">{b.requestedTime}</span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate text-base font-semibold text-foreground">{b.customerName || b.phoneNumber}</span>
+            <span className="truncate text-base font-semibold text-foreground">{b.customerName || formatPhone(b.phoneNumber)}</span>
             {b.walkInReturning ? <StatusBadge tone="info">Returning</StatusBadge> : <StatusBadge tone="neutral">New customer</StatusBadge>}
             {b.status === "cancelled" ? (
               <StatusBadge tone="neutral">Cancelled</StatusBadge>
@@ -191,7 +191,7 @@ function WalkInRow({ booking: b, bl, onOpen }: { booking: Booking; bl: string | 
             )}
           </span>
           <span className="mt-0.5 block truncate text-sm text-muted-foreground">
-            {[b.boxSummary, b.receiver ? `To ${b.receiver.fullName}${b.receiver.town ? `, ${b.receiver.town}` : ""}` : null, b.phoneNumber].filter(Boolean).join(" · ")}
+            {[b.boxSummary, b.receiver ? `To ${b.receiver.fullName}${b.receiver.town ? `, ${b.receiver.town}` : ""}` : null, formatPhone(b.phoneNumber)].filter(Boolean).join(" · ")}
           </span>
         </span>
         {bl ? (

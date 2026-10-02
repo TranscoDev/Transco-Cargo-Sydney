@@ -666,6 +666,35 @@ export async function fetchConsolidations(): Promise<Consolidation[]> {
   return data.consolidations.map(mapConsolidation);
 }
 
+/** Move a BL to another shipment (container), or out of one (null). The same record moves — never a copy. */
+export async function moveShipment(shipmentId: string, batchNumber: number | null): Promise<{ from: number | null; to: number | null }> {
+  const res = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}/move`, {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ batchNumber }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; from?: number | null; to?: number | null };
+  if (!res.ok) throw new Error(data.error || `Could not move it (${res.status})`);
+  return { from: data.from ?? null, to: data.to ?? null };
+}
+
+/** Start a new shipment (container), e.g. Shipment 59 — no customers yet; they join when their BL is assigned. */
+export async function createConsolidation(input: {
+  batchNumber?: number | null;
+  peNumber?: string | null;
+  departureDate?: string | null;
+  arrivalDate?: string | null;
+}): Promise<Consolidation> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; consolidation?: BackendConsolidation };
+  if (!res.ok || !data.consolidation) throw new Error(data.error || `Could not create the shipment (${res.status})`);
+  return mapConsolidation(data.consolidation);
+}
+
 interface BackendConsolidationDetail extends BackendConsolidation {
   shipments: BackendShipmentRecord[];
 }

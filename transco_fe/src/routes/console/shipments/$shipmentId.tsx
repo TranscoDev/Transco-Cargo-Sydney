@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Box, Check, History, Layers, Phone, Ship, User } from "lucide-react";
 
 import { Breadcrumbs, EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge } from "@/components/transco/page-kit";
+import { MoveShipmentControl } from "@/components/transco/move-shipment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { fetchShipment, updateShipment } from "@/lib/transco/api";
 import { friendlyError, notify } from "@/lib/transco/notify";
+import { formatPhone, telHref } from "@/lib/transco/phone";
 import { shipmentStatus } from "@/lib/transco/status";
 import { SHIPMENT_STATUSES, SHIPMENT_STATUS_LABELS, type Shipment, type ShipmentStatus } from "@/lib/transco/types";
 
@@ -68,13 +70,24 @@ function ShipmentDetailPage() {
           <Skeleton className="h-48 w-full rounded-xl" />
         </div>
       ) : (
-        <ShipmentView shipment={shipment} title={title} onChange={setShipment} />
+        <ShipmentView key={`${shipment.id}-${shipment.consolidationId ?? "none"}`} shipment={shipment} title={title} onChange={setShipment} onReload={load} />
       )}
     </PageShell>
   );
 }
 
-function ShipmentView({ shipment: s, title, onChange }: { shipment: Shipment; title: string; onChange: (s: Shipment) => void }) {
+function ShipmentView({
+  shipment: s,
+  title,
+  onChange,
+  onReload,
+}: {
+  shipment: Shipment;
+  title: string;
+  onChange: (s: Shipment) => void;
+  /** Reloads the BL (after it moves to another shipment). */
+  onReload: () => void;
+}) {
   const [saving, setSaving] = useState(false);
   const st = shipmentStatus(s.status);
   const idx = SHIPMENT_STATUSES.indexOf(s.status);
@@ -124,8 +137,8 @@ function ShipmentView({ shipment: s, title, onChange }: { shipment: Shipment; ti
               {s.customerName || "Customer"}
             </Link>
             {s.phoneNumber && (
-              <a href={`tel:+${s.phoneNumber.replace(/^\+/, "")}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
-                <Phone className="h-3.5 w-3.5" aria-hidden />+{s.phoneNumber.replace(/^\+/, "")}
+              <a href={telHref(s.phoneNumber)} className="inline-flex items-center gap-1.5 hover:text-foreground">
+                <Phone className="h-3.5 w-3.5" aria-hidden />{formatPhone(s.phoneNumber)}
               </a>
             )}
             {s.consolidationId && (
@@ -142,6 +155,16 @@ function ShipmentView({ shipment: s, title, onChange }: { shipment: Shipment; ti
           <p className="mt-2 text-sm text-muted-foreground">
             {[[s.origin, s.destination].filter(Boolean).join(" → "), cargo, s.serviceType].filter(Boolean).join(" · ") || "No route or cargo details yet"}
           </p>
+        </div>
+        {/* Put in the wrong shipment? Move this same BL — never a copy. */}
+        <div className="w-full sm:w-96">
+          <MoveShipmentControl
+            shipmentId={s.id}
+            currentBatchNumber={s.consolidationId ? s.batchNumber ?? null : null}
+            blNumber={s.hblNumber ?? null}
+            customerName={s.customerName}
+            onMoved={onReload}
+          />
         </div>
       </header>
 
@@ -214,7 +237,7 @@ function ShipmentView({ shipment: s, title, onChange }: { shipment: Shipment; ti
                 >
                   {s.receiverProfile.name}
                 </Link>
-                {s.receiverProfile.phone && <span className="ml-2 text-sm text-muted-foreground">{s.receiverProfile.phone}</span>}
+                {s.receiverProfile.phone && <span className="ml-2 text-sm text-muted-foreground">{formatPhone(s.receiverProfile.phone)}</span>}
                 {s.receiverProfile.hblNumbers.length > 1 && (
                   <p className="mt-1 text-sm text-muted-foreground">
                     Has received {s.receiverProfile.hblNumbers.length - 1} other shipment

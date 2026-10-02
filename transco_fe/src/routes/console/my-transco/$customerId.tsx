@@ -33,7 +33,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { assignBookingBl, setPortalPassword, updateBooking } from "@/lib/transco/api";
 import { useConversations } from "@/lib/transco/store";
-import { printDeclaration, type DeclarationPerson } from "@/lib/transco/declaration-print";
+import { type DeclarationPerson } from "@/lib/transco/declaration-print";
+import { PrintPreviewDialog } from "@/components/transco/forms-print";
+import { ShipmentPicker } from "@/components/transco/shipment-picker";
 import { Breadcrumbs, LoadingRows, StatusBadge as PageStatusBadge, type StatusTone as PageStatusTone } from "@/components/transco/page-kit";
 import { BookingDetailsEditor } from "@/components/transco/booking-details-editor";
 import { friendlyError, notify } from "@/lib/transco/notify";
@@ -703,8 +705,9 @@ function BookingPanel({ booking: b, act, embedded = true }: { booking: PortalBoo
     setShipmentNo("");
   };
 
-  const print = () =>
-    printDeclaration(b.id).catch((err: unknown) => notify.error("Couldn't open the declaration", friendlyError(err, "Please try again.")));
+  // Every print goes through a preview first.
+  const [previewAll, setPreviewAll] = useState(false);
+  const print = () => setPreviewAll(true);
 
   const channel = b.channel === "portal" ? "Booked online" : b.channel === "website" ? "Website chat" : b.channel === "whatsapp" ? "WhatsApp" : null;
 
@@ -761,7 +764,7 @@ function BookingPanel({ booking: b, act, embedded = true }: { booking: PortalBoo
           {next.kind === "bl" && (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_8rem_auto]">
               <Input className="bg-card" value={bl} onChange={(e) => { setBl(e.target.value); setError(""); }} placeholder="BL number, e.g. 203115" autoComplete="off" aria-label="BL number" />
-              <Input className="bg-card" type="number" min="1" value={shipmentNo} onChange={(e) => setShipmentNo(e.target.value)} placeholder="Shipment no." aria-label="Shipment number (optional), e.g. 57" />
+              <ShipmentPicker value={shipmentNo} onChange={setShipmentNo} className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground" />
               <Button type="button" onClick={saveBl} disabled={busy}>Assign BL</Button>
             </div>
           )}
@@ -811,8 +814,9 @@ function BookingPanel({ booking: b, act, embedded = true }: { booking: PortalBoo
               </Button>
             )}
             <Button type="button" size="sm" variant="outline" onClick={print}>
-              <Printer className="mr-1.5 h-4 w-4" /> Print declaration
+              <Printer className="mr-1.5 h-4 w-4" /> Print forms
             </Button>
+            {previewAll && <PrintPreviewDialog bookingId={b.id} form={{ key: "all", title: "All forms" }} onClose={() => setPreviewAll(false)} />}
           </div>
         </div>
       </div>
@@ -827,7 +831,7 @@ function BookingPanel({ booking: b, act, embedded = true }: { booking: PortalBoo
               <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Change BL</summary>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Input className="h-8 w-40" value={bl} onChange={(e) => setBl(e.target.value)} placeholder="New BL number" aria-label="New BL number" />
-                <Input className="h-8 w-28" type="number" min="1" value={shipmentNo} onChange={(e) => setShipmentNo(e.target.value)} placeholder="Shipment no." aria-label="Shipment number" />
+                <ShipmentPicker value={shipmentNo} onChange={setShipmentNo} className="h-8 w-44 rounded-md border border-input bg-card px-2 text-sm text-foreground" />
                 <Button type="button" size="sm" className="h-8" onClick={saveBl} disabled={busy}>Save BL</Button>
               </div>
             </details>
@@ -887,7 +891,7 @@ function PersonSummary({ title, person, withId = false }: { title: string; perso
           <p className="font-semibold text-foreground">{person.fullName}</p>
           <p className="text-muted-foreground">{[person.address, person.town].filter(Boolean).join(", ")}</p>
           <p className="text-muted-foreground">
-            {person.mobile}
+            {formatPhone(person.mobile)}
             {person.email ? ` · ${person.email}` : ""}
           </p>
           {withId && person.idNumber && <p className="mt-0.5 text-foreground">Passport / NIC: <span className="font-medium tabular-nums">{person.idNumber}</span></p>}

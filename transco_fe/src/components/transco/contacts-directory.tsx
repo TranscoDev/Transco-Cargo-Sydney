@@ -36,6 +36,7 @@ import {
   type Segment,
   type SegmentFilter,
 } from "@/lib/transco/types";
+import { formatPhone } from "@/lib/transco/phone";
 
 /**
  * Address-book view of every customer — separate from ContactList (the
@@ -655,7 +656,7 @@ function ContactRow({
         </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-        {conversation.phoneNumber}
+        {formatPhone(conversation.phoneNumber)}
       </td>
       <td className="px-4 py-3">
         <SourceBadges sources={sourcesFor(conversation)} />
@@ -787,7 +788,7 @@ function ContactProfileModal({
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 text-xs">
           <div>
             <p className="text-[15px] font-semibold text-foreground">{conversation.customerName}</p>
-            <p className="mt-0.5 text-muted-foreground">{conversation.phoneNumber}</p>
+            <p className="mt-0.5 text-muted-foreground">{formatPhone(conversation.phoneNumber)}</p>
             {conversation.email && <p className="text-muted-foreground">{conversation.email}</p>}
           </div>
 

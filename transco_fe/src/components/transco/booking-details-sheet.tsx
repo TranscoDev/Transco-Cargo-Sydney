@@ -10,7 +10,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchDeclaration,
-  printDeclaration,
   sendFormsEmail,
   type DeclarationPerson,
   type DeclarationPrintData,
@@ -19,6 +18,12 @@ import { finaliseWalkIn } from "@/lib/transco/api";
 import { formatDate } from "@/lib/transco/my-transco";
 import { friendlyError, notify } from "@/lib/transco/notify";
 import { BookingDetailsEditor } from "@/components/transco/booking-details-editor";
+import { FormsCard, PrintPreviewDialog } from "@/components/transco/forms-print";
+import { AirFreightCard } from "@/components/transco/air-freight-card";
+import { ShipmentPicker } from "@/components/transco/shipment-picker";
+import { MoveShipmentControl } from "@/components/transco/move-shipment";
+import { Breadcrumbs, PageShell, StatusBadge } from "@/components/transco/page-kit";
+import { formatPhone } from "@/lib/transco/phone";
 
 /**
  * Everything staff need about one booking in one place — customer,
@@ -46,7 +51,7 @@ export function BookingDetailsSheet({
 }) {
   const [data, setData] = useState<DeclarationPrintData | null>(null);
   const [error, setError] = useState("");
-  const [printError, setPrintError] = useState("");
+  const [previewAll, setPreviewAll] = useState(false);
   const [editing, setEditing] = useState(false);
 
   const load = useCallback(() => {
@@ -61,12 +66,8 @@ export function BookingDetailsSheet({
     if (open) load();
   }, [open, load]);
 
-  const print = () => {
-    setPrintError("");
-    printDeclaration(bookingId).catch((err: unknown) =>
-      setPrintError(err instanceof Error ? err.message : "Could not open the declaration"),
-    );
-  };
+  // Every print goes through a preview first.
+  const print = () => setPreviewAll(true);
 
   const d = data && data.bookingId === bookingId ? data : null;
   const walkIn = d?.walkIn ?? null;
@@ -87,14 +88,13 @@ export function BookingDetailsSheet({
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" onClick={print} disabled={!d} variant={confirm?.status === "submitted" ? "outline" : "default"}>
                 <Printer className="mr-2 h-4 w-4" />
-                Print declaration
+                Print forms
               </Button>
               <Button type="button" variant="outline" onClick={() => setEditing(true)} disabled={!d}>
                 <PenLine className="mr-2 h-4 w-4" />
                 Change details
               </Button>
             </div>
-            {printError && <p className="mt-2 text-xs font-medium text-attention-foreground">{printError}</p>}
           </div>
 
           {error ? (
@@ -114,74 +114,196 @@ export function BookingDetailsSheet({
             <>
               {confirm && <FinaliseSection key={`${d.bookingId}-${confirm.status}`} data={d} onDone={load} onAssignBl={onAssignBl} />}
               {d.blNumber && <SendFormsEmail data={d} onSent={load} />}
+              <FormsCard key={`${d.bookingId}-${d.serviceKey}-${d.dangerousGoods?.lithium ? "li" : ""}`} bookingId={d.bookingId} />
 
-              <Section title="Customer">
-                <Rows
-                  rows={[
-                    ["Name", d.customer.name ?? (walkIn?.status === "submitted" ? d.sender?.fullName : null)],
-                    ["Customer no.", d.customer.customerCode],
-                    ["Phone", d.customer.phoneNumber ? `+${d.customer.phoneNumber}` : null],
-                  ]}
-                />
-                {d.customer.id ? (
-                  <CustomerLink customerId={d.customer.id} myTransco={d.channel === "portal"} />
-                ) : walkIn?.status === "submitted" ? (
-                  <p className="mt-2 text-xs text-muted-foreground">Linked to the customer's profile by phone number when you finalise.</p>
-                ) : null}
-              </Section>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-foreground">Declaration</span>
-                {walkIn ? (
-                  <Badge variant="secondary" className="text-xs">Filled on the customer's phone</Badge>
-                ) : d.declarationSubmittedAt ? (
-                  <Badge variant="secondary" className="text-xs">Filled online</Badge>
-                ) : (
-                  <Badge variant="outline" className="text-xs">Not filled online — fill in on the printout</Badge>
-                )}
-                {d.declarationStatus === "received" && <Badge className="text-xs">Checked</Badge>}
-              </div>
-
-              <PersonSection
-                title={d.sender && !d.senderIsAccountHolder ? "Sender (someone else)" : "Sender"}
-                person={d.sender}
-                showId={!!d.sender?.idNumber}
-              />
-              <PersonSection title="Receiver" person={d.receiver} showId />
-
-              <Section title="Shipment">
-                <Rows
-                  rows={[
-                    ["Boxes", d.items.length ? d.items.map((i) => `${i.qty} × ${i.label}`).join(", ") : d.itemsText],
-                    ["Service", d.service],
-                    ["Destination", [d.destination, d.country].filter(Boolean).join(", ")],
-                    ["Delivery", d.delivery],
-                    [walkIn ? "Came in" : "Drop-off", d.dropOff ? [d.dropOff.date ? formatDate(d.dropOff.date) : null, d.dropOff.time].filter(Boolean).join(" · ") : null],
-                    ["Insurance", d.insurance === null ? null : d.insurance ? "Yes — wants insurance" : "No"],
-                    ["BL number", d.blNumber],
-                    ["Customer note", d.notes],
-                  ]}
-                />
-              </Section>
-
-              {d.contents.length > 0 && <ContentsSection contents={d.contents} />}
-
-              {d.signature && (
-                <Section title="Signed">
-                  <p className="text-xs font-medium text-foreground">{d.signature.name}</p>
-                  {d.signature.image ? (
-                    <img src={d.signature.image} alt={`Signature of ${d.signature.name ?? "the sender"}`} className="mt-2 h-16 w-auto rounded border bg-white p-1" />
-                  ) : (
-                    <p className="mt-1 text-xs text-muted-foreground">Not drawn — they sign the printout by pen.</p>
-                  )}
-                </Section>
-              )}
+              <BookingInfo d={d} />
             </>
           )}
         </div>
       </SheetContent>
       <BookingDetailsEditor bookingId={bookingId} open={editing} onOpenChange={setEditing} onSaved={load} />
+      {previewAll && <PrintPreviewDialog bookingId={bookingId} form={{ key: "all", title: "All forms" }} onClose={() => setPreviewAll(false)} />}
     </Sheet>
+  );
+}
+
+/**
+ * One booking as a full page — where staff do the drop-off work: the
+ * Confirm area (BL, what's inside with values, insurance, weight/CBM,
+ * charges) on the left, and everything to check against (forms, send
+ * email, customer, sender, receiver, shipment) on the right.
+ */
+export function BookingWorkspace({ bookingId }: { bookingId: string }) {
+  const [data, setData] = useState<DeclarationPrintData | null>(null);
+  const [error, setError] = useState("");
+  const [previewAll, setPreviewAll] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  const load = useCallback(() => {
+    setError("");
+    fetchDeclaration(bookingId)
+      .then(setData)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not load the booking"));
+  }, [bookingId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const d = data && data.bookingId === bookingId ? data : null;
+  const confirm = d?.confirm ?? null;
+  const name = d ? d.customer.name ?? d.sender?.fullName ?? "No name" : "";
+
+  return (
+    <PageShell width="full" className="max-w-350">
+      <header className="mb-5">
+        <Breadcrumbs items={[{ label: "Bookings", to: "/console/bookings" }, { label: d?.bookingCode ?? "Booking" }]} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xl font-semibold tracking-tight text-foreground">
+              <span className="tabular-nums">{d?.bookingCode ?? "Booking"}</span>
+              {d?.blNumber && <span className="text-base font-semibold text-primary tabular-nums">BL {d.blNumber}</span>}
+              {confirm &&
+                (confirm.status === "finalised" ? (
+                  <StatusBadge tone="success">Confirmed</StatusBadge>
+                ) : (
+                  <StatusBadge tone="attention">To confirm</StatusBadge>
+                ))}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">{d ? [name, d.itemsText, [d.destination, d.country].filter(Boolean).join(", ")].filter(Boolean).join(" · ") : "Loading…"}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => setEditing(true)} disabled={!d}>
+              <PenLine className="mr-2 h-4 w-4" /> Change details
+            </Button>
+            <Button type="button" onClick={() => setPreviewAll(true)} disabled={!d}>
+              <Printer className="mr-2 h-4 w-4" /> Print forms
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {error ? (
+        <div className="rounded-lg bg-attention-soft p-4 text-sm">
+          <p className="font-medium text-attention-foreground">{error}</p>
+          <Button type="button" size="sm" variant="outline" className="mt-2" onClick={load}>
+            Try again
+          </Button>
+        </div>
+      ) : !d ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <Skeleton className="h-120 w-full" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          {/* Left: the work. */}
+          <div className="flex flex-col gap-5 text-sm">
+            {confirm ? (
+              <FinaliseSection key={`${d.bookingId}-${confirm.status}`} data={d} onDone={load} />
+            ) : (
+              <section className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+                This booking has no online declaration to confirm (it was made in the chat). Record weights, price and the BL from
+                the booking's ⋯ menu on the Bookings page, and fill the printed forms by hand.
+              </section>
+            )}
+            {d.shipmentId && (
+              <MoveShipmentControl
+                key={`${d.shipmentId}-${d.batchNumber ?? "none"}`}
+                shipmentId={d.shipmentId}
+                currentBatchNumber={d.batchNumber}
+                blNumber={d.blNumber}
+                customerName={d.customer.name ?? d.sender?.fullName}
+                onMoved={load}
+              />
+            )}
+            {d.serviceKey === "air" && <AirFreightCard key={`${d.bookingId}-air`} data={d} onSaved={load} />}
+            {d.blNumber && <SendFormsEmail data={d} onSent={load} />}
+          </div>
+          {/* Right: what to check against. */}
+          <div className="flex flex-col gap-5 text-sm lg:sticky lg:top-4">
+            <FormsCard key={`${d.bookingId}-${d.serviceKey}-${d.dangerousGoods?.lithium ? "li" : ""}`} bookingId={d.bookingId} />
+            <BookingInfo d={d} />
+          </div>
+        </div>
+      )}
+
+      <BookingDetailsEditor bookingId={bookingId} open={editing} onOpenChange={setEditing} onSaved={load} />
+      {previewAll && <PrintPreviewDialog bookingId={bookingId} form={{ key: "all", title: "All forms" }} onClose={() => setPreviewAll(false)} />}
+    </PageShell>
+  );
+}
+
+/** The booking's reference details: customer, declaration, sender, receiver, shipment, items, signature. */
+function BookingInfo({ d }: { d: DeclarationPrintData }) {
+  const walkIn = d.walkIn;
+  return (
+    <>
+  <Section title="Customer">
+    <Rows
+      rows={[
+        ["Name", d.customer.name ?? (walkIn?.status === "submitted" ? d.sender?.fullName : null)],
+        ["Customer no.", d.customer.customerCode],
+        ["Phone", d.customer.phoneNumber ? formatPhone(d.customer.phoneNumber) : null],
+      ]}
+    />
+    {d.customer.id ? (
+      <CustomerLink customerId={d.customer.id} myTransco={d.channel === "portal"} />
+    ) : walkIn?.status === "submitted" ? (
+      <p className="mt-2 text-xs text-muted-foreground">Linked to the customer's profile by phone number when you finalise.</p>
+    ) : null}
+  </Section>
+
+  <div className="flex flex-wrap items-center gap-2">
+    <span className="text-xs font-semibold text-foreground">Declaration</span>
+    {walkIn ? (
+      <Badge variant="secondary" className="text-xs">Filled on the customer's phone</Badge>
+    ) : d.declarationSubmittedAt ? (
+      <Badge variant="secondary" className="text-xs">Filled online</Badge>
+    ) : (
+      <Badge variant="outline" className="text-xs">Not filled online — fill in on the printout</Badge>
+    )}
+    {d.declarationStatus === "received" && <Badge className="text-xs">Checked</Badge>}
+  </div>
+
+  <PersonSection
+    title={d.sender && !d.senderIsAccountHolder ? "Sender (someone else)" : "Sender"}
+    person={d.sender}
+    showId={!!d.sender?.idNumber}
+  />
+  <PersonSection title="Receiver" person={d.receiver} showId />
+
+  <Section title="Shipment">
+    <Rows
+      rows={[
+        ["Boxes", d.items.length ? d.items.map((i) => `${i.qty} × ${i.label}`).join(", ") : d.itemsText],
+        ["Service", d.service],
+        ["Destination", [d.destination, d.country].filter(Boolean).join(", ")],
+        ["Delivery", d.delivery],
+        [walkIn ? "Came in" : "Drop-off", d.dropOff ? [d.dropOff.date ? formatDate(d.dropOff.date) : null, d.dropOff.time].filter(Boolean).join(" · ") : null],
+        ["Insurance", d.insurance === null ? null : d.insurance ? "Yes — wants insurance" : "No"],
+        ["BL number", d.blNumber],
+        ["Customer note", d.notes],
+      ]}
+    />
+  </Section>
+
+  {d.contents.length > 0 && <ContentsSection contents={d.contents} />}
+
+  {d.signature && (
+    <Section title="Signed">
+      <p className="text-xs font-medium text-foreground">{d.signature.name}</p>
+      {d.signature.image ? (
+        <img src={d.signature.image} alt={`Signature of ${d.signature.name ?? "the sender"}`} className="mt-2 h-16 w-auto rounded border bg-white p-1" />
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">Not drawn — they sign the printout by pen.</p>
+      )}
+    </Section>
+  )}
+    </>
   );
 }
 
@@ -316,7 +438,7 @@ function FinaliseSection({
   };
 
   return (
-    <section className={finalised ? "rounded-lg border bg-panel p-3" : "rounded-lg border-2 border-primary/40 bg-card p-3"}>
+    <section className={finalised ? "@container rounded-lg border bg-panel p-3" : "@container rounded-lg border-2 border-primary/40 bg-card p-3"}>
       {finalised ? (
         <div className="mb-3 flex items-start gap-2">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success-foreground" aria-hidden />
@@ -343,9 +465,12 @@ function FinaliseSection({
       {hasBl ? (
         <p className="mb-3 text-xs text-muted-foreground">To change the BL or shipment number, use “Weights, price &amp; BL” on the booking.</p>
       ) : (
-        <div className="mb-4 grid grid-cols-[1fr_7rem] gap-3">
+        <div className="mb-4 grid grid-cols-[1fr_11rem] gap-3">
           <Field id="fin-bl" label="BL number" value={bl} onChange={setBl} inputMode="text" hint="Required — the customer's main reference." />
-          <Field id="fin-batch" label="Shipment no." value={batch} onChange={setBatch} placeholder="e.g. 57" />
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="fin-batch" className="text-xs">Shipment</Label>
+            <ShipmentPicker id="fin-batch" value={batch} onChange={setBatch} className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground" />
+          </div>
         </div>
       )}
 
@@ -431,13 +556,13 @@ function FinaliseSection({
         {insurance === true && <span className="text-muted-foreground">Contact Supun on 03 9357 7228 for cover.</span>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         <Field id="fin-weight" label="Weight (kg)" value={weight} onChange={setWeight} />
         <Field id="fin-cbm" label="CBM" value={cbm} onChange={setCbm} />
       </div>
 
       <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Office use · charges ($)</p>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3">
         {OFFICE_FIELDS.map((f) => (
           <Field key={f.key} id={`fin-${f.key}`} label={f.key === "discount" ? "Discount (−)" : f.label} value={office[f.key]} onChange={(v) => setOffice((s) => ({ ...s, [f.key]: v }))} />
         ))}
@@ -476,7 +601,7 @@ function SendFormsEmail({ data, onSent }: { data: DeclarationPrintData; onSent: 
     setSending(true);
     try {
       const r = await sendFormsEmail(data.bookingId);
-      notify.success("Forms emailed to the office", r.to ? `Sent to ${r.to} with the declaration attached.` : undefined);
+      notify.success("Forms emailed to the office", r.to ? `Sent to ${r.to} with the forms attached.` : undefined);
       onSent();
     } catch (err) {
       notify.error("Couldn't send the email", friendlyError(err, "Please try again."));
@@ -492,7 +617,7 @@ function SendFormsEmail({ data, onSent }: { data: DeclarationPrintData; onSent: 
           <p className="text-xs text-muted-foreground">
             {last
               ? `Last sent ${formatDate(last.at)}${last.by ? ` by ${last.by}` : ""}${data.formEmails.length > 1 ? ` · sent ${data.formEmails.length} times` : ""}`
-              : "Sends the filled declaration (PDF) to the office inbox. Never to the customer."}
+              : "Sends every filled form (PDFs) to the office inbox. Never to the customer."}
           </p>
         </div>
         <Button type="button" variant={last ? "outline" : "default"} onClick={send} disabled={sending}>
@@ -585,7 +710,7 @@ function PersonSection({ title, person, showId = false }: { title: string; perso
           rows={[
             ["Full name", person.fullName],
             ["Address", [person.address, person.town].filter(Boolean).join(", ")],
-            ["Mobile", person.mobile],
+            ["Mobile", formatPhone(person.mobile)],
             ...(person.homePhone ? ([["Home phone", person.homePhone]] as [string, string | null][]) : []),
             ["Email", person.email],
             ...(showId ? ([["Passport / NIC", person.idNumber ?? null]] as [string, string | null][]) : []),
