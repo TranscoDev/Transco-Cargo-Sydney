@@ -76,5 +76,15 @@ Thumbs.db
 /google-sheet-prototype
 
 /.claude
-/transco_agent_site
 /other
+
+# The public website is tracked (its pages are public anyway); only the
+# generated worker bundles and wrangler's cache stay out. Rebuild them
+# with `node build.js` before `npx wrangler deploy`.
+/transco_agent_site/worker.js
+/transco_agent_site/worker-preview.js
+/transco_agent_site/.wrangler
+
+# PDFs are never committed (the original paper forms in
+# transco_be/media/forms live on disk only — copy them in by hand).
+*.pdf
