@@ -131,6 +131,8 @@ function decl(town, overrides = {}) {
     insurance: false,
     declarationAccepted: true,
     signedName: 'Alpha Sender',
+    // Needed for Air Freight bookings (ignored for Sea).
+    dangerousGoods: { noProhibited: true, medications: false, lithium: false, liquids: false },
     ...(overrides.signOff || {})
   };
 }
@@ -1383,6 +1385,30 @@ test('walk-in finalise: staff only; links/creates the customer by phone and reco
   assert.match(pdfRes.headers.get('content-disposition'), /Shipping-Declaration-BL-WALKIN-001\.pdf/);
   assert.equal(Buffer.from(await pdfRes.arrayBuffer()).subarray(0, 4).toString(), '%PDF');
 
+  // Every form for the booking in one PDF: Sri Lanka → declaration + UPB
+  // customs form + delivery agreement (3 pages for up to 20 items).
+  const { PDFDocument } = require('pdf-lib');
+  const allRes = await fetch(`${BASE_URL}/api/forms/${b._id}/forms.pdf`, { headers: { Authorization: `Bearer ${staffToken}` } });
+  assert.equal(allRes.status, 200);
+  assert.equal((await PDFDocument.load(Buffer.from(await allRes.arrayBuffer()))).getPageCount(), 3);
+  // The list of forms, and each one on its own (for preview / printing one).
+  const list = await api('GET', `/api/forms/${b._id}/list`, { token: staffToken });
+  assert.deepEqual(list.body.forms.map(f => f.key), ['declaration', 'upb', 'delivery']);
+  for (const key of ['declaration', 'upb', 'delivery']) {
+    const one = await fetch(`${BASE_URL}/api/forms/${b._id}/forms/${key}`, { headers: { Authorization: `Bearer ${staffToken}` } });
+    assert.equal(one.status, 200, key);
+    assert.equal((await PDFDocument.load(Buffer.from(await one.arrayBuffer()))).getPageCount(), 1, key);
+  }
+  const notThisOne = await fetch(`${BASE_URL}/api/forms/${b._id}/forms/packing`, { headers: { Authorization: `Bearer ${staffToken}` } });
+  assert.equal(notThisOne.status, 404, 'no India packing list on a Sri Lanka booking');
+  // India → declaration + packing list.
+  const india = await api('POST', '/api/public/dropoff', {
+    body: walkInForm({ country: 'india', items: [{ type: 'general', qty: 1 }], sender: { ...walkInForm().sender, idNumber: '' } })
+  });
+  const indiaId = (await db.collection('bookings').findOne({ bookingCode: india.body.bookingCode }))._id;
+  const indiaRes = await fetch(`${BASE_URL}/api/forms/${indiaId}/forms.pdf`, { headers: { Authorization: `Bearer ${staffToken}` } });
+  assert.equal((await PDFDocument.load(Buffer.from(await indiaRes.arrayBuffer()))).getPageCount(), 2);
+
   // "Send email" only after a BL; here email isn't set up, so it says so
   // honestly and records nothing.
   const unconfirmed = await api('POST', '/api/public/dropoff', { body: walkInForm() });
@@ -1493,4 +1519,115 @@ test('My Transco bookings collect the full declaration; at drop-off staff only v
   const old = await db.collection('bookings').insertOne({ customerId: b.customerId, customerName: 'Old', phoneNumber: '61400555321', requestedDay: 'saturday', requestedTime: '11:00', status: 'pending', createdAt: new Date() });
   const notConfirmable = await api('POST', `/api/walk-ins/${old.insertedId}/finalise`, { token: staffToken, body: { hblNumber: 'OLD-1' } });
   assert.equal(notConfirmable.status, 404);
+});
+
+test('Air Freight: dangerous goods answers are required, and add the checklist (and lithium document) to the forms', async () => {
+  const air = (dg) => ({ ...walkInForm({ service: 'air', sender: { ...walkInForm().sender, mobile: '+61 400 555 444' } }), ...(dg === undefined ? {} : { dangerousGoods: dg }) });
+  const none = await api('POST', '/api/public/dropoff', { body: air() });
+  assert.equal(none.status, 400);
+  assert.equal(none.body.field, 'dangerousGoods.notInBoxes');
+
+  // Someone may really have one of the items: allowed, but they must say so on purpose.
+  const has = { notInBoxes: [true, true, false, true, true], medications: false, lithium: false, liquids: false };
+  const noAck = await api('POST', '/api/public/dropoff', { body: air(has) });
+  assert.equal(noAck.body.field, 'dangerousGoods.prohibitedAcknowledged');
+  const withAck = await api('POST', '/api/public/dropoff', { body: air({ ...has, prohibitedAcknowledged: true }) });
+  assert.equal(withAck.status, 201, JSON.stringify(withAck.body));
+  const flagged = await db.collection('bookings').findOne({ bookingCode: withAck.body.bookingCode });
+  assert.equal(flagged.dangerousGoods.noProhibited, false);
+  assert.deepEqual(flagged.dangerousGoods.notInBoxes, [true, true, false, true, true]);
+  const noDetails = await api('POST', '/api/public/dropoff', { body: air({ noProhibited: true, medications: false, lithium: true, liquids: false }) });
+  assert.equal(noDetails.body.field, 'dangerousGoods.lithiumDetails');
+
+  const ok = await api('POST', '/api/public/dropoff', {
+    body: air({ noProhibited: true, medications: false, lithium: true, lithiumDetails: '1 phone with battery', liquids: false, liquidsDetails: 'ignored when No' })
+  });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  const b = await db.collection('bookings').findOne({ bookingCode: ok.body.bookingCode });
+  assert.deepEqual(b.dangerousGoods, { noProhibited: true, notInBoxes: [true, true, true, true, true], medications: false, lithium: true, lithiumDetails: '1 phone with battery', liquids: false, liquidsDetails: '' });
+
+  const list = await api('GET', `/api/forms/${b._id}/list`, { token: staffToken });
+  assert.deepEqual(list.body.forms.map(f => f.key), ['declaration', 'upb', 'delivery', 'dangerous', 'lithium']);
+
+  // Staff choose the lithium configuration (and can correct answers).
+  const put = await api('PUT', `/api/forms/${b._id}/dangerous-goods`, { token: staffToken, body: { lithiumDoc: { configs: ['ion_967_ii', 'bogus'], phone: '+61 400 555 444' } } });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  const after = await db.collection('bookings').findOne({ _id: b._id });
+  assert.deepEqual(after.lithiumDoc.configs, ['ion_967_ii']);
+  assert.ok(after.staffEdits.some(e => e.changed.includes('lithium battery document')));
+  const noLithium = await api('PUT', `/api/forms/${b._id}/dangerous-goods`, { token: staffToken, body: { dangerousGoods: { noProhibited: true, medications: false, lithium: false, liquids: false } } });
+  assert.equal(noLithium.status, 200);
+  const list2 = await api('GET', `/api/forms/${b._id}/list`, { token: staffToken });
+  assert.deepEqual(list2.body.forms.map(f => f.key), ['declaration', 'upb', 'delivery', 'dangerous']);
+
+  // Sea bookings don't take dangerous goods answers.
+  const sea = await api('POST', '/api/public/dropoff', { body: walkInForm() });
+  const seaId = (await db.collection('bookings').findOne({ bookingCode: sea.body.bookingCode }))._id;
+  const seaPut = await api('PUT', `/api/forms/${seaId}/dangerous-goods`, { token: staffToken, body: { lithiumDoc: { configs: [] } } });
+  assert.equal(seaPut.status, 400);
+});
+
+test('staff create a new shipment (container) with no customers; customers join it when their BL is assigned', async () => {
+  const anon = await api('POST', '/api/consolidations', { body: {} });
+  assert.equal(anon.status, 401);
+  const before = await db.collection('consolidations').find({}).sort({ batchNumber: -1 }).limit(1).toArray();
+  const expected = (before[0] ? before[0].batchNumber : 0) + 1;
+
+  const made = await api('POST', '/api/consolidations', { token: staffToken, body: { departureDate: '2026-10-10', arrivalDate: '2026-12-08', peNumber: 'PE-7001' } });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  assert.equal(made.body.consolidation.batchNumber, expected, 'next number by default');
+  assert.equal(made.body.consolidation.label, `${expected}-OCT`);
+  assert.equal(made.body.consolidation.importedShipmentCount, 0);
+
+  const dup = await api('POST', '/api/consolidations', { token: staffToken, body: { batchNumber: expected } });
+  assert.equal(dup.status, 409);
+  const badDates = await api('POST', '/api/consolidations', { token: staffToken, body: { departureDate: '2026-10-10', arrivalDate: '2026-10-01' } });
+  assert.equal(badDates.status, 400);
+
+  // A walk-in confirmed into the new shipment.
+  const w = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, mobile: '+61 400 555 222' } }) });
+  const wb = await db.collection('bookings').findOne({ bookingCode: w.body.bookingCode });
+  const done = await api('POST', `/api/walk-ins/${wb._id}/finalise`, { token: staffToken, body: { hblNumber: 'NEWSHIP-1', batchNumber: expected, contentValues: [10, 5] } });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  const detail = await api('GET', `/api/consolidations/${made.body.consolidation._id}`, { token: staffToken });
+  assert.deepEqual(detail.body.consolidation.shipments.map(s => s.hblNumber), ['NEWSHIP-1']);
+});
+
+test('staff move a BL to the right shipment without duplicating it, and the move is recorded', async () => {
+  const a = await api('POST', '/api/consolidations', { token: staffToken, body: {} });
+  const b = await api('POST', '/api/consolidations', { token: staffToken, body: {} });
+  const numA = a.body.consolidation.batchNumber;
+  const numB = b.body.consolidation.batchNumber;
+
+  const w = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...walkInForm().sender, mobile: '+61 400 555 111' } }) });
+  const booking = await db.collection('bookings').findOne({ bookingCode: w.body.bookingCode });
+  await api('POST', `/api/walk-ins/${booking._id}/finalise`, { token: staffToken, body: { hblNumber: 'MOVE-1', batchNumber: numA, contentValues: [1, 1] } });
+  const before = await db.collection('shipments').findOne({ hblNumber: 'MOVE-1' });
+
+  const anon = await api('PATCH', `/api/shipments/${before._id}/move`, { body: { batchNumber: numB } });
+  assert.equal(anon.status, 401);
+  const same = await api('PATCH', `/api/shipments/${before._id}/move`, { token: staffToken, body: { batchNumber: numA } });
+  assert.equal(same.status, 400);
+
+  const moved = await api('PATCH', `/api/shipments/${before._id}/move`, { token: staffToken, body: { batchNumber: numB } });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.equal(moved.body.from, numA);
+  assert.equal(moved.body.to, numB);
+  assert.equal(await db.collection('shipments').countDocuments({ hblNumber: 'MOVE-1' }), 1, 'still one BL record');
+  const after = await db.collection('shipments').findOne({ _id: before._id });
+  assert.equal(String(after.consolidationId), String(b.body.consolidation._id));
+  assert.match(after.history[after.history.length - 1].note, new RegExp(`Moved from Shipment ${numA} to Shipment ${numB}`));
+  assert.equal(after.batchNumber, numB, 'the stored number follows the move');
+  const bl = await api('GET', `/api/shipments/${before._id}`, { token: staffToken });
+  assert.equal((bl.body.shipment || bl.body).batchNumber, numB);
+
+  // The booking page knows where it is now.
+  const print = await api('GET', `/api/my-transco/bookings/${booking._id}/declaration`, { token: staffToken });
+  assert.equal(print.body.declaration.batchNumber, numB);
+  assert.equal(print.body.declaration.shipmentId, String(before._id));
+
+  // Taken out of any shipment.
+  const out = await api('PATCH', `/api/shipments/${before._id}/move`, { token: staffToken, body: { batchNumber: null } });
+  assert.equal(out.status, 200);
+  assert.equal((await db.collection('shipments').findOne({ _id: before._id })).consolidationId, null);
 });

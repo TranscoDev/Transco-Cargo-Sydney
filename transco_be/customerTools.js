@@ -244,6 +244,55 @@ function validateSignOff(body) {
   return { value: { insurance: body.insurance, signedName, signatureImage } };
 }
 
+// Air Freight: the Dangerous & Restricted Goods Checklist answers. The
+// customer ticks all five "NO …" lines (no aerosols, flammables, batteries/
+// fuel, drugs/weapons, jewellery/money/cards) and answers Yes/No for
+// medications, lithium batteries in products and liquids — with the type
+// and quantity when it's Yes. Returns { error, field } or { value }.
+// A customer may really have one of the prohibited items — that doesn't
+// stop the form: the lines they couldn't tick are kept (notInBoxes[i] =
+// false) and flagged for staff to check at drop-off. Customers confirm it
+// on purpose (requireAck), so a forgotten tick isn't mistaken for it.
+const DG_LINE_COUNT = 5;
+function validateDangerousGoods(raw, { requireAck = false } = {}) {
+  const dg = raw || {};
+  let notInBoxes;
+  if (Array.isArray(dg.notInBoxes) && dg.notInBoxes.length === DG_LINE_COUNT && dg.notInBoxes.every(v => typeof v === 'boolean')) {
+    notInBoxes = dg.notInBoxes.slice();
+  } else if (dg.noProhibited === true) {
+    notInBoxes = new Array(DG_LINE_COUNT).fill(true);
+  } else {
+    return { error: 'Please go through each "NO" line of the Air Freight checklist.', field: 'dangerousGoods.notInBoxes' };
+  }
+  const noProhibited = notInBoxes.every(Boolean);
+  if (!noProhibited && requireAck && dg.prohibitedAcknowledged !== true) {
+    return { error: 'Please confirm that your boxes may contain the items you didn\'t tick — our staff will check them with you.', field: 'dangerousGoods.prohibitedAcknowledged' };
+  }
+  const value = { noProhibited, notInBoxes };
+  for (const [key, label] of [['medications', 'medications'], ['lithium', 'lithium batteries'], ['liquids', 'liquids']]) {
+    if (typeof dg[key] !== 'boolean') return { error: `Please answer Yes or No for ${label}.`, field: `dangerousGoods.${key}` };
+    value[key] = dg[key];
+  }
+  for (const key of ['lithium', 'liquids']) {
+    const details = oneLine(dg[`${key}Details`], 160);
+    if (value[key] && details.length < 2) {
+      return { error: `Please write the type of product and quantity for the ${key === 'lithium' ? 'lithium batteries' : 'liquids'}.`, field: `dangerousGoods.${key}Details` };
+    }
+    value[`${key}Details`] = value[key] ? details : '';
+  }
+  return { value };
+}
+
+// The lithium battery transport document's configuration — staff choose it.
+const LITHIUM_CONFIGS = ['ion_965_ii', 'ion_965_ib', 'ion_966_ii', 'ion_967_ii', 'metal_968_ii', 'metal_968_ib', 'metal_969_ii', 'metal_970_ii'];
+function validateLithiumDoc(raw) {
+  const l = raw || {};
+  const configs = Array.isArray(l.configs) ? [...new Set(l.configs.filter(c => LITHIUM_CONFIGS.includes(c)))] : [];
+  const phone = oneLine(l.phone, 30);
+  if (phone && !/^\+?[\d\s()-]{7,30}$/.test(phone)) return { error: 'Please check the phone number for the batteries.', field: 'lithiumDoc.phone' };
+  return { value: { configs, phone } };
+}
+
 function samePerson(a, b) {
   return (a.idNumber && a.idNumber === b.idNumber) || (a.fullName.toLowerCase() === b.fullName.toLowerCase() && a.mobile.replace(/\D/g, '') === b.mobile.replace(/\D/g, ''));
 }
@@ -660,8 +709,12 @@ function createCustomerTools({
     if (!booking) return null;
     const [customer, shipment] = await Promise.all([
       booking.customerId ? customers().findOne({ _id: booking.customerId }, { projection: { customerCode: 1, name: 1, phoneNumber: 1 } }) : null,
-      shipments().findOne({ bookingId: booking._id }, { projection: { hblNumber: 1, blNumber: 1 } })
+      shipments().findOne({ bookingId: booking._id }, { projection: { hblNumber: 1, blNumber: 1, consolidationId: 1 } })
     ]);
+    // Which shipment (container) the BL is in — for "Move to another shipment".
+    const batch = shipment && shipment.consolidationId
+      ? await consolidations().findOne({ _id: shipment.consolidationId }, { projection: { batchNumber: 1 } })
+      : null;
     const country = COUNTRIES[booking.country] ? COUNTRIES[booking.country].label : null;
     return {
       bookingId: String(booking._id),
@@ -703,6 +756,10 @@ function createCustomerTools({
               finalisedBy: booking.staffConfirm ? booking.staffConfirm.finalisedBy || null : null
             }
           : null,
+      // Air Freight: the customer's dangerous goods answers, and the
+      // lithium battery configuration staff chose.
+      dangerousGoods: booking.dangerousGoods || null,
+      lithiumDoc: booking.lithiumDoc || null,
       // "Send email" history (office inbox) — newest last.
       formEmails: (booking.formEmails || []).map(e => ({ at: e.at, by: e.by || null })),
       itemsText: booking.items && booking.items.length ? itemsSummary(booking.items) : (booking.boxSummary || null),
@@ -715,6 +772,8 @@ function createCustomerTools({
       declarationSubmittedAt: booking.declarationSubmittedAt || null,
       declarationStatus: booking.declarationStatus === 'received' ? 'received' : 'not_received',
       blNumber: shipment ? (shipment.hblNumber || shipment.blNumber || null) : null,
+      shipmentId: shipment ? String(shipment._id) : null,
+      batchNumber: batch ? batch.batchNumber ?? null : null,
       channel: booking.channel || null,
       status: booking.status || null,
       customer: customer
@@ -927,6 +986,12 @@ function createCustomerTools({
     if (contentsCheck.error) return contentsCheck;
     const signOff = validateSignOff(body);
     if (signOff.error) return signOff;
+    let dangerousGoods = null;
+    if (service === 'air') {
+      const dg = validateDangerousGoods(body.dangerousGoods, { requireAck: true });
+      if (dg.error) return dg;
+      dangerousGoods = dg.value;
+    }
 
     const deliveryType = body.deliveryType;
     if (!DELIVERY_LABELS[deliveryType]) return { error: 'Please choose door delivery or collection.' };
@@ -957,6 +1022,7 @@ function createCustomerTools({
         insurance: signOff.value.insurance,
         signedName: signOff.value.signedName,
         signatureImage: signOff.value.signatureImage,
+        dangerousGoods,
         customerNotes: notes || null,
         requestedDay: dateOption.day,
         requestedTime: dropOff.time,
@@ -999,6 +1065,7 @@ function createCustomerTools({
       insurance: value.insurance,
       declarationAccepted: true,
       signature: { name: value.signedName, image: value.signatureImage, signedAt: new Date() },
+      ...(value.dangerousGoods ? { dangerousGoods: value.dangerousGoods } : {}),
       // Filled online with the booking; confirmed by staff at drop-off
       // when they value the items and assign the BL.
       declarationSubmittedAt: new Date(),
@@ -1093,6 +1160,9 @@ module.exports = {
   validateItems,
   validateContents,
   validateSignOff,
+  validateDangerousGoods,
+  validateLithiumDoc,
+  LITHIUM_CONFIGS,
   cleanText,
   COUNTRIES,
   SERVICE_LABELS,

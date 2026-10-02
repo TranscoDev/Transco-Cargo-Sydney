@@ -3139,11 +3139,20 @@ async function attachCustomerInfo(shipmentDocs) {
     : [];
   const receiverById = new Map(receiverDocs.map(r => [String(r._id), r]));
 
+  // Which shipment (container) each BL is in, from the shipment itself —
+  // BLs assigned in the console don't store the number.
+  const batchIds = [...new Set(shipmentDocs.map(s => (s.consolidationId ? String(s.consolidationId) : null)).filter(Boolean))];
+  const batchDocs = batchIds.length
+    ? await consolidations().find({ _id: { $in: batchIds.map(id => new ObjectId(id)) } }, { projection: { batchNumber: 1 } }).toArray()
+    : [];
+  const batchNumberById = new Map(batchDocs.map(b => [String(b._id), b.batchNumber ?? null]));
+
   return shipmentDocs.map(s => {
     const customer = byId.get(String(s.customerId));
     const receiver = s.receiverId ? receiverById.get(String(s.receiverId)) : null;
     return {
       ...s,
+      batchNumber: s.consolidationId ? batchNumberById.get(String(s.consolidationId)) ?? s.batchNumber ?? null : null,
       customerName: customer ? customer.name : null,
       phoneNumber: customer ? customer.phoneNumber : null,
       // Deduped receiver record, distinct from the embedded `receiver`
@@ -3373,6 +3382,50 @@ app.get('/api/shipments/:shipmentId/timeline', async (req, res) => {
 });
 
 
+// Move a customer's BL to another shipment (container) — or out of one —
+// when staff put it in the wrong one. The SAME record moves (never a
+// copy), and the move is written into the BL's history.
+app.patch('/api/shipments/:shipmentId/move', async (req, res) => {
+  try {
+    const { shipmentId } = req.params;
+    if (!ObjectId.isValid(shipmentId)) return res.status(400).json({ error: 'Invalid shipment id' });
+    const shipment = await shipments().findOne({ _id: new ObjectId(shipmentId) });
+    if (!shipment) return res.status(404).json({ error: 'BL not found' });
+
+    const raw = (req.body || {}).batchNumber;
+    let target = null;
+    if (raw !== null && raw !== undefined && raw !== '') {
+      const batchNumber = Number(raw);
+      if (!Number.isInteger(batchNumber) || batchNumber < 1) return res.status(400).json({ error: 'Choose a shipment to move it to.' });
+      target = await consolidations().findOne({ batchNumber });
+      if (!target) return res.status(404).json({ error: `Shipment ${batchNumber} not found` });
+    }
+    const current = shipment.consolidationId ? await consolidations().findOne({ _id: shipment.consolidationId }, { projection: { batchNumber: 1 } }) : null;
+    if (String(current ? current._id : '') === String(target ? target._id : '')) {
+      return res.status(400).json({ error: target ? `It's already in Shipment ${target.batchNumber}.` : 'It isn\'t in a shipment.' });
+    }
+
+    const label = c => (c ? `Shipment ${c.batchNumber}` : 'no shipment');
+    const by = req.user && req.user.email ? req.user.email : 'staff';
+    const now = new Date().toISOString();
+    const updated = await shipments().findOneAndUpdate(
+      { _id: shipment._id },
+      {
+        // batchNumber too: imported BLs store it, and it must follow the move.
+        $set: { consolidationId: target ? target._id : null, batchNumber: target ? target.batchNumber : null, updatedAt: now },
+        $push: { history: { status: shipment.status, at: now, note: `Moved from ${label(current)} to ${label(target)} by ${by}` } }
+      },
+      { returnDocument: 'after' }
+    );
+    const [withCustomerInfo] = await attachCustomerInfo([updated]);
+    broadcast('shipment.updated', { shipment: withCustomerInfo });
+    res.json({ shipment: withCustomerInfo, from: current ? current.batchNumber : null, to: target ? target.batchNumber : null });
+  } catch (err) {
+    console.error('Error moving shipment:', err.message);
+    res.status(500).json({ error: 'Failed to move the BL' });
+  }
+});
+
 const SHIPMENT_UPDATABLE_FIELDS = [
   'serviceType', 'origin', 'destination', 'blNumber', 'containerNumber',
   'cargo', 'boxCount', 'weight', 'cbm', 'trackingNumber', 'warehouseStatus'
@@ -3519,6 +3572,68 @@ app.get('/api/consolidations', async (req, res) => {
   }
 });
 
+
+// Staff start a new shipment (container) — e.g. "Shipment 59" — before any
+// customers are in it. Customers join it later, when their BL is assigned
+// with this shipment number. Same shape as the ones imported from the
+// tracker sheet, with empty totals; the label is "59-OCT" (number + the
+// departure month).
+const MONTHS_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function isoDateOrNull(v) {
+  if (v === undefined || v === null || v === '') return { value: null };
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(new Date(`${v}T00:00:00Z`).getTime())) return { error: 'Dates must be real dates.' };
+  return { value: v };
+}
+
+app.post('/api/consolidations', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const latest = await consolidations().find({}, { projection: { batchNumber: 1 } }).sort({ batchNumber: -1 }).limit(1).toArray();
+    const nextNumber = latest.length ? (latest[0].batchNumber || 0) + 1 : 1;
+    const batchNumber = body.batchNumber === undefined || body.batchNumber === null || body.batchNumber === '' ? nextNumber : Number(body.batchNumber);
+    if (!Number.isInteger(batchNumber) || batchNumber < 1 || batchNumber > 100000) {
+      return res.status(400).json({ error: 'The shipment number must be a whole number, e.g. 59.' });
+    }
+    const departure = isoDateOrNull(body.departureDate);
+    const arrival = isoDateOrNull(body.arrivalDate);
+    if (departure.error || arrival.error) return res.status(400).json({ error: departure.error || arrival.error });
+    if (departure.value && arrival.value && arrival.value < departure.value) {
+      return res.status(400).json({ error: 'The arrival date can\'t be before the departure date.' });
+    }
+    const peNumber = typeof body.peNumber === 'string' && body.peNumber.trim() ? body.peNumber.trim().slice(0, 40) : null;
+    const monthFrom = departure.value ? new Date(`${departure.value}T00:00:00Z`) : getSydneyNow();
+    const now = new Date().toISOString();
+    const doc = {
+      batchNumber,
+      label: `${batchNumber}-${MONTHS_SHORT[monthFrom.getUTCMonth()]}`,
+      peNumber,
+      hblRange: { from: '', to: '' },
+      totals: { hbl: 0, tc: 0, gb: 0, ob: 0, wb: 0, dd: 0, totalCbm: null, totalBoxes: null },
+      paymentTotals: { zeller: 0, eft: 0, cash: 0 },
+      financials: { grossIncome: 0, totalExpenses: 0, grossProfit: 0 },
+      financialsNote: null,
+      dates: {
+        sydneyCalendarEtd: departure.value, sydneyCalendarEta: arrival.value,
+        peblEta: null, peblClearanceDate: null, peblDeliveryDate: null,
+        transconnectPickupSyd: null, transconnectDeliveryMel: null
+      },
+      source: 'console',
+      createdBy: req.user && req.user.email ? req.user.email : 'staff',
+      createdAt: now,
+      updatedAt: now
+    };
+    const { insertedId } = await consolidations().insertOne(doc);
+    const created = { ...doc, _id: insertedId, importedShipmentCount: 0 };
+    broadcast('consolidation.created', { consolidation: created });
+    res.status(201).json({ consolidation: created });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'That shipment number already exists.' });
+    }
+    console.error('Error creating shipment (consolidation):', err.message);
+    res.status(500).json({ error: 'Failed to create the shipment' });
+  }
+});
 
 app.get('/api/consolidations/:consolidationId', async (req, res) => {
 

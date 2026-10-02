@@ -21,11 +21,11 @@ const express = require('express');
 const { ObjectId } = require('mongodb');
 const { customers, bookings, shipments } = require('./db');
 const {
-  validatePerson, validateItems, validateContents, validateSignOff, cleanText, hasRealName,
+  validatePerson, validateItems, validateContents, validateSignOff, validateDangerousGoods, validateLithiumDoc, cleanText, hasRealName,
   COUNTRIES, SERVICE_LABELS, ITEM_TYPES, ITEM_LABELS, DELIVERY_LABELS
 } = require('./customerTools');
 const { normalizePhoneNumber } = require('./normalizePhone');
-const { shippingDeclarationPdf, declarationFileName } = require('./formsPdf');
+const { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf } = require('./formsPdf');
 
 const IP_WINDOW_MS = 15 * 60 * 1000;
 const IP_MAX_SUBMISSIONS = Number(process.env.WALKIN_IP_LIMIT) || 8;
@@ -109,6 +109,12 @@ function validateDropOff(input) {
 
   const signOff = validateSignOff(body);
   if (signOff.error) return signOff;
+  let dangerousGoods = null;
+  if (serviceType === 'air') {
+    const dg = validateDangerousGoods(body.dangerousGoods, { requireAck: true });
+    if (dg.error) return dg;
+    dangerousGoods = dg.value;
+  }
 
   const notes = typeof body.notes === 'string' ? oneLine(body.notes, 300) : '';
 
@@ -118,7 +124,7 @@ function validateDropOff(input) {
       sender: sender.value, receiver: receiver.value,
       items: items.value, deliveryType: body.deliveryType,
       contents: contents.value, insurance: signOff.value.insurance,
-      signedName: signOff.value.signedName, signatureImage: signOff.value.signatureImage, notes: notes || null
+      signedName: signOff.value.signedName, signatureImage: signOff.value.signatureImage, dangerousGoods, notes: notes || null
     }
   };
 }
@@ -228,6 +234,7 @@ module.exports = function createWalkInRouters({
       insurance: v.insurance,
       declarationAccepted: true,
       signature: { name: v.signedName, image: v.signatureImage, signedAt: now },
+      ...(v.dangerousGoods ? { dangerousGoods: v.dangerousGoods } : {}),
       declarationSubmittedAt: now,
       declarationStatus: 'not_received',
       warehouseStatus: 'not_received',
@@ -472,6 +479,72 @@ module.exports = function createWalkInRouters({
     res.send(pdf);
   }));
 
+  // Every form this booking gets (declaration, + UPB and delivery
+  // agreement for Sri Lanka, + packing list for India) — what Print opens.
+  formsRouter.get('/:bookingId/forms.pdf', wrap(async (req, res) => {
+    const d = await loadForPrint(req, res);
+    if (!d) return;
+    const pdf = await allFormsPdf(d);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Transco-forms-${refOf(d)}.pdf"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(pdf);
+  }));
+
+  // Air Freight: staff update the dangerous goods answers (the customer
+  // changed something at the counter) and choose the lithium battery
+  // configuration for the transport document. Logged like other edits.
+  formsRouter.put('/:bookingId/dangerous-goods', wrap(async (req, res) => {
+    const { bookingId } = req.params;
+    if (!ObjectId.isValid(bookingId)) return res.status(400).json({ error: 'Invalid booking id' });
+    const _id = new ObjectId(bookingId);
+    const b = await bookings().findOne({ _id });
+    if (!b) return res.status(404).json({ error: 'Booking not found' });
+    if (b.serviceType !== 'air') return res.status(400).json({ error: 'Dangerous goods forms are for Air Freight bookings.' });
+    const body = req.body || {};
+    const set = {};
+    const changed = [];
+    if ('dangerousGoods' in body) {
+      const dg = validateDangerousGoods(body.dangerousGoods);
+      if (dg.error) return res.status(400).json(dg);
+      set.dangerousGoods = dg.value;
+      changed.push('dangerous goods');
+    }
+    if ('lithiumDoc' in body) {
+      const l = validateLithiumDoc(body.lithiumDoc);
+      if (l.error) return res.status(400).json(l);
+      set.lithiumDoc = l.value;
+      changed.push('lithium battery document');
+    }
+    if (!changed.length) return res.status(400).json({ error: 'Nothing to save.' });
+    const now = new Date();
+    const by = req.user && req.user.email ? req.user.email : 'staff';
+    await bookings().updateOne({ _id }, {
+      $set: { ...set, staffEditedAt: now },
+      $push: { staffEdits: { $each: [{ at: now, by, changed }], $slice: -50 } }
+    });
+    res.json({ ok: true });
+  }));
+
+  // Which forms this booking gets, for the console's Forms list.
+  formsRouter.get('/:bookingId/list', wrap(async (req, res) => {
+    const d = await loadForPrint(req, res);
+    if (!d) return;
+    res.json({ forms: formsFor(d).map(x => ({ key: x.key, title: x.title })) });
+  }));
+
+  // One form on its own (preview / print just that one).
+  formsRouter.get('/:bookingId/forms/:key', wrap(async (req, res) => {
+    const d = await loadForPrint(req, res);
+    if (!d) return;
+    const one = await singleFormPdf(d, req.params.key);
+    if (!one) return res.status(404).json({ error: 'This booking does not have that form.' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${one.filename}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(one.content);
+  }));
+
   // "Send email": the office inbox only (never the customer), only once
   // the BL is assigned, with the filled forms attached. Staff can send it
   // again (e.g. after a correction); every send is recorded.
@@ -479,23 +552,23 @@ module.exports = function createWalkInRouters({
     const d = await loadForPrint(req, res);
     if (!d) return;
     if (!d.blNumber) return res.status(400).json({ error: 'Assign the BL number first — the forms are sent once the BL is assigned.' });
-    const pdf = await shippingDeclarationPdf(d);
+    const files = await formAttachments(d);
     const name = d.sender ? d.sender.fullName : (d.customer && d.customer.name) || 'Customer';
     const booking = await bookings().findOne({ _id: new ObjectId(d.bookingId) });
     let sent;
     try {
       sent = await sendEmail({
         to: staffEmail,
-        subject: `BL ${d.blNumber} — ${name} — declaration forms`,
-        html: `<p><strong>BL ${esc(d.blNumber)}</strong> — forms for ${esc(name)}, attached as PDF.</p>${summaryHtml({ ...booking, hblNumber: d.blNumber })}`,
-        attachments: [{ filename: declarationFileName(d), content: pdf.toString('base64') }]
+        subject: `BL ${d.blNumber} — ${name} — forms`,
+        html: `<p><strong>BL ${esc(d.blNumber)}</strong> — forms for ${esc(name)}, attached as PDF: ${files.map(f => esc(f.filename)).join(', ')}.</p>${summaryHtml({ ...booking, hblNumber: d.blNumber })}`,
+        attachments: files.map(f => ({ filename: f.filename, content: f.content.toString('base64') }))
       });
     } catch (err) {
       console.error('Forms email failed:', err.response && err.response.data ? JSON.stringify(err.response.data) : err.message);
       return res.status(502).json({ error: 'The email service refused the email, so nothing was sent. Please try again in a minute.' });
     }
     if (!sent) return res.status(503).json({ error: 'Email sending is not set up on the server, so nothing was sent.' });
-    const entry = { at: new Date(), by: req.user && req.user.email ? req.user.email : 'staff', to: staffEmail, files: [declarationFileName(d)] };
+    const entry = { at: new Date(), by: req.user && req.user.email ? req.user.email : 'staff', to: staffEmail, files: files.map(f => f.filename) };
     await bookings().updateOne({ _id: booking._id }, { $push: { formEmails: { $each: [entry], $slice: -20 } } });
     res.json({ ok: true, sentAt: entry.at, to: staffEmail });
   }));
