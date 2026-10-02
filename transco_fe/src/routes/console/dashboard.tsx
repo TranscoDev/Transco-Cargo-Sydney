@@ -1,107 +1,296 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  AlertTriangle,
   CalendarClock,
-  DollarSign,
-  MessageSquareDot,
-  Package,
-  Receipt,
-  UserPlus,
-  Wallet,
+  ChevronRight,
+  ClipboardCheck,
+  MapPin,
+  MessageCircle,
+  PackageCheck,
+  Search,
+  Ship,
+  Sunrise,
+  type LucideIcon,
 } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type StatusTone } from "@/components/transco/page-kit";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { fetchDashboardSummary, type DashboardSummary } from "@/lib/transco/api";
 
 export const Route = createFileRoute("/console/dashboard")({
   component: DashboardPage,
 });
 
-interface MetricCard {
-  label: string;
-  icon: typeof CalendarClock;
-  value: number | null;
-  /** Shown instead of a number when the underlying module hasn't
-   * shipped yet — never a fake 0 that could be mistaken for real data. */
-  unavailableReason?: string;
-  to?: string;
-}
-
+/**
+ * The morning check-in: a greeting, today's real numbers, and the work
+ * that needs doing — each item a single click from where it's done.
+ * Every number comes from /api/dashboard/summary; nothing is invented,
+ * and a count the backend doesn't return is simply not shown.
+ */
 function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
+    setFailed(false);
     fetchDashboardSummary()
-      .then((data) => {
-        if (!cancelled) setSummary(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load dashboard");
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then(setSummary)
+      .catch(() => setFailed(true));
   }, []);
 
-  const cards: MetricCard[] = [
-    { label: "Today's Bookings", icon: CalendarClock, value: summary?.todaysBookings ?? null, to: "/console/bookings" },
-    { label: "New Customers Today", icon: UserPlus, value: summary?.newCustomersToday ?? null, to: "/console/customers" },
-    { label: "Unread Conversations", icon: MessageSquareDot, value: summary?.unreadConversations ?? null, to: "/console/conversations" },
-    { label: "Flagged for Attention", icon: AlertTriangle, value: summary?.attentionConversations ?? null, to: "/console/conversations" },
-    { label: "Active Shipments", icon: Package, value: summary?.activeShipments ?? null, to: "/console/shipments" },
-    { label: "Revenue", icon: DollarSign, value: null, unavailableReason: "Available in Phase 5" },
-    { label: "Payments Received", icon: Wallet, value: null, unavailableReason: "Available in Phase 5" },
-    { label: "Outstanding Payments", icon: Receipt, value: null, unavailableReason: "Available in Phase 5" },
-  ];
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const today = new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
-      <h1 className="mb-1 text-lg font-semibold text-foreground">Dashboard</h1>
-      <p className="mb-5 text-sm text-muted-foreground">A quick snapshot of what needs attention today.</p>
+    <PageShell>
+      <header className="mb-8">
+        <p className="text-sm text-muted-foreground">{today}</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+          {greeting()} 👋
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">Here's what needs your attention today.</p>
+      </header>
 
-      {error && (
-        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {error}
-        </p>
+      {failed ? (
+        <ErrorState
+          title="Couldn't load today's overview"
+          description="Everything else in Transco Admin still works — use the menu, or try again."
+          onRetry={load}
+        />
+      ) : !summary ? (
+        <DashboardSkeleton />
+      ) : (
+        <DashboardBody s={summary} />
       )}
+    </PageShell>
+  );
+}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          const body = (
-            <Card key={card.label} className="transition-colors hover:border-primary/40">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
-                <CardTitle className="text-xs font-medium text-muted-foreground">{card.label}</CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                {card.unavailableReason ? (
-                  <p className="text-xs text-muted-foreground">{card.unavailableReason}</p>
-                ) : (
-                  <p className="text-2xl font-semibold tabular-nums text-foreground">
-                    {card.value === null && !error ? "—" : (card.value ?? 0)}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          );
-          return card.to ? (
-            <Link key={card.label} to={card.to}>
-              {body}
-            </Link>
+function greeting() {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+// ---------------------------------------------------------------
+
+type BookingsSearch = { show?: "declarations" | "bls" };
+
+interface WorkItem {
+  count: number;
+  label: string;
+  hint: string;
+  to: string;
+  search?: BookingsSearch;
+  icon: LucideIcon;
+  tone: StatusTone;
+}
+
+function DashboardBody({ s }: { s: DashboardSummary }) {
+  const waiting = s.conversationsWaiting ?? s.unreadConversations;
+  const dropOffs = s.todaysDropOffs ?? [];
+
+  const stats: { label: string; value: number | undefined; to: string; search?: BookingsSearch; icon: LucideIcon }[] = [
+    { label: "Drop-offs today", value: s.todaysBookings, to: "/console/bookings", icon: CalendarClock },
+    { label: "Conversations waiting", value: waiting, to: "/console/conversations", icon: MessageCircle },
+    { label: "Declarations to check", value: s.declarationsToCheck, to: "/console/bookings", search: { show: "declarations" }, icon: ClipboardCheck },
+    { label: "BLs to assign", value: s.blsToAssign, to: "/console/bookings", search: { show: "bls" }, icon: PackageCheck },
+  ];
+
+  const work = ([
+    {
+      count: waiting,
+      label: plural(waiting, "Reply to 1 conversation", `Reply to ${waiting} conversations`),
+      hint: "Customers waiting for an answer, or chats the bot flagged for staff.",
+      to: "/console/conversations",
+      icon: MessageCircle,
+      tone: "info",
+    },
+    {
+      count: s.declarationsToCheck ?? 0,
+      label: plural(s.declarationsToCheck ?? 0, "Check 1 declaration", `Check ${s.declarationsToCheck} declarations`),
+      hint: "Filled online by customers — open the booking, check it, mark it Checked.",
+      to: "/console/bookings",
+      search: { show: "declarations" },
+      icon: ClipboardCheck,
+      tone: "pending",
+    },
+    {
+      count: s.blsToAssign ?? 0,
+      label: plural(s.blsToAssign ?? 0, "Assign 1 BL", `Assign ${s.blsToAssign} BLs`),
+      hint: "Boxes are in the warehouse — give each booking its shipment reference.",
+      to: "/console/bookings",
+      search: { show: "bls" },
+      icon: PackageCheck,
+      tone: "pending",
+    },
+  ] satisfies WorkItem[]).filter((w) => w.count > 0);
+
+  return (
+    <div className="flex flex-col gap-10">
+      {/* TODAY */}
+      <section>
+        <SectionHeading>Today</SectionHeading>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {stats
+            .filter((st) => st.value !== undefined)
+            .map((st) => (
+              <Link
+                key={st.label}
+                to={st.to}
+                search={st.search ?? {}}
+                className="group rounded-xl border bg-card p-4 shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/30"
+              >
+                <div className="flex items-center justify-between">
+                  <st.icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/0 transition-colors group-hover:text-muted-foreground" aria-hidden />
+                </div>
+                <p className="mt-3 text-3xl font-semibold tabular-nums text-foreground">{st.value}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{st.label}</p>
+              </Link>
+            ))}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        {/* YOUR WORK TODAY */}
+        <section>
+          <SectionHeading>Your work today</SectionHeading>
+          {work.length ? (
+            <ul className="flex flex-col gap-2">
+              {work.map((w) => (
+                <li key={w.label}>
+                  <Link
+                    to={w.to}
+                    search={w.search ?? {}}
+                    className="group flex items-center gap-4 rounded-xl border bg-card px-4 py-3.5 shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/30"
+                  >
+                    <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full", w.tone === "info" ? "bg-info-soft text-info-foreground" : "bg-warning-soft text-warning-foreground")}>
+                      <w.icon className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-foreground">{w.label}</span>
+                      <span className="block text-sm text-muted-foreground">{w.hint}</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           ) : (
-            body
-          );
-        })}
+            <div className="rounded-xl border bg-card">
+              <EmptyState icon={Sunrise} title="You're all caught up" description="No conversations, declarations or BLs are waiting. Everything is clear for now." />
+            </div>
+          )}
+        </section>
+
+        {/* TODAY'S DROP-OFFS */}
+        <section>
+          <SectionHeading
+            action={
+              <Link to="/console/bookings" className="text-sm font-medium text-primary hover:underline">
+                All bookings
+              </Link>
+            }
+          >
+            Today's drop-offs
+          </SectionHeading>
+          <div className="rounded-xl border bg-card">
+            {dropOffs.length ? (
+              <ul className="divide-y">
+                {dropOffs.map((d) => (
+                  <li key={d.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="w-16 shrink-0 text-sm font-semibold tabular-nums text-foreground">{fmtTime(d.time)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-foreground">{d.customerName ?? "Customer"}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {[d.bookingCode, d.boxSummary].filter(Boolean).join(" · ") || "—"}
+                      </span>
+                    </span>
+                    <BookingStatus status={d.status} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState compact icon={CalendarClock} title="No drop-offs booked for today" description="New bookings will show up here." />
+            )}
+          </div>
+        </section>
       </div>
 
-      <div className="mt-6 rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
-        Low-stock alerts, pending staff actions, and recent activity will appear here once Inventory
-        (Phase 3) and the remaining modules ship.
+      {/* QUICK ACTIONS */}
+      <section>
+        <SectionHeading>Quick actions</SectionHeading>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <QuickAction to="/console/customers" icon={Search} label="Find a customer" />
+          <QuickAction to="/console/shipments" icon={Ship} label="Find a shipment" />
+          <QuickAction to="/console/conversations" icon={MessageCircle} label="Conversations" />
+          <QuickAction to="/console/bookings" icon={CalendarClock} label="Bookings" />
+          <QuickAction to="/console/tracking" icon={MapPin} label="Track a BL" />
+        </div>
+        <p className="mt-4 text-sm text-muted-foreground">
+          {s.activeShipments} shipment{s.activeShipments === 1 ? "" : "s"} on the way · {s.newCustomersToday} new customer
+          {s.newCustomersToday === 1 ? "" : "s"} today
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function QuickAction({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/30"
+    >
+      <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+      {label}
+    </Link>
+  );
+}
+
+const BOOKING_STATUS: Record<string, { label: string; tone: StatusTone }> = {
+  pending: { label: "Pending", tone: "pending" },
+  confirmed: { label: "Confirmed", tone: "info" },
+  completed: { label: "Done", tone: "success" },
+};
+
+function BookingStatus({ status }: { status: string }) {
+  const s = BOOKING_STATUS[status] ?? { label: status, tone: "neutral" as StatusTone };
+  return <StatusBadge tone={s.tone}>{s.label}</StatusBadge>;
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-10" aria-busy="true" aria-label="Loading today's overview">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[3fr_2fr]">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-16 rounded-xl" />
+          <Skeleton className="h-16 rounded-xl" />
+        </div>
+        <Skeleton className="h-40 rounded-xl" />
       </div>
     </div>
   );
+}
+
+function plural(n: number, one: string, many: string) {
+  return n === 1 ? one : many;
+}
+
+function fmtTime(t: string | null) {
+  if (!t) return "—";
+  const [h = NaN, m = 0] = t.split(":").map(Number);
+  if (Number.isNaN(h)) return t;
+  const suffix = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 || 12;
+  return m ? `${h12}:${String(m).padStart(2, "0")}${suffix}` : `${h12}${suffix}`;
 }

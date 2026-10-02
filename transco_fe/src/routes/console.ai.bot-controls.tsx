@@ -11,8 +11,9 @@ export const Route = createFileRoute("/console/ai/bot-controls")({
   component: () => (
     <ComingSoonPanel
       icon={PauseCircle}
-      title="Bot Controls"
+      title="Bot settings"
       phase="Still in the header dropdown for now — moves here in Phase 6 (deferred)"
+      note="To pause or resume the bots today, use the Bot Controls button at the top right."
     />
   ),
 });

@@ -18,6 +18,7 @@ import type {
   CustomerStatus,
   EmailCampaignResult,
   ImportResult,
+  LinkedAccount,
   MediaType,
   Message,
   MessageStatus,
@@ -75,6 +76,19 @@ export interface BackendCustomer {
   totalShipments?: number;
   totalRevenue?: number;
   outstandingBalance?: number | null;
+  /** Website chats: the My Transco account the visitor was signed in to. */
+  linkedAccount?: LinkedAccount | null;
+}
+
+/**
+ * What to show as a conversation's number. A website chat has no phone of
+ * its own (its stored "number" is an internal session id): show the signed-in
+ * customer's real number, or say plainly that they weren't signed in.
+ */
+export function contactNumber(c: { channel?: ConversationChannel | undefined; phoneNumber: string; linkedAccount?: LinkedAccount | null | undefined }): string {
+  if (c.linkedAccount?.phoneNumber) return c.linkedAccount.phoneNumber;
+  if (c.channel === "website") return "Not signed in";
+  return c.phoneNumber;
 }
 
 export interface BackendShipment {
@@ -119,6 +133,11 @@ export interface BackendBooking {
   declarationStatus?: Booking["declarationStatus"];
   warehouseStatus?: Booking["warehouseStatus"];
   customerNotes?: string | null;
+  declarationSubmittedAt?: string | null;
+  receiver?: { fullName?: string; town?: string } | null;
+  walkIn?: { status?: "submitted" | "finalised"; returning?: boolean } | null;
+  contents?: unknown[] | null;
+  staffConfirm?: { status?: string } | null;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -149,7 +168,51 @@ export function mapBooking(b: BackendBooking): Booking {
     declarationStatus: b.declarationStatus,
     warehouseStatus: b.warehouseStatus,
     customerNotes: b.customerNotes,
+    declarationSubmittedAt: b.declarationSubmittedAt,
+    receiver: b.receiver?.fullName ? { fullName: b.receiver.fullName, town: b.receiver.town ?? null } : null,
+    walkInStatus: b.walkIn?.status ?? null,
+    walkInReturning: b.walkIn?.returning ?? null,
+    declarationComplete: Boolean(b.declarationSubmittedAt && Array.isArray(b.contents) && b.contents.length),
+    staffConfirmed: b.walkIn?.status === "finalised" || b.staffConfirm?.status === "finalised",
   };
+}
+
+/** Staff finalise a walk-in at the counter (see transco_be/walkInRoutes.js). */
+export interface WalkInFinaliseInput {
+  /** Required the first time — the declaration is confirmed once its BL is assigned. */
+  hblNumber?: string;
+  /** The bulk shipment it goes in, e.g. 57 (optional). */
+  batchNumber?: number | null;
+  /** Staff's value (AUD) for each item, in the customer's list order — required. */
+  contentValues?: number[];
+  /** The full item list, as edited by staff at the counter (each with its value). */
+  contents?: { description: string; condition: "new" | "used"; qty: number; value: number }[];
+  /** The customer's insurance answer, if staff changed it at the counter. */
+  insurance?: boolean;
+  weight?: number | null;
+  cbm?: number | null;
+  officeUse?: {
+    freight: number | null;
+    pickup: number | null;
+    doorToDoor: number | null;
+    discount: number | null;
+    total: number | null;
+  };
+  collectionCentre?: string | null;
+}
+
+export async function finaliseWalkIn(
+  bookingId: string,
+  input: WalkInFinaliseInput,
+): Promise<{ customerId: string | null; hblNumber: string | null; firstTime: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/api/walk-ins/${bookingId}/finalise`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; customerId?: string | null; hblNumber?: string | null; firstTime?: boolean };
+  if (!res.ok) throw new Error(data.error || `Could not finalise (${res.status})`);
+  return { customerId: data.customerId ?? null, hblNumber: data.hblNumber ?? null, firstTime: Boolean(data.firstTime) };
 }
 
 export function mapMessage(m: BackendMessage): Message {
@@ -266,7 +329,8 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
   return {
     id: c._id,
     customerName: c.name,
-    phoneNumber: c.phoneNumber,
+    phoneNumber: contactNumber(c),
+    linkedAccount: c.linkedAccount ?? null,
     mode: c.mode,
     channel: c.channel,
     messages: c.messages.map(mapMessage),
@@ -308,6 +372,9 @@ interface BackendCustomerProfile extends BackendCustomerWithMessages {
   totalRevenue: number;
   outstandingBalance: number | null;
   financeDataAvailable: boolean;
+  customerCode?: string | null;
+  hasOnlineAccount?: boolean;
+  phoneVerified?: boolean;
 }
 
 /** GET /api/customers/:id/profile — the CRM detail view. Separate from
@@ -328,6 +395,8 @@ export async function fetchCustomerProfile(customerId: string): Promise<Customer
     bookings: c.bookings.map(mapBooking),
     liveShipments: c.liveShipments.map(mapShipmentRecord),
     financeDataAvailable: c.financeDataAvailable,
+    customerCode: c.customerCode ?? null,
+    hasOnlineAccount: c.hasOnlineAccount === true,
   };
 }
 
@@ -597,6 +666,35 @@ export async function fetchConsolidations(): Promise<Consolidation[]> {
   return data.consolidations.map(mapConsolidation);
 }
 
+/** Move a BL to another shipment (container), or out of one (null). The same record moves — never a copy. */
+export async function moveShipment(shipmentId: string, batchNumber: number | null): Promise<{ from: number | null; to: number | null }> {
+  const res = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}/move`, {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ batchNumber }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; from?: number | null; to?: number | null };
+  if (!res.ok) throw new Error(data.error || `Could not move it (${res.status})`);
+  return { from: data.from ?? null, to: data.to ?? null };
+}
+
+/** Start a new shipment (container), e.g. Shipment 59 — no customers yet; they join when their BL is assigned. */
+export async function createConsolidation(input: {
+  batchNumber?: number | null;
+  peNumber?: string | null;
+  departureDate?: string | null;
+  arrivalDate?: string | null;
+}): Promise<Consolidation> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; consolidation?: BackendConsolidation };
+  if (!res.ok || !data.consolidation) throw new Error(data.error || `Could not create the shipment (${res.status})`);
+  return mapConsolidation(data.consolidation);
+}
+
 interface BackendConsolidationDetail extends BackendConsolidation {
   shipments: BackendShipmentRecord[];
 }
@@ -796,6 +894,20 @@ export interface DashboardSummary {
   unreadConversations: number;
   attentionConversations: number;
   activeShipments: number;
+  /** Unread OR flagged for staff, counted once. Absent on older backends. */
+  conversationsWaiting?: number;
+  /** Declarations the customer filled online that staff haven't checked yet. */
+  declarationsToCheck?: number;
+  /** Boxes received at the warehouse but no shipment/BL yet. */
+  blsToAssign?: number;
+  todaysDropOffs?: {
+    id: string;
+    customerName: string | null;
+    time: string | null;
+    bookingCode: string | null;
+    status: string;
+    boxSummary: string | null;
+  }[];
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {

@@ -49,6 +49,9 @@ async function connectToDatabase(uri, dbName = 'transco') {
   await db.collection('customerOtps').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection('customerOtps').createIndex({ phoneNumber: 1, createdAt: -1 });
 
+  // Shipping calendar: one entry per country + cutoff date.
+  await db.collection('shippingSchedule').createIndex({ country: 1, cutoff: 1 }, { unique: true });
+
   console.log('Connected to MongoDB');
   return db;
 }
@@ -56,6 +59,10 @@ async function connectToDatabase(uri, dbName = 'transco') {
 function getDb() {
   if (!db) throw new Error('Database not connected yet');
   return db;
+}
+
+function shippingSchedule() {
+  return getDb().collection('shippingSchedule');
 }
 
 function customers() {
@@ -180,5 +187,6 @@ module.exports = {
   invoices,
   payments,
   campaigns,
-  segments
+  segments,
+  shippingSchedule
 };

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { fetchConsolidations, fetchPackagingActivity } from "@/lib/transco/api";
+import { LoadingRows } from "@/components/transco/page-kit";
 import type {
   Consolidation,
   PackagingActivityResult,
@@ -102,9 +103,9 @@ function PackagingActivityPage() {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
       <div className="mb-4">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
           <PackageSearch className="h-4 w-4 text-muted-foreground" />
           Packaging Activity
         </h1>
@@ -176,13 +177,13 @@ function PackagingActivityPage() {
       </div>
 
       {error && (
-        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="mb-4 rounded-lg border border-attention/20 bg-attention-soft px-4 py-3 text-sm text-attention-foreground">
           {error}
         </p>
       )}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <LoadingRows rows={4} />
       ) : activity ? (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -202,9 +203,9 @@ function PackagingActivityPage() {
             ))}
           </div>
 
-          <div className="overflow-auto rounded-md border border-border">
+          <div className="overflow-auto rounded-xl border bg-card shadow-xs">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Box Type</th>
                   <th className="px-3 py-2 text-right font-medium">Total Used</th>
@@ -233,7 +234,7 @@ function PackagingActivityPage() {
             </table>
           </div>
 
-          <div className="mt-3 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <div className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
               {activity.shipmentCount} shipment{activity.shipmentCount === 1 ? "" : "s"} in this

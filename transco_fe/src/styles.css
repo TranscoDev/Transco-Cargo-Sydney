@@ -79,6 +79,18 @@
   --color-nav-active-foreground: var(--nav-active-foreground);
   --color-nav-border: var(--nav-border);
   --color-nav-tint: var(--nav-tint);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-foreground: var(--info-foreground);
+  --color-attention: var(--attention);
+  --color-attention-soft: var(--attention-soft);
+  --color-attention-foreground: var(--attention-foreground);
 }
 
 :root {
@@ -144,6 +156,23 @@
   --human-border: oklch(0.9 0.075 90);
   --human-foreground: oklch(0.45 0.09 78);
 
+  /* Calm status colours — always a soft tinted background with readable
+   * text (see StatusBadge), never a loud solid fill. "attention" is the
+   * gentle red for "please look at this"; --destructive stays reserved
+   * for destructive buttons (delete). Base colour = icons/dots. */
+  --success: oklch(0.6 0.12 155);
+  --success-soft: oklch(0.955 0.035 155);
+  --success-foreground: oklch(0.42 0.09 155);
+  --warning: oklch(0.72 0.13 75);
+  --warning-soft: oklch(0.965 0.045 85);
+  --warning-foreground: oklch(0.47 0.1 65);
+  --info: oklch(0.6 0.11 245);
+  --info-soft: oklch(0.955 0.025 245);
+  --info-foreground: oklch(0.43 0.1 250);
+  --attention: oklch(0.62 0.16 25);
+  --attention-soft: oklch(0.96 0.025 25);
+  --attention-foreground: oklch(0.48 0.14 25);
+
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -172,6 +201,18 @@
   --human-tint: oklch(0.22 0.03 90);
   --human-border: oklch(0.42 0.07 88);
   --human-foreground: oklch(0.88 0.09 88);
+  --success: oklch(0.7 0.12 155);
+  --success-soft: oklch(0.3 0.05 155);
+  --success-foreground: oklch(0.86 0.08 155);
+  --warning: oklch(0.78 0.12 80);
+  --warning-soft: oklch(0.32 0.05 75);
+  --warning-foreground: oklch(0.88 0.09 85);
+  --info: oklch(0.7 0.1 245);
+  --info-soft: oklch(0.3 0.05 250);
+  --info-foreground: oklch(0.86 0.06 245);
+  --attention: oklch(0.7 0.14 25);
+  --attention-soft: oklch(0.32 0.06 25);
+  --attention-foreground: oklch(0.87 0.07 25);
   --card: oklch(0.208 0.042 265.755);
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);

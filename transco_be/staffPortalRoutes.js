@@ -151,7 +151,7 @@ module.exports = function createStaffPortalRouter({ tools }) {
       tools.getCustomerBookings(c._id, { limit: 100, staff: true }),
       tools.getCustomerShipments(c._id, { limit: 100, staff: true }),
       bookings().find({ customerId: c._id }, {
-        projection: { channel: 1, declarationStatus: 1, warehouseStatus: 1, status: 1, requestedTime: 1, customerName: 1, notes: 1 }
+        projection: { channel: 1, declarationStatus: 1, declarationSubmittedAt: 1, warehouseStatus: 1, status: 1, requestedTime: 1, customerName: 1, notes: 1, sender: 1, senderIsAccountHolder: 1, receiver: 1 }
       }).toArray(),
       customers().find({ linkedCustomerId: c._id }, { projection: { name: 1, sessionId: 1, createdAt: 1 } }).toArray()
     ]);
@@ -165,6 +165,12 @@ module.exports = function createStaffPortalRouter({ tools }) {
         channel: raw.channel || null,
         rawStatus: raw.status || null,
         declarationStatus: raw.declarationStatus === 'received' ? 'received' : 'not_received',
+        declarationSubmittedAt: raw.declarationSubmittedAt || null,
+        // Full declaration details — staff see all of it (the customer's
+        // own view only shows names back to them).
+        sender: raw.sender || null,
+        senderIsAccountHolder: raw.senderIsAccountHolder !== false,
+        receiver: raw.receiver || null,
         warehouseStatus: raw.warehouseStatus === 'received' ? 'received' : 'not_received',
         staffNotes: raw.notes || null
       };
@@ -297,6 +303,31 @@ module.exports = function createStaffPortalRouter({ tools }) {
     if (!c) return;
     await customers().updateOne({ _id: c._id }, { $set: { portalLoginFailures: 0 }, $unset: { portalLockedUntil: '' } });
     res.json({ success: true });
+  }));
+
+  // ---------- declaration print ----------
+
+  // Everything on one booking's declaration form, for the console's
+  // "Print declaration" button. Any booking, not only My Transco ones.
+  router.get('/bookings/:bookingId/declaration', wrap(async (req, res) => {
+    const data = await tools.getDeclarationForPrint(req.params.bookingId);
+    if (!data) return res.status(404).json({ error: 'Booking not found' });
+    res.json({ declaration: data });
+  }));
+
+  // ---------- staff edits to a booking ----------
+
+  router.get('/bookings/:bookingId/edit', wrap(async (req, res) => {
+    const data = await tools.getBookingForStaffEdit(req.params.bookingId);
+    if (!data) return res.status(404).json({ error: 'Booking not found' });
+    res.json({ booking: data });
+  }));
+
+  router.patch('/bookings/:bookingId/details', wrap(async (req, res) => {
+    const result = await tools.staffUpdateBookingDetails(req.params.bookingId, req.body, req.user && req.user.email);
+    if (result.notFound) return res.status(404).json({ error: 'Booking not found' });
+    if (result.error) return res.status(400).json({ error: result.error, field: result.field || null });
+    res.json({ success: true, changed: result.changed });
   }));
 
   // eslint-disable-next-line no-unused-vars

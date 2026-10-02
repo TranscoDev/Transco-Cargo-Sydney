@@ -4,8 +4,8 @@ export type ConversationMode = "CHATBOT" | "HUMAN";
  * everywhere else (backend, comparisons, storage). Staff just reads
  * better than "Human" in a dashboard built for staff to use. */
 export const MODE_LABELS: Record<ConversationMode, string> = {
-  CHATBOT: "CHATBOT",
-  HUMAN: "STAFF",
+  CHATBOT: "Bot",
+  HUMAN: "Staff",
 };
 
 /** Absent/undefined means "whatsapp" — every conversation that existed
@@ -180,6 +180,16 @@ export interface Conversation {
   totalShipments?: number | undefined;
   totalRevenue?: number | undefined;
   outstandingBalance?: number | null | undefined;
+  /** Website chats only: the My Transco account the visitor was signed in
+   * to — who they really are (their phoneNumber shown is this account's). */
+  linkedAccount?: LinkedAccount | null | undefined;
+}
+
+export interface LinkedAccount {
+  id: string;
+  name: string | null;
+  phoneNumber: string | null;
+  customerCode: string | null;
 }
 
 /** GET /api/customers/:id/profile — the CRM detail view. A superset of
@@ -192,6 +202,10 @@ export interface CustomerProfile extends Conversation {
    * inherited `shipments` field (historical import), which is untouched. */
   liveShipments: Shipment[];
   financeDataAvailable: boolean;
+  /** Friendly customer number (CUS-000123) — null until first assigned. */
+  customerCode: string | null;
+  /** Has a My Transco (customer website) account. */
+  hasOnlineAccount: boolean;
 }
 
 export interface ConversationSummary {
@@ -205,6 +219,7 @@ export interface ConversationSummary {
   unreadCount: number;
   needsAttention?: boolean | undefined;
   needsAttentionMessage?: NeedsAttentionMessage | undefined;
+  linkedAccount?: LinkedAccount | null | undefined;
 }
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
@@ -247,14 +262,29 @@ export interface Booking {
   /** Human-readable reference ("BK-000245") — the same one the customer
    * sees in My Transco. Absent on older bookings until first viewed. */
   bookingCode?: string | null | undefined;
-  /** "portal" for bookings the customer made in My Transco. */
+  /** "portal" for bookings the customer made in My Transco; "walk_in" for
+   * the drop-off form a customer filled on their phone at the counter. */
   channel?: string | null | undefined;
+  /** Walk-ins only: "submitted" until staff check the boxes and Finalise. */
+  walkInStatus?: "submitted" | "finalised" | null | undefined;
+  /** Walk-ins only: the phone number was already a customer when the form came in. */
+  walkInReturning?: boolean | null | undefined;
+  /** The full declaration (incl. what's inside) was filled online or on the QR form. */
+  declarationComplete?: boolean | undefined;
+  /** Staff checked the boxes, valued the items and assigned the BL. */
+  staffConfirmed?: boolean | undefined;
   /** Customer-visible progress stages, set by staff (My Transco shows a
    * stage as done only once it's recorded here). */
   declarationStatus?: BookingStageStatus | null | undefined;
   warehouseStatus?: BookingStageStatus | null | undefined;
   /** Anything the customer typed in the booking form's notes box. */
   customerNotes?: string | null | undefined;
+  /** Set when the customer filled the declaration (sender + receiver) in
+   * the online booking form — printable from the console. */
+  declarationSubmittedAt?: string | null | undefined;
+  /** Who the boxes are for, from the online declaration (full details
+   * load in the booking details panel). */
+  receiver?: { fullName: string; town: string | null } | null | undefined;
 }
 
 export type BookingStageStatus = "received" | "not_received";

@@ -1,8 +1,15 @@
 import { Bot, UserRound } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MODE_LABELS, type ConversationMode } from "@/lib/transco/types";
+import type { ConversationMode } from "@/lib/transco/types";
 
+/**
+ * Who is answering this customer, in plain words, with the one thing
+ * staff can do about it: take over from the bot, or hand the chat back.
+ * (Replaces a CHATBOT/STAFF toggle plus a second "Switch to…" button
+ * that did the same thing.)
+ */
 export function ModeSwitch({
   mode,
   onChange,
@@ -13,47 +20,27 @@ export function ModeSwitch({
   const isHuman = mode === "HUMAN";
 
   return (
-    <div className="flex items-center gap-2">
-      <div
-        className="flex items-center rounded-md border border-border bg-secondary/60 p-0.5"
-        role="group"
-        aria-label="Conversation mode"
-      >
-        {(["CHATBOT", "HUMAN"] as ConversationMode[]).map((m) => {
-          const active = mode === m;
-          const Icon = m === "HUMAN" ? UserRound : Bot;
-          return (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onChange(m)}
-              className={cn(
-                "flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors",
-                !active && "text-muted-foreground hover:text-foreground",
-                active && m === "HUMAN" && "bg-human text-human-foreground shadow-sm",
-                active && m === "CHATBOT" && "bg-panel text-foreground shadow-sm",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {MODE_LABELS[m]}
-            </button>
-          );
-        })}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => onChange(isHuman ? "CHATBOT" : "HUMAN")}
+    <div className="flex items-center gap-2.5">
+      <span
         className={cn(
-          "hidden rounded-md px-3 py-1.5 text-xs font-medium transition-colors lg:inline-flex",
-          isHuman
-            ? "border border-human-border bg-human-tint text-human-foreground hover:bg-human-soft"
-            : "border border-border bg-panel text-foreground hover:bg-secondary",
+          "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:inline-flex",
+          isHuman ? "bg-human-soft text-human-foreground" : "bg-secondary text-secondary-foreground",
         )}
       >
-        {isHuman ? "Switch to Chatbot" : "Switch to Staff"}
-      </button>
+        {isHuman ? <UserRound className="h-3.5 w-3.5" aria-hidden /> : <Bot className="h-3.5 w-3.5" aria-hidden />}
+        {isHuman ? "You're replying" : "Bot is replying"}
+      </span>
+      {isHuman ? (
+        <Button type="button" size="sm" variant="outline" onClick={() => onChange("CHATBOT")}>
+          <Bot className="mr-1.5 h-4 w-4" aria-hidden />
+          Hand back to bot
+        </Button>
+      ) : (
+        <Button type="button" size="sm" onClick={() => onChange("HUMAN")}>
+          <UserRound className="mr-1.5 h-4 w-4" aria-hidden />
+          Take over chat
+        </Button>
+      )}
     </div>
   );
 }

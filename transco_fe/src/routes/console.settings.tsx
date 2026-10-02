@@ -28,9 +28,9 @@ function SettingsPage() {
   const me = getCurrentUser();
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
       <div className="mb-6">
-        <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
           <SettingsIcon className="h-4 w-4 text-muted-foreground" />
           Settings
         </h1>
@@ -177,7 +177,7 @@ function YourAccountCard({ email, name }: { email: string | null; name: string |
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           {success && (
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">Password updated.</p>
+            <p className="text-xs text-success-foreground">Password updated.</p>
           )}
           <Button type="submit" size="sm" disabled={saving} className="self-start">
             {saving ? "Saving…" : "Update Password"}

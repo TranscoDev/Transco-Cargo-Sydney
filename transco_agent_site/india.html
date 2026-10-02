@@ -1,0 +1,730 @@
+<!--
+  Transco Cargo Sydney — India reference page (sample/test build).
+
+  Real published figures reused as-is from the live
+  transcosydney.com.au/india page: flat-rate pricing, no distance
+  zones, no named India-side warehouse (unlike Sri Lanka's Wattala).
+  That's a genuine gap in the live site's own content, not something
+  this page invents — flagged honestly below rather than papered over.
+
+  Shipping-calendar dates live in the SCHEDULE list near the bottom of
+  this file — staff add real dates there. An empty list shows an
+  honest "being confirmed" state instead of guessed dates.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>India — Transco Cargo Sydney</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #182233;
+    --cream: #f6f4ef;
+    --ink: #1c2430;
+    --muted: #6b7480;
+    --in-orange: #f0762e;
+    --in-orange-deep: #d15f1e;
+    --in-tint: #fdf1e7;
+    --sl-teal: #12a189;
+    --line: #e3e0d8;
+    --bot-bubble: #eef1f6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: linear-gradient(rgba(246,244,239,0.68), rgba(246,244,239,0.68)), url('https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=1600,fit=crop,saturation=1.6,contrast=1.2/A3Q7bo0gbPUjX8Jp/indg-mnl42lw8l9c7PJ0q.png') center/cover fixed; color: var(--ink); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 800; letter-spacing: -0.02em; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px clamp(20px, 5vw, 64px); background: var(--navy); color: #fff; position: sticky; top: 0; z-index: 500; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; text-decoration: none; color: #fff; }
+  .nav-brand-mark { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+  .nav-right { display: flex; align-items: center; gap: clamp(20px, 3vw, 32px); }
+  .nav-links { display: flex; align-items: center; gap: 24px; font-size: 14px; font-weight: 500; }
+  .nav-links a { text-decoration: none; color: rgba(255,255,255,0.82); transition: opacity 0.15s ease, background 0.15s ease; }
+  .nav-links a:hover { opacity: 0.75; }
+  .nav-links a.active { opacity: 1; color: #fff; border-bottom: 2px solid var(--in-orange); padding-bottom: 4px; }
+  .nav-links a.nav-link-primary { color: #fff; opacity: 1; font-weight: 700; padding: 7px 14px; border-radius: 999px; background: rgba(18,161,137,0.22); border: 1px solid rgba(18,161,137,0.5); }
+  .nav-links a.nav-link-primary:hover { background: rgba(18,161,137,0.32); opacity: 1; }
+  .nav-toggle { display: none; background: none; border: none; color: #fff; padding: 6px; cursor: pointer; flex-shrink: 0; }
+  .nav-toggle svg { display: block; width: 24px; height: 24px; }
+  .nav-mobile-panel { display: none; flex-direction: column; gap: 2px; background: #232f45; padding: 6px clamp(20px, 5vw, 64px) 20px; position: sticky; top: 61px; z-index: 499; }
+  .nav-mobile-panel.open { display: flex; }
+  .nav-mobile-panel a { color: rgba(255,255,255,0.9); text-decoration: none; font-size: 15.5px; font-weight: 500; padding: 13px 2px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .nav-mobile-panel a.active { color: var(--in-orange); }
+  @media (max-width: 1040px) {
+    .nav-right { display: none; }
+    .nav-toggle { display: block; }
+  }
+
+  /* No image of its own — the body's flag background (saturation/
+     contrast-boosted so it isn't the pale washed-out version) shows
+     through continuously instead of two crops creating a seam. */
+  .ctry-hero {
+    background: linear-gradient(100deg, rgba(253,241,231,0.55) 0%, rgba(253,251,246,0.3) 55%, rgba(253,251,246,0.15) 100%);
+    padding: clamp(56px, 9vw, 100px) clamp(20px, 5vw, 64px);
+    border-bottom: 1px solid var(--line);
+  }
+  .ctry-hero-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .ctry-flag { font-size: 46px; line-height: 1; }
+  .ctry-hero h1 { font-size: clamp(28px, 4vw, 40px); margin: 0 0 6px; color: var(--navy); }
+  .ctry-hero p { margin: 0; color: var(--muted); font-size: 15px; max-width: 560px; }
+  .ctry-badge { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--in-orange-deep); background: rgba(240,118,46,0.12); border: 1px solid rgba(240,118,46,0.3); padding: 5px 12px; border-radius: 999px; margin-bottom: 10px; }
+
+  .layout { max-width: 1100px; margin: 0 auto; padding: clamp(32px, 5vw, 56px) clamp(20px, 5vw, 64px); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 36px; align-items: start; }
+  @media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; margin-bottom: 28px; }
+  .card h2 { font-size: 20px; color: var(--navy); margin: 0 0 4px; }
+  .card .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 20px; }
+
+  table.price-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.price-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; padding: 0 10px 10px 0; border-bottom: 1px solid var(--line); }
+  table.price-table td { padding: 12px 10px 12px 0; border-bottom: 1px solid var(--line); }
+  table.price-table tr:last-child td { border-bottom: none; }
+  table.price-table td.price { font-weight: 700; color: var(--in-orange-deep); }
+
+  .note { background: var(--in-tint); border: 1px solid rgba(240,118,46,0.25); border-radius: 12px; padding: 14px 16px; font-size: 13.5px; color: var(--ink); margin-bottom: 12px; }
+  .note:last-child { margin-bottom: 0; }
+  .note strong { color: var(--in-orange-deep); }
+  .note.warn { background: #fdf6e9; border-color: rgba(212,160,23,0.3); }
+  .note.warn strong { color: #a3760f; }
+  .card-link { display: inline-block; font-size: 13.5px; font-weight: 700; color: var(--in-orange-deep); margin-top: 16px; text-decoration: none; }
+  .card-link:hover { text-decoration: underline; }
+
+  /* ---------- Shipping calendar: one card per cutoff date ----------
+     The last day to hand boxes over in Sydney, with when sea and air
+     shipments from it arrive. Dates come from the backend, managed by
+     staff in the console (Operations → Shipping calendar). */
+  .cut-list { display: flex; flex-direction: column; gap: 12px; }
+  .cut-card { display: grid; grid-template-columns: 74px 28px minmax(0, 1fr); align-items: center; gap: 8px; border: 1.5px solid var(--line); border-radius: 16px; padding: 16px 18px; background: #fff; }
+  .cut-card.next { border-color: #f0762e; background: #fff6ef; }
+  .cut-date .m { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .cut-date .d { display: block; font-size: 38px; font-weight: 800; line-height: 1; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .cut-date .w { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .cut-arrow { font-size: 22px; color: #c3c8cf; text-align: center; }
+  .cut-card.next .cut-arrow { color: #f0762e; }
+  .cut-tag { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 8px; padding: 3px 10px; border-radius: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: #f1efe9; color: var(--muted); }
+  .cut-card.next .cut-tag { background: #fde3d0; color: #c2570f; }
+  /* "+ Book" on each date: straight to My Transco's booking form, this country picked. */
+  .cut-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .cut-head .cut-tag { margin-bottom: 0; }
+  .cut-book { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 5px 12px; border-radius: 999px; background: var(--navy, #182233); color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; transition: transform 0.15s ease, background 0.15s ease; }
+  .cut-book:hover { transform: translateY(-1px); background: #2a3648; }
+  .cut-book:focus-visible { outline: 3px solid #f0762e; outline-offset: 2px; }
+  .cut-book .plus { font-size: 16px; line-height: 1; }
+  .cut-head .cut-tag { white-space: nowrap; }
+  @media (max-width: 420px) { .cut-head .cut-tag { padding: 3px 7px; font-size: 10.5px; letter-spacing: 0.03em; } .cut-book { padding: 4px 9px; font-size: 12px; } .cut-book .plus { font-size: 14px; } }
+  .cut-row { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 3px 0; }
+  .cut-row .ico { width: 20px; text-align: center; }
+  .cut-body { max-width: 330px; }
+  .cut-row .lbl { flex: 1; white-space: nowrap; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; font-size: 12.5px; }
+  .cut-row .when { white-space: nowrap; }
+  .cut-row.sea .lbl { color: #1f6fd1; }
+  .cut-row.air .lbl { color: #1f9d55; }
+  .cut-row .when { font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .cut-row .when.tbc { font-weight: 500; color: var(--muted); white-space: normal; text-align: right; font-size: 12.5px; line-height: 1.2; }
+  .cut-note { margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .cut-skel { height: 104px; border-radius: 16px; background: linear-gradient(90deg, #f1efe9, #f8f6f1, #f1efe9); background-size: 200% 100%; animation: cutShimmer 1.4s infinite; }
+  @keyframes cutShimmer { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .cut-skel { animation: none; } }
+  @media (max-width: 420px) { .cut-card { grid-template-columns: 58px 18px minmax(0, 1fr); padding: 14px 12px; gap: 6px; } .cut-date .d { font-size: 32px; } .cut-row .lbl { font-size: 11.5px; letter-spacing: 0.02em; } .cut-row { gap: 6px; font-size: 13.5px; } }
+  .sched-empty { border: 1px dashed #d6d2c8; border-radius: 12px; padding: 20px; text-align: center; font-size: 14px; color: var(--muted); }
+  .sched-empty b { display: block; color: var(--navy); font-size: 15px; margin-bottom: 4px; }
+  .sched-empty button { display: block; margin: 14px auto 0; }
+  .btn-soft { border: 1.5px solid var(--navy); background: #fff; color: var(--navy); font-family: inherit; font-size: 14px; font-weight: 700; padding: 9px 16px; border-radius: 999px; cursor: pointer; min-height: 42px; }
+  .btn-soft:hover { background: var(--navy); color: #fff; }
+
+  /* ---------- Box prices — rate tiles, "Best Value" on the tier that
+     is genuinely cheapest per kg at these rates ---------- */
+  .rate-label { font-size: 13.5px; font-weight: 700; color: var(--navy); margin: 0 0 12px; }
+  .rate-label span { font-weight: 500; color: var(--muted); }
+  .rate-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 22px; }
+  .rate-tiles:last-of-type { margin-bottom: 0; }
+  .rate-tile { position: relative; border: 1px solid var(--line); border-radius: 10px; padding: 14px 10px; text-align: center; }
+  .rate-tile.best { border-color: var(--in-orange); }
+  .rate-tile .badge { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #fff; background: var(--in-orange); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .rate-tile .qty { font-size: 12.5px; font-weight: 700; color: var(--navy); }
+  .rate-tile .weight { font-size: 11px; color: var(--muted); margin: 2px 0 8px; }
+  .rate-tile .price { font-size: 21px; font-weight: 800; color: var(--in-orange-deep); }
+
+  /* ---------- Compact chat sidebar ---------- */
+  .chat-side { position: sticky; top: 20px; background: var(--navy); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: 620px; }
+  .chat-side-head { padding: 16px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .chat-side-avatar { width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, #2c4059, #10141f); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .chat-side-head .t { font-weight: 700; font-size: 14.5px; color: #fff; }
+  .chat-side-head .s { font-size: 11.5px; color: rgba(255,255,255,0.6); }
+
+  /* Empty state for the compact chat. Nothing is sent until the visitor
+     asks something — the page's country travels with their first real
+     message instead (see PAGE_COUNTRY below). */
+  #cs-empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; background: #fbfaf7; }
+  #cs-empty-state p { margin: 0; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .cs-suggestions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .cs-suggestion { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; font-size: 12.5px; font-weight: 600; color: var(--navy); text-align: left; cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
+  .cs-suggestion:hover { border-color: var(--in-orange); transform: translateY(-1px); }
+  #cs-messages { flex: 1; overflow-y: auto; padding: 16px; display: none; flex-direction: column; gap: 8px; background: #fbfaf7; }
+  .cs-msg { max-width: 88%; padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .cs-msg-customer { align-self: flex-end; background: var(--navy); color: #fff; border-bottom-right-radius: 3px; }
+  .cs-msg-bot { align-self: flex-start; background: var(--bot-bubble); color: #222; border: 1px solid #dde3ea; border-bottom-left-radius: 3px; }
+  .cs-msg img { max-width: 100%; border-radius: 8px; margin-top: 6px; display: block; }
+  .cs-menu { align-self: flex-start; max-width: 94%; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cs-chip { background: #fff; color: var(--navy); border: 1.3px solid var(--navy); border-radius: 999px; padding: 7px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .cs-chip:hover { background: var(--navy); color: #fff; }
+  .cs-typing { align-self: flex-start; display: flex; gap: 4px; padding: 9px 12px; background: var(--bot-bubble); border-radius: 12px; border-bottom-left-radius: 3px; }
+  .cs-typing span { width: 5px; height: 5px; border-radius: 50%; background: #9aa5b1; animation: csB 1.2s infinite ease-in-out; }
+  .cs-typing span:nth-child(2) { animation-delay: .15s; } .cs-typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes csB { 0%,60%,100% { transform: translateY(0); opacity: .6; } 30% { transform: translateY(-3px); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .cs-typing span { animation: none; opacity: 0.8; } }
+
+  #cs-input-row { display: flex; gap: 6px; padding: 12px; border-top: 1px solid var(--line); background: #fff; }
+  #cs-input { flex: 1; border: 1px solid #d7dbd9; border-radius: 20px; padding: 9px 13px; font-size: 13px; outline: none; font-family: inherit; }
+  #cs-input:focus { border-color: var(--navy); }
+  #cs-send { background: var(--navy); color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 14px; flex-shrink: 0; }
+  #cs-send:disabled { opacity: .5; }
+
+  /* ---------- Phones: floating chat button instead of a chat box at
+     the bottom of the page. The same chat opens full-screen, with a
+     back button; desktop keeps the sticky sidebar. ---------- */
+  .chat-close, .chat-fab { display: none; }
+  .chat-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 40px; height: 40px; border-radius: 10px; font-size: 19px; cursor: pointer; flex-shrink: 0; }
+  .chat-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 900; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; background: var(--in-orange-deep); color: #fff; box-shadow: 0 10px 28px rgba(209,95,30,0.45); cursor: pointer; }
+  .chat-fab svg { width: 27px; height: 27px; }
+  @media (max-width: 880px) {
+    .chat-side { display: none; }
+    .chat-fab { display: inline-flex; }
+    body.chat-open { overflow: hidden; }
+    body.chat-open .chat-side { display: flex; position: fixed; inset: 0; z-index: 1000; height: 100vh; height: 100dvh; border-radius: 0; }
+    body.chat-open .chat-fab { display: none; }
+    .chat-close { display: block; }
+    .chat-side-head { padding-top: max(12px, env(safe-area-inset-top)); }
+    #cs-empty-state { justify-content: flex-start; padding-top: 28px; }
+    .cs-suggestion { font-size: 15px; padding: 14px; }
+    .cs-msg { font-size: 15px; }
+    #cs-input { font-size: 16px; padding: 11px 14px; }
+    #cs-send { width: 44px; height: 44px; }
+    #cs-input-row { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  }
+
+  /* ---------- Footer (same structure as index.html, for site-wide
+     consistency) ---------- */
+  .footer { background: var(--navy); color: rgba(255,255,255,0.72); }
+  .footer-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: clamp(40px, 6vw, 64px) clamp(20px, 5vw, 64px) 28px;
+    display: grid;
+    grid-template-columns: minmax(220px, 1.3fr) repeat(2, minmax(140px, 1fr));
+    gap: 32px;
+  }
+  @media (max-width: 640px) { .footer-inner { grid-template-columns: 1fr; } }
+  .footer-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px; color: #fff; margin-bottom: 10px; }
+  .footer-brand-mark { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+  .footer-tagline { font-size: 13px; line-height: 1.6; max-width: 260px; margin: 0 0 16px; }
+  .footer-routes { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85); }
+  .footer-col h4 { font-size: 12.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; margin: 0 0 14px; }
+  .footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .footer-col a { font-size: 13.5px; text-decoration: none; color: rgba(255,255,255,0.72); }
+  .footer-col a:hover { color: #fff; }
+  .footer-bottom {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px clamp(20px, 5vw, 64px) 28px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Floating chat button: the Transco Agent robot, face cropped into the
+     circle, on white with a coloured ring. Falls back to the chat icon. */
+  .fab-has-bot { background: #fff !important; border: 3px solid var(--fab-ring, #0c7d6b) !important; overflow: hidden; width: 64px !important; height: 64px !important; box-shadow: 0 8px 24px rgba(24,34,51,0.28), 0 0 0 4px rgba(255,255,255,0.85) !important; }
+  .fab-has-bot svg { display: none; }
+  .fab-bot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; transform: scale(1.16); transform-origin: 50% 50%; pointer-events: none; }
+</style>
+</head>
+<body>
+
+  <nav class="nav">
+    <a class="nav-brand" href="/">
+      <img class="nav-brand-mark" src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=64,fit=crop,f=png/A3Q7bo0gbPUjX8Jp/tr-lohfgo-FT4eaVMOTX6BeHh2.png" alt="Transco Cargo Sydney logo" />
+      Transco Cargo Sydney
+    </a>
+    <div class="nav-right">
+      <div class="nav-links">
+        <a href="/#agent" class="nav-link-primary">Chat with Transco Agent</a>
+        <a href="/sri-lanka.html">Sri Lanka</a>
+        <a href="/india.html" class="active">India</a>
+        <a href="/box-info.html">Box Info</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/account.html">My Transco</a>
+      </div>
+    </div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-mobile-panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path id="nav-toggle-icon" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </nav>
+  <div class="nav-mobile-panel" id="nav-mobile-panel">
+    <a href="/#agent">Chat with Transco Agent</a>
+    <a href="/sri-lanka.html">Sri Lanka</a>
+    <a href="/india.html" class="active">India</a>
+    <a href="/box-info.html">Box Info</a>
+    <a href="/about.html">About</a>
+    <a href="/contact.html">Contact</a>
+    <a href="/account.html">My Transco</a>
+  </div>
+
+  <header class="ctry-hero">
+    <div class="ctry-hero-inner">
+      <div class="ctry-flag">🇮🇳</div>
+      <div>
+        <div class="ctry-badge">India shipments</div>
+        <h1>Shipping to India</h1>
+        <p>Delivery to your home anywhere in India</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div>
+      <section class="card" aria-labelledby="sched-title">
+        <h2 id="sched-title">Shipping calendar</h2>
+        <p class="sub">Hand your boxes over in Sydney by the cutoff date. Arrival dates are estimates.</p>
+        <div id="sched-list" aria-live="polite"></div>
+      </section>
+
+      <section class="card" aria-labelledby="boxes-title">
+        <h2 id="boxes-title">Box prices</h2>
+        <p class="sub">Flat rate from Seven Hills — the same price for pickup or door delivery, anywhere in India.</p>
+
+        <p class="rate-label">General cargo box <span>· up to 30kg each</span></p>
+        <div class="rate-tiles">
+          <div class="rate-tile">
+            <div class="qty">1 Box</div>
+            <div class="weight">30kg</div>
+            <div class="price tabular">$400</div>
+          </div>
+          <div class="rate-tile">
+            <div class="qty">2 Boxes</div>
+            <div class="weight">60kg</div>
+            <div class="price tabular">$600</div>
+          </div>
+          <div class="rate-tile best">
+            <span class="badge">Best Value</span>
+            <div class="qty">3 Boxes</div>
+            <div class="weight">90kg</div>
+            <div class="price tabular">$800</div>
+          </div>
+        </div>
+
+        <p class="rate-label">Tea Chest or Quarter CBM <span>· up to 50kg each, same price</span></p>
+        <div class="rate-tiles">
+          <div class="rate-tile">
+            <div class="qty">1 Box</div>
+            <div class="weight">50kg</div>
+            <div class="price tabular">$600</div>
+          </div>
+          <div class="rate-tile">
+            <div class="qty">2 Boxes</div>
+            <div class="weight">100kg</div>
+            <div class="price tabular">$900</div>
+          </div>
+          <div class="rate-tile best">
+            <span class="badge">Best Value</span>
+            <div class="qty">3 Boxes</div>
+            <div class="weight">150kg</div>
+            <div class="price tabular">$1200</div>
+          </div>
+        </div>
+        <a class="card-link" href="/box-info.html">Compare box sizes →</a>
+      </section>
+
+      <div class="card">
+        <h2>Good to know</h2>
+        <p class="sub">India's setup is simpler than Sri Lanka's, on purpose — but a couple of things are worth being upfront about.</p>        <div class="note" data-i18n="in.flat">
+          <strong>One flat rate</strong> — door delivery costs the same as warehouse pickup, and price doesn't change by destination city within India (unlike Sri Lanka's zone system).
+        </div>
+        <div class="note warn" data-i18n="in.filling">
+          <strong>Still being filled in</strong> — India doesn't yet have a named destination-side warehouse or a duty-free allowance note the way Sri Lanka does. If you need either, Transco Agent will connect you directly with our team rather than guess.
+        </div>
+      </div>
+    </div>
+
+    <aside class="chat-side" id="chat-side" aria-label="Transco Agent chat">
+      <div class="chat-side-head">
+        <button type="button" class="chat-close" id="chat-close" aria-label="Close chat">←</button>
+        <div class="chat-side-avatar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 11.5C4 7.36 7.58 4 12 4s8 3.36 8 7.5-3.58 7.5-8 7.5c-1.06 0-2.07-.19-3-.55L4.5 20l1.02-3.86C4.55 14.9 4 13.26 4 11.5z" fill="#fff"/></svg>
+        </div>
+        <div>
+          <div class="t">Transco Agent</div>
+          <div class="s">Ask about India shipping</div>
+        </div>
+      </div>
+      <div id="cs-empty-state">
+        <p>Ask anything, or try:</p>
+        <div class="cs-suggestions">
+          <button class="cs-suggestion" onclick="quickAsk('I want a price quote')">🧮 Get a Price Quote</button>
+          <button class="cs-suggestion" onclick="quickAsk('How much for warehouse pickup?')">🏭 Seven Hills Pickup</button>
+          <button class="cs-suggestion" onclick="quickAsk('How much for door delivery?')">🚚 Door Delivery</button>
+          <button class="cs-suggestion" onclick="quickAsk('I&#39;d like to talk to a staff member')">👤 Talk to Our Team</button>
+        </div>
+      </div>
+      <div id="cs-messages"></div>
+      <div id="cs-input-row">
+        <input id="cs-input" type="text" placeholder="Type your question..." />
+        <button id="cs-send" aria-label="Send">➤</button>
+      </div>
+    </aside>
+  </main>
+
+  <button type="button" class="chat-fab fab-has-bot" style="--fab-ring: #d15f1e" id="chat-fab" aria-label="Chat with Transco Agent">
+    <img class="fab-bot" src="data:image/avif;base64,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" alt="" onerror="this.parentNode.classList.remove('fab-has-bot');this.remove();" />
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 11.5C4 7.36 7.58 4 12 4s8 3.36 8 7.5-3.58 7.5-8 7.5c-1.06 0-2.07-.19-3-.55L4.5 20l1.02-3.86C4.55 14.9 4 13.26 4 11.5z" fill="#fff"/></svg>
+  </button>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand">
+          <img class="footer-brand-mark" src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=64,fit=crop,f=png/A3Q7bo0gbPUjX8Jp/tr-lohfgo-FT4eaVMOTX6BeHh2.png" alt="Transco Cargo Sydney logo" />
+          Transco Cargo Sydney
+        </div>
+        <p class="footer-tagline">Fast, reliable, and secure cargo services from Australia to Sri Lanka and India. Your goods, our commitment.</p>
+        <div class="footer-routes">
+          <span>Sydney → Sri Lanka</span>
+          <span>Sydney → India</span>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="/#agent">Transco Agent</a></li>
+          <li><a href="/sri-lanka.html">Sri Lanka</a></li>
+          <li><a href="/india.html">India</a></li>
+          <li><a href="/box-info.html">Box Info</a></li>
+          <li><a href="/about.html">About</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="tel:0468382023">0468 382 023</a></li>
+          <li><a href="tel:0434842023">0434 842 023</a></li>
+          <li><a href="#" onclick="return false;">Unit 1, No 79 Station Road,<br>Seven Hills NSW 2147</a></li>
+          <li><a href="#" onclick="return false;">transcosydney.com.au</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">© 2026 Transco Cargo Sydney. All rights reserved.</div>
+  </footer>
+
+<script>
+(function () {
+  var API_ORIGIN = "https://transco-backend-production.up.railway.app";
+  // Local development only: served from localhost with the
+  // "transco_dev_api_origin" setting, talk to a local backend instead —
+  // so testing this page never creates visitors in the live console.
+  try {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem("transco_dev_api_origin")) {
+      API_ORIGIN = localStorage.getItem("transco_dev_api_origin");
+    }
+  } catch (e) {}
+  var WIDGET_API_URL = API_ORIGIN + "/api/web-chat";
+  var SESSION_STORAGE_KEY = "transco_agent_site_session_id";
+  // Sent with every message from this page, so the Agent knows the
+  // visitor is shipping to India without a fake "I'm shipping to
+  // India" message being posted into their chat on every visit.
+  var PAGE_COUNTRY = "india";
+
+  function getSessionId() {
+    try {
+      var existing = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (existing) return existing;
+      var fresh = "agentsite-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, fresh);
+      return fresh;
+    } catch (e) {
+      return "agentsite-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+    }
+  }
+  var sessionId = getSessionId();
+
+  var messagesEl = document.getElementById("cs-messages");
+  var input = document.getElementById("cs-input");
+  var sendBtn = document.getElementById("cs-send");
+
+  function renderMessageHtml(text) {
+    var escaped = String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return escaped.replace(/\*([^*\n]+?)\*/g, "<strong>$1</strong>");
+  }
+
+  function addMessage(text, kind, media, scrollToStart) {
+    var div = document.createElement("div");
+    div.className = "cs-msg cs-msg-" + kind;
+    div.innerHTML = renderMessageHtml(text);
+    if (media && media.flyerUrl) {
+      var img = document.createElement("img");
+      img.src = media.flyerUrl;
+      div.appendChild(img);
+    }
+    messagesEl.appendChild(div);
+    if (scrollToStart) {
+      var containerTop = messagesEl.getBoundingClientRect().top;
+      var msgTop = div.getBoundingClientRect().top;
+      messagesEl.scrollTop += (msgTop - containerTop) - 8;
+    } else {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    return div;
+  }
+
+  function addMenu(items) {
+    if (!items || !items.length) return;
+    var wrap = document.createElement("div");
+    wrap.className = "cs-menu";
+    items.forEach(function (item) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "cs-chip";
+      chip.textContent = item.title;
+      chip.addEventListener("click", function () {
+        sendPayload({ sessionId: sessionId, menuItemId: item.id }, item.title);
+      });
+      wrap.appendChild(chip);
+    });
+    messagesEl.appendChild(wrap);
+  }
+
+  function addTypingIndicator() {
+    var div = document.createElement("div");
+    div.className = "cs-typing";
+    div.innerHTML = "<span></span><span></span><span></span>";
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  var sending = false;
+  var emptyStateEl = document.getElementById("cs-empty-state");
+
+  function showChat() {
+    if (emptyStateEl) { emptyStateEl.style.display = "none"; }
+    messagesEl.style.display = "flex";
+  }
+
+  function sendPayload(payload, displayText) {
+    if (sending) return;
+    payload.country = PAGE_COUNTRY;
+    showChat();
+    addMessage(displayText, "customer");
+    sending = true;
+    sendBtn.disabled = true;
+    var typingEl = addTypingIndicator();
+
+    fetch(WIDGET_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        typingEl.remove();
+        if (data.error) { addMessage("Sorry, something went wrong. Please try again.", "bot"); return; }
+        if (data.handedOff) { addMessage(data.note || "A staff member will be with you shortly.", "bot"); return; }
+        addMessage(data.reply || "", "bot", data.media, true);
+        addMenu(data.menu && data.menu.items);
+      })
+      .catch(function () {
+        typingEl.remove();
+        addMessage("Sorry, I couldn't reach our server. Please check your connection.", "bot");
+      })
+      .finally(function () { sending = false; sendBtn.disabled = false; });
+  }
+
+  function sendMessage() {
+    var text = input.value.trim();
+    if (!text || sending) return;
+    input.value = "";
+    sendPayload({ sessionId: sessionId, message: text }, text);
+  }
+
+  // ---- Phones: the chat opens full-screen from the floating button ----
+  var phoneQuery = window.matchMedia("(max-width: 880px)");
+  var chatOpen = false;
+
+  function openChat(focus) {
+    if (!phoneQuery.matches) {
+      if (focus) input.focus();
+      return;
+    }
+    if (!chatOpen) {
+      chatOpen = true;
+      document.body.classList.add("chat-open");
+      // The phone's Back button closes the chat instead of leaving the page.
+      try { history.pushState({ csChat: true }, ""); } catch (e) {}
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (focus) setTimeout(function () { input.focus(); }, 60);
+  }
+
+  function closeChat(fromHistory) {
+    if (!chatOpen) return;
+    chatOpen = false;
+    document.body.classList.remove("chat-open");
+    if (!fromHistory && history.state && history.state.csChat) { try { history.back(); } catch (e) {} }
+  }
+
+  document.getElementById("chat-fab").addEventListener("click", function () { openChat(true); });
+  document.getElementById("chat-close").addEventListener("click", function () { closeChat(false); });
+  window.addEventListener("popstate", function () { if (chatOpen) closeChat(true); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && chatOpen) closeChat(false); });
+  // Rotating to a desktop-width layout mustn't leave the page locked.
+  if (phoneQuery.addEventListener) phoneQuery.addEventListener("change", function () { if (!phoneQuery.matches) closeChat(true); });
+
+  window.quickAsk = function (phrase) {
+    if (window.TranscoI18n) phrase = window.TranscoI18n.t(phrase);
+    openChat(false);
+    sendPayload({ sessionId: sessionId, message: phrase }, phrase);
+  };
+
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") sendMessage(); });
+})();
+</script>
+
+<script>
+// ============================================================
+// SHIPPING CALENDAR — dates are managed by staff in the console
+// (Operations → Shipping calendar) and loaded live from the backend.
+// ============================================================
+(function () {
+  var COUNTRY = "india";
+  var API_ORIGIN = "https://transco-backend-production.up.railway.app";
+  try {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem("transco_dev_api_origin")) {
+      API_ORIGIN = localStorage.getItem("transco_dev_api_origin");
+    }
+  } catch (e) {}
+  var listEl = document.getElementById("sched-list");
+  var dates = null;
+  var failed = false;
+
+  function T(s) { return window.TranscoI18n ? window.TranscoI18n.t(s) : s; }
+  function loc() { return window.TranscoI18n ? window.TranscoI18n.locale() : "en-AU"; }
+  function day(iso) { var p = String(iso).split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function askButton(label, phrase) {
+    var b = el("button", "btn-soft", label);
+    b.type = "button";
+    b.addEventListener("click", function () { if (window.quickAsk) window.quickAsk(phrase); });
+    return b;
+  }
+
+  function row(kind, icon, label, iso) {
+    var r = el("div", "cut-row " + kind);
+    r.appendChild(el("span", "ico", icon));
+    r.appendChild(el("span", "lbl", label));
+    r.appendChild(iso
+      ? el("span", "when", day(iso).toLocaleDateString(loc(), { month: "short", day: "numeric" }))
+      : el("span", "when tbc", "To be confirmed"));
+    return r;
+  }
+
+  function render() {
+    listEl.replaceChildren();
+    if (failed) {
+      var err = el("div", "sched-empty");
+      err.appendChild(el("b", null, "Couldn't load the dates right now"));
+      err.appendChild(el("span", null, "Ask us and we'll tell you the next hand-over date."));
+      err.appendChild(askButton("Ask for the next date", "What is your shipping schedule?"));
+      listEl.appendChild(err);
+      return;
+    }
+    if (!dates) {
+      for (var s = 0; s < 2; s++) listEl.appendChild(el("div", "cut-skel"));
+      return;
+    }
+    if (!dates.length) {
+      var empty = el("div", "sched-empty");
+      empty.appendChild(el("b", null, "Next dates are being confirmed"));
+      empty.appendChild(el("span", null, "Ask us and we'll tell you the next hand-over date."));
+      empty.appendChild(askButton("Ask for the next date", "What is your shipping schedule?"));
+      listEl.appendChild(empty);
+      return;
+    }
+    var list = el("div", "cut-list");
+    dates.forEach(function (d, i) {
+      var c = day(d.cutoff);
+      var card = el("div", "cut-card" + (i === 0 ? " next" : ""));
+      var dt = el("div", "cut-date");
+      dt.appendChild(el("span", "m", c.toLocaleDateString(loc(), { month: "short" })));
+      dt.appendChild(el("span", "d", String(c.getDate()).padStart(2, "0")));
+      dt.appendChild(el("span", "w", c.toLocaleDateString(loc(), { weekday: "short" })));
+      card.appendChild(dt);
+      card.appendChild(el("span", "cut-arrow", "→"));
+      var body = el("div", "cut-body");
+      var head = el("div", "cut-head");
+      head.appendChild(el("span", "cut-tag", i === 0 ? "Next cutoff" : "Upcoming"));
+      var book = el("a", "cut-book");
+      book.href = "/account.html#/book/" + COUNTRY;
+      book.setAttribute("aria-label", T("Book a drop-off for this shipment"));
+      book.appendChild(el("span", "plus", "+"));
+      book.appendChild(el("span", null, T("Book")));
+      head.appendChild(book);
+      body.appendChild(head);
+      body.appendChild(row("sea", "🚢", "Sea freight", d.seaArrival));
+      body.appendChild(row("air", "✈️", "Air freight", d.airArrival));
+      if (d.note) body.appendChild(el("div", "cut-note", d.note));
+      card.appendChild(body);
+      list.appendChild(card);
+    });
+    listEl.appendChild(list);
+  }
+
+  render();
+  fetch(API_ORIGIN + "/api/public/schedule?country=" + COUNTRY)
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (data) { dates = data.dates || []; render(); })
+    .catch(function () { failed = true; render(); });
+  // Month/day names follow the chosen language.
+  window.addEventListener("transco:lang", render);
+})();
+</script>
+
+<script>
+(function () {
+  var toggle = document.getElementById('nav-toggle');
+  var panel = document.getElementById('nav-mobile-panel');
+  var icon = document.getElementById('nav-toggle-icon');
+  if (!toggle || !panel) return;
+  var OPEN_D = "M6 6l12 12M6 18L18 6";
+  var CLOSED_D = "M4 6h16M4 12h16M4 18h16";
+  function setOpen(open) {
+    panel.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    if (icon) icon.setAttribute('d', open ? OPEN_D : CLOSED_D);
+  }
+  toggle.addEventListener('click', function () { setOpen(!panel.classList.contains('open')); });
+  panel.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', function () { setOpen(false); });
+  });
+})();
+</script>
+
+<script src="/i18n.js"></script>
+</body>
+</html>

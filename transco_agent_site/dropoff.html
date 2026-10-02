@@ -1,0 +1,1075 @@
+<!--
+  Transco Cargo Sydney — walk-in drop-off form (the QR code at the counter).
+
+  A customer who arrives without a booking fills the Shipping Declaration
+  here on their own phone, instead of the old outside form. It goes
+  straight into the CRM (POST /api/public/dropoff) where staff check the
+  boxes and finalise it; the customer gets their copy by email after that.
+
+  Their details are remembered ONLY on their own phone (localStorage), so
+  next time is one tap — nothing is looked up from the server by phone
+  number, so nobody can see someone else's details by typing their number.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Drop-off form — Transco Cargo Sydney</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #182233;
+    --ink: #1c2430;
+    --muted: #5f6873;
+    --line: #dedad1;
+    --cream: #f6f4ef;
+    --teal: #0c7d6b;
+    --teal-soft: #e6f6f1;
+    --red: #b42318;
+    --red-soft: #fdecea;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--cream); color: var(--ink); font-size: 16px; line-height: 1.45; }
+  header { background: var(--navy); color: #fff; padding: max(12px, env(safe-area-inset-top)) 16px 12px; position: sticky; top: 0; z-index: 10; }
+  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 560px; margin: 0 auto; }
+  .brand { font-weight: 800; font-size: 16px; letter-spacing: -0.01em; }
+  .brand small { display: block; font-weight: 500; font-size: 12px; color: rgba(255,255,255,0.7); }
+  .langs { display: flex; gap: 4px; background: rgba(255,255,255,0.1); border-radius: 10px; padding: 3px; }
+  .langs button { border: 0; background: transparent; color: rgba(255,255,255,0.8); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 9px; border-radius: 8px; cursor: pointer; }
+  .langs button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+  .progress { max-width: 560px; margin: 10px auto 0; display: flex; gap: 4px; }
+  .progress span { flex: 1; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.18); }
+  .progress span.on { background: #5fd3bd; }
+
+  main { max-width: 560px; margin: 0 auto; padding: 18px 16px calc(110px + env(safe-area-inset-bottom)); }
+  .step-label { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
+  h1 { font-size: 23px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; color: var(--navy); }
+  .lead { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+  h2 { font-size: 16px; margin: 22px 0 10px; color: var(--navy); }
+
+  .choices { display: grid; gap: 10px; }
+  .choices.two { grid-template-columns: 1fr 1fr; }
+  .choice { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; min-height: 58px; }
+  .choice .ic { font-size: 24px; line-height: 1; }
+  .choice small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+  .choice[aria-pressed="true"] { border-color: var(--teal); background: var(--teal-soft); }
+  .choice:focus-visible, .btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #5fd3bd; outline-offset: 2px; }
+
+  .box-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; }
+  .box-row .name { font-weight: 600; }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper button { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--cream); font-size: 22px; font-weight: 600; color: var(--navy); cursor: pointer; }
+  .stepper output { min-width: 28px; text-align: center; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .box-row.has { border-color: var(--teal); }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+  .field label .opt { font-weight: 400; color: var(--muted); }
+  .field input, .field textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
+  .field textarea { min-height: 76px; resize: vertical; }
+  .field .hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .field.bad input, .field.bad textarea { border-color: var(--red); background: #fffafa; }
+
+  .reuse { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--teal-soft); border: 1.5px solid #9ad8c9; color: var(--teal); border-radius: var(--radius); padding: 12px 14px; font: inherit; font-weight: 600; text-align: left; cursor: pointer; margin-bottom: 16px; }
+  .reuse small { display: block; font-weight: 400; color: var(--ink); }
+
+  .item { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px 12px; margin-bottom: 8px; }
+  .item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--muted); min-height: 24px; }
+  .item-top button { border: 0; background: none; color: var(--red); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 6px; }
+  .item input { width: 100%; font: inherit; font-size: 16px; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; }
+  /* New/Used, how many and value on one row — keeps a long list short. */
+  .item-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 8px; margin-top: 8px; align-items: end; }
+  .known { background: #fff; border: 1.5px solid #9ad8c9; border-radius: var(--radius); padding: 14px; margin-bottom: 16px; }
+  .known .row2 { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; margin: 10px 0; }
+  .known select, .known input { width: 100%; font: inherit; font-size: 16px; padding: 11px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+  .known .small-btn { width: 100%; border: 0; border-radius: 12px; padding: 12px; font: inherit; font-weight: 700; background: var(--navy); color: #fff; cursor: pointer; }
+  .known .small-btn[disabled] { opacity: 0.6; }
+  .known .msg { font-size: 14px; margin-top: 8px; color: var(--muted); }
+  .known .msg.bad { color: var(--red); font-weight: 600; }
+  .signed { background: var(--teal-soft); border: 1.5px solid #9ad8c9; color: var(--teal); border-radius: var(--radius); padding: 12px 14px; font-weight: 600; margin-bottom: 16px; }
+  .saved-list { display: grid; gap: 8px; margin-bottom: 16px; }
+  .item-grid label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
+  .seg { display: flex; gap: 4px; }
+  .seg button { flex: 1; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 4px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; min-width: 0; }
+  .seg button[aria-pressed="true"] { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+  .item.bad { border-color: var(--red); }
+  .add { width: 100%; border: 2px dashed #b9b4a8; background: transparent; border-radius: var(--radius); padding: 14px; font: inherit; font-weight: 700; color: var(--navy); cursor: pointer; }
+  .total { display: flex; justify-content: space-between; font-weight: 700; margin-top: 12px; padding: 0 4px; }
+
+  .note { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; margin-bottom: 14px; }
+  .note.info { background: var(--teal-soft); border-color: #9ad8c9; }
+  .check { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; font-size: 15px; }
+  .check input { width: 24px; height: 24px; margin: 1px 0 0; accent-color: var(--teal); flex-shrink: 0; }
+  .check.bad { border-color: var(--red); }
+
+  .sig-wrap { background: #fff; border: 1.5px dashed #b9b4a8; border-radius: var(--radius); position: relative; }
+  .sig-wrap canvas { display: block; width: 100%; height: 160px; touch-action: none; cursor: crosshair; }
+  .sig-wrap .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #a6a093; pointer-events: none; font-size: 15px; }
+  .sig-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .sig-actions button { border: 0; background: none; color: var(--navy); font: inherit; font-weight: 600; cursor: pointer; padding: 6px; }
+
+  .error { background: var(--red-soft); color: var(--red); border-radius: 12px; padding: 12px 14px; font-weight: 600; font-size: 14px; margin: 0 0 14px; }
+
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 10; }
+  .bar-inner { max-width: 560px; margin: 0 auto; display: flex; gap: 10px; }
+  .btn { flex: 1; border: 0; border-radius: 14px; padding: 15px; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; background: var(--teal); color: #fff; min-height: 54px; }
+  .btn.back { flex: 0 0 auto; background: var(--cream); color: var(--navy); border: 1px solid var(--line); padding: 15px 18px; }
+  .btn[disabled] { opacity: 0.6; cursor: default; }
+
+  .done { text-align: center; padding-top: 24px; }
+  .done .big { width: 76px; height: 76px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 40px; display: grid; place-items: center; margin: 0 auto 16px; }
+  .done .code { display: inline-block; font-size: 28px; font-weight: 800; letter-spacing: 0.01em; background: #fff; border: 2px solid var(--teal); border-radius: 14px; padding: 10px 20px; margin: 14px 0; font-variant-numeric: tabular-nums; }
+  .done .summary { text-align: left; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-top: 16px; font-size: 14px; }
+  .done .summary div { padding: 3px 0; display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
+  .done .summary b { color: var(--muted); font-weight: 600; }
+  [hidden] { display: none !important; }
+</style>
+<script src="/phone-format.js"></script>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <div class="brand">Transco Cargo Sydney<small data-t="Drop-off form">Drop-off form</small></div>
+    <div class="langs" role="group" aria-label="Language">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="si">සිං</button>
+      <button type="button" data-lang="ta">த</button>
+    </div>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</header>
+
+<main id="main" aria-live="polite"></main>
+
+<div class="bar" id="bar">
+  <div class="bar-inner">
+    <button type="button" class="btn back" id="back">←</button>
+    <button type="button" class="btn" id="next"></button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var API_ORIGIN = "https://transco-backend-production.up.railway.app";
+  try {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem("transco_dev_api_origin")) {
+      API_ORIGIN = localStorage.getItem("transco_dev_api_origin");
+    }
+  } catch (e) {}
+  var LANG_KEY = "transco_lang";
+  var LAST_KEY = "transco_dropoff_last";
+  var DRAFT_KEY = "transco_dropoff_draft";
+
+  // ---------- text (English / Sinhala / Tamil) ----------
+  // Box names, place names and the reference number stay in English,
+  // the same way the rest of the site writes them.
+  var T = {
+    si: {
+      "We'll check your boxes with you and give you your BL number.": "අපි ඔබත් එක්ක box බලලා ඔබේ BL අංකය දෙනවා.",
+      "List everything in your boxes — Customs needs it.": "Box වල තියෙන හැම දෙයක්ම ලියන්න — Customs වලට ඕන.",
+      "Signed in to My Transco — your saved details are filled in.": "My Transco වලට sign in වුණා — ඔබේ විස්තර පුරවලා තියෙනවා.",
+      "Use my saved details": "මගේ save කළ විස්තර පාවිච්චි කරන්න",
+      "Been here before?": "කලින් ඇවිත් තියෙනවද?",
+      "Fill in my details with a WhatsApp code": "WhatsApp code එකකින් මගේ විස්තර පුරවන්න",
+      "We'll send a code to your WhatsApp.": "අපි ඔබේ WhatsApp එකට code එකක් එවනවා.",
+      "6-digit code": "ඉලක්කම් 6ක code එක",
+      "Fill in my details": "මගේ විස්තර පුරවන්න",
+      "Send code": "Code එක එවන්න",
+      "Your saved receivers": "ඔබේ save කළ ලබන්නන්",
+      "Code sent — check your WhatsApp.": "Code එක එව්වා — ඔබේ WhatsApp බලන්න.",
+      "Couldn't send a code. Please fill the form in yourself.": "Code එකක් එවන්න බැරි වුණා. කරුණාකර පෝරමය ඔබම පුරවන්න.",
+      "That code didn't work. Please try again.": "ඒ code එක හරි ගියේ නෑ. ආයෙත් උත්සාහ කරන්න.",
+      "Air Freight safety check": "Air Freight ආරක්ෂක පරීක්ෂාව",
+      "Tick each line to confirm it is NOT in your boxes.": "ඔබේ box වල මේවා නැති බව තහවුරු කිරීමට හැම පේළියක්ම tick කරන්න.",
+      "No aerosol cans, sprays or perfumes": "Aerosol කෑන්, sprays හෝ සුවඳ විලවුන් නැත",
+      "No flammable items, explosives, magnets or hazardous items": "ගිනි ගන්නා බඩු, පුපුරණ ද්‍රව්‍ය, චුම්බක හෝ අනතුරුදායක බඩු නැත",
+      "No batteries, engines, fuel or oil of any type": "කිසිම වර්ගයක batteries, එන්ජින්, ඉන්ධන හෝ තෙල් නැත",
+      "No illicit drugs, pornography, weapons or firearms": "නීති විරෝධී මත්ද්‍රව්‍ය, අසභ්‍ය දේ, ආයුධ හෝ ගිනි අවි නැත",
+      "No precious jewellery, gold, precious stones, money, credit/bank cards or passports": "වටිනා ස්වර්ණාභරණ, රත්තරන්, මැණික්, මුදල්, credit/bank cards හෝ passports නැත",
+      "Any medications?": "බෙහෙත් තියෙනවද?",
+      "If yes, only personal medication with a prescription.": "ඔව් නම්, prescription එකක් සමඟ පුද්ගලික බෙහෙත් පමණයි.",
+      "Lithium batteries in any product?": "කිසියම් භාණ්ඩයක lithium batteries තියෙනවද?",
+      "For example a phone, laptop, camera or power bank.": "උදා: phone, laptop, camera හෝ power bank.",
+      "Any liquids?": "ද්‍රව තියෙනවද?",
+      "Type of product and quantity": "භාණ්ඩ වර්ගය සහ ප්‍රමාණය",
+      "Undeclared dangerous goods cost at least AUD 250 per item to remove, and airport security may also fine you.": "ප්‍රකාශ නොකළ අනතුරුදායක බඩු ඉවත් කිරීමට එක බඩුවකට අවම AUD 250ක් වැය වෙනවා, ගුවන්තොටුපොළ ආරක්ෂාවෙනුත් දඩ ගැසිය හැක.",
+      "Please tick each line to confirm it is not in your boxes.": "කරුණාකර හැම පේළියක්ම tick කරන්න.",
+      "Please answer each Air Freight question.": "කරුණාකර හැම Air Freight ප්‍රශ්නයකටම උත්තර දෙන්න.",
+      "Please write the type of product and quantity.": "කරුණාකර භාණ්ඩ වර්ගය සහ ප්‍රමාණය ලියන්න.",
+      "These can't go by Air Freight. Our staff will check them with you at drop-off (they may need to go by Sea Freight or be taken out):": "මේවා Air Freight වලින් යවන්න බෑ. Box දාන්න එද්දී අපේ staff ඔබත් එක්ක මේවා බලනවා (Sea Freight වලින් යවන්න හෝ ඉවත් කරන්න වෙන්න පුළුවන්):",
+      "Yes, my boxes may contain the items I didn't tick.": "ඔව්, මම tick නොකළ බඩු මගේ box වල තියෙන්න පුළුවන්.",
+      "Please tick the lines that are not in your boxes, or confirm the ones that may be.": "කරුණාකර box වල නැති පේළි tick කරන්න, නැත්නම් තියෙන්න පුළුවන් ඒවා තහවුරු කරන්න.",
+      "Aerosol cans, sprays or perfumes": "Aerosol කෑන්, sprays හෝ සුවඳ විලවුන්",
+      "Flammable items, explosives, magnets or hazardous items": "ගිනි ගන්නා බඩු, පුපුරණ ද්‍රව්‍ය, චුම්බක හෝ අනතුරුදායක බඩු",
+      "Batteries, engines, fuel or oil": "Batteries, එන්ජින්, ඉන්ධන හෝ තෙල්",
+      "Illicit drugs, pornography, weapons or firearms": "නීති විරෝධී මත්ද්‍රව්‍ය, අසභ්‍ය දේ, ආයුධ හෝ ගිනි අවි",
+      "Precious jewellery, gold, precious stones, money, cards or passports": "වටිනා ස්වර්ණාභරණ, රත්තරන්, මැණික්, මුදල්, cards හෝ passports",
+      "Drop-off form": "Drop-off පෝරමය",
+      "Step {n} of {m}": "පියවර {n} / {m}",
+      "Next": "ඊළඟ", "Send to Transco": "Transco වෙත යවන්න", "Sending…": "යවමින්…",
+      "Where are you sending?": "ඔබ යවන්නේ කොහෙටද?",
+      "Fill this while you wait — our staff will check your boxes with you.": "බලාගෙන ඉන්න අතරේ මෙය පුරවන්න — අපේ staff ඔබත් එක්ක box බලයි.",
+      "Sri Lanka": "ශ්‍රී ලංකාව", "India": "ඉන්දියාව",
+      "How is it going?": "යවන්නේ කොහොමද?",
+      "Sea Freight": "Sea Freight", "Air Freight": "Air Freight",
+      "Your boxes": "ඔබේ box", "Tap + for each box you brought today.": "අද ගෙනා හැම box එකටම + ඔබන්න.",
+      "At the destination": "ගමනාන්තයේදී",
+      "Pickup from our warehouse": "අපේ ගබඩාවෙන් ගන්නවා", "The receiver collects the boxes.": "Receiver box ගන්න එනවා.",
+      "Door delivery": "Door delivery", "Delivered to the receiver's address (extra charge).": "Receiver ගේ ලිපිනයටම (අමතර ගාස්තුවක්).",
+      "Sender — you": "යවන්නා — ඔබ", "As on your passport or NIC.": "ඔබේ passport හෝ NIC එකේ විදිහටම.",
+      "Use my details from last time": "කලින් දුන්න විස්තර පාවිච්චි කරන්න",
+      "Full name (as on passport / NIC)": "සම්පූර්ණ නම (passport / NIC එකේ විදිහට)",
+      "Passport or NIC number": "Passport හෝ NIC අංකය",
+      "Address": "ලිපිනය", "Mobile": "Mobile", "Home phone": "ගෙදර දුරකථනය", "optional": "අවශ්‍ය නම් පමණයි", "Email": "Email",
+      "Your copy is emailed here.": "ඔබේ පිටපත මෙතනට email කරනවා.",
+      "Receiver": "ලබන්නා", "Who the boxes are for.": "Box යවන්නේ කාටද.",
+      "Same receiver as last time": "කලින් වතාවේ ලබන්නාම",
+      "Town / city": "නගරය",
+      "What's inside?": "ඇතුළේ මොනවද?",
+      "List everything in your boxes — Customs needs it. Value is for customs only.": "Box වල තියෙන හැම දෙයක්ම ලියන්න — Customs වලට ඕන. වටිනාකම customs සඳහා පමණයි.",
+      "Item {n}": "අයිතමය {n}", "Remove": "ඉවත් කරන්න", "e.g. Chocolate": "උදා: Chocolate",
+      "New": "අලුත්", "Used": "පාවිච්චි කළ", "How many": "කීයද", "Value ($)": "වටිනාකම ($)",
+      "+ Add another item": "+ තවත් අයිතමයක්", "Total value": "මුළු වටිනාකම",
+      "Almost done": "තව ටිකයි",
+      "Do you want your goods insured?": "ඔබේ බඩු insure කරන්න ඕනද?",
+      "Yes": "ඔව්", "No": "නැහැ",
+      "For insurance, please contact Supun on 03 9357 7228 for more details.": "Insurance සඳහා වැඩි විස්තර Supun ගෙන් අහන්න: 03 9357 7228.",
+      "I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.": "ගිනි අවි, අනතුරුදායක බඩු, රසායන, තහනම් බඩු හෝ වාණිජ ප්‍රමාණයේ බඩු මේවායේ නැති බව මම ප්‍රකාශ කරමි.",
+      "Type your full name to sign": "අත්සන් කිරීමට ඔබේ සම්පූර්ණ නම ලියන්න",
+      "Signature": "අත්සන", "Sign here with your finger": "ඇඟිල්ලෙන් මෙතන අත්සන් කරන්න",
+      "Clear": "මකන්න", "You can also sign the printed form at the counter.": "Counter එකේදී print කළ පෝරමයේත් අත්සන් කරන්න පුළුවන්.",
+      "Thank you!": "ස්තූතියි!",
+      "Please show this screen to our staff.": "කරුණාකර මේ screen එක අපේ staff ට පෙන්වන්න.",
+      "We'll check your boxes with you, then email your copy with your BL number.": "අපි ඔබත් එක්ක box බලලා, ඔබේ BL අංකය සමඟ පිටපත email කරනවා.",
+      "Sending to": "යවන්නේ", "Boxes": "Box", "Receiver ": "ලබන්නා ",
+      "Fill another form": "තවත් පෝරමයක් පුරවන්න",
+      "Please choose where you are sending to.": "කරුණාකර යවන්නේ කොහෙටද කියලා තෝරන්න.",
+      "Please choose Sea or Air freight.": "කරුණාකර Sea හෝ Air තෝරන්න.",
+      "Please add at least one box.": "කරුණාකර අඩුම තරමේ box එකක් එකතු කරන්න.",
+      "Please choose pickup or door delivery.": "කරුණාකර pickup හෝ door delivery තෝරන්න.",
+      "Please fill in the boxes marked in red.": "කරුණාකර රතු පාටින් පෙන්වන කොටු පුරවන්න.",
+      "Please check the email address.": "කරුණාකර email ලිපිනය බලන්න.",
+      "Please check the mobile number.": "කරුණාකර mobile අංකය බලන්න.",
+      "Please describe each item, its number and value.": "කරුණාකර හැම අයිතමයකම විස්තරය, ගණන සහ වටිනාකම දාන්න.",
+      "Please answer the insurance question.": "කරුණාකර insurance ප්‍රශ්නයට උත්තර දෙන්න.",
+      "Please tick the declaration.": "කරුණාකර ප්‍රකාශය tick කරන්න.",
+      "Please type your full name to sign.": "කරුණාකර අත්සන් කිරීමට ඔබේ නම ලියන්න.",
+      "Couldn't send. Please check your internet and try again, or ask our staff.": "යවන්න බැරි වුණා. Internet බලලා ආයෙත් උත්සාහ කරන්න, නැත්නම් staff ගෙන් අහන්න."
+    },
+    ta: {
+      "We'll check your boxes with you and give you your BL number.": "உங்களுடன் பெட்டிகளைச் சரிபார்த்து உங்கள் BL எண்ணைத் தருவோம்.",
+      "List everything in your boxes — Customs needs it.": "பெட்டிகளில் உள்ள அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை.",
+      "Signed in to My Transco — your saved details are filled in.": "My Transco இல் உள்நுழைந்துள்ளீர்கள் — உங்கள் விவரங்கள் நிரப்பப்பட்டுள்ளன.",
+      "Use my saved details": "சேமித்த என் விவரங்களைப் பயன்படுத்து",
+      "Been here before?": "முன்பு வந்திருக்கிறீர்களா?",
+      "Fill in my details with a WhatsApp code": "WhatsApp code மூலம் என் விவரங்களை நிரப்பு",
+      "We'll send a code to your WhatsApp.": "உங்கள் WhatsApp க்கு ஒரு code அனுப்புவோம்.",
+      "6-digit code": "6 இலக்க code",
+      "Fill in my details": "என் விவரங்களை நிரப்பு",
+      "Send code": "Code அனுப்பு",
+      "Your saved receivers": "சேமித்த பெறுநர்கள்",
+      "Code sent — check your WhatsApp.": "Code அனுப்பப்பட்டது — உங்கள் WhatsApp ஐப் பாருங்கள்.",
+      "Couldn't send a code. Please fill the form in yourself.": "Code அனுப்ப முடியவில்லை. தயவுசெய்து படிவத்தை நீங்களே நிரப்புங்கள்.",
+      "That code didn't work. Please try again.": "அந்த code சரியில்லை. மீண்டும் முயலுங்கள்.",
+      "Air Freight safety check": "Air Freight பாதுகாப்பு சரிபார்ப்பு",
+      "Tick each line to confirm it is NOT in your boxes.": "இவை உங்கள் பெட்டிகளில் இல்லை என்பதை உறுதிப்படுத்த ஒவ்வொரு வரியையும் tick செய்யுங்கள்.",
+      "No aerosol cans, sprays or perfumes": "Aerosol கேன்கள், sprays அல்லது வாசனை திரவியங்கள் இல்லை",
+      "No flammable items, explosives, magnets or hazardous items": "தீப்பற்றக்கூடியவை, வெடிபொருட்கள், காந்தங்கள் அல்லது ஆபத்தான பொருட்கள் இல்லை",
+      "No batteries, engines, fuel or oil of any type": "எந்த வகை batteries, இயந்திரங்கள், எரிபொருள் அல்லது எண்ணெயும் இல்லை",
+      "No illicit drugs, pornography, weapons or firearms": "சட்டவிரோத போதைப்பொருள், ஆபாசப் பொருட்கள், ஆயுதங்கள் அல்லது துப்பாக்கிகள் இல்லை",
+      "No precious jewellery, gold, precious stones, money, credit/bank cards or passports": "விலையுயர்ந்த நகைகள், தங்கம், இரத்தினங்கள், பணம், credit/bank cards அல்லது passports இல்லை",
+      "Any medications?": "மருந்துகள் உள்ளனவா?",
+      "If yes, only personal medication with a prescription.": "ஆம் எனில், prescription உடன் சொந்த மருந்துகள் மட்டும்.",
+      "Lithium batteries in any product?": "ஏதேனும் பொருளில் lithium batteries உள்ளனவா?",
+      "For example a phone, laptop, camera or power bank.": "உதா: phone, laptop, camera அல்லது power bank.",
+      "Any liquids?": "திரவங்கள் உள்ளனவா?",
+      "Type of product and quantity": "பொருள் வகை மற்றும் அளவு",
+      "Undeclared dangerous goods cost at least AUD 250 per item to remove, and airport security may also fine you.": "அறிவிக்கப்படாத ஆபத்தான பொருட்களை அகற்ற ஒரு பொருளுக்கு குறைந்தது AUD 250 செலவாகும், விமான நிலைய பாதுகாப்பும் அபராதம் விதிக்கலாம்.",
+      "Please tick each line to confirm it is not in your boxes.": "தயவுசெய்து ஒவ்வொரு வரியையும் tick செய்யுங்கள்.",
+      "Please answer each Air Freight question.": "ஒவ்வொரு Air Freight கேள்விக்கும் பதிலளியுங்கள்.",
+      "Please write the type of product and quantity.": "பொருள் வகை மற்றும் அளவை எழுதுங்கள்.",
+      "These can't go by Air Freight. Our staff will check them with you at drop-off (they may need to go by Sea Freight or be taken out):": "இவை Air Freight இல் அனுப்ப முடியாது. பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff உங்களுடன் சரிபார்ப்பார்கள் (Sea Freight இல் அனுப்பவோ அகற்றவோ வேண்டியிருக்கலாம்):",
+      "Yes, my boxes may contain the items I didn't tick.": "ஆம், நான் tick செய்யாத பொருட்கள் என் பெட்டிகளில் இருக்கலாம்.",
+      "Please tick the lines that are not in your boxes, or confirm the ones that may be.": "பெட்டிகளில் இல்லாத வரிகளை tick செய்யுங்கள், அல்லது இருக்கக்கூடியவற்றை உறுதிப்படுத்துங்கள்.",
+      "Aerosol cans, sprays or perfumes": "Aerosol கேன்கள், sprays அல்லது வாசனை திரவியங்கள்",
+      "Flammable items, explosives, magnets or hazardous items": "தீப்பற்றக்கூடியவை, வெடிபொருட்கள், காந்தங்கள் அல்லது ஆபத்தான பொருட்கள்",
+      "Batteries, engines, fuel or oil": "Batteries, இயந்திரங்கள், எரிபொருள் அல்லது எண்ணெய்",
+      "Illicit drugs, pornography, weapons or firearms": "சட்டவிரோத போதைப்பொருள், ஆபாசப் பொருட்கள், ஆயுதங்கள் அல்லது துப்பாக்கிகள்",
+      "Precious jewellery, gold, precious stones, money, cards or passports": "விலையுயர்ந்த நகைகள், தங்கம், இரத்தினங்கள், பணம், cards அல்லது passports",
+      "Drop-off form": "Drop-off படிவம்",
+      "Step {n} of {m}": "படி {n} / {m}",
+      "Next": "அடுத்து", "Send to Transco": "Transco க்கு அனுப்பு", "Sending…": "அனுப்புகிறது…",
+      "Where are you sending?": "எங்கே அனுப்புகிறீர்கள்?",
+      "Fill this while you wait — our staff will check your boxes with you.": "காத்திருக்கும்போது இதை நிரப்புங்கள் — எங்கள் staff உங்களுடன் பெட்டிகளைச் சரிபார்ப்பார்கள்.",
+      "Sri Lanka": "இலங்கை", "India": "இந்தியா",
+      "How is it going?": "எப்படி அனுப்புகிறீர்கள்?",
+      "Sea Freight": "Sea Freight", "Air Freight": "Air Freight",
+      "Your boxes": "உங்கள் பெட்டிகள்", "Tap + for each box you brought today.": "இன்று கொண்டு வந்த ஒவ்வொரு பெட்டிக்கும் + அழுத்துங்கள்.",
+      "At the destination": "சேருமிடத்தில்",
+      "Pickup from our warehouse": "எங்கள் கிடங்கில் சேகரிப்பு", "The receiver collects the boxes.": "பெறுநர் பெட்டிகளைச் சேகரிப்பார்.",
+      "Door delivery": "Door delivery", "Delivered to the receiver's address (extra charge).": "பெறுநர் முகவரிக்கே விநியோகம் (கூடுதல் கட்டணம்).",
+      "Sender — you": "அனுப்புநர் — நீங்கள்", "As on your passport or NIC.": "உங்கள் passport அல்லது NIC இல் உள்ளபடி.",
+      "Use my details from last time": "கடந்த முறை விவரங்களைப் பயன்படுத்து",
+      "Full name (as on passport / NIC)": "முழுப் பெயர் (passport / NIC இல் உள்ளபடி)",
+      "Passport or NIC number": "Passport அல்லது NIC எண்",
+      "Address": "முகவரி", "Mobile": "Mobile", "Home phone": "வீட்டு தொலைபேசி", "optional": "விருப்பமானால்", "Email": "Email",
+      "Your copy is emailed here.": "உங்கள் நகல் இங்கே email செய்யப்படும்.",
+      "Receiver": "பெறுநர்", "Who the boxes are for.": "பெட்டிகள் யாருக்கு.",
+      "Same receiver as last time": "கடந்த முறை பெறுநரே",
+      "Town / city": "நகரம்",
+      "What's inside?": "உள்ளே என்ன இருக்கிறது?",
+      "List everything in your boxes — Customs needs it. Value is for customs only.": "பெட்டிகளில் உள்ள அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை. மதிப்பு customs க்கு மட்டுமே.",
+      "Item {n}": "பொருள் {n}", "Remove": "நீக்கு", "e.g. Chocolate": "உதா: Chocolate",
+      "New": "புதியது", "Used": "பயன்படுத்தியது", "How many": "எத்தனை", "Value ($)": "மதிப்பு ($)",
+      "+ Add another item": "+ இன்னொரு பொருள்", "Total value": "மொத்த மதிப்பு",
+      "Almost done": "கிட்டத்தட்ட முடிந்தது",
+      "Do you want your goods insured?": "உங்கள் பொருட்களுக்கு insurance வேண்டுமா?",
+      "Yes": "ஆம்", "No": "இல்லை",
+      "For insurance, please contact Supun on 03 9357 7228 for more details.": "Insurance பற்றிய மேலும் விவரங்களுக்கு Supun ஐ அழையுங்கள்: 03 9357 7228.",
+      "I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.": "துப்பாக்கிகள், ஆபத்தான பொருட்கள், இரசாயனங்கள், தடைசெய்யப்பட்ட பொருட்கள் அல்லது வணிக அளவிலான பொருட்கள் இவற்றில் இல்லை என்று நான் அறிவிக்கிறேன்.",
+      "Type your full name to sign": "கையொப்பமிட உங்கள் முழுப் பெயரை எழுதுங்கள்",
+      "Signature": "கையொப்பம்", "Sign here with your finger": "விரலால் இங்கே கையொப்பமிடுங்கள்",
+      "Clear": "அழி", "You can also sign the printed form at the counter.": "Counter இல் அச்சிட்ட படிவத்திலும் கையொப்பமிடலாம்.",
+      "Thank you!": "நன்றி!",
+      "Please show this screen to our staff.": "தயவுசெய்து இந்த திரையை எங்கள் staff இடம் காட்டுங்கள்.",
+      "We'll check your boxes with you, then email your copy with your BL number.": "உங்களுடன் பெட்டிகளைச் சரிபார்த்து, உங்கள் BL எண்ணுடன் நகலை email செய்வோம்.",
+      "Sending to": "அனுப்புவது", "Boxes": "பெட்டிகள்", "Receiver ": "பெறுநர் ",
+      "Fill another form": "இன்னொரு படிவம் நிரப்பு",
+      "Please choose where you are sending to.": "எங்கே அனுப்புகிறீர்கள் என்று தேர்ந்தெடுங்கள்.",
+      "Please choose Sea or Air freight.": "Sea அல்லது Air தேர்ந்தெடுங்கள்.",
+      "Please add at least one box.": "குறைந்தது ஒரு பெட்டியைச் சேர்க்கவும்.",
+      "Please choose pickup or door delivery.": "Pickup அல்லது door delivery தேர்ந்தெடுங்கள்.",
+      "Please fill in the boxes marked in red.": "சிவப்பில் காட்டப்பட்டவற்றை நிரப்புங்கள்.",
+      "Please check the email address.": "Email முகவரியைச் சரிபாருங்கள்.",
+      "Please check the mobile number.": "Mobile எண்ணைச் சரிபாருங்கள்.",
+      "Please describe each item, its number and value.": "ஒவ்வொரு பொருளின் விவரம், எண்ணிக்கை, மதிப்பை எழுதுங்கள்.",
+      "Please answer the insurance question.": "Insurance கேள்விக்கு பதிலளியுங்கள்.",
+      "Please tick the declaration.": "அறிவிப்பை tick செய்யுங்கள்.",
+      "Please type your full name to sign.": "கையொப்பமிட உங்கள் பெயரை எழுதுங்கள்.",
+      "Couldn't send. Please check your internet and try again, or ask our staff.": "அனுப்ப முடியவில்லை. Internet ஐச் சரிபார்த்து மீண்டும் முயலுங்கள், அல்லது staff இடம் கேளுங்கள்."
+    }
+  };
+
+  var lang = "en";
+  try { lang = localStorage.getItem(LANG_KEY) || "en"; } catch (e) {}
+  if (!T[lang] && lang !== "en") lang = "en";
+
+  function t(text, vars) {
+    var out = (T[lang] && T[lang][text]) || text;
+    if (vars) Object.keys(vars).forEach(function (k) { out = out.replace("{" + k + "}", vars[k]); });
+    return out;
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+  }
+  function store(key, value) {
+    try {
+      if (value === undefined) return JSON.parse(localStorage.getItem(key) || "null");
+      if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) { return null; }
+  }
+
+  // ---------- state ----------
+
+  var FALLBACK_OPTIONS = {
+    countries: [
+      { key: "sri_lanka", label: "Sri Lanka", services: [{ key: "sea", label: "Sea Freight" }, { key: "air", label: "Air Freight" }],
+        itemTypes: [{ key: "tea_chest", label: "Tea Chest" }, { key: "gift_box", label: "Gift Box" }, { key: "wine_box", label: "Wine Box" }, { key: "quarter_cbm", label: "Quarter CBM box" }, { key: "tv", label: "TV" }, { key: "other", label: "Other item" }] },
+      { key: "india", label: "India", services: [{ key: "sea", label: "Sea Freight" }],
+        itemTypes: [{ key: "general", label: "General cargo box" }, { key: "tea_chest", label: "Tea Chest" }, { key: "quarter_cbm", label: "Quarter CBM box" }, { key: "other", label: "Other item" }] }
+    ]
+  };
+  var options = FALLBACK_OPTIONS;
+
+  function emptyPerson() { return { fullName: "", idNumber: "", address: "", town: "", mobile: "", homePhone: "", email: "" }; }
+  function emptyItem() { return { description: "", condition: "", qty: "1", value: "" }; }
+  function fresh() {
+    return {
+      country: "", service: "", boxes: {}, deliveryType: "",
+      sender: emptyPerson(), receiver: emptyPerson(),
+      contents: [emptyItem()],
+      insurance: null, declarationAccepted: false, signedName: "",
+      dg: emptyDg()
+    };
+  }
+  // Air Freight: the Dangerous & Restricted Goods Checklist answers.
+  function emptyDg() { return { no: [false, false, false, false, false], ack: false, medications: null, lithium: null, lithiumDetails: "", liquids: null, liquidsDetails: "" }; }
+  // The same five lines as short item names, for the "may be in your boxes" notice.
+  var DG_ITEMS = [
+    "Aerosol cans, sprays or perfumes",
+    "Flammable items, explosives, magnets or hazardous items",
+    "Batteries, engines, fuel or oil",
+    "Illicit drugs, pornography, weapons or firearms",
+    "Precious jewellery, gold, precious stones, money, cards or passports"
+  ];
+  var DG_LINES = [
+    "No aerosol cans, sprays or perfumes",
+    "No flammable items, explosives, magnets or hazardous items",
+    "No batteries, engines, fuel or oil of any type",
+    "No illicit drugs, pornography, weapons or firearms",
+    "No precious jewellery, gold, precious stones, money, credit/bank cards or passports"
+  ];
+
+  var state = store(DRAFT_KEY) || fresh();
+  if (!state.dg) state.dg = emptyDg();
+  var step = 0;
+  var errorText = "";
+  var badFields = {};
+  var sending = false;
+  var result = null;
+  var signature = { drawn: false, canvas: null };
+  var last = store(LAST_KEY);
+
+  var STEPS = ["where", "boxes", "sender", "receiver", "contents", "finish"];
+
+  function country() {
+    for (var i = 0; i < options.countries.length; i++) if (options.countries[i].key === state.country) return options.countries[i];
+    return null;
+  }
+  function saveDraft() { store(DRAFT_KEY, state); }
+
+  // ---------- rendering ----------
+
+  var main = document.getElementById("main");
+  var nextBtn = document.getElementById("next");
+  var backBtn = document.getElementById("back");
+
+  function render() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-lang]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === lang)); });
+    document.querySelectorAll("[data-t]").forEach(function (el) { el.textContent = t(el.getAttribute("data-t")); });
+
+    var progress = document.getElementById("progress");
+    progress.innerHTML = result ? "" : STEPS.map(function (_, i) { return '<span class="' + (i <= step ? "on" : "") + '"></span>'; }).join("");
+
+    if (result) {
+      document.getElementById("bar").hidden = true;
+      main.innerHTML = renderDone();
+      bindDone();
+      return;
+    }
+    document.getElementById("bar").hidden = false;
+    backBtn.hidden = step === 0;
+    nextBtn.textContent = sending ? t("Sending…") : step === STEPS.length - 1 ? t("Send to Transco") : t("Next") + " →";
+    nextBtn.disabled = sending;
+
+    var html = '<p class="step-label">' + esc(t("Step {n} of {m}", { n: step + 1, m: STEPS.length })) + "</p>";
+    html += errorText ? '<p class="error" role="alert">' + esc(errorText) + "</p>" : "";
+    html += ({ where: renderWhere, boxes: renderBoxes, sender: renderSender, receiver: renderReceiver, contents: renderContents, finish: renderFinish })[STEPS[step]]();
+    main.innerHTML = html;
+    bind();
+  }
+
+  function choice(attrs, pressed, icon, title, sub) {
+    return '<button type="button" class="choice" ' + attrs + ' aria-pressed="' + pressed + '">' +
+      (icon ? '<span class="ic" aria-hidden="true">' + icon + "</span>" : "") +
+      "<span>" + esc(title) + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></button>";
+  }
+
+  function renderWhere() {
+    var c = country();
+    var html = "<h1>" + esc(t("Where are you sending?")) + '</h1><p class="lead">' + esc(t("Fill this while you wait — our staff will check your boxes with you.")) + "</p>";
+    html += '<div class="choices two">' + options.countries.map(function (o) {
+      return choice('data-country="' + o.key + '"', state.country === o.key, o.key === "india" ? "🇮🇳" : "🇱🇰", t(o.label));
+    }).join("") + "</div>";
+    if (c) {
+      html += "<h2>" + esc(t("How is it going?")) + '</h2><div class="choices two">' + c.services.map(function (s) {
+        return choice('data-service="' + s.key + '"', state.service === s.key, s.key === "air" ? "✈️" : "🚢", t(s.label));
+      }).join("") + "</div>";
+    }
+    return html;
+  }
+
+  function renderBoxes() {
+    var c = country();
+    var html = "<h1>" + esc(t("Your boxes")) + '</h1><p class="lead">' + esc(t("Tap + for each box you brought today.")) + "</p>";
+    html += c.itemTypes.map(function (it) {
+      var n = state.boxes[it.key] || 0;
+      return '<div class="box-row' + (n ? " has" : "") + '"><span class="name">' + esc(it.label) + "</span>" +
+        '<span class="stepper"><button type="button" data-box="' + it.key + '" data-d="-1" aria-label="Fewer ' + esc(it.label) + '">−</button>' +
+        "<output>" + n + '</output><button type="button" data-box="' + it.key + '" data-d="1" aria-label="More ' + esc(it.label) + '">+</button></span></div>';
+    }).join("");
+    html += "<h2>" + esc(t("At the destination")) + '</h2><div class="choices">' +
+      choice('data-delivery="collect"', state.deliveryType === "collect", "🏭", t("Pickup from our warehouse"), t("The receiver collects the boxes.")) +
+      choice('data-delivery="door"', state.deliveryType === "door", "🚚", t("Door delivery"), t("Delivered to the receiver's address (extra charge).")) +
+      "</div>";
+    return html;
+  }
+
+  function field(group, key, label, opts) {
+    opts = opts || {};
+    var value = group === "_sign" ? state.signedName : state[group][key];
+    var id = group + "-" + key;
+    var bad = badFields[group + "." + key];
+    var input = opts.multiline
+      ? '<textarea id="' + id + '" data-group="' + group + '" data-key="' + key + '" autocomplete="' + (opts.ac || "off") + '">' + esc(value) + "</textarea>"
+      : '<input id="' + id + '" data-group="' + group + '" data-key="' + key + '" value="' + esc(value) + '" type="' + (opts.type || "text") + '" inputmode="' + (opts.mode || "text") + '" autocomplete="' + (opts.ac || "off") + '"' + (opts.caps ? ' autocapitalize="characters"' : "") + " />";
+    return '<div class="field' + (bad ? " bad" : "") + '"><label for="' + id + '">' + esc(t(label)) + (opts.optional ? ' <span class="opt">(' + esc(t("optional")) + ")</span>" : "") + "</label>" + input +
+      (opts.hint ? '<div class="hint">' + esc(t(opts.hint)) + "</div>" : "") + "</div>";
+  }
+
+  // "Been here before?" — a WhatsApp code to their own number signs them
+  // in to My Transco on this phone and fills in their saved details.
+  function renderKnown() {
+    var saved = account.defaults && account.defaults.sender;
+    if (account.signedIn) {
+      var html = '<div class="signed">✓ ' + esc(t("Signed in to My Transco — your saved details are filled in.")) + "</div>";
+      if (saved && saved.fullName && saved.fullName !== state.sender.fullName) {
+        html += '<button type="button" class="reuse" id="use-saved"><span aria-hidden="true">↺</span><span>' + esc(t("Use my saved details")) + "<small>" + esc(saved.fullName) + "</small></span></button>";
+      }
+      return html;
+    }
+    if (!account.open) {
+      return '<button type="button" class="reuse" id="known-open"><span aria-hidden="true">👋</span><span>' + esc(t("Been here before?")) +
+        "<small>" + esc(t("Fill in my details with a WhatsApp code")) + "</small></span></button>";
+    }
+    var html2 = '<div class="known"><b>' + esc(t("Been here before?")) + "</b>" +
+      '<div class="msg" style="margin-top:4px">' + esc(t("We'll send a code to your WhatsApp.")) + "</div>" +
+      '<div class="row2"><select id="known-cc" aria-label="Country code">' +
+      ["61", "94", "91"].map(function (c) { return '<option value="' + c + '"' + (account.cc === c ? " selected" : "") + ">+" + c + "</option>"; }).join("") +
+      '</select><input id="known-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="04XX XXX XXX" value="' + esc(account.phone) + '" aria-label="' + esc(t("Mobile")) + '" /></div>';
+    if (account.sent) {
+      html2 += '<input id="known-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="' + esc(t("6-digit code")) + '" value="' + esc(account.code) + '" aria-label="' + esc(t("6-digit code")) + '" style="margin-bottom:10px" />' +
+        '<button type="button" class="small-btn" id="known-verify"' + (account.busy ? " disabled" : "") + ">" + esc(t("Fill in my details")) + "</button>";
+    } else {
+      html2 += '<button type="button" class="small-btn" id="known-send"' + (account.busy ? " disabled" : "") + ">" + esc(t("Send code")) + "</button>";
+    }
+    if (account.msg) html2 += '<div class="msg' + (account.msgBad ? " bad" : "") + '">' + esc(account.msg) + "</div>";
+    return html2 + "</div>";
+  }
+
+  function renderSender() {
+    var html = "<h1>" + esc(t("Sender — you")) + '</h1><p class="lead">' + esc(t("As on your passport or NIC.")) + "</p>";
+    html += renderKnown();
+    if (!account.signedIn && last && last.sender && last.sender.fullName && last.sender.fullName !== state.sender.fullName) {
+      html += '<button type="button" class="reuse" id="reuse-sender"><span aria-hidden="true">↺</span><span>' + esc(t("Use my details from last time")) + "<small>" + esc(last.sender.fullName) + "</small></span></button>";
+    }
+    html += field("sender", "fullName", "Full name (as on passport / NIC)", { ac: "name" });
+    html += field("sender", "idNumber", "Passport or NIC number", { caps: true, optional: state.country !== "sri_lanka" });
+    html += field("sender", "address", "Address", { multiline: true, ac: "street-address" });
+    html += field("sender", "mobile", "Mobile", { type: "tel", mode: "tel", ac: "tel" });
+    html += field("sender", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
+    html += field("sender", "email", "Email", { type: "email", mode: "email", ac: "email" });
+    return html;
+  }
+
+  function savedReceivers() {
+    var list = (account.defaults && account.defaults.receivers) || [];
+    return list.filter(function (r) { return !r.country || r.country === state.country; }).slice(0, 6);
+  }
+
+  function renderReceiver() {
+    var html = "<h1>" + esc(t("Receiver")) + '</h1><p class="lead">' + esc(t("Who the boxes are for.")) + "</p>";
+    var saved = savedReceivers();
+    if (saved.length) {
+      html += '<div class="saved-list" role="group" aria-label="' + esc(t("Your saved receivers")) + '"><b style="font-size:14px">' + esc(t("Your saved receivers")) + "</b>" +
+        saved.map(function (r, i) {
+          return choice('data-saved-receiver="' + i + '"', state.receiver.fullName === r.fullName && state.receiver.town === r.town, "", r.fullName, [r.town, r.address].filter(Boolean).join(" · "));
+        }).join("") + "</div>";
+    } else if (last && last.receiver && last.receiver.fullName && last.country === state.country && last.receiver.fullName !== state.receiver.fullName) {
+      html += '<button type="button" class="reuse" id="reuse-receiver"><span aria-hidden="true">↺</span><span>' + esc(t("Same receiver as last time")) + "<small>" + esc(last.receiver.fullName + (last.receiver.town ? ", " + last.receiver.town : "")) + "</small></span></button>";
+    }
+    html += field("receiver", "fullName", "Full name (as on passport / NIC)");
+    html += field("receiver", "idNumber", "Passport or NIC number", { caps: true });
+    html += field("receiver", "address", "Address", { multiline: true });
+    html += field("receiver", "town", "Town / city");
+    html += field("receiver", "mobile", "Mobile", { type: "tel", mode: "tel" });
+    html += field("receiver", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
+    html += field("receiver", "email", "Email", { type: "email", mode: "email" });
+    return html;
+  }
+
+  function renderContents() {
+    var html = "<h1>" + esc(t("What's inside?")) + '</h1><p class="lead">' + esc(t("List everything in your boxes — Customs needs it.")) + "</p>";
+    html += state.contents.map(function (c, i) {
+      var bad = badFields["contents." + i];
+      return '<div class="item' + (bad ? " bad" : "") + '"><div class="item-top"><span>' + esc(t("Item {n}", { n: i + 1 })) + "</span>" +
+        (state.contents.length > 1 ? '<button type="button" data-remove="' + i + '">' + esc(t("Remove")) + "</button>" : "") + "</div>" +
+        '<input data-item="' + i + '" data-k="description" value="' + esc(c.description) + '" placeholder="' + esc(t("e.g. Chocolate")) + '" aria-label="' + esc(t("Item {n}", { n: i + 1 })) + '" />' +
+        '<div class="item-grid"><div class="seg" role="group" aria-label="' + esc(t("New")) + " / " + esc(t("Used")) + '"><button type="button" data-item="' + i + '" data-cond="new" aria-pressed="' + (c.condition === "new") + '">' + esc(t("New")) + "</button>" +
+        '<button type="button" data-item="' + i + '" data-cond="used" aria-pressed="' + (c.condition === "used") + '">' + esc(t("Used")) + "</button></div>" +
+        '<div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(c.qty) + '" inputmode="numeric" /></div></div></div>';
+    }).join("");
+    html += '<button type="button" class="add" id="add-item">' + esc(t("+ Add another item")) + "</button>";
+    return html;
+  }
+
+  function renderDg() {
+    var dg = state.dg;
+    var html = "<h2>✈️ " + esc(t("Air Freight safety check")) + '</h2><p class="lead" style="margin-bottom:10px">' + esc(t("Tick each line to confirm it is NOT in your boxes.")) + "</p>";
+    DG_LINES.forEach(function (line, i) {
+      html += '<label class="check' + (badFields["dg.no"] && !dg.no[i] ? " bad" : "") + '" style="margin-bottom:8px"><input type="checkbox" data-dgno="' + i + '"' + (dg.no[i] ? " checked" : "") + " /><span>" + esc(t(line)) + "</span></label>";
+    });
+    // A line left unticked means it may be in their boxes. That's allowed —
+    // it's flagged for staff — but they confirm it on purpose here.
+    var missing = DG_ITEMS.filter(function (_, i) { return !dg.no[i]; });
+    if (missing.length) {
+      html += '<div class="note" style="margin-top:6px;border-color:#f3c3bd;background:#fff6f5"><b>' +
+        esc(t("These can't go by Air Freight. Our staff will check them with you at drop-off (they may need to go by Sea Freight or be taken out):")) +
+        '</b><ul style="margin:6px 0 0;padding-left:18px">' + missing.map(function (m) { return "<li>" + esc(t(m)) + "</li>"; }).join("") + "</ul></div>" +
+        '<label class="check' + (badFields["dg.ack"] ? " bad" : "") + '" style="margin-top:8px"><input type="checkbox" id="dg-ack"' + (dg.ack ? " checked" : "") + " /><span>" +
+        esc(t("Yes, my boxes may contain the items I didn't tick.")) + "</span></label>";
+    }
+    function question(key, label, hint, withDetails) {
+      var out = '<h2 style="font-size:15px;margin:18px 0 8px">' + esc(t(label)) + "</h2>" + (hint ? '<p class="lead" style="margin:-4px 0 8px;font-size:14px">' + esc(t(hint)) + "</p>" : "") +
+        '<div class="choices two">' + choice('data-dgq="' + key + '" data-v="no"', dg[key] === false, "", t("No")) + choice('data-dgq="' + key + '" data-v="yes"', dg[key] === true, "", t("Yes")) + "</div>";
+      if (withDetails && dg[key] === true) {
+        out += '<div class="field' + (badFields["dg." + key + "Details"] ? " bad" : "") + '" style="margin-top:10px"><label for="dg-' + key + '">' + esc(t("Type of product and quantity")) + '</label><input id="dg-' + key + '" data-dgd="' + key + '" value="' + esc(dg[key + "Details"]) + '" /></div>';
+      }
+      return out;
+    }
+    html += question("medications", "Any medications?", "If yes, only personal medication with a prescription.", false);
+    html += question("lithium", "Lithium batteries in any product?", "For example a phone, laptop, camera or power bank.", true);
+    html += question("liquids", "Any liquids?", null, true);
+    html += '<div class="note" style="margin-top:14px;border-color:#f3c3bd;background:#fff6f5">⚠️ ' + esc(t("Undeclared dangerous goods cost at least AUD 250 per item to remove, and airport security may also fine you.")) + "</div>";
+    return html;
+  }
+
+  function renderFinish() {
+    var html = "<h1>" + esc(t("Almost done")) + "</h1>";
+    if (state.service === "air") html += renderDg() + '<div style="height:10px"></div>';
+    html += "<h2>" + esc(t("Do you want your goods insured?")) + '</h2><div class="choices two">' +
+      choice('data-ins="yes"', state.insurance === true, "", t("Yes")) + choice('data-ins="no"', state.insurance === false, "", t("No")) + "</div>";
+    if (state.insurance === true) html += '<div class="note info" style="margin-top:10px">🛡️ ' + esc(t("For insurance, please contact Supun on 03 9357 7228 for more details.")) + "</div>";
+    html += '<div style="height:22px"></div>';
+    html += '<label class="check' + (badFields.declarationAccepted ? " bad" : "") + '"><input type="checkbox" id="declare"' + (state.declarationAccepted ? " checked" : "") + " /><span>" +
+      esc(t("I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.")) + "</span></label>";
+    html += '<div style="margin-top:18px">' + field("_sign", "signedName", "Type your full name to sign") + "</div>";
+    html += '<div class="field"><label>' + esc(t("Signature")) + ' <span class="opt">(' + esc(t("optional")) + ')</span></label><div class="sig-wrap"><canvas id="sig"></canvas><div class="ph" id="sig-ph">' + esc(t("Sign here with your finger")) + "</div></div>" +
+      '<div class="sig-actions"><span>' + esc(t("You can also sign the printed form at the counter.")) + '</span><button type="button" id="sig-clear">' + esc(t("Clear")) + "</button></div></div>";
+    return html;
+  }
+
+  function renderDone() {
+    var c = country();
+    var boxes = c ? c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) { return state.boxes[it.key] + " × " + it.label; }).join(", ") : "";
+    return '<div class="done"><div class="big" aria-hidden="true">✓</div><h1>' + esc(t("Thank you!")) + "</h1>" +
+      '<p class="lead" style="font-size:17px;color:var(--ink);font-weight:600">' + esc(t("Please show this screen to our staff.")) + "</p>" +
+      '<div class="code">' + esc(result.bookingCode) + "</div>" +
+      '<p class="lead">' + esc(t("We'll check your boxes with you and give you your BL number.")) + "</p>" +
+      '<div class="summary"><div><b>' + esc(t("Sending to")) + "</b> " + esc(c ? t(c.label) : "") + "</div><div><b>" + esc(t("Boxes")) + "</b> " + esc(boxes) + "</div><div><b>" + esc(t("Receiver ")) + "</b> " + esc(state.receiver.fullName) + "</div></div>" +
+      '<button type="button" class="btn back" id="again" style="width:100%;margin-top:22px">' + esc(t("Fill another form")) + "</button></div>";
+  }
+
+  // ---------- events ----------
+
+  function bind() {
+    main.querySelectorAll("[data-country]").forEach(function (b) {
+      b.onclick = function () {
+        var key = b.getAttribute("data-country");
+        if (state.country !== key) { state.country = key; state.service = ""; state.boxes = {}; }
+        var c = country();
+        if (c && c.services.length === 1) state.service = c.services[0].key;
+        errorText = ""; saveDraft(); render();
+      };
+    });
+    main.querySelectorAll("[data-service]").forEach(function (b) {
+      b.onclick = function () { state.service = b.getAttribute("data-service"); errorText = ""; saveDraft(); render(); };
+    });
+    main.querySelectorAll("[data-box]").forEach(function (b) {
+      b.onclick = function () {
+        var k = b.getAttribute("data-box");
+        var n = Math.max(0, Math.min(30, (state.boxes[k] || 0) + Number(b.getAttribute("data-d"))));
+        if (n) state.boxes[k] = n; else delete state.boxes[k];
+        errorText = ""; saveDraft(); render();
+      };
+    });
+    main.querySelectorAll("[data-delivery]").forEach(function (b) {
+      b.onclick = function () { state.deliveryType = b.getAttribute("data-delivery"); errorText = ""; saveDraft(); render(); };
+    });
+    main.querySelectorAll("[data-group]").forEach(function (input) {
+      input.oninput = function () {
+        var g = input.getAttribute("data-group"), k = input.getAttribute("data-key");
+        if (g === "_sign") state.signedName = input.value; else state[g][k] = input.value;
+        if (badFields[g + "." + k]) { delete badFields[g + "." + k]; input.parentNode.classList.remove("bad"); }
+        saveDraft();
+      };
+    });
+    var signInput = main.querySelector('[data-group="_sign"]');
+    if (signInput) {
+      signInput.value = state.signedName || "";
+      if (!state.signedName && state.sender.fullName) { signInput.value = state.sender.fullName; state.signedName = state.sender.fullName; }
+    }
+    var rs = document.getElementById("reuse-sender");
+    if (rs) rs.onclick = function () { state.sender = Object.assign(emptyPerson(), last.sender); saveDraft(); render(); };
+    var rr = document.getElementById("reuse-receiver");
+    if (rr) rr.onclick = function () { state.receiver = Object.assign(emptyPerson(), last.receiver); saveDraft(); render(); };
+
+    // Saved details (signed in to My Transco).
+    var us = document.getElementById("use-saved");
+    if (us) us.onclick = function () { applySaved(true); render(); };
+    main.querySelectorAll("[data-saved-receiver]").forEach(function (b) {
+      b.onclick = function () {
+        var r = savedReceivers()[Number(b.getAttribute("data-saved-receiver"))];
+        if (r) { state.receiver = Object.assign(emptyPerson(), pick(r)); badFields = {}; saveDraft(); render(); }
+      };
+    });
+    // "Been here before?" — WhatsApp code.
+    var ko = document.getElementById("known-open");
+    if (ko) ko.onclick = function () {
+      account.open = true;
+      if (!account.phone && state.sender.mobile) account.phone = state.sender.mobile;
+      render();
+      var p = document.getElementById("known-phone"); if (p) p.focus();
+    };
+    var kc = document.getElementById("known-cc");
+    if (kc) kc.onchange = function () { account.cc = kc.value; };
+    var kp = document.getElementById("known-phone");
+    if (kp) kp.oninput = function () { account.phone = kp.value; };
+    var kcode = document.getElementById("known-code");
+    if (kcode) kcode.oninput = function () { account.code = kcode.value; };
+    var ks = document.getElementById("known-send");
+    if (ks) ks.onclick = requestCode;
+    var kv = document.getElementById("known-verify");
+    if (kv) kv.onclick = verifyCode;
+
+    main.querySelectorAll("input[data-item]").forEach(function (input) {
+      input.oninput = function () {
+        state.contents[Number(input.getAttribute("data-item"))][input.getAttribute("data-k")] = input.value;
+        var total = document.getElementById("total");
+        if (total) total.textContent = "$" + (Math.round(totalValue() * 100) / 100);
+        saveDraft();
+      };
+    });
+    main.querySelectorAll("button[data-cond]").forEach(function (b) {
+      b.onclick = function () { state.contents[Number(b.getAttribute("data-item"))].condition = b.getAttribute("data-cond"); saveDraft(); render(); };
+    });
+    main.querySelectorAll("[data-remove]").forEach(function (b) {
+      b.onclick = function () { state.contents.splice(Number(b.getAttribute("data-remove")), 1); badFields = {}; saveDraft(); render(); };
+    });
+    var add = document.getElementById("add-item");
+    if (add) add.onclick = function () {
+      state.contents.push(emptyItem()); saveDraft(); render();
+      var inputs = main.querySelectorAll('input[data-k="description"]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    };
+    main.querySelectorAll("[data-ins]").forEach(function (b) {
+      b.onclick = function () { state.insurance = b.getAttribute("data-ins") === "yes"; errorText = ""; saveDraft(); render(); };
+    });
+    main.querySelectorAll("[data-dgno]").forEach(function (box) {
+      box.onchange = function () { state.dg.no[Number(box.getAttribute("data-dgno"))] = box.checked; saveDraft(); render(); };
+    });
+    var ack = document.getElementById("dg-ack");
+    if (ack) ack.onchange = function () { state.dg.ack = ack.checked; delete badFields["dg.ack"]; ack.parentNode.classList.remove("bad"); saveDraft(); };
+    main.querySelectorAll("[data-dgq]").forEach(function (b) {
+      b.onclick = function () {
+        var key = b.getAttribute("data-dgq");
+        state.dg[key] = b.getAttribute("data-v") === "yes";
+        errorText = ""; saveDraft(); render();
+        var d = document.getElementById("dg-" + key); if (d && state.dg[key]) d.focus();
+      };
+    });
+    main.querySelectorAll("[data-dgd]").forEach(function (input) {
+      input.oninput = function () { state.dg[input.getAttribute("data-dgd") + "Details"] = input.value; input.parentNode.classList.remove("bad"); saveDraft(); };
+    });
+    var declare = document.getElementById("declare");
+    if (declare) declare.onchange = function () { state.declarationAccepted = declare.checked; delete badFields.declarationAccepted; declare.parentNode.classList.remove("bad"); saveDraft(); };
+    var sig = document.getElementById("sig");
+    if (sig) setupSignature(sig);
+  }
+
+  function bindDone() {
+    document.getElementById("again").onclick = function () {
+      result = null; state = fresh(); step = 0; signature.drawn = false; store(DRAFT_KEY, null); render(); window.scrollTo(0, 0);
+    };
+  }
+
+  document.querySelectorAll("[data-lang]").forEach(function (b) {
+    b.onclick = function () { lang = b.getAttribute("data-lang"); try { localStorage.setItem(LANG_KEY, lang); } catch (e) {} render(); };
+  });
+
+  // ---------- returning customers (My Transco sign-in) ----------
+
+  var TOKEN_KEY = "transco_customer_token";
+  var account = { signedIn: false, defaults: null, open: false, cc: "61", phone: "", code: "", sent: false, busy: false, msg: "", msgBad: false };
+
+  function pick(p) {
+    var out = {};
+    ["fullName", "idNumber", "address", "town", "mobile", "homePhone", "email"].forEach(function (k) { if (p && p[k]) out[k] = p[k]; });
+    return out;
+  }
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
+
+  // Fills the sender from the saved details — only into an empty form,
+  // unless the customer asked for it (force).
+  function applySaved(force) {
+    var s = account.defaults && account.defaults.sender;
+    if (!s || !s.fullName) return;
+    if (force || (!state.sender.fullName && !state.sender.mobile)) {
+      state.sender = Object.assign(emptyPerson(), pick(s));
+      badFields = {};
+      saveDraft();
+    }
+  }
+
+  function loadSaved(force) {
+    var tk = getToken();
+    if (!tk) return Promise.resolve(false);
+    return fetch(API_ORIGIN + "/api/portal/booking-options", { headers: { Authorization: "Bearer " + tk } })
+      .then(function (r) {
+        if (r.status === 401) { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then(function (d) {
+        if (!d || !d.declaration) return false;
+        account.signedIn = true;
+        account.defaults = d.declaration;
+        applySaved(force);
+        render();
+        return true;
+      })
+      .catch(function () { return false; });
+  }
+
+  function postJson(path, body) {
+    return fetch(API_ORIGIN + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; }); });
+  }
+
+  function requestCode() {
+    if (account.busy) return;
+    account.busy = true; account.msg = ""; render();
+    postJson("/api/portal/auth/request-code", { countryCode: account.cc, phone: account.phone })
+      .then(function (r) {
+        account.busy = false;
+        if (r.ok) { account.sent = true; account.msg = t("Code sent — check your WhatsApp."); account.msgBad = false; }
+        else { account.msg = (r.data && r.data.error) || t("Couldn't send a code. Please fill the form in yourself."); account.msgBad = true; }
+        render();
+        var c = document.getElementById("known-code"); if (c) c.focus();
+      })
+      .catch(function () { account.busy = false; account.msg = t("Couldn't send a code. Please fill the form in yourself."); account.msgBad = true; render(); });
+  }
+
+  function verifyCode() {
+    if (account.busy) return;
+    account.busy = true; account.msg = ""; render();
+    postJson("/api/portal/auth/verify-code", { countryCode: account.cc, phone: account.phone, code: account.code, source: "warehouse_qr" })
+      .then(function (r) {
+        if (!r.ok || !r.data.token) {
+          account.busy = false;
+          account.msg = (r.data && r.data.error) || t("That code didn't work. Please try again.");
+          account.msgBad = true;
+          render();
+          return;
+        }
+        try { localStorage.setItem(TOKEN_KEY, r.data.token); } catch (e) {}
+        return loadSaved(true).then(function (ok) {
+          account.busy = false;
+          if (!ok || !(account.defaults && account.defaults.sender && account.defaults.sender.fullName)) {
+            account.open = false;
+            errorText = "";
+            account.msg = "";
+          }
+          render();
+        });
+      })
+      .catch(function () { account.busy = false; account.msg = t("That code didn't work. Please try again."); account.msgBad = true; render(); });
+  }
+
+  // ---------- signature pad ----------
+
+  function setupSignature(canvas) {
+    var ratio = Math.max(window.devicePixelRatio || 1, 1);
+    var rect = canvas.getBoundingClientRect();
+    var keep = signature.drawn && signature.canvas ? signature.canvas : null;
+    canvas.width = Math.round(rect.width * ratio);
+    canvas.height = Math.round(rect.height * ratio);
+    var ctx = canvas.getContext("2d");
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#12308a";
+    if (keep) ctx.drawImage(keep, 0, 0, rect.width, rect.height);
+    var ph = document.getElementById("sig-ph");
+    if (ph) ph.hidden = signature.drawn;
+    var drawing = false, lastPt = null;
+    function pt(e) { var r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    canvas.onpointerdown = function (e) { drawing = true; lastPt = pt(e); canvas.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.arc(lastPt.x, lastPt.y, 1.1, 0, Math.PI * 2); ctx.fillStyle = "#12308a"; ctx.fill(); mark(); };
+    canvas.onpointermove = function (e) {
+      if (!drawing) return;
+      var p = pt(e);
+      ctx.beginPath(); ctx.moveTo(lastPt.x, lastPt.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      lastPt = p;
+    };
+    canvas.onpointerup = canvas.onpointercancel = function () { drawing = false; remember(); };
+    function mark() { if (!signature.drawn) { signature.drawn = true; if (ph) ph.hidden = true; } }
+    function remember() {
+      var copy = document.createElement("canvas");
+      copy.width = canvas.width; copy.height = canvas.height;
+      copy.getContext("2d").drawImage(canvas, 0, 0);
+      signature.canvas = copy;
+    }
+    document.getElementById("sig-clear").onclick = function () {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      signature.drawn = false; signature.canvas = null;
+      if (ph) ph.hidden = false;
+    };
+  }
+
+  // A small, cropped PNG of the drawing (transparent background), or null.
+  function signaturePng() {
+    if (!signature.drawn || !signature.canvas) return null;
+    var src = signature.canvas;
+    var data = src.getContext("2d").getImageData(0, 0, src.width, src.height).data;
+    var minX = src.width, minY = src.height, maxX = -1, maxY = -1;
+    for (var y = 0; y < src.height; y += 2) for (var x = 0; x < src.width; x += 2) {
+      if (data[(y * src.width + x) * 4 + 3] > 10) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    }
+    if (maxX < 0) return null;
+    var pad = 8;
+    minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+    maxX = Math.min(src.width, maxX + pad); maxY = Math.min(src.height, maxY + pad);
+    var w = maxX - minX, h = maxY - minY;
+    var scale = Math.min(1, 600 / w, 200 / h);
+    var out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(w * scale)); out.height = Math.max(1, Math.round(h * scale));
+    out.getContext("2d").drawImage(src, minX, minY, w, h, 0, 0, out.width, out.height);
+    return out.toDataURL("image/png");
+  }
+
+  // ---------- checks per step ----------
+
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function phoneOk(v) { var d = String(v || "").replace(/\D/g, ""); return /^\+?[\d\s()-]+$/.test(String(v || "").trim()) && d.length >= 7 && d.length <= 15; }
+
+  function checkPerson(group, withTown, idRequired) {
+    var p = state[group], bad = {};
+    if (String(p.fullName).trim().length < 2) bad[group + ".fullName"] = 1;
+    if (idRequired && !/^[A-Za-z0-9]{5,20}$/.test(String(p.idNumber).replace(/\s/g, ""))) bad[group + ".idNumber"] = 1;
+    if (!idRequired && p.idNumber && !/^[A-Za-z0-9]{5,20}$/.test(String(p.idNumber).replace(/\s/g, ""))) bad[group + ".idNumber"] = 1;
+    if (String(p.address).trim().length < 5) bad[group + ".address"] = 1;
+    if (withTown && String(p.town).trim().length < 2) bad[group + ".town"] = 1;
+    if (!phoneOk(p.mobile)) bad[group + ".mobile"] = 1;
+    if (p.homePhone && !phoneOk(p.homePhone)) bad[group + ".homePhone"] = 1;
+    if (!EMAIL_RE.test(String(p.email).trim())) bad[group + ".email"] = 1;
+    return bad;
+  }
+
+  function check(stepName) {
+    badFields = {};
+    if (stepName === "where") {
+      if (!country()) return t("Please choose where you are sending to.");
+      if (!state.service) return t("Please choose Sea or Air freight.");
+    }
+    if (stepName === "boxes") {
+      if (!Object.keys(state.boxes).length) return t("Please add at least one box.");
+      if (!state.deliveryType) return t("Please choose pickup or door delivery.");
+    }
+    if (stepName === "sender" || stepName === "receiver") {
+      badFields = stepName === "sender" ? checkPerson("sender", false, state.country === "sri_lanka") : checkPerson("receiver", true, true);
+      var keys = Object.keys(badFields);
+      if (keys.length === 1 && /\.email$/.test(keys[0])) return t("Please check the email address.");
+      if (keys.length === 1 && /\.mobile$/.test(keys[0])) return t("Please check the mobile number.");
+      if (keys.length) return t("Please fill in the boxes marked in red.");
+    }
+    if (stepName === "contents") {
+      state.contents.forEach(function (c, i) {
+        var q = Number(c.qty);
+        if (String(c.description).trim().length < 2 || !c.condition || !(Number.isInteger(q) && q >= 1 && q <= 999)) badFields["contents." + i] = 1;
+      });
+      if (Object.keys(badFields).length) return t("Please describe each item, its number and value.");
+    }
+    if (stepName === "finish") {
+      if (state.service === "air") {
+        var dg = state.dg;
+        if (!dg.no.every(Boolean) && !dg.ack) { badFields["dg.ack"] = 1; return t("Please tick the lines that are not in your boxes, or confirm the ones that may be."); }
+        if (dg.medications === null || dg.lithium === null || dg.liquids === null) return t("Please answer each Air Freight question.");
+        if (dg.lithium && String(dg.lithiumDetails).trim().length < 2) { badFields["dg.lithiumDetails"] = 1; return t("Please write the type of product and quantity."); }
+        if (dg.liquids && String(dg.liquidsDetails).trim().length < 2) { badFields["dg.liquidsDetails"] = 1; return t("Please write the type of product and quantity."); }
+      }
+      if (state.insurance === null) return t("Please answer the insurance question.");
+      if (!state.declarationAccepted) { badFields.declarationAccepted = 1; return t("Please tick the declaration."); }
+      if (String(state.signedName).trim().length < 2) { badFields["_sign.signedName"] = 1; return t("Please type your full name to sign."); }
+    }
+    return "";
+  }
+
+  // Server field → the step it lives on.
+  function stepForField(f) {
+    if (!f) return step;
+    if (f === "country" || f === "service") return 0;
+    if (f === "items" || f === "deliveryType") return 1;
+    if (f.indexOf("sender.") === 0) return 2;
+    if (f.indexOf("receiver.") === 0) return 3;
+    if (f === "contents") return 4;
+    return 5;
+  }
+
+  function submit() {
+    var c = country();
+    var body = {
+      country: state.country,
+      service: state.service,
+      items: c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) { return { type: it.key, qty: state.boxes[it.key] }; }),
+      deliveryType: state.deliveryType,
+      sender: state.sender,
+      receiver: state.receiver,
+      contents: state.contents.map(function (x) { return { description: x.description, condition: x.condition, qty: Number(x.qty) }; }),
+      insurance: state.insurance,
+      declarationAccepted: state.declarationAccepted,
+      signedName: state.signedName,
+      signatureImage: signaturePng()
+    };
+    if (state.service === "air") {
+      body.dangerousGoods = {
+        notInBoxes: state.dg.no.slice(),
+        prohibitedAcknowledged: !state.dg.no.every(Boolean) && !!state.dg.ack,
+        medications: state.dg.medications, lithium: state.dg.lithium, lithiumDetails: state.dg.lithiumDetails,
+        liquids: state.dg.liquids, liquidsDetails: state.dg.liquidsDetails
+      };
+    }
+    sending = true; errorText = ""; render();
+    fetch(API_ORIGIN + "/api/public/dropoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        sending = false;
+        if (!r.ok) {
+          errorText = (r.data && r.data.error) || t("Couldn't send. Please check your internet and try again, or ask our staff.");
+          if (r.data && r.data.field) { badFields = {}; badFields[r.data.field] = 1; step = stepForField(r.data.field); }
+          render(); window.scrollTo(0, 0);
+          return;
+        }
+        result = r.data;
+        // Remembered on THIS phone only, for next time.
+        store(LAST_KEY, { country: state.country, sender: state.sender, receiver: state.receiver });
+        last = store(LAST_KEY);
+        store(DRAFT_KEY, null);
+        render(); window.scrollTo(0, 0);
+      })
+      .catch(function () {
+        sending = false;
+        errorText = t("Couldn't send. Please check your internet and try again, or ask our staff.");
+        render();
+      });
+  }
+
+  nextBtn.onclick = function () {
+    if (sending) return;
+    var problem = check(STEPS[step]);
+    if (problem) { errorText = problem; render(); window.scrollTo(0, 0); return; }
+    errorText = "";
+    if (step === STEPS.length - 1) return submit();
+    step += 1; render(); window.scrollTo(0, 0);
+  };
+  backBtn.onclick = function () { if (step > 0) { step -= 1; errorText = ""; badFields = {}; render(); window.scrollTo(0, 0); } };
+
+  // Box types come from the backend (same lists as online booking).
+  fetch(API_ORIGIN + "/api/public/dropoff/options")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) { if (data && data.countries && data.countries.length) { options = data; render(); } })
+    .catch(function () {});
+
+  // Already signed in to My Transco on this phone → saved details ready.
+  loadSaved(false);
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -501,7 +501,8 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
   // ---------- bookings ----------
 
   router.get('/booking-options', wrap(async (req, res) => {
-    res.json(await tools.getBookingOptions());
+    const options = await tools.getBookingOptions();
+    res.json({ ...options, declaration: tools.declarationDefaults(req.customer) });
   }));
 
   router.get('/bookings', wrap(async (req, res) => {
@@ -516,7 +517,7 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
 
   router.post('/bookings', wrap(async (req, res) => {
     const result = await tools.createBooking(req.customer, req.body);
-    if (result.error) return res.status(400).json({ error: result.error });
+    if (result.error) return res.status(400).json({ error: result.error, field: result.field || null });
     res.status(201).json({ booking: result.booking });
   }));
 

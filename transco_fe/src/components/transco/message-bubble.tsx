@@ -68,18 +68,18 @@ export function MessageBubble({
         )}
       >
         {message.sender === "CHATBOT" && (
-          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Chatbot
           </p>
         )}
         {isHuman && (
-          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-human-foreground">
+          <p className="mb-0.5 text-xs font-semibold text-human-foreground">
             Staff
           </p>
         )}
         {flagged && (
-          <p className="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-destructive">
-            ⚠️ Flagged
+          <p className="mb-0.5 flex items-center gap-1 text-xs font-semibold text-attention-foreground">
+            Asked for staff help
           </p>
         )}
         <MediaContent message={message} />
@@ -89,11 +89,11 @@ export function MessageBubble({
           </p>
         )}
         {message.status === "FAILED" && message.failureReason && (
-          <p className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-destructive">
+          <p className="mt-1 flex items-start gap-1 text-xs leading-snug text-attention-foreground">
             ⚠️ {message.failureReason}
           </p>
         )}
-        <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums text-muted-foreground">
+        <p className="mt-0.5 flex items-center justify-end gap-1 text-xs tabular-nums text-muted-foreground">
           {formatMessageTime(message.createdAt)}
           {outgoing && (
             <MessageStatusIcon status={message.status} failureReason={message.failureReason} />

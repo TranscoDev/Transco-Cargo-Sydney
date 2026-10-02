@@ -9,9 +9,10 @@ import {
   type ReactNode,
 } from "react";
 
-import { createMessage, getMockConversations, simulatedInbound } from "./mock-data";
+import { createMessage, simulatedInbound } from "./mock-data";
 import { logout as clearSession } from "./auth";
 import {
+  contactNumber,
   createManualContact,
   createSegment as createSegmentRequest,
   deleteBooking as deleteBookingRequest,
@@ -22,7 +23,9 @@ import {
   fetchSegments,
   fetchShipments,
   importCustomersFile,
+  mapBooking,
   mapMessage,
+  type BackendBooking,
   markConversationRead,
   sendEmailCampaign as sendEmailCampaignRequest,
   sendAttachment as sendAttachmentRequest,
@@ -66,6 +69,15 @@ import type {
   SegmentFilter,
   Shipment,
 } from "./types";
+import { notify } from "./notify";
+
+/** Toast after a booking status change succeeds. */
+const BOOKING_STATUS_DONE: Record<BookingStatus, string> = {
+  confirmed: "Booking confirmed",
+  completed: "Marked as done — boxes dropped off",
+  cancelled: "Booking cancelled",
+  pending: "Booking reopened",
+};
 
 /**
  * Conversation/message state layer, backed by the real transco_be API and
@@ -111,6 +123,9 @@ interface ConversationsApi {
    * Not optimistic — rejects with the backend's message (e.g. a BL that's
    * already taken) so the form can show it. */
   assignBookingBl: (bookingId: string, hblNumber: string, batchNumber?: number | null) => Promise<void>;
+  /** Set when conversations couldn't be loaded (shown as a banner with Try again). */
+  loadError: string | null;
+  retryLoad: () => void;
   /** True while the website bot is paused — website visitors get a friendly
    * pause notice instead of an AI reply. Independent of whatsappPaused. */
   websitePaused: boolean;
@@ -172,6 +187,7 @@ function toSummary(c: Conversation): ConversationSummary {
     unreadCount: c.messages.filter((m) => m.sender === "CUSTOMER" && m.read === false).length,
     needsAttention: c.needsAttention === true,
     needsAttentionMessage: c.needsAttentionMessage,
+    linkedAccount: c.linkedAccount ?? null,
   };
 }
 
@@ -201,35 +217,40 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // original local-only mock simulation for a backend-less demo.
   const isLiveRef = useRef(false);
 
+  // Set when the conversations couldn't be loaded — the console shows a
+  // clear "couldn't load" banner with Try again. Never sample/demo
+  // customers: in a live CRM staff could mistake them for real ones.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const retryLoad = useCallback(() => setLoadAttempt((n) => n + 1), []);
+
   useEffect(() => {
     let cancelled = false;
     fetchConversations()
       .then((real) => {
         if (cancelled) return;
         isLiveRef.current = true;
+        setLoadError(null);
         setConversations(real);
       })
       .catch((err) => {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : "";
         // A reachable backend that rejects the request (expired/invalid
-        // session — e.g. the server's session secret rotated) must never
-        // be papered over with fabricated demo customers. Only a
-        // genuinely unreachable backend (no server running at all, the
-        // standalone-demo case) falls back to mock data.
+        // session — e.g. the server's session secret rotated) signs out.
         if (message.includes("(401)")) {
           console.warn("Session is no longer valid — signing out.", err);
           clearSession();
           window.location.href = "/";
           return;
         }
-        console.warn("Could not reach the backend; showing local demo data instead.", err);
-        setConversations(getMockConversations());
+        console.warn("Could not load conversations.", err);
+        setLoadError("Couldn't load conversations and customers from the server.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -325,8 +346,9 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       removed = prev.find((b) => b.id === bookingId);
       return prev.filter((b) => b.id !== bookingId);
     });
-    deleteBookingRequest(bookingId).catch((err) => {
+    deleteBookingRequest(bookingId).then(() => notify.success("Booking deleted")).catch((err) => {
       console.error("Failed to delete booking:", err);
+      notify.error("Couldn't delete this booking", "It has been put back. Please try again.");
       if (removed) {
         setBookings((prev) =>
           prev.some((b) => b.id === bookingId) ? prev : [removed!, ...prev],
@@ -337,22 +359,34 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
 
   const updateBookingStatus = useCallback((bookingId: string, status: BookingStatus) => {
     // Optimistic; reverted on failure the same way deleteBooking is above.
-    let previousStatus: BookingStatus | undefined;
-    setBookings((prev) =>
-      prev.map((b) => {
-        if (b.id !== bookingId) return b;
-        previousStatus = b.status;
-        return { ...b, status };
-      }),
-    );
-    updateBookingStatusRequest(bookingId, status).catch((err) => {
-      console.error("Failed to update booking status:", err);
-      if (previousStatus) {
-        setBookings((prev) =>
-          prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus! } : b)),
-        );
-      }
-    });
+    // The success toast offers Undo (e.g. an accidental "Mark done"), which
+    // simply applies the previous status again — without offering another undo.
+    const apply = (next: BookingStatus, offerUndo: boolean) => {
+      let previousStatus: BookingStatus | undefined;
+      setBookings((prev) =>
+        prev.map((b) => {
+          if (b.id !== bookingId) return b;
+          previousStatus = b.status;
+          return { ...b, status: next };
+        }),
+      );
+      updateBookingStatusRequest(bookingId, next)
+        .then(() => {
+          const back = previousStatus;
+          if (offerUndo && back && back !== next) notify.success(BOOKING_STATUS_DONE[next], undefined, () => apply(back, false));
+          else notify.success(offerUndo ? BOOKING_STATUS_DONE[next] : "Change undone");
+        })
+        .catch((err) => {
+          console.error("Failed to update booking status:", err);
+          notify.error("Couldn't update this booking", "Nothing was changed. Please try again.");
+          if (previousStatus) {
+            setBookings((prev) =>
+              prev.map((b) => (b.id === bookingId ? { ...b, status: previousStatus! } : b)),
+            );
+          }
+        });
+    };
+    apply(status, true);
   }, []);
 
   const updateBooking = useCallback((bookingId: string, updates: BookingUpdateInput) => {
@@ -365,8 +399,30 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         return { ...b, ...updates };
       }),
     );
-    updateBookingRequest(bookingId, updates).catch((err) => {
+    updateBookingRequest(bookingId, updates).then(() => {
+      // A one-field stage change (Mark checked / boxes received) gets Undo.
+      const stageOnly = Object.keys(updates).length === 1 && (updates.declarationStatus || updates.warehouseStatus);
+      const undo = stageOnly && previous
+        ? () => {
+            const field = updates.declarationStatus ? "declarationStatus" : "warehouseStatus";
+            const was = (previous![field] ?? "not_received") as BookingUpdateInput["declarationStatus"];
+            setBookings((list) => list.map((b) => (b.id === bookingId ? { ...b, [field]: was } : b)));
+            updateBookingRequest(bookingId, { [field]: was })
+              .then(() => notify.success("Change undone"))
+              .catch(() => notify.error("Couldn't undo that", "Please change it back from Edit booking."));
+          }
+        : undefined;
+      notify.success(
+        updates.declarationStatus === "received" ? "Declaration checked"
+          : updates.declarationStatus === "not_received" ? "Declaration marked as not checked"
+          : updates.warehouseStatus === "received" ? "Boxes marked as received"
+          : "Booking updated",
+        undefined,
+        undo,
+      );
+    }).catch((err) => {
       console.error("Failed to update booking:", err);
+      notify.error("Couldn't save this booking", "Your changes were not saved. Please try again.");
       if (previous) {
         setBookings((prevList) =>
           prevList.map((b) => (b.id === bookingId ? previous! : b)),
@@ -378,8 +434,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const assignBookingBl = useCallback(
     async (bookingId: string, hblNumber: string, batchNumber?: number | null) => {
       const { shipmentId } = await assignBookingBlRequest(bookingId, hblNumber, batchNumber);
+      notify.success(`BL ${hblNumber} assigned`, "Declaration confirmed. The customer can see it in My Transco now.");
+      // A declaration is confirmed once its BL is assigned.
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received" } : b)),
+        prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received", declarationStatus: "received" } : b)),
       );
     },
     [],
@@ -398,6 +456,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       }));
       updateContactInfoRequest(conversationId, info).catch((err) => {
         console.error("Failed to persist contact info:", err);
+        notify.error("Couldn't save the customer's details", "Please try again.");
       });
     },
     [patch],
@@ -592,10 +651,31 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       // Optimistic local update; conversationId doubles as the backend
       // customer._id once a conversation is backed by real data. Errors are
       // logged, not surfaced, so the mock-data demo keeps working standalone.
-      patch(conversationId, (c) => ({ ...c, mode }));
-      setCustomerMode(conversationId, mode).catch((err) => {
-        console.error("Failed to persist mode change:", err);
+      let previous: ConversationMode | undefined;
+      patch(conversationId, (c) => {
+        previous = c.mode;
+        return { ...c, mode };
       });
+      setCustomerMode(conversationId, mode)
+        .then(() => {
+          if (!isLiveRef.current) return;
+          notify.success(
+            mode === "HUMAN" ? "You've taken over this chat" : "Handed back to the bot",
+            mode === "HUMAN" ? "The bot won't reply here until you hand it back." : "The bot will answer this customer again.",
+          );
+        })
+        .catch((err) => {
+          console.error("Failed to persist mode change:", err);
+          // Never leave staff believing the bot is paused when it isn't.
+          if (previous && isLiveRef.current) {
+            const revertTo = previous;
+            patch(conversationId, (c) => ({ ...c, mode: revertTo }));
+            notify.error(
+              mode === "HUMAN" ? "Couldn't take over this chat" : "Couldn't hand back to the bot",
+              "Nothing changed — please try again.",
+            );
+          }
+        });
     },
     [patch],
   );
@@ -647,7 +727,9 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
                 {
                   id: customer._id,
                   customerName: customer.name,
-                  phoneNumber: customer.phoneNumber,
+                  phoneNumber: contactNumber(customer),
+                  channel: customer.channel,
+                  linkedAccount: customer.linkedAccount ?? null,
                   mode: customer.mode,
                   messages: [mapped],
                 },
@@ -662,6 +744,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
             const next = [...prev];
             next[idx] = {
               ...conversation,
+              // A website visitor may sign in (or rename themselves) mid-chat.
+              customerName: customer.name || conversation.customerName,
+              phoneNumber: contactNumber({ ...customer, channel: customer.channel ?? conversation.channel }),
+              linkedAccount: customer.linkedAccount ?? conversation.linkedAccount ?? null,
               mode: customer.mode,
               messages: [...conversation.messages, mapped],
             };
@@ -745,25 +831,51 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         }
 
         case "booking.created": {
-          const b = event.payload as BookingCreatedPayload;
+          // Same mapping as the list load, so a booking that arrives live
+          // (a walk-in form, an online booking) shows everything at once.
+          const b = event.payload as BookingCreatedPayload & BackendBooking;
           setBookings((prev) => {
             if (prev.some((existing) => existing.id === b._id)) return prev;
-            return [
-              {
-                id: b._id,
-                customerId: b.customerId,
-                customerName: b.customerName,
-                phoneNumber: b.phoneNumber,
-                requestedDay: b.requestedDay,
-                requestedTime: b.requestedTime,
-                status: b.status,
-                createdAt: b.createdAt,
-                boxSummary: b.boxSummary,
-                resolvedDate: b.resolvedDate,
-              },
-              ...prev,
-            ];
+            return [mapBooking(b), ...prev];
           });
+          return;
+        }
+
+        // Staff finalised a walk-in at the counter: now linked to the
+        // customer, received, with weight/CBM/price.
+        case "booking.walk_in_finalised": {
+          const p = event.payload as {
+            _id: string;
+            customerId: string | null;
+            customerName: string;
+            phoneNumber: string;
+            weight: number | null;
+            cbm: number | null;
+            price: number | null;
+            shipmentId: string | null;
+            status: BookingStatus;
+          };
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === p._id
+                ? {
+                    ...b,
+                    customerId: p.customerId ?? b.customerId,
+                    customerName: p.customerName,
+                    phoneNumber: p.phoneNumber,
+                    weight: p.weight,
+                    cbm: p.cbm,
+                    price: p.price,
+                    shipmentId: p.shipmentId ?? b.shipmentId,
+                    status: p.status,
+                    warehouseStatus: "received",
+                    declarationStatus: "received",
+                    walkInStatus: b.channel === "walk_in" ? "finalised" : b.walkInStatus,
+                    staffConfirmed: true,
+                  }
+                : b,
+            ),
+          );
           return;
         }
 
@@ -776,6 +888,26 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         case "booking.status_changed": {
           const { _id, status } = event.payload as BookingStatusChangedPayload;
           setBookings((prev) => prev.map((b) => (b.id === _id ? { ...b, status } : b)));
+          return;
+        }
+
+        // Staff changed the boxes/receiver/delivery after the booking was made.
+        case "booking.details_changed": {
+          const p = event.payload as {
+            _id: string;
+            boxSummary: string | null;
+            boxCount: number | null;
+            destination: string | null;
+            customerNotes: string | null;
+            receiver: { fullName: string; town: string | null } | null;
+          };
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === p._id
+                ? { ...b, boxSummary: p.boxSummary, boxCount: p.boxCount, destination: p.destination, customerNotes: p.customerNotes, receiver: p.receiver }
+                : b,
+            ),
+          );
           return;
         }
 
@@ -835,6 +967,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       updateBooking,
       assignBookingBl,
+      loadError,
+      retryLoad,
       websitePaused,
       whatsappPaused,
       updatePauseState,
@@ -855,6 +989,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       updateBooking,
       assignBookingBl,
+      loadError,
+      retryLoad,
       websitePaused,
       whatsappPaused,
       markAsRead,

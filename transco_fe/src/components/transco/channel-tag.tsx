@@ -9,7 +9,7 @@ export function ChannelTag({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider",
         "bg-secondary text-muted-foreground ring-1 ring-inset ring-border",
         className,
       )}

@@ -1,15 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 
-import { BookingsPanel } from "@/components/transco/bookings-panel";
+import { BookingsPanel, type BookingFilter } from "@/components/transco/bookings-panel";
 import { useConversations } from "@/lib/transco/store";
 
-// Unchanged from the old /console "bookings" tab — same component,
-// same props.
-export const Route = createFileRoute("/console/bookings")({
+export const Route = createFileRoute("/console/bookings/")({
   component: BookingsPage,
 });
 
 function BookingsPage() {
+  // The ?show=… filter is validated on the bookings layout route.
+  const { show } = useSearch({ from: "/console/bookings" });
   const { bookings, deleteBooking, updateBookingStatus, updateBooking, assignBookingBl } = useConversations();
   return (
     <BookingsPanel
@@ -18,6 +18,7 @@ function BookingsPage() {
       onUpdateStatus={updateBookingStatus}
       onUpdateBooking={updateBooking}
       onAssignBl={assignBookingBl}
+      initialFilter={(show ?? "all") as BookingFilter}
     />
   );
 }

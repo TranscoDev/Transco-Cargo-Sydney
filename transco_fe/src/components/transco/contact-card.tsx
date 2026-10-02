@@ -6,6 +6,7 @@ import { ModeTag } from "./mode-tag";
 import { ChannelTag } from "./channel-tag";
 import { MessageStatusIcon } from "./message-status";
 import { UnreadBadge } from "./unread-badge";
+import { formatPhone } from "@/lib/transco/phone";
 
 function initials(name: string) {
   return name
@@ -46,7 +47,7 @@ export function ContactCard({
         className={cn(
           "absolute inset-y-0 left-0 w-[3px]",
           isHuman ? "bg-human" : "bg-transparent",
-          needsAttention && "bg-destructive",
+          needsAttention && "bg-attention",
           selected && !isHuman && !needsAttention && "bg-primary",
         )}
       />
@@ -75,7 +76,7 @@ export function ContactCard({
           </span>
           <span
             className={cn(
-              "shrink-0 text-[11px] tabular-nums",
+              "shrink-0 text-xs tabular-nums",
               unreadCount > 0 ? "font-medium text-primary" : "text-muted-foreground",
             )}
           >
@@ -101,15 +102,25 @@ export function ContactCard({
         </span>
 
         {needsAttention && (
-          <span className="mt-1 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+          <span className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
             <span className="shrink-0">⚠️</span>
             <span className="truncate">{needsAttentionMessage?.content ?? "Flagged for follow-up"}</span>
           </span>
         )}
 
-        <span className="mt-1.5 flex items-center gap-1">
+        <span className="mt-1.5 flex flex-wrap items-center gap-1">
           <ModeTag mode={mode} />
           {channel === "website" && <ChannelTag />}
+          {/* Signed in to My Transco while chatting on the website — we know
+              who this is: their real number and customer code. */}
+          {conversation.linkedAccount && (
+            <span
+              className="inline-flex items-center gap-1 rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success-foreground"
+              title={`Signed in to My Transco · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}
+            >
+              ✓ Signed in{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
+            </span>
+          )}
         </span>
       </span>
     </button>

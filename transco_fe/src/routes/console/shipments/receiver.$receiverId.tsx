@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchReceiver } from "@/lib/transco/api";
 import { SHIPMENT_STATUS_LABELS, type ReceiverProfile } from "@/lib/transco/types";
+import { Breadcrumbs, LoadingRows, StatusBadge } from "@/components/transco/page-kit";
+import { shipmentStatus } from "@/lib/transco/status";
 
 // Sibling of index.tsx under shipments/route.tsx's Outlet. Mirrors
 // CustomerProfile's role but for the receiving side — a receiver has no
@@ -29,27 +31,21 @@ function ReceiverProfilePage() {
   }, [receiverId]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
-      <Link
-        to="/console/shipments"
-        className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to Shipments
-      </Link>
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
+      <Breadcrumbs items={[{ label: "Shipments", to: "/console/shipments" }, { label: receiver?.name ?? "Receiver" }]} />
 
       {error && (
-        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="mb-4 rounded-lg border border-attention/20 bg-attention-soft px-4 py-3 text-sm text-attention-foreground">
           {error}
         </p>
       )}
 
-      {!receiver && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!receiver && !error && <LoadingRows rows={4} />}
 
       {receiver && (
         <>
           <div className="mb-5">
-            <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
               <User className="h-4 w-4 text-muted-foreground" />
               {receiver.name}
             </h1>
@@ -89,9 +85,9 @@ function ReceiverProfilePage() {
             All shipments to this person ({receiver.shipments.length})
           </h2>
 
-          <div className="overflow-auto rounded-md border border-border">
+          <div className="overflow-auto rounded-xl border bg-card shadow-xs">
             <table className="w-full min-w-[700px] text-left text-sm">
-              <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">HBL</th>
                   <th className="px-3 py-2 font-medium">Shipment</th>
@@ -142,9 +138,7 @@ function ReceiverProfilePage() {
                       {s.totalBoxes ?? s.boxCount ?? "—"}
                     </td>
                     <td className="px-3 py-2">
-                      <Badge variant="secondary" className="font-medium">
-                        {SHIPMENT_STATUS_LABELS[s.status]}
-                      </Badge>
+                      <StatusBadge tone={shipmentStatus(s.status).tone}>{shipmentStatus(s.status).label}</StatusBadge>
                     </td>
                   </tr>
                 ))}

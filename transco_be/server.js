@@ -173,6 +173,7 @@ app.use('/uploads', express.static(ATTACHMENT_UPLOAD_DIR));
 const PUBLIC_API_PREFIXES = [
   '/auth/login',   // issues the token — can't require one to get one
   '/web-chat',     // public website chat widget, no staff session
+  '/public/',      // read-only website data (e.g. the shipping calendar) — see scheduleRoutes.js
   '/portal/'       // My Transco — applies its own CUSTOMER auth (portalRoutes.js);
                    // trailing slash so e.g. a future '/portal-x' route isn't public
 ];
@@ -1476,7 +1477,7 @@ async function markNeedsAttention(customer, triggerMessage) {
 
   broadcast('customer.needs_attention', {
     customerId: customer._id,
-    customer,
+    customer: withoutSignInSecrets(customer),
 
     lastMessage: {
       content: triggerMessage.content,
@@ -1491,16 +1492,42 @@ async function markNeedsAttention(customer, triggerMessage) {
 // BROADCAST MESSAGE
 // ============================================================
 
+// A website chat has no real phone number of its own. When the visitor was
+// signed in to My Transco, this is who they really are — shown in the
+// console's Conversations instead of the anonymous session.
+function linkedAccountSummary(account) {
+  if (!account) return null;
+  return {
+    id: String(account._id),
+    name: account.name || null,
+    phoneNumber: account.phoneNumber || null,
+    customerCode: account.customerCode || null
+  };
+}
+
+async function linkedAccountFor(customer) {
+  if (!customer || !customer.linkedCustomerId) return null;
+  const account = await customers().findOne(
+    { _id: customer.linkedCustomerId },
+    { projection: { name: 1, phoneNumber: 1, customerCode: 1 } }
+  );
+  return linkedAccountSummary(account);
+}
+
 async function broadcastMessageCreated(customer, message) {
-  const unreadCount = await messages().countDocuments({
-    customerId: customer._id,
-    senderType: 'CUSTOMER',
-    isRead: false
-  });
+  const [unreadCount, linkedAccount] = await Promise.all([
+    messages().countDocuments({
+      customerId: customer._id,
+      senderType: 'CUSTOMER',
+      isRead: false
+    }),
+    linkedAccountFor(customer)
+  ]);
 
   broadcast('message.created', {
     message,
-    customer,
+    // Every staff console receives this — never include sign-in secrets.
+    customer: { ...withoutSignInSecrets(customer), linkedAccount },
     unreadCount,
 
     lastMessage: {
@@ -1766,6 +1793,18 @@ app.post('/webhook', async (req, res) => {
     if (customer.mode === 'CHATBOT') {
 
       await sendTypingIndicator(message.id);
+
+      // Schedule questions are answered from the shipping calendar staff
+      // keep in the console — the same dates the website shows — not by
+      // the AI, so the two can never disagree.
+      const scheduleReply = await scheduleAnswerer.answerScheduleQuestion({
+        text,
+        country: customer.webCountry || null
+      });
+      if (scheduleReply) {
+        await sendAndTrackOutbound(customer, 'CHATBOT', scheduleReply, inboundMessage._id, isNewCustomer);
+        return;
+      }
 
       const reply =
         await getFlowiseReply(
@@ -2188,6 +2227,17 @@ app.patch('/api/settings/pause-state', async (req, res) => {
 // GET CUSTOMERS
 // ============================================================
 
+// A customer record as it may leave the server: My Transco sign-in
+// secrets and lockout internals are never sent to any browser, staff
+// included (password hash, session version, failed-attempt counters).
+function withoutSignInSecrets(customer) {
+  const {
+    passwordHash, portalTokenVersion, portalLoginFailures, portalLockedUntil,
+    ...safe
+  } = customer;
+  return safe;
+}
+
 app.get('/api/customers', async (req, res) => {
 
   try {
@@ -2233,6 +2283,8 @@ app.get('/api/customers', async (req, res) => {
     const bookingsByCustomer = new Map();
 
     for (const booking of allBookings) {
+      // A walk-in isn't linked to a customer until staff confirm it.
+      if (!booking.customerId) continue;
       const key = booking.customerId.toString();
       const bucket = bookingsByCustomer.get(key);
       if (bucket) {
@@ -2248,6 +2300,8 @@ app.get('/api/customers', async (req, res) => {
 
 
     for (const message of allMessages) {
+
+      if (!message.customerId) continue;
 
       const key =
         message.customerId.toString();
@@ -2273,6 +2327,7 @@ app.get('/api/customers', async (req, res) => {
     const shipmentsByCustomer = new Map();
 
     for (const shipment of allShipments) {
+      if (!shipment.customerId) continue;
       const key = shipment.customerId.toString();
       const bucket = shipmentsByCustomer.get(key);
       if (bucket) {
@@ -2285,6 +2340,7 @@ app.get('/api/customers', async (req, res) => {
     const liveShipmentsByCustomer = new Map();
 
     for (const shipment of allLiveShipments) {
+      if (!shipment.customerId) continue;
       const key = shipment.customerId.toString();
       const bucket = liveShipmentsByCustomer.get(key);
       if (bucket) {
@@ -2295,10 +2351,18 @@ app.get('/api/customers', async (req, res) => {
     }
 
 
+    const customerById = new Map(allCustomers.map(c => [String(c._id), c]));
+
     const result =
       allCustomers.map(customer => ({
 
-        ...customer,
+        ...withoutSignInSecrets(customer),
+
+        hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
+
+        linkedAccount: customer.linkedCustomerId
+          ? linkedAccountSummary(customerById.get(String(customer.linkedCustomerId)))
+          : null,
 
         messages:
           messagesByCustomer.get(
@@ -2410,12 +2474,26 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
       resolvedDate: resolvedDateString(booking)
     }));
 
+    // Which bulk shipment each BL is in ("Shipment 57"), for the profile.
+    const batchIds = [...new Set(customerLiveShipments.map(s => s.consolidationId && String(s.consolidationId)).filter(Boolean))];
+    const batchDocs = batchIds.length
+      ? await consolidations().find({ _id: { $in: batchIds.map(id => new ObjectId(id)) } }, { projection: { batchNumber: 1 } }).toArray()
+      : [];
+    const batchNumberById = new Map(batchDocs.map(b => [String(b._id), b.batchNumber ?? null]));
+    const liveShipmentsWithBatch = customerLiveShipments.map(s => ({
+      ...s,
+      batchNumber: s.batchNumber ?? (s.consolidationId ? batchNumberById.get(String(s.consolidationId)) ?? null : null)
+    }));
+
     res.status(200).json({
       customer: {
-        ...customer,
+        ...withoutSignInSecrets(customer),
+        // For the profile header: "Online account ✓" badge.
+        hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
+        linkedAccount: await linkedAccountFor(customer),
         messages: customerMessages,
         shipments: customerShipments,
-        liveShipments: customerLiveShipments,
+        liveShipments: liveShipmentsWithBatch,
         bookings: bookingsWithResolvedDate,
         totalBookings: bookingsWithResolvedDate.length,
         totalShipments: customerLiveShipments.length,
@@ -2471,15 +2549,21 @@ app.get('/api/dashboard/summary', async (req, res) => {
     const startOfDayId = ObjectId.createFromTime(startOfDayUtcSeconds);
     const startOfNextDayId = ObjectId.createFromTime(startOfDayUtcSeconds + 24 * 60 * 60);
 
+    const notCancelled = { status: { $ne: 'cancelled' } };
+
     const [
       todaysBookingsCount,
       newCustomersCount,
       unreadCustomerIds,
       attentionCount,
-      activeShipmentsCount
+      activeShipmentsCount,
+      attentionCustomerIds,
+      declarationsToCheck,
+      blsToAssign,
+      todaysDropOffs
     ] = await Promise.all([
 
-      bookings().countDocuments({ requestedDateISO: todayString }),
+      bookings().countDocuments({ requestedDateISO: todayString, ...notCancelled }),
 
       customers().countDocuments({
         _id: { $gte: startOfDayId, $lt: startOfNextDayId }
@@ -2491,16 +2575,57 @@ app.get('/api/dashboard/summary', async (req, res) => {
 
       // "Active" = not yet delivered — the one status a shipment reaches
       // and then stays at, so this is a real live-in-progress count.
-      shipments().countDocuments({ status: { $ne: 'delivered' } })
+      shipments().countDocuments({ status: { $ne: 'delivered' } }),
+
+      customers().distinct('_id', { needsAttention: true }),
+
+      // Filled online by the customer, not yet checked by staff.
+      bookings().countDocuments({
+        declarationSubmittedAt: { $exists: true, $ne: null },
+        declarationStatus: { $ne: 'received' },
+        ...notCancelled
+      }),
+
+      // Boxes are in our warehouse but the booking has no shipment/BL yet
+      // — the next step staff need to take.
+      bookings().countDocuments({
+        $or: [{ warehouseStatus: 'received' }, { status: 'completed' }],
+        shipmentId: { $in: [null, ''] },
+        ...notCancelled
+      }),
+
+      bookings()
+        .find(
+          { requestedDateISO: todayString, ...notCancelled },
+          { projection: { customerName: 1, phoneNumber: 1, requestedTime: 1, bookingCode: 1, status: 1, boxSummary: 1 } }
+        )
+        .sort({ requestedTime: 1 })
+        .limit(12)
+        .toArray()
 
     ]);
+
+    // A conversation "waiting" = an unread customer message OR flagged
+    // for staff — counted once even if it's both.
+    const waiting = new Set([...unreadCustomerIds, ...attentionCustomerIds].map(String));
 
     res.status(200).json({
       todaysBookings: todaysBookingsCount,
       newCustomersToday: newCustomersCount,
       unreadConversations: unreadCustomerIds.length,
       attentionConversations: attentionCount,
-      activeShipments: activeShipmentsCount
+      activeShipments: activeShipmentsCount,
+      conversationsWaiting: waiting.size,
+      declarationsToCheck,
+      blsToAssign,
+      todaysDropOffs: todaysDropOffs.map(b => ({
+        id: String(b._id),
+        customerName: b.customerName || b.phoneNumber || null,
+        time: b.requestedTime || null,
+        bookingCode: b.bookingCode || null,
+        status: b.status || 'pending',
+        boxSummary: b.boxSummary || null
+      }))
     });
 
   } catch (err) {
@@ -2525,8 +2650,10 @@ app.get('/api/bookings', async (req, res) => {
 
   try {
 
+    // A walk-in's drawn signature is only needed when one booking is
+    // opened or printed — not in the whole list.
     const allBookings = await bookings()
-      .find({})
+      .find({}, { projection: { 'signature.image': 0 } })
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -2580,7 +2707,9 @@ app.get('/api/bookings/count', async (req, res) => {
 
     const count = await bookings().countDocuments({
       requestedDay: day,
-      status: { $nin: ['cancelled', 'completed'] }
+      status: { $nin: ['cancelled', 'completed'] },
+      // Walk-ins came without an appointment — they never use up a slot.
+      channel: { $ne: 'walk_in' }
     });
 
     res.status(200).json({
@@ -2852,6 +2981,84 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
 // One BL belongs to exactly one customer shipment — the unique
 // hblNumber index enforces it; a clash is reported, never overwritten.
 
+// Shared by this route and the walk-in Finalise step (walkInRoutes.js).
+// Returns { status, error } when the BL can't be assigned, otherwise
+// { shipment, existing }. With dryRun it only checks (format, clash,
+// shipment number) and writes nothing — so a caller can check BEFORE
+// changing anything else, never leaving a half-done record behind.
+async function assignBlToBooking(booking, { hblNumber: rawBl, batchNumber: batchNumberRaw } = {}, { dryRun = false } = {}) {
+  const hblNumber = String(rawBl || '').trim();
+  if (!/^[A-Za-z0-9-]{1,32}$/.test(hblNumber)) {
+    return { status: 400, error: 'BL number must be 1-32 letters, numbers, or hyphens' };
+  }
+  if (!dryRun && !booking.customerId) {
+    return { status: 400, error: 'This booking is not linked to a customer' };
+  }
+
+  let consolidation = null;
+  if (batchNumberRaw !== undefined && batchNumberRaw !== null && batchNumberRaw !== '') {
+    const batchNumber = Number(batchNumberRaw);
+    if (!Number.isInteger(batchNumber) || batchNumber < 1) {
+      return { status: 400, error: 'Shipment number must be a whole number, e.g. 57' };
+    }
+    consolidation = await consolidations().findOne({ batchNumber });
+    if (!consolidation) {
+      return { status: 404, error: `Shipment ${batchNumber} not found` };
+    }
+  }
+
+  const clash = await shipments().findOne({ hblNumber });
+  const existing = await shipments().findOne({ bookingId: booking._id });
+  if (clash && (!existing || String(clash._id) !== String(existing._id))) {
+    return { status: 409, error: `BL ${hblNumber} is already assigned to another shipment` };
+  }
+  if (dryRun) return { ok: true, hblNumber };
+
+  const now = new Date().toISOString();
+  let shipment;
+
+  if (existing) {
+    const set = { hblNumber, updatedAt: now };
+    if (consolidation) set.consolidationId = consolidation._id;
+    shipment = await shipments().findOneAndUpdate(
+      { _id: existing._id },
+      { $set: set },
+      { returnDocument: 'after' }
+    );
+  } else {
+    // Boxes are in hand by the time a BL is assigned — the shipment
+    // starts at "cargo_received", with that recorded in its history.
+    const doc = {
+      shipmentNumber: generateShipmentNumber(),
+      customerId: booking.customerId,
+      bookingId: booking._id,
+      hblNumber,
+      consolidationId: consolidation ? consolidation._id : null,
+      serviceType: booking.serviceType || null,
+      origin: booking.origin || 'Sydney',
+      destination: booking.destination || null,
+      cargo: booking.boxSummary || null,
+      boxCount: booking.boxCount ?? null,
+      status: 'cargo_received',
+      warehouseStatus: null,
+      history: [{ status: 'cargo_received', at: now, note: `BL ${hblNumber} assigned` }],
+      createdAt: now,
+      updatedAt: now
+    };
+    const { insertedId } = await shipments().insertOne(doc);
+    shipment = { ...doc, _id: insertedId };
+  }
+
+  // A declaration is confirmed once its BL is assigned.
+  const bookingSet = { shipmentId: String(shipment._id), warehouseStatus: 'received', declarationStatus: 'received' };
+  if (!booking.bookingCode) bookingSet.bookingCode = await customerTools.newBookingCode();
+  await bookings().updateOne({ _id: booking._id }, { $set: bookingSet });
+
+  const [withCustomerInfo] = await attachCustomerInfo([shipment]);
+  broadcast('shipment.updated', { shipment: withCustomerInfo });
+  return { shipment: withCustomerInfo, existing: Boolean(existing) };
+}
+
 app.post('/api/bookings/:bookingId/bl', async (req, res) => {
 
   try {
@@ -2861,87 +3068,17 @@ app.post('/api/bookings/:bookingId/bl', async (req, res) => {
       return res.status(400).json({ error: 'Invalid booking id' });
     }
 
-    const hblNumber = String((req.body || {}).hblNumber || '').trim();
-    if (!/^[A-Za-z0-9-]{1,32}$/.test(hblNumber)) {
-      return res.status(400).json({
-        error: 'BL number must be 1-32 letters, numbers, or hyphens'
-      });
-    }
-
     const booking = await bookings().findOne({ _id: new ObjectId(bookingId) });
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    if (!booking.customerId) {
-      return res.status(400).json({ error: 'This booking is not linked to a customer' });
-    }
 
-    let consolidation = null;
-    const batchNumberRaw = (req.body || {}).batchNumber;
-    if (batchNumberRaw !== undefined && batchNumberRaw !== null && batchNumberRaw !== '') {
-      const batchNumber = Number(batchNumberRaw);
-      if (!Number.isInteger(batchNumber) || batchNumber < 1) {
-        return res.status(400).json({ error: 'Batch number must be a whole number' });
-      }
-      consolidation = await consolidations().findOne({ batchNumber });
-      if (!consolidation) {
-        return res.status(404).json({ error: `Batch ${batchNumber} not found` });
-      }
-    }
+    const result = await assignBlToBooking(booking, req.body || {});
+    if (result.error) return res.status(result.status).json({ error: result.error });
 
-    const clash = await shipments().findOne({ hblNumber });
-    const existing = await shipments().findOne({ bookingId: booking._id });
-    if (clash && (!existing || String(clash._id) !== String(existing._id))) {
-      return res.status(409).json({
-        error: `BL ${hblNumber} is already assigned to another shipment`
-      });
-    }
-
-    const now = new Date().toISOString();
-    let shipment;
-
-    if (existing) {
-      const set = { hblNumber, updatedAt: now };
-      if (consolidation) set.consolidationId = consolidation._id;
-      shipment = await shipments().findOneAndUpdate(
-        { _id: existing._id },
-        { $set: set },
-        { returnDocument: 'after' }
-      );
-    } else {
-      // Boxes are in hand by the time a BL is assigned — the shipment
-      // starts at "cargo_received", with that recorded in its history.
-      const doc = {
-        shipmentNumber: generateShipmentNumber(),
-        customerId: booking.customerId,
-        bookingId: booking._id,
-        hblNumber,
-        consolidationId: consolidation ? consolidation._id : null,
-        serviceType: booking.serviceType || null,
-        origin: booking.origin || 'Sydney',
-        destination: booking.destination || null,
-        cargo: booking.boxSummary || null,
-        boxCount: booking.boxCount ?? null,
-        status: 'cargo_received',
-        warehouseStatus: null,
-        history: [{ status: 'cargo_received', at: now, note: `BL ${hblNumber} assigned` }],
-        createdAt: now,
-        updatedAt: now
-      };
-      const { insertedId } = await shipments().insertOne(doc);
-      shipment = { ...doc, _id: insertedId };
-    }
-
-    const bookingSet = { shipmentId: String(shipment._id), warehouseStatus: 'received' };
-    if (!booking.bookingCode) bookingSet.bookingCode = await customerTools.newBookingCode();
-    await bookings().updateOne({ _id: booking._id }, { $set: bookingSet });
-
-    const [withCustomerInfo] = await attachCustomerInfo([shipment]);
-    broadcast('shipment.updated', { shipment: withCustomerInfo });
-
-    res.status(existing ? 200 : 201).json({
+    res.status(result.existing ? 200 : 201).json({
       success: true,
-      shipment: withCustomerInfo
+      shipment: result.shipment
     });
 
   } catch (err) {
@@ -2960,7 +3097,6 @@ app.post('/api/bookings/:bookingId/bl', async (req, res) => {
     });
   }
 });
-
 
 // ============================================================
 // SHIPMENTS (Phase 2) — live operational tracking, separate from the
@@ -3003,11 +3139,20 @@ async function attachCustomerInfo(shipmentDocs) {
     : [];
   const receiverById = new Map(receiverDocs.map(r => [String(r._id), r]));
 
+  // Which shipment (container) each BL is in, from the shipment itself —
+  // BLs assigned in the console don't store the number.
+  const batchIds = [...new Set(shipmentDocs.map(s => (s.consolidationId ? String(s.consolidationId) : null)).filter(Boolean))];
+  const batchDocs = batchIds.length
+    ? await consolidations().find({ _id: { $in: batchIds.map(id => new ObjectId(id)) } }, { projection: { batchNumber: 1 } }).toArray()
+    : [];
+  const batchNumberById = new Map(batchDocs.map(b => [String(b._id), b.batchNumber ?? null]));
+
   return shipmentDocs.map(s => {
     const customer = byId.get(String(s.customerId));
     const receiver = s.receiverId ? receiverById.get(String(s.receiverId)) : null;
     return {
       ...s,
+      batchNumber: s.consolidationId ? batchNumberById.get(String(s.consolidationId)) ?? s.batchNumber ?? null : null,
       customerName: customer ? customer.name : null,
       phoneNumber: customer ? customer.phoneNumber : null,
       // Deduped receiver record, distinct from the embedded `receiver`
@@ -3237,6 +3382,50 @@ app.get('/api/shipments/:shipmentId/timeline', async (req, res) => {
 });
 
 
+// Move a customer's BL to another shipment (container) — or out of one —
+// when staff put it in the wrong one. The SAME record moves (never a
+// copy), and the move is written into the BL's history.
+app.patch('/api/shipments/:shipmentId/move', async (req, res) => {
+  try {
+    const { shipmentId } = req.params;
+    if (!ObjectId.isValid(shipmentId)) return res.status(400).json({ error: 'Invalid shipment id' });
+    const shipment = await shipments().findOne({ _id: new ObjectId(shipmentId) });
+    if (!shipment) return res.status(404).json({ error: 'BL not found' });
+
+    const raw = (req.body || {}).batchNumber;
+    let target = null;
+    if (raw !== null && raw !== undefined && raw !== '') {
+      const batchNumber = Number(raw);
+      if (!Number.isInteger(batchNumber) || batchNumber < 1) return res.status(400).json({ error: 'Choose a shipment to move it to.' });
+      target = await consolidations().findOne({ batchNumber });
+      if (!target) return res.status(404).json({ error: `Shipment ${batchNumber} not found` });
+    }
+    const current = shipment.consolidationId ? await consolidations().findOne({ _id: shipment.consolidationId }, { projection: { batchNumber: 1 } }) : null;
+    if (String(current ? current._id : '') === String(target ? target._id : '')) {
+      return res.status(400).json({ error: target ? `It's already in Shipment ${target.batchNumber}.` : 'It isn\'t in a shipment.' });
+    }
+
+    const label = c => (c ? `Shipment ${c.batchNumber}` : 'no shipment');
+    const by = req.user && req.user.email ? req.user.email : 'staff';
+    const now = new Date().toISOString();
+    const updated = await shipments().findOneAndUpdate(
+      { _id: shipment._id },
+      {
+        // batchNumber too: imported BLs store it, and it must follow the move.
+        $set: { consolidationId: target ? target._id : null, batchNumber: target ? target.batchNumber : null, updatedAt: now },
+        $push: { history: { status: shipment.status, at: now, note: `Moved from ${label(current)} to ${label(target)} by ${by}` } }
+      },
+      { returnDocument: 'after' }
+    );
+    const [withCustomerInfo] = await attachCustomerInfo([updated]);
+    broadcast('shipment.updated', { shipment: withCustomerInfo });
+    res.json({ shipment: withCustomerInfo, from: current ? current.batchNumber : null, to: target ? target.batchNumber : null });
+  } catch (err) {
+    console.error('Error moving shipment:', err.message);
+    res.status(500).json({ error: 'Failed to move the BL' });
+  }
+});
+
 const SHIPMENT_UPDATABLE_FIELDS = [
   'serviceType', 'origin', 'destination', 'blNumber', 'containerNumber',
   'cargo', 'boxCount', 'weight', 'cbm', 'trackingNumber', 'warehouseStatus'
@@ -3383,6 +3572,68 @@ app.get('/api/consolidations', async (req, res) => {
   }
 });
 
+
+// Staff start a new shipment (container) — e.g. "Shipment 59" — before any
+// customers are in it. Customers join it later, when their BL is assigned
+// with this shipment number. Same shape as the ones imported from the
+// tracker sheet, with empty totals; the label is "59-OCT" (number + the
+// departure month).
+const MONTHS_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function isoDateOrNull(v) {
+  if (v === undefined || v === null || v === '') return { value: null };
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(new Date(`${v}T00:00:00Z`).getTime())) return { error: 'Dates must be real dates.' };
+  return { value: v };
+}
+
+app.post('/api/consolidations', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const latest = await consolidations().find({}, { projection: { batchNumber: 1 } }).sort({ batchNumber: -1 }).limit(1).toArray();
+    const nextNumber = latest.length ? (latest[0].batchNumber || 0) + 1 : 1;
+    const batchNumber = body.batchNumber === undefined || body.batchNumber === null || body.batchNumber === '' ? nextNumber : Number(body.batchNumber);
+    if (!Number.isInteger(batchNumber) || batchNumber < 1 || batchNumber > 100000) {
+      return res.status(400).json({ error: 'The shipment number must be a whole number, e.g. 59.' });
+    }
+    const departure = isoDateOrNull(body.departureDate);
+    const arrival = isoDateOrNull(body.arrivalDate);
+    if (departure.error || arrival.error) return res.status(400).json({ error: departure.error || arrival.error });
+    if (departure.value && arrival.value && arrival.value < departure.value) {
+      return res.status(400).json({ error: 'The arrival date can\'t be before the departure date.' });
+    }
+    const peNumber = typeof body.peNumber === 'string' && body.peNumber.trim() ? body.peNumber.trim().slice(0, 40) : null;
+    const monthFrom = departure.value ? new Date(`${departure.value}T00:00:00Z`) : getSydneyNow();
+    const now = new Date().toISOString();
+    const doc = {
+      batchNumber,
+      label: `${batchNumber}-${MONTHS_SHORT[monthFrom.getUTCMonth()]}`,
+      peNumber,
+      hblRange: { from: '', to: '' },
+      totals: { hbl: 0, tc: 0, gb: 0, ob: 0, wb: 0, dd: 0, totalCbm: null, totalBoxes: null },
+      paymentTotals: { zeller: 0, eft: 0, cash: 0 },
+      financials: { grossIncome: 0, totalExpenses: 0, grossProfit: 0 },
+      financialsNote: null,
+      dates: {
+        sydneyCalendarEtd: departure.value, sydneyCalendarEta: arrival.value,
+        peblEta: null, peblClearanceDate: null, peblDeliveryDate: null,
+        transconnectPickupSyd: null, transconnectDeliveryMel: null
+      },
+      source: 'console',
+      createdBy: req.user && req.user.email ? req.user.email : 'staff',
+      createdAt: now,
+      updatedAt: now
+    };
+    const { insertedId } = await consolidations().insertOne(doc);
+    const created = { ...doc, _id: insertedId, importedShipmentCount: 0 };
+    broadcast('consolidation.created', { consolidation: created });
+    res.status(201).json({ consolidation: created });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'That shipment number already exists.' });
+    }
+    console.error('Error creating shipment (consolidation):', err.message);
+    res.status(500).json({ error: 'Failed to create the shipment' });
+  }
+});
 
 app.get('/api/consolidations/:consolidationId', async (req, res) => {
 
@@ -4151,13 +4402,13 @@ app.patch(
         {
           customerId: updated._id,
           mode: updated.mode,
-          customer: updated
+          customer: withoutSignInSecrets(updated)
         }
       );
 
 
       res.status(200).json({
-        customer: updated
+        customer: withoutSignInSecrets(updated)
       });
 
     } catch (err) {
@@ -4225,10 +4476,10 @@ app.patch(
 
       broadcast('customer.contact_updated', {
         customerId: updated._id,
-        customer: updated
+        customer: withoutSignInSecrets(updated)
       });
 
-      res.status(200).json({ customer: updated });
+      res.status(200).json({ customer: withoutSignInSecrets(updated) });
 
     } catch (err) {
 
@@ -4287,10 +4538,10 @@ app.patch(
 
       broadcast('customer.contact_updated', {
         customerId: updated._id,
-        customer: updated
+        customer: withoutSignInSecrets(updated)
       });
 
-      res.status(200).json({ customer: updated });
+      res.status(200).json({ customer: withoutSignInSecrets(updated) });
 
     } catch (err) {
 
@@ -4366,11 +4617,11 @@ app.post('/api/customers', async (req, res) => {
 
     broadcast('customer.contact_updated', {
       customerId: result.value._id,
-      customer: result.value
+      customer: withoutSignInSecrets(result.value)
     });
 
     res.status(isNewCustomer ? 201 : 200).json({
-      customer: result.value,
+      customer: withoutSignInSecrets(result.value),
       isNewCustomer
     });
 
@@ -5655,6 +5906,40 @@ app.post('/api/customers/:customerId/portal-password', async (req, res) => {
 const createStaffPortalRouter = require('./staffPortalRoutes');
 app.use('/api/my-transco', createStaffPortalRouter({ tools: customerTools }));
 
+// Shipping calendar: public read for the website, staff management in the console.
+const scheduleRouters = require('./scheduleRoutes')({ getSydneyNow });
+app.use('/api/public', scheduleRouters.publicRouter);
+app.use('/api/schedule', scheduleRouters.staffRouter);
+// Both chat channels answer schedule questions from those same dates.
+const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
+
+// One email through Resend (same account as the booking emails).
+// Resolves false when email isn't set up; throws if Resend refuses it.
+async function sendEmail({ to, subject, html, attachments }) {
+  if (!RESEND_API_KEY || !to) return false;
+  await axios.post(
+    'https://api.resend.com/emails',
+    { from: 'Transco Cargo Sydney <onboarding@resend.dev>', to, subject, html, ...(attachments && attachments.length ? { attachments } : {}) },
+    { headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' } }
+  );
+  return true;
+}
+
+// Walk-in drop-offs: the customer fills the declaration on their phone
+// (public), staff finalise it at the counter (behind staff auth).
+const walkInRouters = require('./walkInRoutes')({
+  tools: customerTools,
+  assignBl: assignBlToBooking,
+  getSydneyNow,
+  broadcast,
+  withoutSignInSecrets,
+  sendEmail,
+  staffEmail: STAFF_NOTIFICATION_EMAIL
+});
+app.use('/api/public', walkInRouters.publicRouter);
+app.use('/api/walk-ins', walkInRouters.staffRouter);
+app.use('/api/forms', walkInRouters.formsRouter);
+
 const createWebChatRouter = require('./webChatRoutes');
 app.use('/api/web-chat', createWebChatRouter({
   getFlowiseReply,
@@ -5678,7 +5963,8 @@ app.use('/api/web-chat', createWebChatRouter({
   PICKUP_DELIVERY_MENU_ITEMS_INDIA,
   COUNTRY_MENU_ITEMS,
   customerAuth,
-  customerTools
+  customerTools,
+  answerScheduleQuestion: scheduleAnswerer.answerScheduleQuestion
 }));
 
 

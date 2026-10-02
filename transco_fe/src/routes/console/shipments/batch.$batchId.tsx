@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchConsolidation } from "@/lib/transco/api";
 import { SHIPMENT_STATUS_LABELS, type ConsolidationDetail } from "@/lib/transco/types";
+import { Breadcrumbs, LoadingRows, StatusBadge } from "@/components/transco/page-kit";
+import { shipmentStatus } from "@/lib/transco/status";
 
 // Sibling of index.tsx under shipments/route.tsx's Outlet — same pattern
 // as $shipmentId.tsx. Dot-segment file (batch.$batchId.tsx) inside the
@@ -34,27 +36,21 @@ function BatchDetailPage() {
   }, [batchId]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-chat-canvas p-4 md:p-6">
-      <Link
-        to="/console/shipments"
-        className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to Shipments
-      </Link>
+    <div className="min-h-0 flex-1 overflow-y-auto bg-background px-4 py-5 md:px-8 md:py-7">
+      <Breadcrumbs items={[{ label: "Shipments", to: "/console/shipments" }, { label: batch ? `Shipment ${batch.batchNumber}` : "Shipment" }]} />
 
       {error && (
-        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="mb-4 rounded-lg border border-attention/20 bg-attention-soft px-4 py-3 text-sm text-attention-foreground">
           {error}
         </p>
       )}
 
-      {!batch && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!batch && !error && <LoadingRows rows={4} />}
 
       {batch && (
         <>
           <div className="mb-5">
-            <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
               <Layers className="h-4 w-4 text-muted-foreground" />
               Shipment {batch.batchNumber}
               <span className="text-sm font-normal text-muted-foreground">({batch.label})</span>
@@ -105,12 +101,12 @@ function BatchDetailPage() {
                 </div>
                 <div className="flex items-baseline justify-between border-t border-border pt-2">
                   <span className="text-sm font-medium text-foreground">Profit</span>
-                  <span className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  <span className="text-lg font-semibold tabular-nums text-success-foreground">
                     {AUD.format(batch.financials.grossProfit)}
                   </span>
                 </div>
                 {batch.financialsNote && (
-                  <div className="mt-1 flex items-start gap-1.5 rounded-md bg-secondary/40 p-2 text-[11px] leading-snug text-muted-foreground">
+                  <div className="mt-1 flex items-start gap-1.5 rounded-md bg-secondary/40 p-2 text-xs leading-snug text-muted-foreground">
                     <Info className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>{batch.financialsNote}</span>
                   </div>
@@ -144,9 +140,9 @@ function BatchDetailPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-auto rounded-md border border-border">
+            <div className="overflow-auto rounded-xl border bg-card shadow-xs">
               <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium">HBL</th>
                     <th className="px-3 py-2 font-medium">Sender</th>
@@ -216,9 +212,7 @@ function BatchDetailPage() {
                           : (s.totalBoxes ?? "—")}
                       </td>
                       <td className="px-3 py-2">
-                        <Badge variant="secondary" className="font-medium">
-                          {SHIPMENT_STATUS_LABELS[s.status]}
-                        </Badge>
+                        <StatusBadge tone={shipmentStatus(s.status).tone}>{shipmentStatus(s.status).label}</StatusBadge>
                       </td>
                     </tr>
                   ))}
@@ -235,7 +229,7 @@ function BatchDetailPage() {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
       <span className="text-lg font-semibold tabular-nums text-foreground">{value}</span>

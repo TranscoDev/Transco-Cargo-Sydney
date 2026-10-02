@@ -35,6 +35,17 @@ const SHOW_FREIGHT_MODE_MENU_MARKER = '[[SHOW_FREIGHT_MODE_MENU]]';
 const SHOW_PICKUP_DELIVERY_MENU_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU]]';
 const SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU_INDIA]]';
 const SHOW_COUNTRY_MENU_MARKER = '[[SHOW_COUNTRY_MENU]]';
+// The website's Sri Lanka / India pages send `country` with every
+// message instead of posting a fake "I'm shipping to ..." message on
+// each page load (which used to fill the transcript, the console and
+// the assistant's memory with repeats). The assistant is told once per
+// visitor — and again only if they switch country — by putting the same
+// phrase the country menu uses in front of their real question. The
+// saved transcript keeps only what the visitor actually typed.
+const COUNTRY_CONTEXT_PHRASES = {
+  sri_lanka: "I'm shipping to Sri Lanka",
+  india: "I'm shipping to India"
+};
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 
@@ -131,7 +142,9 @@ module.exports = function createWebChatRouter({
   // My Transco (optional — when absent, the widget behaves exactly as
   // it always has, for everyone).
   customerAuth,
-  customerTools
+  customerTools,
+  // Schedule questions answered from the shipping calendar (optional).
+  answerScheduleQuestion
 }) {
   const router = express.Router();
 
@@ -169,7 +182,7 @@ module.exports = function createWebChatRouter({
 
   router.post('/', async (req, res) => {
     try {
-      const { sessionId, message, menuItemId, action, shipmentId, label } = req.body || {};
+      const { sessionId, message, menuItemId, action, shipmentId, label, country } = req.body || {};
 
       if (!sessionId || typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'sessionId is required' });
@@ -219,10 +232,16 @@ module.exports = function createWebChatRouter({
       // staff see who they're talking to. The chat stays on its own
       // website-session record (the account's WhatsApp conversation and
       // mode are never touched from here).
-      if (account && String(customer.linkedCustomerId || '') !== String(account._id)) {
-        const link = { linkedCustomerId: account._id };
-        if (hasRealName(account)) link.name = account.name;
-        await customers().updateOne({ _id: customer._id }, { $set: link });
+      // Kept in sync on every signed-in message, so a name the customer
+      // changes in My Transco shows up in the console's Conversations too.
+      if (account) {
+        const link = {};
+        if (String(customer.linkedCustomerId || '') !== String(account._id)) link.linkedCustomerId = account._id;
+        if (hasRealName(account) && customer.name !== account.name) link.name = account.name;
+        if (Object.keys(link).length) {
+          await customers().updateOne({ _id: customer._id }, { $set: link });
+          Object.assign(customer, link);
+        }
       }
 
       // What the customer "said", for the transcript and for staff to
@@ -363,7 +382,46 @@ module.exports = function createWebChatRouter({
         return res.status(400).json({ error: 'Unrecognized action' });
       }
 
-      const rawReply = await getFlowiseReply(outgoingText, sessionId);
+      // Schedule questions: answered from the shipping calendar (the same
+      // dates the website shows), not by the AI. Done before the country
+      // context below, so the AI still gets that on the next real question.
+      if (answerScheduleQuestion) {
+        const scheduleReply = await answerScheduleQuestion({
+          text: outgoingText,
+          country: (Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) && country) || customer.webCountry || null
+        });
+        if (scheduleReply) {
+          const saved = await saveMessage({
+            customerId: customer._id,
+            senderType: 'CHATBOT',
+            content: scheduleReply,
+            isRead: true,
+            replyToMessageId: incoming._id,
+            whatsappStatus: null
+          });
+          await broadcastMessageCreated(customer, saved);
+          return res.json({ reply: scheduleReply, media: null, menu: null, cards: [], actions: [], handedOff: false });
+        }
+      }
+
+      // Which country this visitor has already told the assistant about:
+      // either in their own words (the country buttons/menu send exactly
+      // these phrases) or via the page they're on. Unknown `country`
+      // values are ignored, never an error — older pages don't send one.
+      let flowiseText = outgoingText;
+      const statedCountry = Object.keys(COUNTRY_CONTEXT_PHRASES)
+        .find(key => COUNTRY_CONTEXT_PHRASES[key].toLowerCase() === outgoingText.toLowerCase());
+      const pageCountry = Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) ? country : null;
+      if (statedCountry) {
+        if (customer.webCountry !== statedCountry) {
+          await customers().updateOne({ _id: customer._id }, { $set: { webCountry: statedCountry } });
+        }
+      } else if (pageCountry && customer.webCountry !== pageCountry) {
+        flowiseText = `${COUNTRY_CONTEXT_PHRASES[pageCountry]}. ${outgoingText}`;
+        await customers().updateOne({ _id: customer._id }, { $set: { webCountry: pageCountry } });
+      }
+
+      const rawReply = await getFlowiseReply(flowiseText, sessionId);
 
       if (!rawReply) {
         return res.status(502).json({ error: 'No reply from assistant — please try again.' });

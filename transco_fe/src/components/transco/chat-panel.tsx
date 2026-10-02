@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { AlertTriangle, ArrowLeft, Clock, Phone } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { AlertTriangle, ArrowLeft, Clock, Phone, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatDayDivider } from "@/lib/transco/time";
@@ -8,6 +9,7 @@ import type { Conversation, ConversationMode, Message } from "@/lib/transco/type
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 import { ModeSwitch } from "./mode-switch";
+import { formatPhone } from "@/lib/transco/phone";
 
 function groupByDay(messages: Message[]) {
   const groups: { label: string; items: Message[] }[] = [];
@@ -59,6 +61,9 @@ export function ChatPanel({
     ? conversation.needsAttentionMessage?.createdAt
     : undefined;
   const windowClosedHoursAgo = whatsappWindowClosedHoursAgo(conversation);
+  // A signed-in website chat opens the customer's real profile, not the
+  // anonymous chat record.
+  const profileId = conversation.linkedAccount?.id ?? conversation.id;
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -90,12 +95,34 @@ export function ChatPanel({
             </button>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-foreground">
-              {conversation.customerName}
+            <h1 className="truncate text-base font-semibold text-foreground">
+              <Link
+                to="/console/customers/$customerId"
+                params={{ customerId: profileId }}
+                title="Open customer profile"
+                className="hover:underline"
+              >
+                {conversation.customerName}
+              </Link>
             </h1>
-            <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-              <Phone className="h-3 w-3 shrink-0" />
-              {conversation.phoneNumber}
+            <p className="flex items-center gap-3 truncate text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <Phone className="h-3 w-3 shrink-0" aria-hidden />
+                {formatPhone(conversation.phoneNumber)}
+              </span>
+              {conversation.linkedAccount && (
+                <span className="rounded bg-success-soft px-1.5 font-medium text-success-foreground">
+                  ✓ Signed in{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
+                </span>
+              )}
+              <Link
+                to="/console/customers/$customerId"
+                params={{ customerId: profileId }}
+                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+              >
+                <UserRound className="h-3 w-3 shrink-0" aria-hidden />
+                View profile
+              </Link>
             </p>
           </div>
         </div>
@@ -103,13 +130,14 @@ export function ChatPanel({
       </header>
 
       {conversation.needsAttention && (
-        <div className="flex shrink-0 items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 md:px-6">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div className="flex shrink-0 items-start gap-2.5 border-b border-attention/20 bg-attention-soft px-3 py-2.5 md:px-6">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-attention" aria-hidden />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-destructive">Flagged for follow-up</p>
-            <p className="truncate text-xs text-destructive/90">
-              {conversation.needsAttentionMessage?.content ?? "The chatbot handed this off to staff."}
+            <p className="text-sm font-semibold text-attention-foreground">The bot asked for staff help</p>
+            <p className="truncate text-sm text-attention-foreground/85">
+              {conversation.needsAttentionMessage?.content ?? "The bot handed this chat to staff."}
             </p>
+            {!isHuman && <p className="mt-0.5 text-xs text-attention-foreground/80">Take over the chat to reply yourself.</p>}
           </div>
         </div>
       )}
@@ -118,7 +146,7 @@ export function ChatPanel({
         {groupByDay(conversation.messages).map((group) => (
           <div key={group.label} className="space-y-2">
             <div className="flex justify-center py-1">
-              <span className="rounded bg-panel px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground ring-1 ring-inset ring-border">
+              <span className="rounded-full bg-panel px-3 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
                 {group.label}
               </span>
             </div>
@@ -130,9 +158,9 @@ export function ChatPanel({
       </div>
 
       {windowClosedHoursAgo !== null && (
-        <div className="flex shrink-0 items-start gap-2 border-t border-amber-600/30 bg-amber-500/10 px-3 py-2 md:px-6">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <p className="text-xs text-amber-700 dark:text-amber-400">
+        <div className="flex shrink-0 items-start gap-2 border-t border-warning/30 bg-warning-soft px-3 py-2 md:px-6">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+          <p className="text-sm text-warning-foreground">
             This customer hasn't messaged in over 24 hours ({windowClosedHoursAgo}h past the window), so
             WhatsApp will block a new message until they write in again.
           </p>

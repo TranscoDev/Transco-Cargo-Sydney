@@ -17,13 +17,13 @@ import { ConversationsProvider, useConversations } from "@/lib/transco/store";
 export const Route = createFileRoute("/console")({
   head: () => ({
     meta: [
-      { title: "Conversation Console — Transco" },
+      { title: "Transco Admin" },
       {
         name: "description",
         content:
-          "Monitor WhatsApp customer conversations, spot unread messages, and hand chats between chatbot and staff.",
+          "Transco staff workspace — conversations, customers, bookings and shipments.",
       },
-      { property: "og:title", content: "Conversation Console — Transco" },
+      { property: "og:title", content: "Transco Admin" },
       {
         property: "og:description",
         content: "Monitor WhatsApp customer conversations and hand chats between chatbot and staff.",
