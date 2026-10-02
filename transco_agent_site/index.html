@@ -1,0 +1,1428 @@
+<!--
+  Transco Cargo Sydney — "Transco Agent" homepage prototype.
+
+  A SAMPLE/TEST site only — not connected to git, not the real
+  Hostinger site. Exists to prototype an agent-first homepage (chat
+  embedded as the centerpiece, not a floating corner bubble) before
+  anything gets ported to the real site. Talks to the same live
+  backend the WhatsApp bot and the corner-widget test page use
+  (POST /api/web-chat), so every reply here is the real bot, not a
+  mockup.
+
+  Self-contained: no build step, no dependencies beyond Google Fonts.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Transco Cargo Sydney — Transco Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #182233;
+    --navy-soft: #2a3648;
+    --cream: #f6f4ef;
+    --ink: #1c2430;
+    --muted: #6b7480;
+    --sl-teal: #12a189;
+    --sl-teal-deep: #0c7d6b;
+    --in-orange: #f0762e;
+    --in-orange-deep: #d15f1e;
+    --bot-bubble: #eef1f6;
+    --line: #e3e0d8;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  /* One shared blurred/darkened photo, fixed to the viewport, behind
+     the entire page — not a separate crop for the hero and a separate
+     (or absent) one for everything below it. Two independent copies of
+     this photo, cropped and scaled to different boxes, is what created
+     the visible seam where they met; a single fixed layer can't
+     mismatch itself. .hero layers its own extra scrim on top for text
+     contrast; everything below it just shows this same backdrop
+     through a light cream wash. */
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background: url('https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=1600,fit=crop/A3Q7bo0gbPUjX8Jp/cardboard-box-retail-counter-mP4MjyGQWZtba40l.jpg') center/cover;
+    filter: brightness(0.66) saturate(0.9) blur(3px);
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: rgba(246,244,239,0.5);
+  }
+  h1, h2, h3, .display {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+  img, svg { max-width: 100%; }
+
+  /* ---------- Top nav ---------- */
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px clamp(20px, 5vw, 64px);
+    background: var(--navy);
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 500;
+  }
+  .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; }
+  .nav-brand-mark { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+
+  .nav-right { display: flex; align-items: center; gap: clamp(20px, 3vw, 32px); }
+  .nav-links { display: flex; align-items: center; gap: 24px; font-size: 14px; font-weight: 500; }
+  .nav-links a { text-decoration: none; color: rgba(255,255,255,0.82); transition: opacity 0.15s ease, background 0.15s ease; }
+  .nav-links a:hover { opacity: 0.75; }
+  /* "Transco Agent" is the primary destination on this page, not just
+     another link in the list — a soft teal pill sets it apart the way
+     the [Chat with Transco] CTA does, without duplicating that button's
+     full-strength treatment. */
+  .nav-links a.nav-link-primary {
+    color: #fff;
+    opacity: 1;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(18,161,137,0.22);
+    border: 1px solid rgba(18,161,137,0.5);
+  }
+  .nav-links a.nav-link-primary:hover { background: rgba(18,161,137,0.32); opacity: 1; }
+
+  .nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: #fff;
+    padding: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nav-toggle svg { display: block; width: 24px; height: 24px; }
+
+  .nav-mobile-panel {
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--navy-soft);
+    padding: 6px clamp(20px, 5vw, 64px) 20px;
+    position: sticky;
+    top: 62px;
+    z-index: 499;
+  }
+  .nav-mobile-panel.open { display: flex; }
+  .nav-mobile-panel a {
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+    font-size: 15.5px;
+    font-weight: 500;
+    padding: 13px 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  @media (max-width: 1040px) {
+    .nav-right { display: none; }
+    .nav-toggle { display: block; }
+  }
+
+  /* ---------- Hero ---------- */
+  /* The hero shows body's own fixed photo backdrop (see body::before
+     above) straight through — no separate cropped copy of its own
+     anymore, so there's nothing for it to mismatch at its edges. It
+     layers its own extra scrim (::after) on top, strong enough for
+     text contrast behind the headline, fading out toward the right and
+     softening toward the bottom so it hands off cleanly to the lighter
+     wash the rest of the page uses over that same shared backdrop. */
+  .hero {
+    position: relative;
+    color: var(--ink);
+    padding: clamp(48px, 8vw, 96px) clamp(20px, 5vw, 64px) clamp(64px, 10vw, 120px);
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      radial-gradient(ellipse 620px 460px at 12% 8%, rgba(18,161,137,0.16), transparent 60%),
+      radial-gradient(ellipse 640px 480px at 92% 4%, rgba(240,118,46,0.14), transparent 58%),
+      linear-gradient(100deg, rgba(255,253,249,0.95) 0%, rgba(255,253,249,0.88) 38%, rgba(255,253,249,0.58) 64%, rgba(246,244,239,0.3) 100%);
+    /* Fades the whole scrim (every layer above, together) down to
+       nothing by the very bottom, so hero hands off to exactly what's
+       already sitting behind it (the shared photo + body's own light
+       wash) rather than to a second, differently-composed fade — that
+       mismatch was what still produced a seam at this edge. */
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 70%, transparent 100%);
+  }
+  .hero-dotgrid {
+    position: absolute; inset: 0; z-index: 2; opacity: 0.4;
+    background-image: radial-gradient(rgba(24,34,51,0.10) 1.3px, transparent 1.3px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(ellipse 900px 500px at 70% 20%, #000 0%, transparent 70%);
+    mask-image: radial-gradient(ellipse 900px 500px at 70% 20%, #000 0%, transparent 70%);
+  }
+  .hero-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    /* Second column (minmax(0, 1fr) minmax(240px, 360px)) is for
+       .hero-visual — restore it when that card is uncommented below. */
+    grid-template-columns: 1fr;
+    gap: clamp(32px, 5vw, 64px);
+    align-items: center;
+    position: relative;
+    z-index: 3;
+  }
+  @media (max-width: 900px) { .hero-inner { grid-template-columns: 1fr; } }
+
+  .hero h1 {
+    font-size: clamp(42px, 6.2vw, 64px);
+    line-height: 1.05;
+    margin: 0 0 18px;
+    color: var(--navy);
+  }
+  .hero h1 .accent { color: var(--sl-teal-deep); }
+  .hero p.lede {
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 0 32px;
+  }
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 14px; }
+  /* Language switch — chosen here, remembered for the whole site and My Transco. */
+  .lang-switch { display: inline-flex; gap: 2px; padding: 4px; margin-bottom: 22px; border-radius: 999px; background: rgba(255,255,255,0.9); box-shadow: 0 1px 3px rgba(24,34,51,0.12); }
+  .lang-switch button { border: none; background: none; padding: 7px 16px; border-radius: 999px; font: inherit; font-size: 14.5px; font-weight: 600; color: var(--navy); cursor: pointer; min-height: 36px; }
+  .lang-switch button:hover { background: rgba(24,34,51,0.06); }
+  .lang-switch button.active { background: var(--navy); color: #fff; }
+  /* Below ~480px the clamp() above bottoms out at a fixed 42px — fine
+     down to about tablet width, but on a small phone that's still 3-4
+     wrapped lines dominating the screen. This gives phones their own,
+     smaller floor. CTAs go full-width and stack here too, instead of
+     wrapping at their natural (uneven) content width. */
+  @media (max-width: 480px) {
+    .hero h1 { font-size: clamp(30px, 9vw, 38px); margin-bottom: 14px; }
+    .hero p.lede { font-size: 16px; margin-bottom: 24px; }
+    .hero-ctas { flex-direction: column; }
+    .country-cta { width: 100%; justify-content: center; }
+  }
+  .country-cta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 22px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 15.5px;
+    color: #fff;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .country-cta:hover { transform: translateY(-2px); }
+  /* "New booking" sits under the two country buttons, as wide as both,
+     and goes straight to My Transco's booking form. */
+  .hero-actions { display: inline-flex; flex-direction: column; gap: 14px; max-width: 100%; }
+  .book-cta {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px 22px; border-radius: 14px;
+    background: var(--navy); color: #fff; font-weight: 700; font-size: 15.5px;
+    text-decoration: none; box-shadow: 0 8px 22px rgba(24,34,51,0.28);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .book-cta:hover { transform: translateY(-2px); background: var(--navy-soft); }
+  .book-cta:focus-visible, .country-cta:focus-visible { outline: 3px solid var(--sl-teal); outline-offset: 2px; }
+  /* Same treatment the real site uses on its own "View Sri Lanka /
+     View India" buttons — the actual national flag as a tinted
+     background photo, not a plain color fill. */
+  .country-cta.sl {
+    background:
+      linear-gradient(135deg, rgba(18,161,137,0.72), rgba(12,125,107,0.8)),
+      url('https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=400,fit=crop/A3Q7bo0gbPUjX8Jp/slg-YD0Er0V8XKipNnnv.png') center/cover;
+    box-shadow: 0 8px 22px rgba(18,161,137,0.35);
+  }
+  .country-cta.in {
+    background:
+      linear-gradient(135deg, rgba(240,118,46,0.7), rgba(209,95,30,0.8)),
+      url('https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=400,fit=crop/A3Q7bo0gbPUjX8Jp/indg-mnl42lw8l9c7PJ0q.png') center/cover;
+    box-shadow: 0 8px 22px rgba(240,118,46,0.35);
+  }
+  .country-cta .flag { font-size: 18px; }
+
+  /* ---------- Trust strip ---------- */
+  /* A dedicated strip instead of burying these numbers at the bottom
+     of the hero (where they read as an afterthought). A solid navy
+     fill here read as a second nav bar stacked right under the real
+     one — so this sits on the same shared photo backdrop as the rest
+     of the page (see body::before/::after) instead of its own block
+     colour, with just a hairline border top and bottom for definition. */
+  .trust-strip {
+    color: var(--navy);
+    border-top: 1px solid rgba(24,34,51,0.12);
+    border-bottom: 1px solid rgba(24,34,51,0.12);
+  }
+  .trust-strip-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 16px clamp(20px, 5vw, 64px);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 32px;
+  }
+  .trust-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13.5px; color: rgba(24,34,51,0.7); }
+  .trust-facts b { color: var(--navy); font-weight: 800; margin-right: 4px; }
+  .trust-sep { color: rgba(24,34,51,0.2); }
+  .trust-routes { display: flex; flex-wrap: wrap; gap: 20px; font-size: 13px; font-weight: 600; color: rgba(24,34,51,0.55); }
+  @media (max-width: 640px) {
+    .trust-strip-inner { flex-direction: column; align-items: flex-start; gap: 8px; }
+  }
+
+  /* ---------- Logistics services ---------- */
+  .logistics-section {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(48px, 7vw, 80px) clamp(20px, 5vw, 64px);
+  }
+  .logistics-heading { text-align: center; max-width: 560px; margin: 0 auto 40px; }
+  .logistics-heading .kicker {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sl-teal-deep);
+    margin-bottom: 10px;
+  }
+  .logistics-heading h2 { font-size: clamp(24px, 3vw, 30px); margin: 0; color: var(--navy); }
+  .logistics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .logistics-col { padding: 30px clamp(16px, 3vw, 36px); border-top: 3px solid transparent; }
+  .logistics-col.sl { border-top-color: var(--sl-teal); border-right: 1px solid var(--line); }
+  .logistics-col.in { border-top-color: var(--in-orange); }
+  @media (max-width: 700px) {
+    .logistics-grid { grid-template-columns: 1fr; }
+    .logistics-col.sl { border-right: none; border-bottom: 1px solid var(--line); }
+  }
+  .logistics-col-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .logistics-col-head .flag { font-size: 30px; line-height: 1; }
+  .logistics-col-head h3 { font-size: 19px; margin: 0; color: var(--navy); }
+  .logistics-col-head .route { margin: 2px 0 0; font-size: 13px; color: var(--muted); font-weight: 600; }
+  /* Solid white + a colour-coded icon badge and left edge, instead of
+     the near-transparent cards these used to be — those blended into
+     the photo behind them and were hard to make out. */
+  .service-list { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .service-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ink);
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 4px solid transparent;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(24,34,51,0.06);
+  }
+  .logistics-col.sl .service-list li { border-left-color: var(--sl-teal); }
+  .logistics-col.in .service-list li { border-left-color: var(--in-orange); }
+  .service-list .service-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .logistics-col.sl .service-icon { background: rgba(18,161,137,0.14); }
+  .logistics-col.in .service-icon { background: rgba(240,118,46,0.14); }
+  .logistics-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; text-decoration: none; }
+  .logistics-col.sl .logistics-link { color: var(--sl-teal-deep); }
+  .logistics-col.in .logistics-link { color: var(--in-orange-deep); }
+  .logistics-link:hover { text-decoration: underline; }
+
+  /* ---------- Agent section ---------- */
+  .agent-section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: clamp(48px, 7vw, 88px) clamp(20px, 5vw, 64px);
+  }
+  .agent-heading { text-align: center; max-width: 620px; margin: 0 auto 40px; }
+  .agent-heading .kicker {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sl-teal-deep);
+    margin-bottom: 10px;
+  }
+  .agent-heading h2 { font-size: clamp(26px, 3.4vw, 34px); margin: 0 0 12px; color: var(--navy); }
+  .agent-heading p { color: var(--muted); font-size: 15.5px; line-height: 1.6; margin: 0; }
+
+  .agent-panel {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    gap: 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(24,34,51,0.08);
+  }
+  @media (max-width: 860px) { .agent-panel { grid-template-columns: 1fr; } }
+
+  /* Left: identity + quick starts + WhatsApp handoff. Soft mint-to-
+     peach gradient (echoing the teal/orange country colors, gently)
+     instead of a flat dark panel — calmer and warmer than solid navy,
+     with navy reserved for text so it still reads clearly. */
+  .agent-side {
+    /* Navy tones only, varying shade top-to-bottom for depth — the
+       earlier teal-to-orange blend accidentally read as the Indian
+       flag, which is wrong for a brand serving both Sri Lanka and
+       India equally. The paired colors stay on the small icon only,
+       where they don't carry that association. */
+    background: linear-gradient(165deg, #253a52 0%, var(--navy) 55%, #10141f 100%);
+    color: #fff;
+    padding: 26px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .agent-avatar {
+    width: 42px; height: 42px; border-radius: 13px;
+    background: linear-gradient(135deg, #2c4059, #10141f);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(24,34,51,0.14);
+  }
+  .agent-avatar svg { width: 22px; height: 22px; }
+  .agent-name { font-weight: 700; font-size: 17px; margin: 12px 0 4px; color: #fff; }
+  .agent-sub { font-size: 12.5px; color: rgba(255,255,255,0.72); line-height: 1.5; }
+
+  .quick-list { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+  .quick-item {
+    display: flex; align-items: center; gap: 9px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 11px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    color: #fff;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .quick-item:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.3); transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
+
+  .whatsapp-cta {
+    margin-top: auto;
+    display: flex; align-items: center; gap: 9px;
+    padding: 11px 13px;
+    background: #25c96a;
+    border-radius: 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(37,201,106,0.28);
+  }
+  .whatsapp-cta:hover { background: #1fae5a; }
+
+  /* Right: the chat itself */
+  .chat-col { display: flex; flex-direction: column; height: 840px; max-height: 88vh; }
+
+  /* Gemini-style empty state — a short greeting plus suggestion cards,
+     shown before any message exists, instead of auto-sending "hi" and
+     dumping the full welcome paragraph into the chat every visit. */
+  #ta-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 24px;
+    text-align: center;
+    gap: 20px;
+    background: #fbfaf7;
+  }
+  .ta-empty-icon {
+    width: 52px; height: 52px; border-radius: 15px;
+    background: linear-gradient(135deg, #2c4059, #10141f);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ta-empty-icon svg { width: 26px; height: 26px; }
+  #ta-empty-state h3 { font-size: 18px; color: var(--navy); margin: 0; }
+  .ta-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 440px; }
+  .ta-suggestion-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 13px 14px; text-align: left; cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .ta-suggestion-card:hover { border-color: var(--sl-teal); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(24,34,51,0.08); }
+  .ta-suggestion-card .emoji { font-size: 19px; }
+  .ta-suggestion-card .label { font-size: 12.5px; font-weight: 600; color: var(--navy); line-height: 1.3; }
+  @media (max-width: 480px) { .ta-suggestions { grid-template-columns: 1fr; } }
+
+  #ta-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fbfaf7;
+  }
+  .ta-msg { max-width: 84%; padding: 11px 14px; border-radius: 13px; font-size: 14.5px; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; }
+  .ta-msg-customer { align-self: flex-end; background: var(--navy); color: #fff; border-bottom-right-radius: 4px; }
+  .ta-msg-bot { align-self: flex-start; background: var(--bot-bubble); color: #222; border: 1px solid #dde3ea; border-bottom-left-radius: 4px; }
+  .ta-msg-system { align-self: center; background: transparent; color: #888; font-size: 12.5px; text-align: center; }
+  .ta-msg img, .ta-msg video { max-width: 100%; border-radius: 8px; margin-top: 6px; display: block; }
+
+  .ta-typing { align-self: flex-start; display: flex; align-items: center; gap: 4px; padding: 11px 14px; background: var(--bot-bubble); border: 1px solid #dde3ea; border-radius: 13px; border-bottom-left-radius: 4px; }
+  .ta-typing-dot { width: 6px; height: 6px; border-radius: 50%; background: #9aa5b1; animation: taBounce 1.2s infinite ease-in-out; }
+  .ta-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .ta-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes taBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.6; } 30% { transform: translateY(-4px); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .ta-typing-dot { animation: none; opacity: 0.8; } }
+
+  .ta-menu { align-self: flex-start; max-width: 94%; display: flex; flex-wrap: wrap; gap: 7px; margin-top: -2px; }
+  .ta-menu-chip {
+    background: #fff; color: var(--navy); border: 1.5px solid var(--navy);
+    border-radius: 999px; padding: 9px 14px; min-height: 40px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .ta-menu-chip:hover, .ta-menu-chip.sel { background: var(--navy); color: #fff; }
+
+  /* Account cards/actions in a bot reply (My Transco — booking/shipment
+     cards and "Sign in" / "View all" / "Track this" buttons). Only ever
+     rendered from backend data, never from the model's free text. */
+  .ta-cards { align-self: flex-start; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; margin-top: -2px; }
+  .ta-card { background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; font-size: 14px; }
+  .ta-card-title { font-weight: 800; color: var(--navy); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .ta-card-line { color: #333; margin-top: 2px; }
+  .ta-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .ta-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 12.5px; font-weight: 700; }
+  .ta-pill.pending { background: #fdf3e1; color: #7a4f00; }
+  .ta-pill.active { background: #e3f4f0; color: #0a6657; }
+  .ta-pill.done { background: #e5f3e8; color: #1f6b33; }
+  .ta-pill.muted { background: #eef0f2; color: #4f5864; }
+  .ta-card a, .ta-card button.ta-card-btn { font-size: 13px; font-weight: 700; color: var(--sl-teal-deep); background: none; border: none; padding: 4px 0; cursor: pointer; text-decoration: none; font-family: inherit; }
+  .ta-actions { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 7px; }
+  .ta-action { display: inline-flex; align-items: center; min-height: 40px; padding: 9px 14px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 13.5px; font-weight: 700; text-decoration: none; border: 1.5px solid var(--navy); cursor: pointer; font-family: inherit; }
+  .ta-action.secondary { background: #fff; color: var(--navy); }
+  .account-link { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 11px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; background: rgba(18,161,137,0.22); border: 1px solid rgba(18,161,137,0.5); }
+  .account-link:hover { background: rgba(18,161,137,0.32); }
+
+  #ta-input-row { display: flex; gap: 8px; padding: 14px; border-top: 1px solid var(--line); background: #fff; }
+  #ta-input { flex: 1; border: 1px solid #d7dbd9; border-radius: 22px; padding: 11px 16px; font-size: 14.5px; outline: none; font-family: inherit; }
+  #ta-input:focus { border-color: var(--navy); }
+  #ta-send { background: var(--navy); color: #fff; border: none; border-radius: 50%; width: 42px; height: 42px; cursor: pointer; font-size: 16px; flex-shrink: 0; }
+  #ta-send:disabled { opacity: 0.5; cursor: default; }
+
+  /* ---------- Phones: one clear path to the Agent ----------
+     On a phone the desktop layout stacked into a menu of six options
+     followed by the same six options again, with the chat box ~2.5
+     screens down. Here instead: an "Ask" box in the hero, a compact
+     launcher in the Agent section, and the chat itself opening
+     full-screen (like a messaging app) with a back button. Desktop is
+     untouched — every rule below is phone-only. */
+  .hero-ask, .ta-launcher, .ta-mobile-head, .ask-fab { display: none; }
+  .ask-box { width: 100%; display: flex; align-items: center; gap: 12px; background: #fff; border: 1.5px solid var(--navy); border-radius: 16px; padding: 12px 14px; min-height: 58px; font-size: 16px; color: var(--muted); text-align: left; cursor: text; font-family: inherit; box-shadow: 0 8px 24px rgba(24,34,51,0.12); }
+  .ask-box .ico { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #2c4059, #10141f); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ask-box .go { margin-left: auto; font-size: 18px; color: var(--navy); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  .ta-launch-hello { margin: 2px 0 12px; font-size: 18px; font-weight: 800; color: var(--navy); text-align: center; }
+  .ta-launch-form { display: flex; flex-direction: column; gap: 12px; }
+  #ta-launch-input { width: 100%; min-height: 58px; padding: 14px 16px; border: 1.5px solid #cfd4d8; border-radius: 16px; font-size: 16px; font-family: inherit; background: #fff; color: var(--ink); outline: none; }
+  #ta-launch-input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(24,34,51,0.12); }
+  .chip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chip-grid button, .chip-grid a { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: #fff; color: var(--navy); font-size: 15px; font-weight: 700; text-align: left; cursor: pointer; text-decoration: none; font-family: inherit; box-shadow: 0 1px 3px rgba(24,34,51,0.06); }
+  .chip-grid button:active, .chip-grid a:active { border-color: var(--sl-teal); background: #f1faf8; }
+  .chip-grid .em { font-size: 22px; flex-shrink: 0; }
+  .ta-launch-send { width: 100%; min-height: 56px; border: none; border-radius: 16px; background: var(--navy); color: #fff; font-size: 17px; font-weight: 800; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .ta-launch-send:active { transform: translateY(1px); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip-row button, .chip-row a { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 8px 13px; border-radius: 999px; border: 1.5px solid rgba(24,34,51,0.2); background: #fff; color: var(--navy); font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; font-family: inherit; }
+  .chip-row button:active, .chip-row a:active { background: var(--navy); color: #fff; }
+  .ta-mobile-head { align-items: center; gap: 10px; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); background: var(--navy); color: #fff; flex-shrink: 0; }
+  .ta-mobile-head .back { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 44px; height: 44px; border-radius: 12px; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+  .ta-mobile-head .who { font-weight: 800; font-size: 16px; line-height: 1.2; }
+  .ta-mobile-head .who small { display: block; font-weight: 500; font-size: 12px; color: rgba(255,255,255,0.72); }
+  .ta-mobile-head .wa { margin-left: auto; background: #25c96a; color: #fff; text-decoration: none; border-radius: 12px; padding: 0 12px; height: 44px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 700; }
+  /* Round floating chat bubble (phones). */
+  .ask-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 900; align-items: center; justify-content: center; width: 62px; height: 62px; padding: 0; border-radius: 50%; border: 3px solid #fff; background: var(--sl-teal-deep); color: #fff; font-family: inherit; box-shadow: 0 10px 28px rgba(12,125,107,0.45); cursor: pointer; opacity: 0; transform: translateY(20px) scale(0.9); pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; }
+  .ask-fab svg { width: 28px; height: 28px; }
+  .ask-fab .dot { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: #25c96a; border: 2px solid #fff; }
+  .ask-fab.show { opacity: 1; transform: none; pointer-events: auto; }
+  .ask-fab.show:active { transform: scale(0.95); }
+  .lbl-short { display: none; }
+  @media (prefers-reduced-motion: reduce) { .ask-fab { transition: none; } }
+
+  @media (max-width: 860px) {
+    .hero-ask { display: block; margin: 0 0 18px; }
+    .hero p.lede { margin-bottom: 18px; }
+    .hero-ctas { flex-direction: row; gap: 10px; }
+    .country-cta { flex: 1; width: auto; justify-content: center; padding: 11px 10px; font-size: 14px; box-shadow: none; }
+    .hero-actions { display: flex; gap: 10px; }
+    .book-cta { padding: 11px 10px; font-size: 14px; box-shadow: none; }
+
+    .agent-section { padding: 32px 8px 36px; }
+    .agent-heading { padding: 0 12px; }
+    .agent-heading { margin-bottom: 16px; }
+    .agent-heading h2 { font-size: 24px; margin-bottom: 0; }
+    .agent-heading p { display: none; }
+    .agent-panel { display: block; border-radius: 18px; }
+    .quick-list { display: none; }
+    .agent-side { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px; }
+    .agent-side > div:first-child { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+    .agent-side .agent-name { margin: 0; }
+    .agent-side .agent-sub { display: none; }
+    .account-link, .whatsapp-cta { margin-top: 0; justify-content: center; text-align: center; min-height: 48px; font-size: 14px; }
+    .lbl-long { display: none; }
+    .lbl-short { display: inline; }
+
+    .chat-col { height: auto; max-height: none; }
+    .ta-launcher { display: block; padding: 24px 16px 22px; background: #fbfaf7; }
+    .ta-launch-hello { font-size: 21px; margin-bottom: 16px; }
+    .ta-launch-form { gap: 14px; }
+    .chip-grid { gap: 12px; }
+    .chip-grid button, .chip-grid a { min-height: 76px; font-size: 16px; padding: 14px; }
+    .chip-grid .em { font-size: 26px; }
+    #ta-launch-input { min-height: 62px; font-size: 17px; }
+    .ta-launch-send { min-height: 60px; font-size: 18px; }
+    .agent-side { padding: 18px 16px; }
+    body:not(.chat-open) .chat-col > #ta-empty-state,
+    body:not(.chat-open) .chat-col > #ta-messages,
+    body:not(.chat-open) .chat-col > #ta-menu-slot,
+    body:not(.chat-open) .chat-col > #ta-input-row { display: none !important; }
+
+    body.chat-open { overflow: hidden; }
+    body.chat-open .chat-col { position: fixed; inset: 0; z-index: 1000; height: 100vh; height: 100dvh; background: #fbfaf7; }
+    body.chat-open .ta-launcher { display: none; }
+    body.chat-open .ta-mobile-head { display: flex; }
+    body.chat-open #ta-input-row { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+    #ta-input { font-size: 16px; }
+    #ta-empty-state { justify-content: flex-start; padding-top: 22px; }
+    .ta-suggestions { grid-template-columns: 1fr 1fr; }
+    .ta-suggestion-card { flex-direction: row; align-items: center; padding: 11px 12px; min-height: 52px; }
+    .ask-fab { display: inline-flex; }
+    body.chat-open .ask-fab { display: none; }
+  }
+
+  /* ---------- Footer ---------- */
+  .footer {
+    background: var(--navy);
+    color: rgba(255,255,255,0.72);
+  }
+  .footer-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: clamp(40px, 6vw, 64px) clamp(20px, 5vw, 64px) 28px;
+    display: grid;
+    grid-template-columns: minmax(220px, 1.3fr) repeat(2, minmax(140px, 1fr));
+    gap: 32px;
+  }
+  @media (max-width: 640px) { .footer-inner { grid-template-columns: 1fr; } }
+
+  .footer-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px; color: #fff; margin-bottom: 10px; }
+  .footer-brand-mark { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+  .footer-tagline { font-size: 13px; line-height: 1.6; max-width: 260px; margin: 0 0 16px; }
+  .footer-routes { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85); }
+
+  .footer-col h4 { font-size: 12.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; margin: 0 0 14px; }
+  .footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .footer-col a { font-size: 13.5px; text-decoration: none; color: rgba(255,255,255,0.72); }
+  .footer-col a:hover { color: #fff; }
+  .footer-col .flag { margin-right: 6px; }
+
+  .footer-bottom {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px clamp(20px, 5vw, 64px) 28px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Floating chat button: the Transco Agent robot, face cropped into the
+     circle, on white with a coloured ring. Falls back to the chat icon. */
+  .fab-has-bot { background: #fff !important; border: 3px solid var(--fab-ring, #0c7d6b) !important; overflow: hidden; width: 64px !important; height: 64px !important; box-shadow: 0 8px 24px rgba(24,34,51,0.28), 0 0 0 4px rgba(255,255,255,0.85) !important; }
+  .fab-has-bot svg { display: none; }
+  .fab-bot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; transform: scale(1.16); transform-origin: 50% 50%; pointer-events: none; }
+</style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-brand">
+      <img class="nav-brand-mark" src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=64,fit=crop,f=png/A3Q7bo0gbPUjX8Jp/tr-lohfgo-FT4eaVMOTX6BeHh2.png" alt="Transco Cargo Sydney logo" />
+      Transco Cargo Sydney
+    </div>
+    <div class="nav-right">
+      <div class="nav-links">
+        <a href="#agent" class="nav-link-primary">Chat with Transco Agent</a>
+        <a href="/sri-lanka.html">Sri Lanka</a>
+        <a href="/india.html">India</a>
+        <a href="/box-info.html">Box Info</a>
+        <a href="/about.html">About</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/account.html" id="nav-account-link">My Transco</a>
+      </div>
+    </div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-mobile-panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path id="nav-toggle-icon" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </nav>
+  <div class="nav-mobile-panel" id="nav-mobile-panel">
+    <a href="#agent">Chat with Transco Agent</a>
+    <a href="/account.html">My Transco</a>
+    <a href="/sri-lanka.html">Sri Lanka</a>
+    <a href="/india.html">India</a>
+    <a href="/box-info.html">Box Info</a>
+    <a href="/about.html">About</a>
+    <a href="/contact.html">Contact</a>
+  </div>
+
+  <header class="hero">
+    <div class="hero-dotgrid" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <div>
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button type="button" data-lang-option="en" lang="en">English</button>
+          <button type="button" data-lang-option="si" lang="si">සිංහල</button>
+          <button type="button" data-lang-option="ta" lang="ta">தமிழ்</button>
+        </div>
+        <h1 data-i18n="hero.title">Ship from Sydney to Sri Lanka &amp; India with <span class="accent">Transco</span>.</h1>
+        <p class="lede">Get instant shipping information, quotes and pickup assistance through our AI-powered Transco Agent.</p>
+        <div class="hero-actions">
+          <div class="hero-ctas">
+            <a class="country-cta sl" href="/sri-lanka.html"><span class="flag">🇱🇰</span> Ship to Sri Lanka</a>
+            <a class="country-cta in" href="/india.html"><span class="flag">🇮🇳</span> Ship to India</a>
+          </div>
+          <a class="book-cta" href="/account.html#/book"><span aria-hidden="true">📝</span> New booking</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="trust-strip">
+    <div class="trust-strip-inner">
+      <div class="trust-facts">
+        <span><b class="tabular">12+</b> Years Experience</span>
+        <span class="trust-sep" aria-hidden="true">|</span>
+        <span><b class="tabular">2</b> Destinations</span>
+        <span class="trust-sep" aria-hidden="true">|</span>
+        <span><b class="tabular">24/7</b> AI Assistance</span>
+      </div>
+      <div class="trust-routes">
+        <span>Sydney → Sri Lanka</span>
+        <span>Sydney → India</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="agent-section" id="agent">
+    <div class="agent-heading">
+      <span class="kicker">Meet Your Bot</span>
+      <h2>One conversation. Every answer.</h2>
+      <p>Transco Agent handles pricing, tracking, pickup bookings and general questions — in English, Sinhala or Tamil — and hands off to our real team the moment something needs a human.</p>
+    </div>
+
+    <div class="agent-panel">
+      <div class="agent-side">
+        <div>
+          <div class="agent-avatar">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 11.5C4 7.36 7.58 4 12 4s8 3.36 8 7.5-3.58 7.5-8 7.5c-1.06 0-2.07-.19-3-.55L4.5 20l1.02-3.86C4.55 14.9 4 13.26 4 11.5z" fill="#fff"/></svg>
+          </div>
+          <div class="agent-name">Transco Agent</div>
+          <div class="agent-sub">Ask anything below — pricing, tracking, pickup bookings, or just say hi.</div>
+        </div>
+
+        <div class="quick-list">
+          <button class="quick-item" onclick="quickStart('I want a price quote', false)">💰 Get a Price Quote</button>
+          <button class="quick-item" onclick="quickStart('I want to track my shipment', false)">📦 Track a Shipment</button>
+          <button class="quick-item" onclick="quickStart('What is your shipping schedule?', false)">🗓️ Shipping Calendar</button>
+          <button class="quick-item" onclick="quickStart('Send me the Declaration Form', false)">📋 Declaration Form</button>
+          <button class="quick-item" onclick="startWithCountry('sri_lanka', false)">🇱🇰 Shipping to Sri Lanka</button>
+          <button class="quick-item" onclick="startWithCountry('india', false)">🇮🇳 Shipping to India</button>
+        </div>
+
+        <a class="account-link" id="ta-account-link" href="/account.html?next=chat">👤 <span id="ta-account-label" class="lbl-long">Sign in to see your bookings &amp; shipments</span><span id="ta-account-short" class="lbl-short">Sign in</span></a>
+
+        <a class="whatsapp-cta" href="https://wa.me/61434842023" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.87.5 3.62 1.38 5.13L2 22l4.99-1.31A9.93 9.93 0 0012 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" opacity=".15"/><path d="M17.47 14.38c-.28-.14-1.64-.81-1.9-.9-.25-.1-.44-.14-.62.14-.18.28-.71.9-.87 1.08-.16.18-.32.2-.6.07-.28-.14-1.17-.43-2.23-1.37-.83-.74-1.38-1.66-1.55-1.94-.16-.28-.02-.43.12-.57.13-.13.28-.32.42-.48.14-.16.18-.28.28-.46.1-.18.05-.35-.02-.49-.07-.14-.62-1.5-.85-2.05-.22-.53-.45-.46-.62-.47-.16-.01-.35-.01-.53-.01-.18 0-.49.07-.74.35-.25.28-.97.95-.97 2.31 0 1.36.99 2.68 1.13 2.86.14.18 1.94 2.96 4.7 4.15.66.28 1.17.45 1.57.58.66.21 1.26.18 1.73.11.53-.08 1.64-.67 1.87-1.31.23-.65.23-1.2.16-1.31-.07-.12-.25-.18-.53-.32z" fill="#fff"/></svg>
+          <span class="lbl-long">Prefer WhatsApp? Chat there instead</span><span class="lbl-short">WhatsApp</span>
+        </a>
+      </div>
+
+      <div class="chat-col" id="ta-chat-col">
+        <!-- Phones only: top bar of the full-screen chat. -->
+        <div class="ta-mobile-head">
+          <button type="button" class="back" id="ta-close-chat" aria-label="Close chat">←</button>
+          <div class="who">Transco Agent<small>English · සිංහල · தமிழ்</small></div>
+          <a class="wa" href="https://wa.me/61434842023" target="_blank" rel="noopener">WhatsApp</a>
+        </div>
+        <!-- Phones only: compact launcher shown in the page (the chat opens full-screen). -->
+        <div class="ta-launcher">
+          <p class="ta-launch-hello" id="ta-launch-hello">How can I help you today?</p>
+          <form class="ta-launch-form" id="ta-launch-form">
+            <div class="chip-grid" id="ta-launch-chips"></div>
+            <label class="sr-only" for="ta-launch-input">Type your question</label>
+            <input id="ta-launch-input" type="text" placeholder="Type your question…" autocomplete="off" enterkeyhint="send" />
+            <button type="submit" class="ta-launch-send" id="ta-launch-send">Send <span aria-hidden="true">➤</span></button>
+          </form>
+        </div>
+        <div id="ta-empty-state">
+          <div class="ta-empty-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 11.5C4 7.36 7.58 4 12 4s8 3.36 8 7.5-3.58 7.5-8 7.5c-1.06 0-2.07-.19-3-.55L4.5 20l1.02-3.86C4.55 14.9 4 13.26 4 11.5z" fill="#fff"/></svg>
+          </div>
+          <h3 id="ta-empty-heading">How can I help you today?</h3>
+          <div class="ta-suggestions" id="ta-suggestions">
+            <button class="ta-suggestion-card" onclick="quickStart('I want a price quote', false)"><span class="emoji">🧮</span><span class="label">Shipping Calculator</span></button>
+            <button class="ta-suggestion-card" onclick="quickStart('I want to track my shipment', false)"><span class="emoji">📦</span><span class="label">Track a Shipment</span></button>
+            <button class="ta-suggestion-card" onclick="quickStart('What is your shipping schedule?', false)"><span class="emoji">📅</span><span class="label">Shipping Calendar</span></button>
+            <button class="ta-suggestion-card" onclick="quickStart('Send me the Declaration Form', false)"><span class="emoji">📋</span><span class="label">Declaration Form</span></button>
+            <button class="ta-suggestion-card" onclick="startWithCountry('sri_lanka', false)"><span class="emoji">🇱🇰</span><span class="label">Shipping to Sri Lanka</span></button>
+            <button class="ta-suggestion-card" onclick="startWithCountry('india', false)"><span class="emoji">🇮🇳</span><span class="label">Shipping to India</span></button>
+          </div>
+        </div>
+        <div id="ta-messages"></div>
+        <div id="ta-menu-slot"></div>
+        <div id="ta-input-row">
+          <input id="ta-input" type="text" placeholder="Type your question..." autocomplete="off" />
+          <button id="ta-send" aria-label="Send">➤</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="logistics-section" aria-label="Shipping services">
+    <div class="logistics-heading">
+      <span class="kicker">Our Services</span>
+      <h2>Where we ship, and how</h2>
+    </div>
+    <div class="logistics-grid">
+      <div class="logistics-col sl">
+        <div class="logistics-col-head">
+          <span class="flag">🇱🇰</span>
+          <div>
+            <h3>Sri Lanka</h3>
+            <p class="route">Sydney → Sri Lanka</p>
+          </div>
+        </div>
+        <ul class="service-list">
+          <li><span class="service-icon">🚢</span> Sea Freight</li>
+          <li><span class="service-icon">✈️</span> Air Freight</li>
+        </ul>
+        <a class="logistics-link" href="/sri-lanka.html">See Sri Lanka pricing →</a>
+      </div>
+      <div class="logistics-col in">
+        <div class="logistics-col-head">
+          <span class="flag">🇮🇳</span>
+          <div>
+            <h3>India</h3>
+            <p class="route">Sydney → India</p>
+          </div>
+        </div>
+        <ul class="service-list">
+          <li><span class="service-icon">📦</span> General Cargo Shipping</li>
+        </ul>
+        <a class="logistics-link" href="/india.html">See India pricing →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand">
+          <img class="footer-brand-mark" src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=64,fit=crop,f=png/A3Q7bo0gbPUjX8Jp/tr-lohfgo-FT4eaVMOTX6BeHh2.png" alt="Transco Cargo Sydney logo" />
+          Transco Cargo Sydney
+        </div>
+        <p class="footer-tagline">Fast, reliable, and secure cargo services from Australia to Sri Lanka and India. Your goods, our commitment.</p>
+        <div class="footer-routes">
+          <span>Sydney → Sri Lanka</span>
+          <span>Sydney → India</span>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#agent">Transco Agent</a></li>
+          <li><a href="/sri-lanka.html">Sri Lanka</a></li>
+          <li><a href="/india.html">India</a></li>
+          <li><a href="/box-info.html">Box Info</a></li>
+          <li><a href="/about.html">About</a></li>
+          <li><a href="/contact.html">Contact</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="tel:0468382023">0468 382 023</a></li>
+          <li><a href="tel:0434842023">0434 842 023</a></li>
+          <li><a href="#" onclick="return false;">Unit 1, No 79 Station Road,<br>Seven Hills NSW 2147</a></li>
+          <li><a href="#" onclick="return false;">transcosydney.com.au</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>© 2026 Transco Cargo Sydney. All rights reserved.</span>
+    </div>
+  </footer>
+
+  <button type="button" class="ask-fab fab-has-bot" style="--fab-ring: #0c7d6b" id="ta-fab" data-open-chat="focus" aria-label="Chat with Transco Agent">
+    <img class="fab-bot" src="data:image/avif;base64,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" alt="" onerror="this.parentNode.classList.remove('fab-has-bot');this.remove();" />
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 11.5C4 7.36 7.58 4 12 4s8 3.36 8 7.5-3.58 7.5-8 7.5c-1.06 0-2.07-.19-3-.55L4.5 20l1.02-3.86C4.55 14.9 4 13.26 4 11.5z" fill="#fff"/></svg>
+  </button>
+
+<script>
+(function () {
+  var API_ORIGIN = "https://transco-backend-production.up.railway.app";
+  // Local development only (see the same block in account.html).
+  try {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem("transco_dev_api_origin")) {
+      API_ORIGIN = localStorage.getItem("transco_dev_api_origin");
+    }
+  } catch (e) {}
+  var WIDGET_API_URL = API_ORIGIN + "/api/web-chat";
+  var PORTAL_API_URL = API_ORIGIN + "/api/portal";
+  var SESSION_STORAGE_KEY = "transco_agent_site_session_id";
+  // Set by My Transco (account.html) after a WhatsApp-code sign-in. Only
+  // ever sent as a bearer token — the backend works out who the customer
+  // is from its signature; this page never claims an identity itself.
+  var CUSTOMER_TOKEN_KEY = "transco_customer_token";
+
+  function getCustomerToken() {
+    try { return localStorage.getItem(CUSTOMER_TOKEN_KEY); } catch (e) { return null; }
+  }
+  function clearCustomerToken() {
+    try { localStorage.removeItem(CUSTOMER_TOKEN_KEY); } catch (e) {}
+  }
+  var customerToken = getCustomerToken();
+  var signedInProfile = null;
+
+  // Warehouse QR codes point at /?src=qr — remembered for this tab so a
+  // sign-in from here records where the customer came from (once).
+  try {
+    if (new URLSearchParams(location.search).get("src") === "qr") sessionStorage.setItem("transco_source", "warehouse_qr");
+  } catch (e) {}
+
+  function getSessionId() {
+    try {
+      var existing = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (existing) return existing;
+      var fresh = "agentsite-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, fresh);
+      return fresh;
+    } catch (e) {
+      return "agentsite-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+    }
+  }
+  var sessionId = getSessionId();
+
+  var messagesEl = document.getElementById("ta-messages");
+  var input = document.getElementById("ta-input");
+  var sendBtn = document.getElementById("ta-send");
+
+  function renderMessageHtml(text) {
+    var escaped = String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    return escaped.replace(/\*([^*\n]+?)\*/g, "<strong>$1</strong>");
+  }
+
+  function addMessage(text, kind, media, scrollToStart) {
+    var div = document.createElement("div");
+    div.className = "ta-msg ta-msg-" + kind;
+    div.innerHTML = renderMessageHtml(text);
+
+    if (media) {
+      if (media.videoUrl) {
+        var video = document.createElement("video");
+        video.src = media.videoUrl;
+        video.controls = true;
+        div.appendChild(video);
+      }
+      if (media.flyerUrl) {
+        var img = document.createElement("img");
+        img.src = media.flyerUrl;
+        img.alt = "Promotional flyer";
+        div.appendChild(img);
+      }
+    }
+
+    messagesEl.appendChild(div);
+
+    if (scrollToStart) {
+      var containerTop = messagesEl.getBoundingClientRect().top;
+      var msgTop = div.getBoundingClientRect().top;
+      messagesEl.scrollTop += (msgTop - containerTop) - 8;
+    } else {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    return div;
+  }
+
+  function addMenu(items) {
+    if (!items || !items.length) return;
+    var wrap = document.createElement("div");
+    wrap.className = "ta-menu";
+    items.forEach(function (item) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "ta-menu-chip";
+      chip.textContent = item.title;
+      chip.addEventListener("click", function () {
+        chip.classList.add("sel");
+        sendPayload({ sessionId: sessionId, menuItemId: item.id }, item.title);
+      });
+      wrap.appendChild(chip);
+    });
+    messagesEl.appendChild(wrap);
+  }
+
+  // Booking/shipment cards and action buttons attached to a reply by the
+  // backend (see portalChat.js) — built with textContent only.
+  var TONE_ICON = { pending: "⏳", active: "●", done: "✓", muted: "–" };
+
+  function addCards(cards) {
+    if (!cards || !cards.length) return;
+    var wrap = document.createElement("div");
+    wrap.className = "ta-cards";
+    cards.forEach(function (card) {
+      var el = document.createElement("div");
+      el.className = "ta-card";
+      var title = document.createElement("div");
+      title.className = "ta-card-title";
+      title.textContent = card.title || "";
+      el.appendChild(title);
+      (card.lines || []).forEach(function (line) {
+        var l = document.createElement("div");
+        l.className = "ta-card-line";
+        l.textContent = line;
+        el.appendChild(l);
+      });
+      var foot = document.createElement("div");
+      foot.className = "ta-card-foot";
+      if (card.status) {
+        var tone = card.status.tone || "muted";
+        var pill = document.createElement("span");
+        pill.className = "ta-pill " + tone;
+        pill.textContent = (TONE_ICON[tone] || "") + " " + (card.status.label || "");
+        foot.appendChild(pill);
+      }
+      if (card.action && card.action.action) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ta-card-btn";
+        btn.textContent = card.action.label + " →";
+        btn.addEventListener("click", function () {
+          sendPayload({ sessionId: sessionId, action: card.action.action, shipmentId: card.action.shipmentId, label: card.action.label + ": " + card.title }, card.action.label + ": " + card.title);
+        });
+        foot.appendChild(btn);
+      } else if (card.href) {
+        var link = document.createElement("a");
+        link.href = card.href;
+        link.textContent = (card.linkLabel || "View") + " →";
+        foot.appendChild(link);
+      }
+      el.appendChild(foot);
+      wrap.appendChild(el);
+    });
+    messagesEl.appendChild(wrap);
+  }
+
+  function addActions(actions) {
+    if (!actions || !actions.length) return;
+    var wrap = document.createElement("div");
+    wrap.className = "ta-actions";
+    actions.forEach(function (a, idx) {
+      var link = document.createElement("a");
+      link.className = "ta-action" + (idx > 0 ? " secondary" : "");
+      link.href = a.href;
+      link.textContent = a.label;
+      if (a.external) { link.target = "_blank"; link.rel = "noopener"; }
+      wrap.appendChild(link);
+    });
+    messagesEl.appendChild(wrap);
+  }
+
+  function addTypingIndicator() {
+    var div = document.createElement("div");
+    div.className = "ta-typing";
+    div.innerHTML = '<span class="ta-typing-dot"></span><span class="ta-typing-dot"></span><span class="ta-typing-dot"></span>';
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  var sending = false;
+  var emptyStateEl = document.getElementById("ta-empty-state");
+
+  function sendPayload(payload, displayText, silent) {
+    if (sending) return;
+
+    if (emptyStateEl) { emptyStateEl.style.display = "none"; }
+    if (!silent) addMessage(displayText, "customer");
+    sending = true;
+    sendBtn.disabled = true;
+    var typingEl = addTypingIndicator();
+
+    var headers = { "Content-Type": "application/json" };
+    if (customerToken) headers.Authorization = "Bearer " + customerToken;
+
+    fetch(WIDGET_API_URL, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        typingEl.remove();
+        if (data.error) {
+          addMessage("Sorry, something went wrong. Please try again in a moment.", "system");
+          return;
+        }
+        if (data.handedOff) {
+          addMessage(data.note || "A staff member will be with you shortly.", "system");
+          return;
+        }
+        addMessage(data.reply || "", "bot", data.media, true);
+        addCards(data.cards);
+        addActions(data.actions);
+        addMenu(data.menu && data.menu.items);
+      })
+      .catch(function () {
+        typingEl.remove();
+        addMessage("Sorry, I couldn't reach our server. Please check your connection and try again.", "system");
+      })
+      .finally(function () {
+        sending = false;
+        sendBtn.disabled = false;
+      });
+  }
+
+  function sendMessage() {
+    var text = input.value.trim();
+    if (!text || sending) return;
+    input.value = "";
+    sendPayload({ sessionId: sessionId, message: text }, text);
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") sendMessage();
+  });
+
+  // Called by the hero/quick-start country buttons — seeds the exact
+  // same phrase the backend's COUNTRY_MENU_ITEMS already use ("I'm
+  // shipping to Sri Lanka" / "I'm shipping to India"), so tapping a
+  // country here behaves identically to tapping it from the
+  // mid-conversation country menu, just skipping straight to it.
+  // scroll defaults to true (needed for the hero buttons, which sit
+  // above the chat) but is passed false from the sidebar's own quick
+  // items below, since those already live right next to the chat —
+  // scrolling there was jumping back to the top of the whole page
+  // instead of doing nothing, which is what should happen when you're
+  // already looking at the chat you just sent a message into.
+  // ---- Phones: the chat opens full-screen ----
+  var phoneQuery = window.matchMedia("(max-width: 860px)");
+  function isPhone() { return phoneQuery.matches; }
+  var chatOpen = false;
+  var chatCol = document.getElementById("ta-chat-col");
+  var fab = document.getElementById("ta-fab");
+
+  function openChat(focus) {
+    if (!isPhone()) {
+      document.getElementById("agent").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (focus) input.focus({ preventScroll: true });
+      return;
+    }
+    if (!chatOpen) {
+      chatOpen = true;
+      document.body.classList.add("chat-open");
+      // The phone's own Back button closes the chat instead of leaving the site.
+      try { history.pushState({ taChat: true }, ""); } catch (e) {}
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    updateFab();
+    if (focus) setTimeout(function () { input.focus(); }, 60);
+  }
+
+  function closeChat(fromHistory) {
+    if (!chatOpen) return;
+    chatOpen = false;
+    document.body.classList.remove("chat-open");
+    if (!fromHistory && history.state && history.state.taChat) { try { history.back(); } catch (e) {} }
+    updateLauncher();
+    updateFab();
+  }
+
+  window.addEventListener("popstate", function () { if (chatOpen) closeChat(true); });
+  document.getElementById("ta-close-chat").addEventListener("click", function () { closeChat(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && chatOpen) closeChat(false); });
+  document.querySelectorAll("[data-open-chat]").forEach(function (el) {
+    el.addEventListener("click", function () { openChat(el.getAttribute("data-open-chat") === "focus"); });
+  });
+  // Rotating a tablet to landscape (desktop layout) mustn't leave the page locked.
+  phoneQuery.addEventListener && phoneQuery.addEventListener("change", function () { if (!isPhone()) closeChat(true); });
+
+  function updateLauncher() {
+    var started = messagesEl.children.length > 0;
+    var hello = document.getElementById("ta-launch-hello");
+    var send = document.getElementById("ta-launch-send");
+    if (hello) hello.textContent = started ? "Your chat is still open" : launchGreeting();
+    if (send) send.firstChild.textContent = started ? "Continue chat " : "Send ";
+  }
+
+  function launchGreeting() {
+    var first = signedInProfile && signedInProfile.name ? signedInProfile.name.trim().split(/\s+/)[0] : "";
+    return first ? "Hi " + first + "! How can I help?" : "How can I help you today?";
+  }
+
+  document.getElementById("ta-launch-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var box = document.getElementById("ta-launch-input");
+    var text = box.value.trim();
+    box.blur();
+    if (!text) { openChat(true); return; }
+    box.value = "";
+    openChat(false);
+    sendPayload({ sessionId: sessionId, message: text }, text);
+  });
+
+  // Floating "Ask us": only on phones, only after scrolling past the Agent section.
+  function updateFab() {
+    if (!fab) return;
+    fab.classList.toggle("show", isPhone() && !chatOpen);
+  }
+  window.addEventListener("resize", updateFab);
+  setTimeout(updateFab, 0);
+  window.addEventListener("scroll", updateFab, { passive: true });
+
+  // Compact option chips for the phone launcher — four common starts;
+  // the Agent asks which country when it needs to.
+  function renderLaunchChips() {
+    var wrap = document.getElementById("ta-launch-chips");
+    if (!wrap) return;
+    var items = signedInProfile
+      ? [["📦", "Track my shipment", function () { window.accountAction("track", "Track my shipment"); }],
+         ["🗂️", "My bookings", function () { window.accountAction("my_bookings", "My bookings"); }],
+         ["💰", "Get a price", function () { window.quickStart("I want a price quote", false); }],
+         ["📝", "New booking", function () { location.href = "/account.html#/book"; }]]
+      : [["💰", "Get a price", function () { window.quickStart("I want a price quote", false); }],
+         ["📦", "Track a shipment", function () { window.quickStart("I want to track my shipment", false); }],
+         ["🗓️", "Shipping calendar", function () { window.quickStart("What is your shipping schedule?", false); }],
+         ["📋", "Declaration form", function () { window.quickStart("Send me the Declaration Form", false); }]];
+    wrap.replaceChildren.apply(wrap, items.map(function (it) {
+      var b = document.createElement("button");
+      b.type = "button";
+      var em = document.createElement("span"); em.className = "em"; em.setAttribute("aria-hidden", "true"); em.textContent = it[0];
+      var lb = document.createElement("span"); lb.textContent = it[1];
+      b.appendChild(em); b.appendChild(lb);
+      b.addEventListener("click", it[2]);
+      return b;
+    }));
+    updateLauncher();
+  }
+
+  window.startWithCountry = function (country, scroll) {
+    if (isPhone()) { openChat(false); scroll = false; }
+    if (scroll !== false) {
+      document.getElementById('agent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    var phrase = country === 'india' ? "I'm shipping to India" : "I'm shipping to Sri Lanka";
+    sendPayload({ sessionId: sessionId, message: phrase }, phrase);
+  };
+
+  window.quickStart = function (phrase, scroll) {
+    if (window.TranscoI18n) phrase = window.TranscoI18n.t(phrase);
+    if (isPhone()) { openChat(false); scroll = false; }
+    if (scroll !== false) {
+      document.getElementById('agent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    sendPayload({ sessionId: sessionId, message: phrase }, phrase);
+  };
+
+  // Account buttons (Track my shipment / My bookings) — answered from
+  // the customer's own records by the backend, not the AI.
+  window.accountAction = function (action, label) {
+    if (isPhone()) openChat(false);
+    sendPayload({ sessionId: sessionId, action: action, label: label }, label);
+  };
+
+  renderLaunchChips();
+
+  // Arriving from another page's floating chat button (/#chat) on a
+  // phone: open the chat straight away rather than landing on the hero.
+  if (location.hash === "#chat" && isPhone()) {
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+    openChat(true);
+  }
+
+  // No auto-sent greeting anymore — the empty state (short heading +
+  // suggestion cards, see #ta-empty-state) fills that role now without
+  // needing a live API call or repeating the full welcome text on
+  // every single visit.
+
+  // ---- Signed-in customer (My Transco) ----
+  function greetingWord() {
+    var hr = new Date().getHours();
+    return hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  }
+
+  function suggestionCard(emoji, label, onClick) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "ta-suggestion-card";
+    var e = document.createElement("span"); e.className = "emoji"; e.textContent = emoji;
+    var l = document.createElement("span"); l.className = "label"; l.textContent = label;
+    b.appendChild(e); b.appendChild(l);
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function showSignedIn(profile) {
+    signedInProfile = profile;
+    var first = profile.name ? profile.name.trim().split(/\s+/)[0] : "";
+    var heading = document.getElementById("ta-empty-heading");
+    if (heading) heading.textContent = greetingWord() + (first ? ", " + first : "") + " 👋 How can I help you today?";
+
+    var grid = document.getElementById("ta-suggestions");
+    if (grid) {
+      grid.replaceChildren(
+        suggestionCard("📦", "Track my shipment", function () { window.accountAction("track", "Track my shipment"); }),
+        suggestionCard("💰", "Get a price", function () { window.quickStart("I want a price quote", false); }),
+        suggestionCard("📝", "Make a booking", function () { location.href = "/account.html#/book"; }),
+        suggestionCard("🗂️", "My bookings", function () { window.accountAction("my_bookings", "My bookings"); }),
+        suggestionCard("🔢", "My BL number", function () { window.accountAction("my_bl", "What's my BL number?"); }),
+        suggestionCard("📋", "Declaration status", function () { window.accountAction("declaration", "Declaration status"); })
+      );
+    }
+
+    renderLaunchChips();
+
+    var label = document.getElementById("ta-account-label");
+    if (label) label.textContent = "My Transco — " + (first || "your account");
+    var shortLabel = document.getElementById("ta-account-short");
+    if (shortLabel) shortLabel.textContent = "My Transco";
+    var link = document.getElementById("ta-account-link");
+    if (link) link.href = "/account.html#/home";
+  }
+
+  function handleAskParam() {
+    var ask;
+    try { ask = new URLSearchParams(location.search).get("ask"); } catch (e) { ask = null; }
+    if (!ask) return;
+    // Consume it so a refresh doesn't re-send the same question.
+    try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
+    if (ask === "price") window.quickStart("I want a price quote");
+    else if (ask === "track") {
+      if (signedInProfile) {
+        if (!isPhone()) document.getElementById("agent").scrollIntoView({ behavior: "smooth", block: "start" });
+        window.accountAction("track", "Track my shipment");
+      } else {
+        window.quickStart("I want to track my shipment");
+      }
+    }
+  }
+
+  document.querySelectorAll('a[href="#agent"]').forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      if (!isPhone()) return;
+      e.preventDefault();
+      openChat(false);
+    });
+  });
+  // Arriving on /#agent on a phone (links from other pages, QR codes) opens the chat.
+  if (location.hash === "#agent" && isPhone()) setTimeout(function () { openChat(false); }, 0);
+
+  if (customerToken) {
+    fetch(PORTAL_API_URL + "/me", { headers: { Authorization: "Bearer " + customerToken } })
+      .then(function (res) {
+        if (res.status === 401) { clearCustomerToken(); customerToken = null; return null; }
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) { if (data && data.profile) showSignedIn(data.profile); })
+      .catch(function () {})
+      .finally(handleAskParam);
+  } else {
+    handleAskParam();
+  }
+})();
+</script>
+
+<script>
+(function () {
+  var toggle = document.getElementById('nav-toggle');
+  var panel = document.getElementById('nav-mobile-panel');
+  var icon = document.getElementById('nav-toggle-icon');
+  if (!toggle || !panel) return;
+
+  var OPEN_D = "M6 6l12 12M6 18L18 6";
+  var CLOSED_D = "M4 6h16M4 12h16M4 18h16";
+
+  function setOpen(open) {
+    panel.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    if (icon) icon.setAttribute('d', open ? OPEN_D : CLOSED_D);
+  }
+
+  toggle.addEventListener('click', function () {
+    setOpen(!panel.classList.contains('open'));
+  });
+
+  panel.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', function () { setOpen(false); });
+  });
+})();
+</script>
+
+<script src="/i18n.js"></script>
+</body>
+</html>
