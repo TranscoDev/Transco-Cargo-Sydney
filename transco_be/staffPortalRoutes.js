@@ -323,6 +323,14 @@ module.exports = function createStaffPortalRouter({ tools }) {
     res.json({ booking: data });
   }));
 
+  // Costing card on the booking page: cost lines, discount, total (= price).
+  router.put('/bookings/:bookingId/costing', wrap(async (req, res) => {
+    const result = await tools.staffSaveCosting(req.params.bookingId, req.body, req.user && req.user.email);
+    if (result.notFound) return res.status(404).json({ error: 'Booking not found' });
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json({ costing: result.costing });
+  }));
+
   router.patch('/bookings/:bookingId/details', wrap(async (req, res) => {
     const result = await tools.staffUpdateBookingDetails(req.params.bookingId, req.body, req.user && req.user.email);
     if (result.notFound) return res.status(404).json({ error: 'Booking not found' });

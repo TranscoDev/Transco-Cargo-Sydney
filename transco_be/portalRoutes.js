@@ -390,10 +390,20 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     const body = req.body || {};
     const password = typeof body.password === 'string' ? body.password : '';
     // Sign in with the mobile number OR the email on the account (for a
-    // customer whose number has changed). One message for every failure,
-    // so this can't be used to find out which numbers/emails have accounts.
+    // customer whose number has changed). Says plainly when there's no
+    // account (→ sign up) or no password yet (→ WhatsApp code) — sign-up
+    // already reveals whether a number has an account, so hiding it here
+    // only confused customers.
     const byEmail = typeof body.email === 'string' && body.email.trim() !== '';
     const failure = byEmail ? 'That email or password is not right.' : 'That phone number or password is not right.';
+    const noAccount = {
+      error: byEmail ? "We couldn't find an account with that email. Don't have an account? Sign up." : "We couldn't find an account for that number. Don't have an account? Sign up.",
+      reason: 'no_account'
+    };
+    const noPassword = {
+      error: 'This number has no password yet. Sign in with a WhatsApp code below, or call us on 0434 842 023.',
+      reason: 'no_password'
+    };
     let customer = null;
     if (byEmail) {
       const email = body.email.trim().toLowerCase();
@@ -414,14 +424,14 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     if (customer && customer.portalLockedUntil && customer.portalLockedUntil > new Date()) {
       return res.status(429).json({ error: 'Too many incorrect tries. Please wait 15 minutes, or sign in with a WhatsApp code.' });
     }
-    if (!customer || !customer.passwordHash || !verifyPassword(password, customer.passwordHash)) {
-      if (customer) {
-        const failures = (customer.portalLoginFailures || 0) + 1;
-        const set = { portalLoginFailures: failures >= LOGIN_MAX_FAILURES ? 0 : failures };
-        if (failures >= LOGIN_MAX_FAILURES) set.portalLockedUntil = new Date(Date.now() + LOGIN_LOCK_MS);
-        await customers().updateOne({ _id: customer._id }, { $set: set });
-      }
-      return res.status(401).json({ error: failure });
+    if (!customer) return res.status(401).json(noAccount);
+    if (!customer.passwordHash) return res.status(401).json(noPassword);
+    if (!verifyPassword(password, customer.passwordHash)) {
+      const failures = (customer.portalLoginFailures || 0) + 1;
+      const set = { portalLoginFailures: failures >= LOGIN_MAX_FAILURES ? 0 : failures };
+      if (failures >= LOGIN_MAX_FAILURES) set.portalLockedUntil = new Date(Date.now() + LOGIN_LOCK_MS);
+      await customers().updateOne({ _id: customer._id }, { $set: set });
+      return res.status(401).json({ error: failure, reason: 'wrong_password' });
     }
 
     const updated = await customers().findOneAndUpdate(
@@ -519,6 +529,14 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     const result = await tools.createBooking(req.customer, req.body);
     if (result.error) return res.status(400).json({ error: result.error, field: result.field || null });
     res.status(201).json({ booking: result.booking });
+  }));
+
+  // The customer edits their own booking (until boxes arrive / a BL is given).
+  router.patch('/bookings/:bookingId', wrap(async (req, res) => {
+    const result = await tools.updateOwnBooking(req.customer._id, req.params.bookingId, req.body);
+    if (result.notFound) return res.status(404).json({ error: "We couldn't find that booking." });
+    if (result.error) return res.status(400).json({ error: result.error, field: result.field || null });
+    res.json({ booking: result.booking });
   }));
 
   router.post('/bookings/:bookingId/cancel', wrap(async (req, res) => {

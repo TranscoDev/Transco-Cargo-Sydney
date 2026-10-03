@@ -49,7 +49,7 @@ const ITEM_LABELS = {
   quarter_cbm: ['Quarter CBM box', 'Quarter CBM boxes'],
   tv: ['TV', 'TVs'],
   general: ['General cargo box', 'General cargo boxes'],
-  other: ['Other item', 'Other items']
+  other: ['Odd-size item', 'Odd-size items']
 };
 
 const DELIVERY_LABELS = {
@@ -178,9 +178,33 @@ function validatePerson(raw, who, { withId = false, idNumber = null, homePhone =
   return { value };
 }
 
+// A TV's screen-size band and an odd-size item's length × width × height
+// (cm) — they set the price, so the online booking asks for them. The
+// bands are the bot's TV price list (calculate_price_LATEST.js); "other"
+// (56–59" or over 75") is priced by our team.
+const TV_SIZE_LABELS = {
+  upto35: 'up to 35"', '36to45': '36–45"', '46to55': '46–55"',
+  '60to65': '60–65"', '66to75': '66–75"', other: 'other size'
+};
+const DIM_CM = { min: 1, max: 500 };
+
+function cleanTvSizes(raw, qty) {
+  if (!Array.isArray(raw) || raw.length !== qty) return null;
+  return raw.every(s => Object.prototype.hasOwnProperty.call(TV_SIZE_LABELS, s)) ? raw.slice() : null;
+}
+
+function cleanDims(raw, qty) {
+  if (!Array.isArray(raw) || raw.length !== qty) return null;
+  const dims = raw.map(d => ({ l: Number(d && d.l), w: Number(d && d.w), h: Number(d && d.h) }));
+  const ok = dims.every(d => [d.l, d.w, d.h].every(n => Number.isFinite(n) && n >= DIM_CM.min && n <= DIM_CM.max));
+  return ok ? dims.map(d => ({ l: Math.round(d.l), w: Math.round(d.w), h: Math.round(d.h) })) : null;
+}
+
 // Box list for a country — shared by the customer booking form and staff
-// edits. Returns { error } or { value: [{ type, qty }] } (types merged).
-function validateItems(country, rawItems) {
+// edits. Returns { error } or { value: [{ type, qty, sizes?, dims? }] }
+// (types merged). requireDetails: TVs need each screen size and odd-size
+// items each L × W × H (the online booking); otherwise they're kept when given.
+function validateItems(country, rawItems, { requireDetails = false } = {}) {
   if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 10) {
     return { error: 'Please add at least one item.' };
   }
@@ -190,13 +214,34 @@ function validateItems(country, rawItems) {
     const qty = Number(raw && raw.qty);
     if (!ITEM_TYPES[country].includes(type)) return { error: 'One of the items is not a type we can book online.' };
     if (!Number.isInteger(qty) || qty < 1 || qty > 30) return { error: 'Each item quantity must be between 1 and 30.' };
+    const item = { type, qty };
+    if (type === 'tv' && (requireDetails || raw.sizes !== undefined)) {
+      const sizes = cleanTvSizes(raw.sizes, qty);
+      if (!sizes) return { error: "Please choose each TV's screen size." };
+      item.sizes = sizes;
+    }
+    if (type === 'other' && (requireDetails || raw.dims !== undefined)) {
+      const dims = cleanDims(raw.dims, qty);
+      if (!dims) return { error: `Please give the length, width and height of each odd-size item in cm (${DIM_CM.min}–${DIM_CM.max}).` };
+      item.dims = dims;
+    }
     const existing = items.find(i => i.type === type);
-    if (existing) existing.qty += qty; else items.push({ type, qty });
+    if (!existing) { items.push(item); continue; }
+    existing.qty += qty;
+    if (item.sizes) existing.sizes = (existing.sizes || []).concat(item.sizes);
+    if (item.dims) existing.dims = (existing.dims || []).concat(item.dims);
   }
   if (items.reduce((n, i) => n + i.qty, 0) > 30) {
     return { error: 'For more than 30 items, please call us on 0434 842 023 so we can plan it with you.' };
   }
   return { value: items };
+}
+
+// " (55", 32")" for TVs, " (120×40×80 cm)" for odd-size items, else "".
+function itemDetail(i) {
+  if (i.type === 'tv' && Array.isArray(i.sizes) && i.sizes.length) return ` (${i.sizes.map(s => TV_SIZE_LABELS[s] || `${s}"`).join(', ')})`;
+  if (i.type === 'other' && Array.isArray(i.dims) && i.dims.length) return ` (${i.dims.map(d => `${d.l}×${d.w}×${d.h} cm`).join('; ')})`;
+  return '';
 }
 
 // ---------- the rest of the declaration (walk-in form + online booking) ----------
@@ -389,7 +434,7 @@ function createCustomerTools({
     return items
       .map(i => {
         const [one, many] = ITEM_LABELS[i.type] || [i.type, i.type];
-        return `${i.qty} ${i.qty === 1 ? one : many}`;
+        return `${i.qty} ${i.qty === 1 ? one : many}${itemDetail(i)}`;
       })
       .join(', ');
   }
@@ -475,6 +520,9 @@ function createCustomerTools({
         ? { date: safeResolvedDate(booking), day: booking.requestedDay, time: booking.requestedTime || null }
         : null,
       notes: booking.customerNotes || null,
+      // 'pickup' = our team collects from the sender (they call to arrange).
+      handover: booking.handover === 'pickup' ? 'pickup' : 'dropoff',
+      pickupNote: booking.pickupNote || null,
       status: bookingStatus(booking, shipment),
       declaration: {
         status: booking.declarationStatus === 'received' ? 'received' : booking.declarationSubmittedAt ? 'submitted' : 'needed',
@@ -488,6 +536,82 @@ function createCustomerTools({
       canCancel: booking.status === 'pending' && !shipment && booking.warehouseStatus !== 'received',
       steps: buildSteps({ booking, shipment })
     };
+  }
+
+  // What the customer's Edit page starts from, for bookings made in the
+  // online form (known country + item types). The declaration (sender,
+  // receiver, item list) can be changed until the BL is issued; boxes,
+  // delivery and drop-off only while they could still cancel.
+  function editableBooking(booking, shipment) {
+    const shaped = shapeBooking(booking, shipment);
+    const open = !shipment && booking.status !== 'cancelled' && booking.status !== 'completed';
+    if (!open || !COUNTRIES[booking.country] || !Array.isArray(booking.items)) return null;
+    const person = p => p ? {
+      fullName: p.fullName || '', address: p.address || '', town: p.town || '', mobile: p.mobile || '',
+      email: p.email || '', idNumber: p.idNumber || '', homePhone: p.homePhone || ''
+    } : null;
+    return {
+      canChangeBoxes: shaped.canCancel,
+      canCancel: shaped.canCancel,
+      sender: person(booking.sender),
+      receiver: person(booking.receiver),
+      contents: (booking.contents || []).map(c => ({ description: c.description, condition: c.condition, qty: c.qty })),
+      country: booking.country,
+      service: booking.serviceType,
+      items: booking.items,
+      deliveryType: booking.deliveryType || null,
+      handover: shaped.handover,
+      pickupNote: booking.pickupNote || '',
+      dropOff: booking.requestedDateISO ? { date: booking.requestedDateISO, time: booking.requestedTime || null } : null,
+      notes: booking.customerNotes || ''
+    };
+  }
+
+  // The customer changes their own booking — same rules as booking. The
+  // declaration (sender, receiver, item list) until the BL is issued;
+  // boxes, delivery, drop-off/pickup and notes only while they could
+  // still cancel. After the BL nothing can be changed online.
+  async function updateOwnBooking(customerId, bookingId, input) {
+    const booking = await findOwnBooking(customerId, bookingId);
+    if (!booking) return { notFound: true };
+    const shipment = await shipments().findOne({ customerId, bookingId: booking._id });
+    const editable = editableBooking(booking, shipment);
+    if (!editable) {
+      return { error: 'This booking can no longer be changed online — its BL has been issued. Please call us on 0434 842 023.' };
+    }
+    const body = input || {};
+    const sender = validatePerson(body.sender, 'sender', { idNumber: booking.country === 'sri_lanka' ? 'required' : 'optional', homePhone: true });
+    if (sender.error) return sender;
+    const receiver = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true });
+    if (receiver.error) return receiver;
+    const contents = validateContents(body.contents);
+    if (contents.error) return contents;
+    const set = {
+      sender: sender.value,
+      receiver: receiver.value,
+      destination: receiver.value.town,
+      contents: contents.value,
+      customerEditedAt: new Date()
+    };
+    if (editable.canChangeBoxes) {
+      const items = validateItems(booking.country, body.items, { requireDetails: true });
+      if (items.error) return { error: items.error, field: 'items' };
+      if (!DELIVERY_LABELS[body.deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
+      const handover = await validateHandover(body, { date: booking.requestedDateISO });
+      if (handover.error) return handover;
+      const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
+      Object.assign(set, {
+        items: items.value,
+        boxSummary: itemsSummary(items.value),
+        boxCount: items.value.reduce((n, i) => n + i.qty, 0),
+        deliveryType: body.deliveryType,
+        customerNotes: notes || null,
+        ...handover.value
+      });
+    }
+    await bookings().updateOne({ _id: booking._id, customerId }, { $set: set });
+    broadcast('booking.details_changed', { _id: String(booking._id), boxSummary: set.boxSummary || booking.boxSummary || null });
+    return { booking: shapeBooking({ ...booking, ...set }, shipment) };
   }
 
   function shapeShipment(shipment, { booking, batch } = {}) {
@@ -564,7 +688,7 @@ function createCustomerTools({
     if (!booking) return null;
     await ensureBookingCodes([booking]);
     const shipment = await shipments().findOne({ customerId, bookingId: booking._id });
-    return shapeBooking(booking, shipment);
+    return { ...shapeBooking(booking, shipment), edit: editableBooking(booking, shipment) };
   }
 
   async function shapeShipments(customerId, shipmentDocs) {
@@ -729,7 +853,14 @@ function createCustomerTools({
       countryKey: COUNTRIES[booking.country] ? booking.country : null,
       serviceKey: booking.serviceType || null,
       deliveryKey: booking.deliveryType || null,
-      items: (booking.items || []).map(i => ({ type: i.type, label: (ITEM_LABELS[i.type] || [i.type])[0], qty: i.qty })),
+      handover: booking.handover === 'pickup' ? 'pickup' : 'dropoff',
+      pickupNote: booking.pickupNote || null,
+      // Staff costing lines (null until staff save one).
+      costing: booking.costing || null,
+      items: (booking.items || []).map(i => ({
+        type: i.type, label: (ITEM_LABELS[i.type] || [i.type])[0], qty: i.qty,
+        ...(i.sizes ? { sizes: i.sizes } : {}), ...(i.dims ? { dims: i.dims } : {})
+      })),
       // From the walk-in form: the customer's own item list, insurance
       // answer and signature; office-use figures staff add at Finalise.
       contents: booking.contents || [],
@@ -816,6 +947,47 @@ function createCustomerTools({
   // boxes at drop-off, a name was misspelt, …). Same validation as the
   // customer form; only the parts sent are changed. Every edit is recorded
   // (who, when, what) so there's a trail of changes to the declaration.
+  // Staff costing for a booking: cost lines (name + amount) they can add,
+  // change or remove, a discount, and the total. The total is also saved
+  // as the booking's price, so lists and reports show it.
+  async function staffSaveCosting(bookingId, body, staffEmail) {
+    const _id = toObjectId(bookingId);
+    if (!_id) return { notFound: true };
+    const b = await bookings().findOne({ _id });
+    if (!b) return { notFound: true };
+    const input = body || {};
+    if (!Array.isArray(input.lines) || input.lines.length > 30) return { error: 'Add up to 30 cost lines.' };
+    const lines = [];
+    for (const l of input.lines) {
+      const label = l && typeof l.label === 'string' ? l.label.trim().slice(0, 80) : '';
+      const amount = Number(l && l.amount);
+      if (!label) return { error: 'Each cost line needs a name.' };
+      if (!Number.isFinite(amount) || amount < 0 || amount > 1000000) return { error: `"${label}" needs an amount of 0 or more.` };
+      lines.push({ label, amount: Math.round(amount * 100) / 100 });
+    }
+    const discount = input.discount === null || input.discount === undefined || input.discount === '' ? 0 : Number(input.discount);
+    if (!Number.isFinite(discount) || discount < 0) return { error: 'The discount must be 0 or more.' };
+    const total = Math.max(0, Math.round((lines.reduce((s, l) => s + l.amount, 0) - discount) * 100) / 100);
+    const costing = { lines, discount, total, updatedAt: new Date(), updatedBy: staffEmail || null };
+    // Also fills the paper form's office-use boxes, so staff never enter
+    // prices twice: "pickup" lines → Pickup, "door"/"delivery" lines → D to D,
+    // everything else → Freight. Staff-only — never shown to customers.
+    const sumWhere = test => Math.round(lines.filter(l => test(l.label.toLowerCase())).reduce((s, l) => s + l.amount, 0) * 100) / 100;
+    const isPickup = t => /pick\s*-?up/.test(t);
+    const isDoor = t => !isPickup(t) && /door|delivery/.test(t);
+    const pickup = sumWhere(isPickup);
+    const doorToDoor = sumWhere(isDoor);
+    const freight = sumWhere(t => !isPickup(t) && !isDoor(t));
+    const officeUse = {
+      ...(b.officeUse || {}),
+      freight: freight || null, pickup: pickup || null, doorToDoor: doorToDoor || null,
+      discount: discount || null, total
+    };
+    await bookings().updateOne({ _id }, { $set: { costing, price: total, officeUse } });
+    broadcast('booking.details_changed', { _id: String(_id), boxSummary: b.boxSummary || null });
+    return { costing };
+  }
+
   async function staffUpdateBookingDetails(bookingId, body, staffEmail) {
     const _id = toObjectId(bookingId);
     if (!_id) return { notFound: true };
@@ -829,6 +1001,14 @@ function createCustomerTools({
       if (!COUNTRIES[b.country]) return { error: 'This booking was made in the chat, so its boxes are edited as text in "Edit booking".' };
       const checked = validateItems(b.country, input.items);
       if (checked.error) return { error: checked.error, field: 'items' };
+      // Keep the customer's TV sizes / odd-size measurements when the
+      // edit doesn't resend them and that item's count is unchanged.
+      for (const item of checked.value) {
+        const before = (b.items || []).find(i => i.type === item.type && i.qty === item.qty);
+        if (!before) continue;
+        if (!item.sizes && before.sizes) item.sizes = before.sizes;
+        if (!item.dims && before.dims) item.dims = before.dims;
+      }
       set.items = checked.value;
       set.boxSummary = itemsSummary(checked.value);
       set.boxCount = checked.value.reduce((n, i) => n + i.qty, 0);
@@ -962,6 +1142,26 @@ function createCustomerTools({
     };
   }
 
+  // How the boxes reach us: dropped off at the warehouse (a day + time),
+  // or a home pickup — our team calls to arrange the day and confirm the
+  // fee, the same as the bot offers (no fixed pickup fee yet). `keep`:
+  // the booking's current slot when editing, so it isn't refused as "full"
+  // because of the booking itself.
+  async function validateHandover(body, keep) {
+    if (body.handover === 'pickup') {
+      const pickupNote = typeof body.pickupNote === 'string' ? body.pickupNote.trim().slice(0, 200) : '';
+      return { value: { handover: 'pickup', pickupNote: pickupNote || null, requestedDay: null, requestedTime: null, requestedDateISO: null } };
+    }
+    const dropOff = body.dropOff || {};
+    const options = await getBookingOptions();
+    const dateOption = options.dropOffDates.find(d => d.date === dropOff.date);
+    if (!dateOption) return { error: 'Please choose one of the available drop-off days.', field: 'dropOff' };
+    if (!dateOption.slots.includes(dropOff.time)) return { error: 'Please choose one of the available drop-off times.', field: 'dropOff' };
+    const unchanged = keep && keep.date === dateOption.date;
+    if (dateOption.full && !unchanged) return { error: 'Sorry, that day just filled up. Please choose another day.', field: 'dropOff' };
+    return { value: { handover: 'dropoff', pickupNote: null, requestedDay: dateOption.day, requestedTime: dropOff.time, requestedDateISO: dateOption.date } };
+  }
+
   // Validates a booking request. Returns { error } with a customer-
   // readable message, or { value } with the clean booking fields.
   async function validateBookingInput(input) {
@@ -972,8 +1172,8 @@ function createCustomerTools({
     const service = body.service;
     if (!COUNTRIES[country].services.includes(service)) return { error: 'Please choose a shipping service.' };
 
-    const itemsCheck = validateItems(country, body.items);
-    if (itemsCheck.error) return { error: itemsCheck.error };
+    const itemsCheck = validateItems(country, body.items, { requireDetails: true });
+    if (itemsCheck.error) return { error: itemsCheck.error, field: 'items' };
     const items = itemsCheck.value;
 
     // The full declaration is collected with the booking, so at drop-off
@@ -1001,16 +1201,9 @@ function createCustomerTools({
     const destination = receiverCheck.value.town;
 
     const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
-    if (items.some(i => i.type === 'other') && notes.length < 3) {
-      return { error: 'Please describe the "other" item in the notes so we can plan for it.' };
-    }
 
-    const dropOff = body.dropOff || {};
-    const options = await getBookingOptions();
-    const dateOption = options.dropOffDates.find(d => d.date === dropOff.date);
-    if (!dateOption) return { error: 'Please choose one of the available drop-off days.' };
-    if (!dateOption.slots.includes(dropOff.time)) return { error: 'Please choose one of the available drop-off times.' };
-    if (dateOption.full) return { error: 'Sorry, that day just filled up. Please choose another day.' };
+    const handover = await validateHandover(body);
+    if (handover.error) return handover;
 
     return {
       value: {
@@ -1024,9 +1217,7 @@ function createCustomerTools({
         signatureImage: signOff.value.signatureImage,
         dangerousGoods,
         customerNotes: notes || null,
-        requestedDay: dateOption.day,
-        requestedTime: dropOff.time,
-        requestedDateISO: dateOption.date
+        ...handover.value
       }
     };
   }
@@ -1049,6 +1240,8 @@ function createCustomerTools({
       requestedDay: value.requestedDay,
       requestedTime: value.requestedTime,
       requestedDateISO: value.requestedDateISO,
+      handover: value.handover,
+      pickupNote: value.pickupNote,
       boxSummary,
       country: value.country,
       serviceType: value.serviceType,
@@ -1129,6 +1322,7 @@ function createCustomerTools({
 
   return {
     ensureCustomerCode,
+    updateOwnBooking,
     publicProfile,
     chatContext,
     getCustomerBookings,
@@ -1144,6 +1338,7 @@ function createCustomerTools({
     getDeclarationForPrint,
     getBookingForStaffEdit,
     staffUpdateBookingDetails,
+    staffSaveCosting,
     createBooking,
     cancelBooking,
     newBookingCode,
@@ -1168,6 +1363,7 @@ module.exports = {
   SERVICE_LABELS,
   ITEM_TYPES,
   ITEM_LABELS,
+  itemDetail,
   DELIVERY_LABELS,
   DECLARATION_FORM_URL,
   SHIPMENT_STATUS_LABELS

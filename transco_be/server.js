@@ -70,7 +70,7 @@ app.use(express.json({ limit: '10mb' }));
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -482,6 +482,7 @@ const MONTH_NAMES_FULL = [
 ];
 
 function formatBookingDayLine(booking) {
+  if (!booking.requestedDay) return 'Home pickup — day to be arranged by phone';
   const dayLabel =
     booking.requestedDay.charAt(0).toUpperCase() +
     booking.requestedDay.slice(1);
@@ -759,6 +760,11 @@ function dateStringForWeekday(dayName, timeHHMM, referenceSydneyNow) {
 // safety net for any booking record that predates that fix and hasn't
 // been backfilled.
 function resolveBookingDate(booking) {
+  // Home pickup (My Transco): no drop-off slot — our team arranges the
+  // day by phone, so it sits on the day it was booked.
+  if (!booking.requestedDay && !booking.requestedDateISO) {
+    return new Date(booking.createdAt || Date.now());
+  }
   if (booking.requestedDateISO) {
     const [y, m, d] = booking.requestedDateISO.split('-').map(Number);
     const [hh, mm] = booking.requestedTime.split(':').map(Number);

@@ -600,7 +600,10 @@ test('password sign-in works, gives one message for every failure, and locks aft
   const unknown = await api('POST', '/api/portal/auth/login', { body: { countryCode: '61', phone: '0400999999', password: 'nope-nope-nope' } });
   assert.equal(wrong.status, 401);
   assert.equal(unknown.status, 401);
-  assert.equal(wrong.body.error, unknown.body.error);
+  // A number with no account is told to sign up, not "wrong password".
+  assert.equal(wrong.body.reason, 'wrong_password');
+  assert.equal(unknown.body.reason, 'no_account');
+  assert.match(unknown.body.error, /Sign up/);
 
   for (let i = 0; i < 4; i++) {
     await api('POST', '/api/portal/auth/login', { body: { countryCode: '61', phone: '0400333001', password: 'still-wrong-pw' } });
@@ -803,7 +806,8 @@ test('email: sign up with an email, then sign in with it (any case); wrong passw
   const bad = await api('POST', '/api/portal/auth/login', { body: { email: 'email.user@example.com', password: 'nope-nope-nope' } });
   const unknown = await api('POST', '/api/portal/auth/login', { body: { email: 'nobody@example.com', password: 'nope-nope-nope' } });
   assert.equal(bad.status, 401);
-  assert.equal(bad.body.error, unknown.body.error);
+  assert.equal(bad.body.reason, 'wrong_password');
+  assert.equal(unknown.body.reason, 'no_account');
 });
 
 test('email: one account per email — refused at sign-up and on profile/staff edits', async () => {
@@ -1630,4 +1634,114 @@ test('staff move a BL to the right shipment without duplicating it, and the move
   const out = await api('PATCH', `/api/shipments/${before._id}/move`, { token: staffToken, body: { batchNumber: null } });
   assert.equal(out.status, 200);
   assert.equal((await db.collection('shipments').findOne({ _id: before._id })).consolidationId, null);
+});
+
+test('online booking: TVs need their screen size, odd-size items their L × W × H', async () => {
+  const acct = await signIn('0400555432');
+  const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  const base = { country: 'sri_lanka', service: 'sea', deliveryType: 'collect', dropOff: nextDropOff(options.body), ...decl('Kandy') };
+
+  const noSize = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, items: [{ type: 'tv', qty: 2, sizes: ['46to55'] }] } });
+  assert.equal(noSize.status, 400);
+  assert.equal(noSize.body.field, 'items');
+  const noDims = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, items: [{ type: 'other', qty: 1 }] } });
+  assert.equal(noDims.body.field, 'items');
+
+  const made = await api('POST', '/api/portal/bookings', {
+    token: acct.token,
+    body: { ...base, items: [{ type: 'tv', qty: 2, sizes: ['46to55', 'upto35'] }, { type: 'other', qty: 1, dims: [{ l: 120, w: 40, h: 80 }] }] }
+  });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const b = await db.collection('bookings').findOne({ _id: new ObjectId(made.body.booking.id) });
+  assert.deepEqual(b.items[0].sizes, ['46to55', 'upto35']);
+  assert.deepEqual(b.items[1].dims, [{ l: 120, w: 40, h: 80 }]);
+  assert.equal(b.boxSummary, '2 TVs (46–55", up to 35"), 1 Odd-size item (120×40×80 cm)');
+
+  // A staff edit that only changes another item keeps the measurements.
+  const edit = await api('PATCH', `/api/my-transco/bookings/${b._id}/details`, {
+    token: staffToken, body: { items: [{ type: 'tv', qty: 2 }, { type: 'other', qty: 1 }, { type: 'gift_box', qty: 1 }] }
+  });
+  assert.equal(edit.status, 200, JSON.stringify(edit.body));
+  const afterEdit = await db.collection('bookings').findOne({ _id: b._id });
+  assert.deepEqual(afterEdit.items[0].sizes, ['46to55', 'upto35']);
+  assert.deepEqual(afterEdit.items[1].dims, [{ l: 120, w: 40, h: 80 }]);
+});
+
+test('walk-in form: TVs need their screen size, odd-size items their L × W × H', async () => {
+  const noSize = await api('POST', '/api/public/dropoff', { body: walkInForm({ items: [{ type: 'tv', qty: 1 }] }) });
+  assert.equal(noSize.status, 400);
+  assert.equal(noSize.body.field, 'items');
+  const ok = await api('POST', '/api/public/dropoff', {
+    body: walkInForm({ items: [{ type: 'tv', qty: 1, sizes: ['other'] }, { type: 'other', qty: 1, dims: [{ l: 100, w: 50, h: 60 }] }] })
+  });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  const b = await db.collection('bookings').findOne({ bookingCode: ok.body.bookingCode });
+  assert.equal(b.boxSummary, '1 TV (other size), 1 Odd-size item (100×50×60 cm)');
+});
+
+test('home pickup instead of a drop-off slot; the customer can edit their own booking until boxes arrive', async () => {
+  const acct = await signIn('0400555654');
+  const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  const base = { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'collect', ...decl('Kandy') };
+
+  // Home pickup: no day/time needed — our team calls to arrange it.
+  const pickup = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, handover: 'pickup', pickupNote: 'Weekends best' } });
+  assert.equal(pickup.status, 201, JSON.stringify(pickup.body));
+  assert.equal(pickup.body.booking.handover, 'pickup');
+  const stored = await db.collection('bookings').findOne({ _id: new ObjectId(pickup.body.booking.id) });
+  assert.equal(stored.handover, 'pickup');
+  assert.equal(stored.pickupNote, 'Weekends best');
+  assert.equal(stored.requestedDateISO, null);
+
+  // Edit: boxes, delivery and switch to a drop-off slot.
+  const view = await api('GET', `/api/portal/bookings/${pickup.body.booking.id}`, { token: acct.token });
+  assert.ok(view.body.booking.edit, 'editable while nothing has happened yet');
+  const slot = nextDropOff(options.body);
+  const edited = await api('PATCH', `/api/portal/bookings/${pickup.body.booking.id}`, {
+    token: acct.token,
+    body: { ...decl('Galle', { receiver: { fullName: 'New Receiver' } }), items: [{ type: 'tea_chest', qty: 2 }, { type: 'tv', qty: 1, sizes: ['upto35'] }], deliveryType: 'door', handover: 'dropoff', dropOff: slot, notes: 'Fragile' }
+  });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  const after = await db.collection('bookings').findOne({ _id: stored._id });
+  assert.equal(after.boxSummary, '2 Tea Chests, 1 TV (up to 35")');
+  assert.equal(after.deliveryType, 'door');
+  assert.equal(after.handover, 'dropoff');
+  assert.equal(after.requestedDateISO, slot.date);
+  assert.equal(after.customerNotes, 'Fragile');
+  assert.equal(after.receiver.fullName, 'New Receiver');
+  assert.equal(after.destination, 'Galle');
+
+  // Same rules as booking; someone else can't touch it.
+  const bad = await api('PATCH', `/api/portal/bookings/${pickup.body.booking.id}`, { token: acct.token, body: { ...decl('Kandy'), items: [{ type: 'tv', qty: 1 }], deliveryType: 'door', handover: 'pickup' } });
+  assert.equal(bad.status, 400);
+  const other = await signIn('0400555655');
+  const notMine = await api('PATCH', `/api/portal/bookings/${pickup.body.booking.id}`, { token: other.token, body: { ...decl('Kandy'), items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'door', handover: 'pickup' } });
+  assert.equal(notMine.status, 404);
+
+  // Once cancelled, it can't be edited any more.
+  await api('POST', `/api/portal/bookings/${pickup.body.booking.id}/cancel`, { token: acct.token });
+  const late = await api('PATCH', `/api/portal/bookings/${pickup.body.booking.id}`, { token: acct.token, body: { ...decl('Kandy'), items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'door', handover: 'pickup' } });
+  assert.equal(late.status, 400);
+});
+
+test('staff costing: lines, discount and total (the total becomes the price); staff only', async () => {
+  const acct = await signIn('0400555876');
+  const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  const made = await api('POST', '/api/portal/bookings', {
+    token: acct.token, body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'door', handover: 'dropoff', dropOff: nextDropOff(options.body), ...decl('Kandy') }
+  });
+  const id = made.body.booking.id;
+  const body = { lines: [{ label: '1 × Tea Chest', amount: 75 }, { label: 'Door delivery', amount: 50 }], discount: 10 };
+  assert.equal((await api('PUT', `/api/my-transco/bookings/${id}/costing`, { token: acct.token, body })).status, 401);
+  const saved = await api('PUT', `/api/my-transco/bookings/${id}/costing`, { token: staffToken, body });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.costing.total, 115);
+  const b = await db.collection('bookings').findOne({ _id: new ObjectId(id) });
+  assert.equal(b.price, 115);
+  // Fills the paper form's office-use boxes too.
+  assert.deepEqual([b.officeUse.freight, b.officeUse.doorToDoor, b.officeUse.pickup, b.officeUse.discount, b.officeUse.total], [75, 50, null, 10, 115]);
+  const print = await api('GET', `/api/my-transco/bookings/${id}/declaration`, { token: staffToken });
+  assert.equal(print.body.declaration.costing.lines.length, 2);
+  const bad = await api('PUT', `/api/my-transco/bookings/${id}/costing`, { token: staffToken, body: { lines: [{ label: 'X', amount: -1 }] } });
+  assert.equal(bad.status, 400);
 });

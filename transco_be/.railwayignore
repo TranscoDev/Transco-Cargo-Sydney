@@ -1,0 +1,4 @@
+# `railway up` skips whatever .gitignore skips — but the original paper
+# forms (media/forms/*.pdf) are never committed and must still reach the
+# server, or formsPdf.js skips those forms. Let them through here.
+!media/forms/*.pdf

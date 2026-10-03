@@ -22,7 +22,7 @@ const { ObjectId } = require('mongodb');
 const { customers, bookings, shipments } = require('./db');
 const {
   validatePerson, validateItems, validateContents, validateSignOff, validateDangerousGoods, validateLithiumDoc, cleanText, hasRealName,
-  COUNTRIES, SERVICE_LABELS, ITEM_TYPES, ITEM_LABELS, DELIVERY_LABELS
+  COUNTRIES, SERVICE_LABELS, ITEM_TYPES, ITEM_LABELS, DELIVERY_LABELS, itemDetail
 } = require('./customerTools');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf } = require('./formsPdf');
@@ -99,7 +99,7 @@ function validateDropOff(input) {
   const receiver = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true });
   if (receiver.error) return receiver;
 
-  const items = validateItems(country, body.items);
+  const items = validateItems(country, body.items, { requireDetails: true });
   if (items.error) return { error: items.error, field: 'items' };
 
   if (!DELIVERY_LABELS[body.deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
@@ -141,7 +141,7 @@ function numberOrNull(v, label) {
 function itemsLine(items) {
   return items.map(i => {
     const [one, many] = ITEM_LABELS[i.type] || [i.type, i.type];
-    return `${i.qty} ${i.qty === 1 ? one : many}`;
+    return `${i.qty} ${i.qty === 1 ? one : many}${itemDetail(i)}`;
   }).join(', ');
 }
 
