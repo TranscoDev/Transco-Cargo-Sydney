@@ -354,6 +354,12 @@
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(24,34,51,0.06);
   }
+  /* Each service card opens its country page. */
+  .service-list li { padding: 0; }
+  .service-list li a { display: flex; align-items: center; gap: 12px; padding: 12px 14px; color: inherit; text-decoration: none; border-radius: 8px; }
+  .service-list li:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(24,34,51,0.12); }
+  .service-list li { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .service-list .go { margin-left: auto; color: var(--muted); font-weight: 600; }
   .logistics-col.sl .service-list li { border-left-color: var(--sl-teal); }
   .logistics-col.in .service-list li { border-left-color: var(--in-orange); }
   .service-list .service-icon {
@@ -840,10 +846,9 @@
           </div>
         </div>
         <ul class="service-list">
-          <li><span class="service-icon">🚢</span> Sea Freight</li>
-          <li><span class="service-icon">✈️</span> Air Freight</li>
+          <li><a href="/sri-lanka.html"><span class="service-icon">🚢</span> Sea Freight<span class="go" aria-hidden="true">→</span></a></li>
+          <li><a href="/sri-lanka.html"><span class="service-icon">✈️</span> Air Freight<span class="go" aria-hidden="true">→</span></a></li>
         </ul>
-        <a class="logistics-link" href="/sri-lanka.html">See Sri Lanka pricing →</a>
       </div>
       <div class="logistics-col in">
         <div class="logistics-col-head">
@@ -854,9 +859,8 @@
           </div>
         </div>
         <ul class="service-list">
-          <li><span class="service-icon">📦</span> General Cargo Shipping</li>
+          <li><a href="/india.html"><span class="service-icon">📦</span> General Cargo Shipping<span class="go" aria-hidden="true">→</span></a></li>
         </ul>
-        <a class="logistics-link" href="/india.html">See India pricing →</a>
       </div>
     </div>
   </section>
