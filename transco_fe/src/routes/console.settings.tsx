@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getCurrentUser } from "@/lib/transco/auth";
-import { changePassword, createStaff, deleteStaff, fetchStaff } from "@/lib/transco/api";
+import { changePassword, createStaff, deleteStaff, fetchStaffWithAccess } from "@/lib/transco/api";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
 import type { StaffAccount } from "@/lib/transco/types";
 import { cn } from "@/lib/utils";
@@ -193,12 +193,15 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  // Only the Transco admin adds or removes staff; everyone else sees the list.
+  const [canManage, setCanManage] = useState(false);
 
   const load = () => {
     setLoading(true);
-    fetchStaff()
+    fetchStaffWithAccess()
       .then((data) => {
-        setStaff(data);
+        setStaff(data.staff);
+        setCanManage(data.canManage);
         setError(null);
       })
       .catch((err) =>
@@ -229,9 +232,12 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
         <CardTitle className="text-sm">Staff Accounts</CardTitle>
-        <AddStaffDialog open={addOpen} onOpenChange={setAddOpen} onCreated={load} />
+        {canManage && <AddStaffDialog open={addOpen} onOpenChange={setAddOpen} onCreated={load} />}
       </CardHeader>
       <CardContent className="p-4 pt-0">
+        {!loading && !canManage && (
+          <p className="mb-3 text-xs text-muted-foreground">Only the Transco admin can add or remove staff members.</p>
+        )}
         {error && <p className="mb-3 text-xs text-destructive">{error}</p>}
         {loading ? (
           <p className="text-xs text-muted-foreground">Loading…</p>
@@ -250,7 +256,7 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
                   </p>
                   <p className="text-xs text-muted-foreground">{s.email}</p>
                 </div>
-                {s.id !== currentUserId && (
+                {canManage && s.id !== currentUserId && (
                   <button
                     type="button"
                     onClick={() => handleDelete(s.id, s.name)}

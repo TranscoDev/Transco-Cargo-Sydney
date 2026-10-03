@@ -1988,6 +1988,22 @@ app.get('/api/auth/session', (req, res) => {
 
 const MIN_PASSWORD_LENGTH = 8;
 
+// Only the Transco admin may add or remove staff. Every other staff
+// login keeps all other access. Admin = a staff record with role
+// 'admin', or an email in ADMIN_EMAILS (default admin@transco.lk).
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'admin@transco.lk')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+async function isStaffAdmin(req) {
+  if (!req.user) return false;
+  if (ADMIN_EMAILS.includes(String(req.user.email || '').toLowerCase())) return true;
+  if (!ObjectId.isValid(req.user.sub)) return false;
+  const record = await users().findOne({ _id: new ObjectId(req.user.sub) }, { projection: { role: 1 } });
+  return Boolean(record && record.role === 'admin');
+}
+
+const ADMIN_ONLY_MESSAGE = 'Only the Transco admin can add or remove staff members.';
+
 app.patch('/api/auth/password', async (req, res) => {
 
   try {
@@ -2044,7 +2060,8 @@ app.get('/api/staff', async (req, res) => {
       .sort({ email: 1 })
       .toArray();
 
-    res.status(200).json({ staff });
+    // canManage: whether this signed-in staff member may add/remove staff.
+    res.status(200).json({ staff, canManage: await isStaffAdmin(req) });
 
   } catch (err) {
 
@@ -2063,6 +2080,8 @@ app.get('/api/staff', async (req, res) => {
 app.post('/api/staff', async (req, res) => {
 
   try {
+
+    if (!(await isStaffAdmin(req))) return res.status(403).json({ error: ADMIN_ONLY_MESSAGE });
 
     const { email, name, password } = req.body || {};
 
@@ -2123,6 +2142,8 @@ app.post('/api/staff', async (req, res) => {
 app.delete('/api/staff/:staffId', async (req, res) => {
 
   try {
+
+    if (!(await isStaffAdmin(req))) return res.status(403).json({ error: ADMIN_ONLY_MESSAGE });
 
     const { staffId } = req.params;
 

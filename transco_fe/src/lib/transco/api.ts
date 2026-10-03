@@ -831,6 +831,14 @@ export async function fetchStaff(): Promise<StaffAccount[]> {
   return data.staff.map(mapStaffAccount);
 }
 
+/** Staff list plus whether the signed-in staff member may add/remove staff (the Transco admin only). */
+export async function fetchStaffWithAccess(): Promise<{ staff: StaffAccount[]; canManage: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/api/staff`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Failed to load staff accounts (${res.status})`);
+  const data = (await res.json()) as { staff: BackendStaffAccount[]; canManage?: boolean };
+  return { staff: data.staff.map(mapStaffAccount), canManage: data.canManage === true };
+}
+
 export async function createStaff(info: {
   email: string;
   name: string;
