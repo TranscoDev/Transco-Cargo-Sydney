@@ -1,3 +1,4 @@
+import { HandoverTags } from "@/components/transco/handover-tags";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -402,6 +403,7 @@ function BookingRow({ booking: b, onOpen }: { booking: Booking; onOpen: () => vo
             {b.bookingCode ? `${b.bookingCode} · ` : ""}
             {fmtDay(b.resolvedDate)}
             {b.requestedTime ? ` · ${b.requestedTime}` : ""}
+            {" "}<HandoverTags booking={b} />
           </span>
           <span className="block truncate text-xs text-muted-foreground">
             {b.boxSummary || "No box details"}

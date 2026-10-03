@@ -138,6 +138,9 @@ export interface BackendBooking {
   walkIn?: { status?: "submitted" | "finalised"; returning?: boolean } | null;
   contents?: unknown[] | null;
   staffConfirm?: { status?: string } | null;
+  deliveryType?: "door" | "collect" | null;
+  handover?: "dropoff" | "pickup" | null;
+  pickupNote?: string | null;
 }
 
 export function mapBooking(b: BackendBooking): Booking {
@@ -146,8 +149,12 @@ export function mapBooking(b: BackendBooking): Booking {
     customerId: b.customerId,
     customerName: b.customerName,
     phoneNumber: b.phoneNumber,
-    requestedDay: b.requestedDay,
-    requestedTime: b.requestedTime,
+    // Home pickups have no drop-off day/time (our team arranges it by phone).
+    requestedDay: b.requestedDay ?? "",
+    requestedTime: b.requestedTime ?? "",
+    deliveryType: b.deliveryType ?? null,
+    handover: b.handover ?? null,
+    pickupNote: b.pickupNote ?? null,
     status: b.status,
     createdAt: b.createdAt,
     boxSummary: b.boxSummary,

@@ -57,10 +57,15 @@ export interface DeclarationPrintData {
   serviceKey: string | null;
   deliveryKey: string | null;
   destination: string | null;
-  items: { type: string; label: string; qty: number }[];
+  items: { type: string; label: string; qty: number; sizes?: string[]; dims?: { l: number; w: number; h: number }[] }[];
   itemsText: string | null;
   boxCount: number | null;
   dropOff: { date: string | null; time: string | null } | null;
+  /** Staff costing: cost lines, discount and total (the total is also the booking's price). */
+  costing: BookingCosting | null;
+  /** "pickup" = home pickup (the customer calls Sajith to arrange it). */
+  handover: "dropoff" | "pickup" | null;
+  pickupNote: string | null;
   notes: string | null;
   sender: DeclarationPerson | null;
   senderIsAccountHolder: boolean;
@@ -129,7 +134,30 @@ export async function fetchDeclaration(bookingId: string): Promise<DeclarationPr
     countryKey: d.countryKey ?? null,
     serviceKey: d.serviceKey ?? null,
     deliveryKey: d.deliveryKey ?? null,
+    handover: d.handover ?? null,
+    pickupNote: d.pickupNote ?? null,
+    costing: d.costing ?? null,
   };
+}
+
+export interface BookingCosting {
+  lines: { label: string; amount: number }[];
+  discount: number;
+  total: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+/** Saves the booking's costing (lines + discount); the server works out the total. */
+export async function saveCosting(bookingId: string, body: { lines: { label: string; amount: number }[]; discount: number }): Promise<BookingCosting> {
+  const res = await fetch(`${API_BASE_URL}/api/my-transco/bookings/${bookingId}/costing`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; costing?: BookingCosting };
+  if (!res.ok || !data.costing) throw new Error(data.error || `Could not save the costing (${res.status})`);
+  return data.costing;
 }
 
 /**

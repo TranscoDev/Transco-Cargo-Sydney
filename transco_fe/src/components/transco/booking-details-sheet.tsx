@@ -1,3 +1,5 @@
+import { CostingCard } from "@/components/transco/costing-card";
+import { HandoverTags } from "@/components/transco/handover-tags";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Mail, PenLine, Plus, Printer, ShipIcon, UserRound, X } from "lucide-react";
@@ -163,6 +165,11 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
             <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xl font-semibold tracking-tight text-foreground">
               <span className="tabular-nums">{d?.bookingCode ?? "Booking"}</span>
               {d?.blNumber && <span className="text-base font-semibold text-primary tabular-nums">BL {d.blNumber}</span>}
+              {d && (
+                <span className="text-base font-normal">
+                  <HandoverTags booking={{ handover: d.handover, deliveryType: d.deliveryKey === "door" ? "door" : null, pickupNote: d.pickupNote }} />
+                </span>
+              )}
               {confirm &&
                 (confirm.status === "finalised" ? (
                   <StatusBadge tone="success">Confirmed</StatusBadge>
@@ -203,13 +210,15 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
           {/* Left: the work. */}
           <div className="flex flex-col gap-5 text-sm">
             {confirm ? (
-              <FinaliseSection key={`${d.bookingId}-${confirm.status}`} data={d} onDone={load} />
+              // Re-reads after a costing save, which fills the office-use boxes.
+              <FinaliseSection key={`${d.bookingId}-${confirm.status}-${d.costing?.updatedAt ?? ""}`} data={d} onDone={load} />
             ) : (
               <section className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
                 This booking has no online declaration to confirm (it was made in the chat). Record weights, price and the BL from
                 the booking's ⋯ menu on the Bookings page, and fill the printed forms by hand.
               </section>
             )}
+            <CostingCard key={`${d.bookingId}-${d.costing?.updatedAt ?? "new"}`} data={d} onSaved={load} />
             {d.shipmentId && (
               <MoveShipmentControl
                 key={`${d.shipmentId}-${d.batchNumber ?? "none"}`}
@@ -279,11 +288,13 @@ function BookingInfo({ d }: { d: DeclarationPrintData }) {
   <Section title="Shipment">
     <Rows
       rows={[
-        ["Boxes", d.items.length ? d.items.map((i) => `${i.qty} × ${i.label}`).join(", ") : d.itemsText],
+        ["Boxes", d.itemsText || d.items.map((i) => `${i.qty} × ${i.label}`).join(", ")],
         ["Service", d.service],
         ["Destination", [d.destination, d.country].filter(Boolean).join(", ")],
         ["Delivery", d.delivery],
-        [walkIn ? "Came in" : "Drop-off", d.dropOff ? [d.dropOff.date ? formatDate(d.dropOff.date) : null, d.dropOff.time].filter(Boolean).join(" · ") : null],
+        d.handover === "pickup"
+          ? ["Home pickup", ["Customer calls Sajith to arrange", d.pickupNote].filter(Boolean).join(" · ")]
+          : [walkIn ? "Came in" : "Drop-off", d.dropOff ? [d.dropOff.date ? formatDate(d.dropOff.date) : null, d.dropOff.time].filter(Boolean).join(" · ") : null],
         ["Insurance", d.insurance === null ? null : d.insurance ? "Yes — wants insurance" : "No"],
         ["BL number", d.blNumber],
         ["Customer note", d.notes],

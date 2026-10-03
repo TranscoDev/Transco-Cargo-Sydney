@@ -36,7 +36,7 @@ import {
   type Segment,
   type SegmentFilter,
 } from "@/lib/transco/types";
-import { formatPhone } from "@/lib/transco/phone";
+import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 
 /**
  * Address-book view of every customer — separate from ContactList (the
@@ -212,10 +212,10 @@ export function ContactsDirectory({
     const q = query.trim().toLowerCase();
     if (!q) return filtered;
     return filtered.filter((c) => {
-      const phone = c.phoneNumber.replace(/\s/g, "").toLowerCase();
+      // phoneMatches: "0418 448 203", "0418" or "61418…" all find 61418448203.
       return (
         c.customerName.toLowerCase().includes(q) ||
-        phone.includes(q.replace(/\s/g, "")) ||
+        phoneMatches(c.phoneNumber, q) ||
         (c.email ?? "").toLowerCase().includes(q) ||
         (c.notes ?? "").toLowerCase().includes(q)
       );

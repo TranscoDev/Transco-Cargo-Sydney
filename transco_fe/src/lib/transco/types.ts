@@ -231,6 +231,11 @@ export interface Booking {
   phoneNumber: string;
   requestedDay: string;
   requestedTime: string;
+  /** "door" = door delivery at the destination, "collect" = warehouse collection. */
+  deliveryType?: "door" | "collect" | null | undefined;
+  /** "pickup" = we collect from the sender's home (arranged by phone); else drop-off. */
+  handover?: "dropoff" | "pickup" | null | undefined;
+  pickupNote?: string | null | undefined;
   status: BookingStatus;
   createdAt: string;
   /** Short plain-English line the bot itself generated (e.g. "3 Tea Chest

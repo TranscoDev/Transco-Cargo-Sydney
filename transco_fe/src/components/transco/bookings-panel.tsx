@@ -1,3 +1,4 @@
+import { HandoverTags } from "@/components/transco/handover-tags";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CalendarClock, CalendarDays, Check, Eye, MoreHorizontal, PenLine, Printer, RotateCcw, Scale, Search, ShipIcon, Trash2, X } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -432,7 +433,7 @@ function BookingCard({
     >
       <div className="flex items-center gap-4 px-4 py-3">
         <div className="w-14 shrink-0 text-center">
-          <p className="text-base font-semibold tabular-nums text-foreground">{booking.requestedTime}</p>
+          <p className="text-base font-semibold tabular-nums text-foreground">{booking.requestedTime || "—"}</p>
           {showDate && <p className="text-xs text-muted-foreground">{shortDay(booking.resolvedDate)}</p>}
         </div>
 
@@ -452,6 +453,7 @@ function BookingCard({
               <StatusBadge tone={st.tone}>{st.label}</StatusBadge>
             )}
             {booking.channel === "portal" && <span className="text-xs text-muted-foreground">· booked online</span>}
+            <span className="text-sm text-foreground"><HandoverTags booking={booking} /></span>
             {booking.channel !== "walk_in" && booking.declarationComplete && (
               <span className="text-xs font-medium text-success-foreground">· Declaration ✓</span>
             )}
