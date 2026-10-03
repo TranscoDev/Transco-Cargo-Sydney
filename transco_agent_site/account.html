@@ -182,11 +182,6 @@
 
   /* Home */
   .hello { font-size: clamp(26px, 6vw, 34px); margin: 6px 0 4px; }
-  .agent-cta { display: flex; align-items: center; gap: 14px; text-decoration: none; color: #fff; background: linear-gradient(165deg, #253a52 0%, var(--navy) 55%, #10141f 100%); border-radius: 20px; padding: 18px; box-shadow: 0 12px 30px rgba(24,34,51,0.18); }
-  .agent-cta .ico { width: 48px; height: 48px; border-radius: 14px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .agent-cta .t { font-weight: 800; font-size: 18px; }
-  .agent-cta .s { font-size: 14px; color: rgba(255,255,255,0.78); }
-  .agent-cta .arrow { margin-left: auto; font-size: 22px; opacity: 0.8; }
   .quick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
   .quick-grid a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; text-decoration: none; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px 8px; min-height: 92px; font-weight: 700; font-size: 14px; color: var(--navy); }
   .quick-grid a:hover { border-color: var(--sl-teal); }
@@ -241,6 +236,8 @@
   /* Choice tiles (radio) */
   .choices { display: grid; gap: 10px; }
   .choices.two { grid-template-columns: 1fr 1fr; }
+  .choices.sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 520px) { .choices.sizes { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 420px) { .choices.two { grid-template-columns: 1fr; } }
   .choice { position: relative; }
   .choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -253,8 +250,14 @@
   .choice input:disabled + label { opacity: 0.5; cursor: not-allowed; background: #f4f4f4; }
 
   /* Quantity rows */
-  .qty-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-  .qty-row:last-child { border-bottom: none; }
+  .qty-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; }
+  .qty-item { border-bottom: 1px solid var(--line); }
+  .qty-item:last-child { border-bottom: none; }
+  .qty-detail { padding: 0 0 14px; }
+  .qty-detail .help { display: block; margin-bottom: 8px; }
+  .qty-detail .field + .field { margin-top: 10px; }
+  .dims-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dims-row .field { margin-top: 0; }
   .qty-row .name { font-weight: 700; color: var(--navy); }
   .stepper { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
   .stepper button { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid #cfd4d8; background: #fff; font-size: 22px; font-weight: 700; color: var(--navy); cursor: pointer; line-height: 1; }
@@ -314,7 +317,6 @@
     body.agent-docked #agent-panel { display: flex; position: sticky; top: 86px; height: calc(100vh - 110px); }
     /* The chat is already on screen — no need for a card that opens it.
        (It comes back if the customer closes the chat.) */
-    body.agent-docked .agent-cta { display: none; }
   }
   @media (max-width: 1199px) {
     body.agent-open #agent-panel { display: flex; position: fixed; inset: 0; z-index: 700; border-radius: 0; border: none; padding-bottom: env(safe-area-inset-bottom); }
@@ -361,7 +363,6 @@
   .tabbar button.ai { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: none; font-size: 11.5px; font-weight: 600; min-height: 50px; cursor: pointer; font-family: inherit; }
   .tabbar button.ai .ai-bubble { width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(135deg, #2c4059, #10141f); display: flex; align-items: center; justify-content: center; margin-top: -18px; box-shadow: 0 6px 16px rgba(24,34,51,0.25); }
   .tabbar button.ai span.lbl { color: var(--navy); }
-  button.agent-cta { width: 100%; border: none; text-align: left; cursor: pointer; font-family: inherit; }
   .quick-grid button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px 8px; min-height: 92px; font-weight: 700; font-size: 14px; color: var(--navy); cursor: pointer; font-family: inherit; }
   .quick-grid button:hover { border-color: var(--sl-teal); }
   @media (max-width: 360px) { .quick-grid button { flex-direction: row; min-height: 56px; justify-content: flex-start; padding: 12px 16px; } }
@@ -466,7 +467,6 @@
       navHome: "Home", navAi: "Ask AI", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
       goodMorning: "Good morning", goodAfternoon: "Good afternoon", goodEvening: "Good evening",
       howHelp: "How can we help today?",
-      askAgent: "Ask Transco Agent", askAgentSub: "Prices, tracking and bookings — in English, සිංහල or தமிழ்.",
       qTrack: "Track my shipment", qPrice: "Get a price", qBook: "New booking",
       latestShipment: "Your latest shipment", latestBooking: "Your latest booking", viewAll: "View all",
       yourBl: "Your BL number", blHint: "Quote this number whenever you contact us or track your shipment.",
@@ -509,6 +509,9 @@
       country: "Country", phone: "Mobile number", phonePlaceholder: "04XX XXX XXX", sendCode: "Send code",
       codeTitle: "Enter your code", codeSub: "We sent a 6-digit code to WhatsApp on {phone}.", codeLabel: "6-digit code", verify: "Sign in",
       resend: "Send a new code", resendIn: "You can ask for a new code in {s} seconds.", changeNumber: "Use a different number",
+      noAccountYet: "We couldn't find an account for that. Don't have an account?", signUpNow: "Sign up",
+      eachLbl: "each", teaFree: "every 3rd free", estTitle: "Approximate cost for your boxes", estPlus: "Plus the items our team will price (TV size or odd-size measurements still to add).", estAir: "Air Freight is priced by weight when we receive your boxes.", estNote: "This is only an approximate cost for the boxes. It is not your final total — door delivery and home pickup are extra, and the price can change (for example weight, size or extra services). For a rough idea of your full price, chat with our agent.", estChat: "Chat with our agent",
+      boxInfoLink: "See box sizes & prices", tvDesc: "Priced by screen size", otherDesc: "Anything that isn't a standard box", handoverQ: "How will we get your boxes?", handDrop: "I'll drop them off", handDropDesc: "At our Seven Hills warehouse", handPick: "Home pickup", handPickDesc: "We collect from the sender's address", pickupInfo: "Please call Sajith on 0468 382 023 to arrange the pickup day and confirm the pickup fee — weekdays after 5pm or any time on weekends.", pickupWhen: "Best days or times for the pickup (optional)", pickupCall: "call Sajith on 0468 382 023 to arrange it", vHandover: "Please choose drop-off or home pickup.", editBooking: "Edit booking", editIntro: "Change your boxes, delivery, drop-off or declaration details. You can change the declaration until your BL number is issued.", editDeclOnly: "Your boxes are with us, so you can now only change the declaration (sender, receiver and items) — until your BL number is issued.", cancelIntro: "Changed your mind? You can cancel this booking.", streetPh: "e.g. Unit 3, 18 Sorrell Street", auMobileHelp: "Australian mobile, e.g. 0412 345 678", vStreet: "Please enter the street address.", vSuburb: "Please enter the suburb.", vState: "Please choose the state.", vPostcode: "Please enter the 4-digit postcode.", vAuMobile: "Please enter an Australian mobile number, e.g. 0412 345 678.",
       noAccountNote: "New here? Signing in creates your account. You can still chat with Transco Agent without signing in.",
       backToChat: "Back to Transco Agent",
       whyTitle: "What you get",
@@ -534,16 +537,18 @@
       s1: "Where are you sending?", s1country: "Destination country", s1service: "How should it travel?",
       seaDesc: "Most popular · lower cost", airDesc: "Faster",
       s2: "What are you sending?", s2help: "Add the boxes or items you plan to send. You can change this later with our team.",
-      decrease: "Remove one {item}", increase: "Add one {item}", notesLabel: "Anything we should know? (optional)", notesOther: "Please describe the \"other\" item here.",
+      decrease: "Remove one {item}", increase: "Add one {item}", notesLabel: "Anything we should know? (optional)",
+      tvHelp: "TV prices go by screen size.", tvSizeN: "TV {n}: screen size", tvOther: "Other size", tvOtherDesc: "56\"–59\" or over 75\" — our team confirms the price",
+      oddHelp: "Anything that isn't one of our standard boxes. Please measure it — it's priced by size.", oddN: "Odd-size item {n} (cm)", lenLbl: "Length", widLbl: "Width", hgtLbl: "Height",
+      vTvSize: "Please choose each TV's screen size.", vDims: "Please enter the length, width and height of each odd-size item in cm (1–500).",
       s3sender: "Who is sending the boxes?", declIntro: "These details go on your declaration form — please use names exactly as on the passport or NIC.", senderMe: "Me", senderMeDesc: "The account holder", senderOther: "Someone else", senderOtherDesc: "Just for this booking", senderFirstNote: "Filled in from your profile. Check they match your passport or NIC — we'll remember them for next time.", senderSavedNote: "Your saved details. Any change you make here is remembered for next time.", senderOtherNote: "Used for this booking only — your own saved details stay the same.", fullNameId: "Full name (as on passport or NIC)", addressLbl: "Address", townLbl: "Town or city", townHelp: "Where the receiver lives, e.g. Kandy, Jaffna, Chennai.", mobileLbl: "Mobile number", mobileHelp: "With country code, e.g. +94 77 123 4567", emailLbl: "Email", idLbl: "Passport or NIC number", idHelp: "Customs needs this for the receiver.", s4receiver: "Who is receiving the boxes?", savedReceivers: "Sending to someone you've sent to before?", receiverNew: "Someone new", receiverNewDesc: "Enter their details", receiverCheck: "We've filled in their saved details — please check they're still correct.", deliveryQ: "How will the receiver get the boxes?", senderLbl: "Sender", receiverLbl: "Receiver", vName: "Please enter the full name as on the passport or NIC.", vAddress: "Please enter the full address.", vTown: "Please enter the receiver's town or city.", vMobile: "Please enter a valid mobile number, with country code.", vEmail: "Please enter a valid email address.", vId: "Please enter the passport or NIC number (letters and numbers only).", vPickReceiver: "Please choose a receiver, or \"Someone new\".", declSubmitted: "✓ Submitted", declSubmittedBody: "Your declaration details were sent with this booking. Our team checks them when you drop off your boxes.", declChange: "Need to change a detail? Call us on 0434 842 023.", ns1done: "Declaration details sent ✓", declFormBodyOnline: "Your declaration is part of every online booking — you fill in the sender and receiver details while booking.",
-      deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "We deliver to the receiver's address above", collect: "Collect from warehouse", collectDesc: "The receiver collects from our destination warehouse",
+      deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "We deliver to the receiver's address", collect: "Collect from warehouse", collectDesc: "The receiver collects from our destination warehouse", collectSl: "Collect from Wattala warehouse", collectSlDesc: "The receiver collects from our Wattala warehouse in Sri Lanka",
       s4: "When will you drop off your boxes?", s4where: "Our warehouse: Unit 1, 79 Station Rd, Seven Hills NSW 2147",
       satNote: "Saturday — walk in any time 11am–3pm", wkNote: "Tuesday to Friday — 5pm to 6pm, by appointment",
       full: "Full", chooseDay: "Choose a day", chooseTime: "Choose a time", pickupNote: "Need a home pickup instead? Call Sajith on 0468 382 023.",
       noDates: "No drop-off days are available online right now. Please call us on 0434 842 023.",
       s5: "Please check your booking", s5sub: "Nothing is booked until you confirm.", edit: "Edit", confirmBooking: "Confirm booking", next: "Continue",
-      priceNote: "Your final price is confirmed when we receive your boxes. Want an estimate first?", askPrice: "Ask Transco Agent for a price",
-      vCountry: "Please choose a country.", vService: "Please choose how it should travel.", vItems: "Please add at least one item.", vOther: "Please describe the \"other\" item.",
+      vCountry: "Please choose a country.", vService: "Please choose how it should travel.", vItems: "Please add at least one item.",
       s2inside: "What's inside your boxes?", s2insideHelp: "List everything you're sending — Customs needs it. Our staff add the values.", itemN: "Item {n}", itemPh: "e.g. Chocolate", newLbl: "New", usedLbl: "Used", howMany: "How many", addItem: "+ Add another item", removeItem: "Remove", vContents: "Please describe each item, say new or used, and how many.", homeLbl: "Home phone (optional)", senderIdLbl: "Passport or NIC number", senderIdOptLbl: "Passport or NIC number (optional)", senderIdHelp: "Needed for Sri Lanka Customs.", vSenderId: "Please enter your passport or NIC number (letters and numbers only).", vHome: "Please check the home phone number, or leave it empty.", signTitle: "Insurance & declaration", insuranceQ: "Do you want your goods insured?", insYes: "Yes", insNo: "No", insuranceNote: "For insurance, please contact Supun on 03 9357 7228 for more details.", declareText: "I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.", signName: "Type your full name to sign", signatureLbl: "Signature (optional)", signHere: "Sign here with your finger", clearSig: "Clear", signLater: "You can also sign the printed form when you drop off.", vInsurance: "Please answer the insurance question.", vDeclare: "Please tick the declaration.", vSignName: "Please type your full name to sign.", insideLbl: "What's inside", insuranceLbl: "Insurance", noFormsNote: "Your declaration is done — at drop-off our staff just check your boxes and give you your BL number.",
       dgTitle: "Air Freight safety check", dgIntro: "Tick each line to confirm it is NOT in your boxes.", dgNo0: "No aerosol cans, sprays or perfumes", dgNo1: "No flammable items, explosives, magnets or hazardous items", dgNo2: "No batteries, engines, fuel or oil of any type", dgNo3: "No illicit drugs, pornography, weapons or firearms", dgNo4: "No precious jewellery, gold, precious stones, money, credit/bank cards or passports", dgMed: "Any medications?", dgMedHint: "If yes, only personal medication with a prescription.", dgLi: "Lithium batteries in any product?", dgLiHint: "For example a phone, laptop, camera or power bank.", dgLiq: "Any liquids?", dgDetails: "Type of product and quantity", dgWarn: "Undeclared dangerous goods cost at least AUD 250 per item to remove, and airport security may also fine you.", vDgNo: "Please tick each line to confirm it is not in your boxes.", vDgQ: "Please answer each Air Freight question.", vDgDetails: "Please write the type of product and quantity.",
       dgHasTitle: "These can't go by Air Freight. Our staff will check them with you at drop-off (they may need to go by Sea Freight or be taken out):", dgAck: "Yes, my boxes may contain the items I didn't tick.", vDgAck: "Please tick the lines that are not in your boxes, or confirm the ones that may be.", dgItem0: "Aerosol cans, sprays or perfumes", dgItem1: "Flammable items, explosives, magnets or hazardous items", dgItem2: "Batteries, engines, fuel or oil", dgItem3: "Illicit drugs, pornography, weapons or firearms", dgItem4: "Precious jewellery, gold, precious stones, money, cards or passports",
@@ -584,7 +589,7 @@
       countries: { sri_lanka: "Sri Lanka", india: "India" },
       services: { sea: "Sea Freight", air: "Air Freight" },
       deliveries: { door: "Door delivery", collect: "Collect from warehouse" },
-      itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "Other item" },
+      itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "Odd-size item" },
       footer: "Questions? Call <a href=\"tel:0434842023\">0434 842 023</a> or <a href=\"/#agent\">ask Transco Agent</a>."
     },
 
@@ -593,7 +598,6 @@
       navHome: "මුල් පිටුව", navAi: "AI අහන්න", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
       goodMorning: "සුබ උදෑසනක්", goodAfternoon: "සුබ දහවලක්", goodEvening: "සුබ සන්ධ්‍යාවක්",
       howHelp: "අද අපි ඔයාට උදව් කරන්නේ කොහොමද?",
-      askAgent: "Transco Agent ගෙන් අහන්න", askAgentSub: "මිල, tracking සහ bookings — English, සිංහල හෝ தமிழ் වලින්.",
       qTrack: "මගේ shipment එක track කරන්න", qPrice: "මිලක් ගන්න", qBook: "අලුත් booking",
       latestShipment: "ඔයාගේ අලුත්ම shipment එක", latestBooking: "ඔයාගේ අලුත්ම booking එක", viewAll: "ඔක්කොම බලන්න",
       yourBl: "ඔයාගේ BL අංකය", blHint: "අපිට කතා කරද්දී හෝ shipment එක track කරද්දී මේ අංකය කියන්න.",
@@ -634,6 +638,9 @@
       country: "රට", phone: "Mobile number", phonePlaceholder: "07X XXX XXXX", sendCode: "Code එක යවන්න",
       codeTitle: "ඔයාගේ code එක දාන්න", codeSub: "{phone} WhatsApp එකට ඉලක්කම් 6ක code එකක් එව්වා.", codeLabel: "ඉලක්කම් 6ක code එක", verify: "Sign in",
       resend: "අලුත් code එකක් යවන්න", resendIn: "තත්පර {s}කින් අලුත් code එකක් ඉල්ලන්න පුළුවන්.", changeNumber: "වෙන number එකක් පාවිච්චි කරන්න",
+      noAccountYet: "ඒකට account එකක් හම්බුණේ නෑ. Account එකක් නැද්ද?", signUpNow: "Sign up වෙන්න",
+      eachLbl: "එකකට", teaFree: "හැම 3වෙනි එකම නොමිලේ", estTitle: "ඔයාගේ පෙට්ටි වලට ආසන්න මිල", estPlus: "ඊට අමතරව අපේ team එක මිල කරන භාණ්ඩ (TV size හෝ මිනුම් තවම දාලා නෑ).", estAir: "Air Freight මිල ඔයාගේ පෙට්ටි ලැබුණාම බර අනුව ගණන් කරනවා.", estNote: "මේක පෙට්ටි වලට විතරක් ආසන්න මිලක්. මේක අවසාන මුළු මිල නෙවෙයි — door delivery සහ home pickup අමතරයි, බර, size හෝ අමතර සේවා අනුව මිල වෙනස් වෙන්න පුළුවන්. මුළු මිල ගැන දළ අදහසක් ගන්න අපේ agent එක්ක chat කරන්න.", estChat: "Agent එක්ක chat කරන්න",
+      boxInfoLink: "Box sizes සහ මිල බලන්න", tvDesc: "Screen size එක අනුව මිල", otherDesc: "සාමාන්‍ය box එකක් නොවන ඕනම දෙයක්", handoverQ: "ඔයාගේ පෙට්ටි අපිට ලැබෙන්නේ කොහොමද?", handDrop: "මම ගෙනත් දෙනවා", handDropDesc: "අපේ Seven Hills warehouse එකට", handPick: "ගෙදරින් ගන්න (Home pickup)", handPickDesc: "යවන කෙනාගේ ලිපිනයෙන් අපි ගන්නවා", pickupInfo: "Pickup දවස arrange කරන්නයි pickup ගාස්තුව confirm කරන්නයි කරුණාකරලා Sajith ට කතා කරන්න 0468 382 023 — සතියේ දින සවස 5න් පස්සේ හෝ සති අන්තයේ ඕනම වෙලාවක.", pickupWhen: "Pickup එකට හොඳ දවස් හෝ වෙලාවන් (අවශ්‍ය නම්)", pickupCall: "arrange කරන්න Sajith ට කතා කරන්න 0468 382 023", vHandover: "කරුණාකරලා ගෙනත් දෙනවද නැත්නම් home pickup ද කියලා තෝරන්න.", editBooking: "Booking එක වෙනස් කරන්න", editIntro: "පෙට්ටි, delivery, drop-off හෝ declaration විස්තර වෙනස් කරන්න. BL අංකය දෙනකම් declaration එක වෙනස් කරන්න පුළුවන්.", editDeclOnly: "ඔයාගේ පෙට්ටි දැන් අප ළඟ, ඒ නිසා දැන් වෙනස් කරන්න පුළුවන් declaration එක (යවන/ලබන කෙනා සහ භාණ්ඩ) විතරයි — BL අංකය දෙනකම්.", cancelIntro: "හිත වෙනස් වුණාද? මේ booking එක cancel කරන්න පුළුවන්.", streetPh: "උදා: Unit 3, 18 Sorrell Street", auMobileHelp: "ඕස්ට්‍රේලියානු mobile, උදා: 0412 345 678", vStreet: "කරුණාකරලා street address එක දාන්න.", vSuburb: "කරුණාකරලා suburb එක දාන්න.", vState: "කරුණාකරලා state එක තෝරන්න.", vPostcode: "කරුණාකරලා ඉලක්කම් 4ක postcode එක දාන්න.", vAuMobile: "කරුණාකරලා ඕස්ට්‍රේලියානු mobile අංකයක් දාන්න, උදා: 0412 345 678.",
       noAccountNote: "අලුත්ද? Sign in වුණාම ඔයාගේ account එක හැදෙනවා. Sign in නොවී Transco Agent එක්ක chat කරන්නත් පුළුවන්.",
       backToChat: "Transco Agent වෙත ආපහු",
       whyTitle: "ඔයාට ලැබෙන දේ",
@@ -657,17 +664,18 @@
       s1: "ඔයා යවන්නේ කොහෙටද?", s1country: "යවන රට", s1service: "යවන්නේ කොහොමද?",
       seaDesc: "ගොඩක් අය තෝරන · අඩු මිල", airDesc: "ඉක්මන්",
       s2: "ඔයා යවන්නේ මොනවද?", s2help: "යවන්න හිතන් ඉන්න පෙට්ටි හෝ භාණ්ඩ එකතු කරන්න. පස්සේ අපේ team එක එක්ක මේක වෙනස් කරන්න පුළුවන්.",
-      decrease: "{item} එකක් අඩු කරන්න", increase: "{item} එකක් එකතු කරන්න", notesLabel: "අපි දැනගන්න ඕන දෙයක් තියෙනවද? (අවශ්‍ය නම්)", notesOther: "කරුණාකරලා \"other\" භාණ්ඩය මෙතන විස්තර කරන්න.",
+      decrease: "{item} එකක් අඩු කරන්න", increase: "{item} එකක් එකතු කරන්න", notesLabel: "අපි දැනගන්න ඕන දෙයක් තියෙනවද? (අවශ්‍ය නම්)",
+      tvHelp: "TV මිල screen size එක අනුවයි.", tvSizeN: "TV {n}: screen size", tvOther: "වෙනත් size එකක්", tvOtherDesc: "56\"–59\" හෝ 75\" ට වැඩි — මිල අපේ team එක confirm කරයි",
+      oddHelp: "අපේ සාමාන්‍ය box වලට අයිති නැති ඕනම දෙයක්. කරුණාකරලා මනින්න — මිල ගණන් කරන්නේ size එක අනුව.", oddN: "අසාමාන්‍ය ප්‍රමාණයේ භාණ්ඩය {n} (cm)", lenLbl: "දිග", widLbl: "පළල", hgtLbl: "උස",
+      vTvSize: "කරුණාකරලා හැම TV එකකම screen size එක තෝරන්න.", vDims: "කරුණාකරලා හැම භාණ්ඩයකම දිග, පළල, උස cm වලින් දාන්න (1–500).",
       s3sender: "පෙට්ටි යවන්නේ කවුද?", declIntro: "මේ විස්තර ඔයාගේ declaration form එකට යනවා — passport එකේ හෝ NIC එකේ තියෙන විදියටම නම් දාන්න.", senderMe: "මම", senderMeDesc: "Account එකේ අයිතිකාරයා", senderOther: "වෙන කෙනෙක්", senderOtherDesc: "මේ booking එකට විතරයි", senderFirstNote: "ඔයාගේ profile එකෙන් පුරවලා තියෙන්නේ. Passport/NIC එකට ගැලපෙනවද බලන්න — ඊළඟ පාරට අපි මතක තියාගන්නවා.", senderSavedNote: "ඔයාගේ save කරපු විස්තර. මෙතන කරන වෙනස්කම් ඊළඟ පාරටත් මතක තියාගන්නවා.", senderOtherNote: "මේ booking එකට විතරයි — ඔයාගේ save කරපු විස්තර වෙනස් වෙන්නේ නෑ.", fullNameId: "සම්පූර්ණ නම (passport/NIC එකේ විදියට)", addressLbl: "ලිපිනය", townLbl: "නගරය", townHelp: "ලබන කෙනා ඉන්න නගරය, උදා: Kandy, Jaffna.", mobileLbl: "Mobile අංකය", mobileHelp: "Country code එකත් එක්ක, උදා: +94 77 123 4567", emailLbl: "Email", idLbl: "Passport හෝ NIC අංකය", idHelp: "ලබන කෙනාගේ මේ අංකය customs වලට ඕන.", s4receiver: "පෙට්ටි ලබන්නේ කවුද?", savedReceivers: "කලින් යවපු කෙනෙක්ටද යවන්නේ?", receiverNew: "අලුත් කෙනෙක්", receiverNewDesc: "එයාගේ විස්තර දාන්න", receiverCheck: "එයාගේ save කරපු විස්තර පුරවලා තියෙනවා — තාම හරිද බලන්න.", deliveryQ: "ලබන කෙනාට පෙට්ටි ලැබෙන්නේ කොහොමද?", senderLbl: "යවන්නා", receiverLbl: "ලබන්නා", vName: "කරුණාකරලා passport/NIC එකේ විදියට සම්පූර්ණ නම දාන්න.", vAddress: "කරුණාකරලා සම්පූර්ණ ලිපිනය දාන්න.", vTown: "කරුණාකරලා ලබන කෙනාගේ නගරය දාන්න.", vMobile: "කරුණාකරලා country code එකත් එක්ක හරි mobile අංකයක් දාන්න.", vEmail: "කරුණාකරලා හරි email ලිපිනයක් දාන්න.", vId: "කරුණාකරලා passport/NIC අංකය දාන්න (අකුරු සහ ඉලක්කම් විතරයි).", vPickReceiver: "කරුණාකරලා ලබන කෙනෙක්ව හෝ \"අලුත් කෙනෙක්\" තෝරන්න.", declSubmitted: "✓ යැව්වා", declSubmittedBody: "ඔයාගේ declaration විස්තර මේ booking එකත් එක්ක ආවා. ඔයා පෙට්ටි ගේනකොට අපේ team එක ඒවා check කරනවා.", declChange: "මොකක් හරි වෙනස් කරන්න ඕනද? 0434 842 023 ට call කරන්න.", ns1done: "Declaration විස්තර යැව්වා ✓", declFormBodyOnline: "හැම online booking එකකම declaration එක තියෙනවා — book කරනකොට යවන්නාගේ සහ ලබන්නාගේ විස්තර දානවා.",
-      deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "ලබන කෙනාගේ ලිපිනයට අපි ගෙනත් දෙනවා", collect: "Warehouse එකෙන් ගන්නවා", collectDesc: "ලබන කෙනා අපේ destination warehouse එකෙන් ගන්නවා",
+      deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "ලබන කෙනාගේ ලිපිනයට අපි ගෙනත් දෙනවා", collect: "Warehouse එකෙන් ගන්නවා", collectDesc: "ලබන කෙනා අපේ destination warehouse එකෙන් ගන්නවා", collectSl: "Wattala warehouse එකෙන් ගන්නවා", collectSlDesc: "ලබන කෙනා ශ්‍රී ලංකාවේ අපේ Wattala warehouse එකෙන් ගන්නවා",
       s4: "ඔයා පෙට්ටි ගේන්නේ කවදාද?", s4where: "අපේ warehouse එක: Unit 1, 79 Station Rd, Seven Hills NSW 2147",
       satNote: "සෙනසුරාදා — 11am–3pm ඕනම වෙලාවක එන්න", wkNote: "අඟහරුවාදා සිට සිකුරාදා — සවස 5–6, appointment එකෙන්",
       full: "පිරිලා", chooseDay: "දවසක් තෝරන්න", chooseTime: "වෙලාවක් තෝරන්න", pickupNote: "ගෙදරින් pickup එකක් ඕනද? Sajith ට 0468 382 023 අමතන්න.",
       noDates: "දැන් online drop-off දවස් නෑ. කරුණාකරලා 0434 842 023 අමතන්න.",
       s5: "කරුණාකරලා ඔයාගේ booking එක check කරන්න", s5sub: "ඔයා confirm කරනකම් මුකුත් book වෙන්නේ නෑ.", edit: "වෙනස් කරන්න", confirmBooking: "Booking එක confirm කරන්න", next: "ඉදිරියට",
-      priceNote: "අවසාන මිල confirm කරන්නේ ඔයාගේ පෙට්ටි ලැබුණාම. කලින් ඇස්තමේන්තුවක් ඕනද?", askPrice: "Transco Agent ගෙන් මිල අහන්න",
-      vCountry: "කරුණාකරලා රටක් තෝරන්න.", vService: "කරුණාකරලා යවන විදිය තෝරන්න.", vItems: "කරුණාකරලා අඩුම තරමේ එක භාණ්ඩයක් එකතු කරන්න.", vOther: "කරුණාකරලා \"other\" භාණ්ඩය විස්තර කරන්න.",
-      s2inside: "ඔබේ box ඇතුළේ මොනවද?", s2insideHelp: "යවන හැම දෙයක්ම ලියන්න — Customs වලට ඕන. වටිනාකම අපේ staff දානවා.", itemN: "අයිතමය {n}", itemPh: "උදා: Chocolate", newLbl: "අලුත්", usedLbl: "පාවිච්චි කළ", howMany: "කීයද", addItem: "+ තවත් අයිතමයක්", removeItem: "ඉවත් කරන්න", vContents: "කරුණාකර හැම අයිතමයක්ම විස්තර කරලා, අලුත්ද පාවිච්චි කළද, කීයද කියන්න.", homeLbl: "ගෙදර දුරකථනය (අවශ්‍ය නම් පමණයි)", senderIdLbl: "Passport හෝ NIC අංකය", senderIdOptLbl: "Passport හෝ NIC අංකය (අවශ්‍ය නම් පමණයි)", senderIdHelp: "ශ්‍රී ලංකා Customs වලට ඕන.", vSenderId: "කරුණාකර ඔබේ passport හෝ NIC අංකය දාන්න.", vHome: "කරුණාකර ගෙදර දුරකථන අංකය බලන්න, නැත්නම් හිස්ව තියන්න.", signTitle: "Insurance සහ ප්‍රකාශය", insuranceQ: "ඔබේ බඩු insure කරන්න ඕනද?", insYes: "ඔව්", insNo: "නැහැ", insuranceNote: "Insurance සඳහා වැඩි විස්තර Supun ගෙන් අහන්න: 03 9357 7228.", declareText: "ගිනි අවි, අනතුරුදායක බඩු, රසායන, තහනම් බඩු හෝ වාණිජ ප්‍රමාණයේ බඩු මේවායේ නැති බව මම ප්‍රකාශ කරමි.", signName: "අත්සන් කිරීමට ඔබේ සම්පූර්ණ නම ලියන්න", signatureLbl: "අත්සන (අවශ්‍ය නම් පමණයි)", signHere: "ඇඟිල්ලෙන් මෙතන අත්සන් කරන්න", clearSig: "මකන්න", signLater: "Box දාන්න එද්දී print කළ පෝරමයේත් අත්සන් කරන්න පුළුවන්.", vInsurance: "කරුණාකර insurance ප්‍රශ්නයට උත්තර දෙන්න.", vDeclare: "කරුණාකර ප්‍රකාශය tick කරන්න.", vSignName: "කරුණාකර අත්සන් කිරීමට ඔබේ නම ලියන්න.", insideLbl: "ඇතුළේ තියෙන දේ", insuranceLbl: "Insurance", noFormsNote: "ඔබේ ප්‍රකාශය ඉවරයි — box දාන්න එද්දී අපේ staff box බලලා ඔබේ BL අංකය දෙනවා.",
+      vCountry: "කරුණාකරලා රටක් තෝරන්න.", vService: "කරුණාකරලා යවන විදිය තෝරන්න.", vItems: "කරුණාකරලා අඩුම තරමේ එක භාණ්ඩයක් එකතු කරන්න.",      s2inside: "ඔබේ box ඇතුළේ මොනවද?", s2insideHelp: "යවන හැම දෙයක්ම ලියන්න — Customs වලට ඕන. වටිනාකම අපේ staff දානවා.", itemN: "අයිතමය {n}", itemPh: "උදා: Chocolate", newLbl: "අලුත්", usedLbl: "පාවිච්චි කළ", howMany: "කීයද", addItem: "+ තවත් අයිතමයක්", removeItem: "ඉවත් කරන්න", vContents: "කරුණාකර හැම අයිතමයක්ම විස්තර කරලා, අලුත්ද පාවිච්චි කළද, කීයද කියන්න.", homeLbl: "ගෙදර දුරකථනය (අවශ්‍ය නම් පමණයි)", senderIdLbl: "Passport හෝ NIC අංකය", senderIdOptLbl: "Passport හෝ NIC අංකය (අවශ්‍ය නම් පමණයි)", senderIdHelp: "ශ්‍රී ලංකා Customs වලට ඕන.", vSenderId: "කරුණාකර ඔබේ passport හෝ NIC අංකය දාන්න.", vHome: "කරුණාකර ගෙදර දුරකථන අංකය බලන්න, නැත්නම් හිස්ව තියන්න.", signTitle: "Insurance සහ ප්‍රකාශය", insuranceQ: "ඔබේ බඩු insure කරන්න ඕනද?", insYes: "ඔව්", insNo: "නැහැ", insuranceNote: "Insurance සඳහා වැඩි විස්තර Supun ගෙන් අහන්න: 03 9357 7228.", declareText: "ගිනි අවි, අනතුරුදායක බඩු, රසායන, තහනම් බඩු හෝ වාණිජ ප්‍රමාණයේ බඩු මේවායේ නැති බව මම ප්‍රකාශ කරමි.", signName: "අත්සන් කිරීමට ඔබේ සම්පූර්ණ නම ලියන්න", signatureLbl: "අත්සන (අවශ්‍ය නම් පමණයි)", signHere: "ඇඟිල්ලෙන් මෙතන අත්සන් කරන්න", clearSig: "මකන්න", signLater: "Box දාන්න එද්දී print කළ පෝරමයේත් අත්සන් කරන්න පුළුවන්.", vInsurance: "කරුණාකර insurance ප්‍රශ්නයට උත්තර දෙන්න.", vDeclare: "කරුණාකර ප්‍රකාශය tick කරන්න.", vSignName: "කරුණාකර අත්සන් කිරීමට ඔබේ නම ලියන්න.", insideLbl: "ඇතුළේ තියෙන දේ", insuranceLbl: "Insurance", noFormsNote: "ඔබේ ප්‍රකාශය ඉවරයි — box දාන්න එද්දී අපේ staff box බලලා ඔබේ BL අංකය දෙනවා.",
       dgTitle: "Air Freight ආරක්ෂක පරීක්ෂාව", dgIntro: "ඔබේ box වල මේවා නැති බව තහවුරු කිරීමට හැම පේළියක්ම tick කරන්න.", dgNo0: "Aerosol කෑන්, sprays හෝ සුවඳ විලවුන් නැත", dgNo1: "ගිනි ගන්නා බඩු, පුපුරණ ද්‍රව්‍ය, චුම්බක හෝ අනතුරුදායක බඩු නැත", dgNo2: "කිසිම වර්ගයක batteries, එන්ජින්, ඉන්ධන හෝ තෙල් නැත", dgNo3: "නීති විරෝධී මත්ද්‍රව්‍ය, අසභ්‍ය දේ, ආයුධ හෝ ගිනි අවි නැත", dgNo4: "වටිනා ස්වර්ණාභරණ, රත්තරන්, මැණික්, මුදල්, credit/bank cards හෝ passports නැත", dgMed: "බෙහෙත් තියෙනවද?", dgMedHint: "ඔව් නම්, prescription එකක් සමඟ පුද්ගලික බෙහෙත් පමණයි.", dgLi: "කිසියම් භාණ්ඩයක lithium batteries තියෙනවද?", dgLiHint: "උදා: phone, laptop, camera හෝ power bank.", dgLiq: "ද්‍රව තියෙනවද?", dgDetails: "භාණ්ඩ වර්ගය සහ ප්‍රමාණය", dgWarn: "ප්‍රකාශ නොකළ අනතුරුදායක බඩු ඉවත් කිරීමට එක බඩුවකට අවම AUD 250ක් වැය වෙනවා, ගුවන්තොටුපොළ ආරක්ෂාවෙනුත් දඩ ගැසිය හැක.", vDgNo: "කරුණාකර හැම පේළියක්ම tick කරන්න.", vDgQ: "කරුණාකර හැම Air Freight ප්‍රශ්නයකටම උත්තර දෙන්න.", vDgDetails: "කරුණාකර භාණ්ඩ වර්ගය සහ ප්‍රමාණය ලියන්න.",
       dgHasTitle: "මේවා Air Freight වලින් යවන්න බෑ. Box දාන්න එද්දී අපේ staff ඔබත් එක්ක මේවා බලනවා (Sea Freight වලින් යවන්න හෝ ඉවත් කරන්න වෙන්න පුළුවන්):", dgAck: "ඔව්, මම tick නොකළ බඩු මගේ box වල තියෙන්න පුළුවන්.", vDgAck: "කරුණාකර box වල නැති පේළි tick කරන්න, නැත්නම් තියෙන්න පුළුවන් ඒවා තහවුරු කරන්න.", dgItem0: "Aerosol කෑන්, sprays හෝ සුවඳ විලවුන්", dgItem1: "ගිනි ගන්නා බඩු, පුපුරණ ද්‍රව්‍ය, චුම්බක හෝ අනතුරුදායක බඩු", dgItem2: "Batteries, එන්ජින්, ඉන්ධන හෝ තෙල්", dgItem3: "නීති විරෝධී මත්ද්‍රව්‍ය, අසභ්‍ය දේ, ආයුධ හෝ ගිනි අවි", dgItem4: "වටිනා ස්වර්ණාභරණ, රත්තරන්, මැණික්, මුදල්, cards හෝ passports",
       vDelivery: "කරුණාකරලා delivery විදියක් තෝරන්න.", vDay: "කරුණාකරලා දවසක් තෝරන්න.", vTime: "කරුණාකරලා වෙලාවක් තෝරන්න.",
@@ -703,7 +711,7 @@
       countries: { sri_lanka: "Sri Lanka", india: "India" },
       services: { sea: "Sea Freight", air: "Air Freight" },
       deliveries: { door: "Door delivery", collect: "Warehouse එකෙන් ගන්නවා" },
-      itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "වෙනත් භාණ්ඩයක්" },
+      itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "අසාමාන්‍ය ප්‍රමාණයේ භාණ්ඩයක්" },
       footer: "ප්‍රශ්න තියෙනවද? <a href=\"tel:0434842023\">0434 842 023</a> අමතන්න, නැත්නම් <a href=\"/#agent\">Transco Agent ගෙන් අහන්න</a>."
     },
 
@@ -712,7 +720,6 @@
       navHome: "முகப்பு", navAi: "AI கேள்", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
       goodMorning: "காலை வணக்கம்", goodAfternoon: "மதிய வணக்கம்", goodEvening: "மாலை வணக்கம்",
       howHelp: "இன்று நாங்கள் எப்படி உதவலாம்?",
-      askAgent: "Transco Agent இடம் கேளுங்கள்", askAgentSub: "விலை, tracking மற்றும் bookings — English, සිංහල அல்லது தமிழில்.",
       qTrack: "என் shipment ஐ track செய்", qPrice: "விலை பெறு", qBook: "புதிய booking",
       latestShipment: "உங்கள் சமீபத்திய shipment", latestBooking: "உங்கள் சமீபத்திய booking", viewAll: "அனைத்தையும் பார்",
       yourBl: "உங்கள் BL எண்", blHint: "எங்களைத் தொடர்பு கொள்ளும்போதும் shipment ஐ track செய்யும்போதும் இந்த எண்ணைக் குறிப்பிடுங்கள்.",
@@ -753,6 +760,9 @@
       country: "நாடு", phone: "Mobile number", phonePlaceholder: "04XX XXX XXX", sendCode: "Code அனுப்பு",
       codeTitle: "உங்கள் code ஐ உள்ளிடுங்கள்", codeSub: "{phone} WhatsApp க்கு 6 இலக்க code அனுப்பினோம்.", codeLabel: "6 இலக்க code", verify: "Sign in",
       resend: "புதிய code அனுப்பு", resendIn: "{s} வினாடிகளில் புதிய code கேட்கலாம்.", changeNumber: "வேறு number ஐப் பயன்படுத்து",
+      noAccountYet: "அதற்கான account கிடைக்கவில்லை. Account இல்லையா?", signUpNow: "Sign up செய்யுங்கள்",
+      eachLbl: "ஒன்றுக்கு", teaFree: "ஒவ்வொரு 3வதும் இலவசம்", estTitle: "உங்கள் பெட்டிகளுக்கான தோராயமான விலை", estPlus: "மேலும் எங்கள் team விலையிடும் பொருட்கள் (TV size அல்லது அளவுகள் இன்னும் சேர்க்கப்படவில்லை).", estAir: "Air Freight விலை உங்கள் பெட்டிகளைப் பெற்றதும் எடையைப் பொறுத்து கணக்கிடப்படும்.", estNote: "இது பெட்டிகளுக்கான தோராயமான விலை மட்டுமே. இது உங்கள் இறுதி மொத்தம் அல்ல — door delivery மற்றும் home pickup கூடுதல், விலை மாறலாம் (எ.கா. எடை, அளவு அல்லது கூடுதல் சேவைகள்). முழு விலையைப் பற்றி தோராயமாக அறிய எங்கள் agent உடன் chat செய்யுங்கள்.", estChat: "எங்கள் agent உடன் chat செய்யுங்கள்",
+      boxInfoLink: "Box அளவுகள் & விலைகளைப் பார்", tvDesc: "Screen size ஐப் பொறுத்து விலை", otherDesc: "வழக்கமான பெட்டி அல்லாத எதுவும்", handoverQ: "உங்கள் பெட்டிகள் எங்களிடம் எப்படி வரும்?", handDrop: "நானே கொண்டு வருவேன்", handDropDesc: "எங்கள் Seven Hills கிடங்குக்கு", handPick: "வீட்டிலிருந்து எடுத்தல் (Home pickup)", handPickDesc: "அனுப்புபவரின் முகவரியிலிருந்து நாங்கள் எடுப்போம்", pickupInfo: "Pickup நாளை ஏற்பாடு செய்யவும் கட்டணத்தை உறுதிப்படுத்தவும் Sajith ஐ அழையுங்கள் 0468 382 023 — வார நாட்களில் மாலை 5க்குப் பின் அல்லது வார இறுதியில் எப்போதும்.", pickupWhen: "Pickup க்கு வசதியான நாட்கள் அல்லது நேரங்கள் (விருப்பம்)", pickupCall: "ஏற்பாடு செய்ய Sajith ஐ அழையுங்கள் 0468 382 023", vHandover: "கொண்டு வருவதா அல்லது home pickup ஆ என்று தேர்ந்தெடுக்கவும்.", editBooking: "Booking ஐ மாற்று", editIntro: "பெட்டிகள், delivery, drop-off அல்லது declaration விவரங்களை மாற்றுங்கள். BL எண் வழங்கப்படும் வரை declaration ஐ மாற்றலாம்.", editDeclOnly: "உங்கள் பெட்டிகள் எங்களிடம் உள்ளன, எனவே இப்போது declaration (அனுப்புபவர், பெறுபவர், பொருட்கள்) மட்டுமே மாற்றலாம் — BL எண் வழங்கப்படும் வரை.", cancelIntro: "மனம் மாறிவிட்டதா? இந்த booking ஐ cancel செய்யலாம்.", streetPh: "உதா: Unit 3, 18 Sorrell Street", auMobileHelp: "ஆஸ்திரேலிய mobile, உதா: 0412 345 678", vStreet: "தெரு முகவரியை உள்ளிடவும்.", vSuburb: "Suburb ஐ உள்ளிடவும்.", vState: "State ஐத் தேர்ந்தெடுக்கவும்.", vPostcode: "4 இலக்க postcode ஐ உள்ளிடவும்.", vAuMobile: "ஆஸ்திரேலிய mobile எண்ணை உள்ளிடவும், உதா: 0412 345 678.",
       noAccountNote: "புதியவரா? Sign in செய்தால் உங்கள் account உருவாகும். Sign in செய்யாமலும் Transco Agent உடன் chat செய்யலாம்.",
       backToChat: "Transco Agent க்குத் திரும்பு",
       whyTitle: "உங்களுக்குக் கிடைப்பவை",
@@ -776,17 +786,18 @@
       s1: "எங்கே அனுப்புகிறீர்கள்?", s1country: "சேரும் நாடு", s1service: "எப்படி அனுப்ப வேண்டும்?",
       seaDesc: "அதிகம் தேர்ந்தெடுக்கப்படுவது · குறைந்த விலை", airDesc: "விரைவானது",
       s2: "என்ன அனுப்புகிறீர்கள்?", s2help: "அனுப்பத் திட்டமிடும் பெட்டிகள் அல்லது பொருட்களைச் சேருங்கள். பின்னர் எங்கள் குழுவுடன் இதை மாற்றலாம்.",
-      decrease: "ஒரு {item} குறை", increase: "ஒரு {item} சேர்", notesLabel: "நாங்கள் தெரிந்துகொள்ள வேண்டியது ஏதாவது? (விருப்பம்)", notesOther: "\"other\" பொருளை இங்கே விவரிக்கவும்.",
+      decrease: "ஒரு {item} குறை", increase: "ஒரு {item} சேர்", notesLabel: "நாங்கள் தெரிந்துகொள்ள வேண்டியது ஏதாவது? (விருப்பம்)",
+      tvHelp: "TV விலை screen size ஐப் பொறுத்தது.", tvSizeN: "TV {n}: screen size", tvOther: "வேறு size", tvOtherDesc: "56\"–59\" அல்லது 75\" க்கு மேல் — விலையை எங்கள் team உறுதிப்படுத்தும்",
+      oddHelp: "எங்கள் வழக்கமான பெட்டிகளில் இல்லாத எதுவும். தயவுசெய்து அளந்து சொல்லுங்கள் — அளவைப் பொறுத்து விலை.", oddN: "வழக்கத்துக்கு மாறான அளவுப் பொருள் {n} (cm)", lenLbl: "நீளம்", widLbl: "அகலம்", hgtLbl: "உயரம்",
+      vTvSize: "ஒவ்வொரு TV யின் screen size ஐயும் தேர்ந்தெடுக்கவும்.", vDims: "ஒவ்வொரு பொருளின் நீளம், அகலம், உயரத்தை cm இல் உள்ளிடவும் (1–500).",
       s3sender: "பெட்டிகளை அனுப்புபவர் யார்?", declIntro: "இந்த விவரங்கள் உங்கள் declaration form இல் இடம்பெறும் — passport அல்லது NIC இல் உள்ளபடியே பெயர்களை எழுதவும்.", senderMe: "நான்", senderMeDesc: "Account உரிமையாளர்", senderOther: "வேறொருவர்", senderOtherDesc: "இந்த booking க்கு மட்டும்", senderFirstNote: "உங்கள் profile இலிருந்து நிரப்பப்பட்டது. உங்கள் passport/NIC உடன் பொருந்துகிறதா எனப் பார்க்கவும் — அடுத்த முறைக்கு நினைவில் வைப்போம்.", senderSavedNote: "நீங்கள் சேமித்த விவரங்கள். இங்கே செய்யும் மாற்றங்கள் அடுத்த முறைக்கும் நினைவில் இருக்கும்.", senderOtherNote: "இந்த booking க்கு மட்டும் — உங்கள் சேமித்த விவரங்கள் மாறாது.", fullNameId: "முழுப் பெயர் (passport/NIC இல் உள்ளபடி)", addressLbl: "முகவரி", townLbl: "நகரம்", townHelp: "பெறுபவர் வசிக்கும் நகரம், உதா: Kandy, Jaffna, Chennai.", mobileLbl: "Mobile எண்", mobileHelp: "Country code உடன், உதா: +94 77 123 4567", emailLbl: "Email", idLbl: "Passport அல்லது NIC எண்", idHelp: "பெறுபவரின் இந்த எண் customs க்குத் தேவை.", s4receiver: "பெட்டிகளைப் பெறுபவர் யார்?", savedReceivers: "முன்பு அனுப்பிய ஒருவருக்கா அனுப்புகிறீர்கள்?", receiverNew: "புதியவர்", receiverNewDesc: "அவரின் விவரங்களை உள்ளிடவும்", receiverCheck: "அவரின் சேமித்த விவரங்களை நிரப்பியுள்ளோம் — இன்னும் சரியா எனப் பார்க்கவும்.", deliveryQ: "பெறுபவர் பெட்டிகளை எப்படிப் பெறுவார்?", senderLbl: "அனுப்புபவர்", receiverLbl: "பெறுபவர்", vName: "passport/NIC இல் உள்ளபடி முழுப் பெயரை உள்ளிடவும்.", vAddress: "முழு முகவரியை உள்ளிடவும்.", vTown: "பெறுபவரின் நகரத்தை உள்ளிடவும்.", vMobile: "Country code உடன் சரியான mobile எண்ணை உள்ளிடவும்.", vEmail: "சரியான email முகவரியை உள்ளிடவும்.", vId: "passport/NIC எண்ணை உள்ளிடவும் (எழுத்துகள் மற்றும் எண்கள் மட்டும்).", vPickReceiver: "பெறுபவரை அல்லது \"புதியவர்\" என்பதைத் தேர்ந்தெடுக்கவும்.", declSubmitted: "✓ சமர்ப்பிக்கப்பட்டது", declSubmittedBody: "உங்கள் declaration விவரங்கள் இந்த booking உடன் அனுப்பப்பட்டன. நீங்கள் பெட்டிகளைக் கொண்டுவரும்போது எங்கள் குழு சரிபார்க்கும்.", declChange: "ஏதாவது மாற்ற வேண்டுமா? 0434 842 023 க்கு அழைக்கவும்.", ns1done: "Declaration விவரங்கள் அனுப்பப்பட்டன ✓", declFormBodyOnline: "ஒவ்வொரு online booking இலும் declaration அடங்கும் — booking செய்யும்போதே அனுப்புபவர், பெறுபவர் விவரங்களை நிரப்புகிறீர்கள்.",
-      deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "பெறுபவரின் முகவரிக்கு நாங்கள் கொண்டு சேர்ப்போம்", collect: "கிடங்கிலிருந்து பெறுதல்", collectDesc: "பெறுபவர் எங்கள் சேருமிடக் கிடங்கிலிருந்து பெற்றுக்கொள்வார்",
+      deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "பெறுபவரின் முகவரிக்கு நாங்கள் கொண்டு சேர்ப்போம்", collect: "கிடங்கிலிருந்து பெறுதல்", collectDesc: "பெறுபவர் எங்கள் சேருமிடக் கிடங்கிலிருந்து பெற்றுக்கொள்வார்", collectSl: "Wattala கிடங்கிலிருந்து பெறுதல்", collectSlDesc: "பெறுபவர் இலங்கையில் உள்ள எங்கள் Wattala கிடங்கிலிருந்து பெற்றுக்கொள்வார்",
       s4: "உங்கள் பெட்டிகளை எப்போது கொண்டு வருவீர்கள்?", s4where: "எங்கள் கிடங்கு: Unit 1, 79 Station Rd, Seven Hills NSW 2147",
       satNote: "சனிக்கிழமை — 11am–3pm எப்போது வேண்டுமானாலும் வாருங்கள்", wkNote: "செவ்வாய் முதல் வெள்ளி — மாலை 5–6, appointment மூலம்",
       full: "நிரம்பியது", chooseDay: "ஒரு நாளைத் தேர்ந்தெடுங்கள்", chooseTime: "ஒரு நேரத்தைத் தேர்ந்தெடுங்கள்", pickupNote: "வீட்டிலிருந்து pickup வேண்டுமா? Sajith ஐ 0468 382 023 இல் அழையுங்கள்.",
       noDates: "இப்போது online இல் drop-off நாட்கள் இல்லை. 0434 842 023 ஐ அழையுங்கள்.",
       s5: "உங்கள் booking ஐச் சரிபாருங்கள்", s5sub: "நீங்கள் confirm செய்யும் வரை எதுவும் book ஆகாது.", edit: "மாற்று", confirmBooking: "Booking ஐ confirm செய்", next: "தொடர்",
-      priceNote: "உங்கள் பெட்டிகளைப் பெற்றதும் இறுதி விலை உறுதிசெய்யப்படும். முதலில் மதிப்பீடு வேண்டுமா?", askPrice: "Transco Agent இடம் விலை கேள்",
-      vCountry: "ஒரு நாட்டைத் தேர்ந்தெடுக்கவும்.", vService: "அனுப்பும் முறையைத் தேர்ந்தெடுக்கவும்.", vItems: "குறைந்தது ஒரு பொருளைச் சேர்க்கவும்.", vOther: "\"other\" பொருளை விவரிக்கவும்.",
-      s2inside: "உங்கள் பெட்டிகளில் என்ன இருக்கிறது?", s2insideHelp: "அனுப்பும் அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை. மதிப்புகளை எங்கள் staff சேர்ப்பார்கள்.", itemN: "பொருள் {n}", itemPh: "உதா: Chocolate", newLbl: "புதியது", usedLbl: "பயன்படுத்தியது", howMany: "எத்தனை", addItem: "+ இன்னொரு பொருள்", removeItem: "நீக்கு", vContents: "ஒவ்வொரு பொருளையும் விவரித்து, புதியதா பயன்படுத்தியதா, எத்தனை என்று சொல்லுங்கள்.", homeLbl: "வீட்டு தொலைபேசி (விருப்பமானால்)", senderIdLbl: "Passport அல்லது NIC எண்", senderIdOptLbl: "Passport அல்லது NIC எண் (விருப்பமானால்)", senderIdHelp: "இலங்கை Customs க்கு தேவை.", vSenderId: "உங்கள் passport அல்லது NIC எண்ணை உள்ளிடுங்கள்.", vHome: "வீட்டு தொலைபேசி எண்ணைச் சரிபாருங்கள், அல்லது காலியாக விடுங்கள்.", signTitle: "Insurance மற்றும் அறிவிப்பு", insuranceQ: "உங்கள் பொருட்களுக்கு insurance வேண்டுமா?", insYes: "ஆம்", insNo: "இல்லை", insuranceNote: "Insurance பற்றிய மேலும் விவரங்களுக்கு Supun ஐ அழையுங்கள்: 03 9357 7228.", declareText: "துப்பாக்கிகள், ஆபத்தான பொருட்கள், இரசாயனங்கள், தடைசெய்யப்பட்ட பொருட்கள் அல்லது வணிக அளவிலான பொருட்கள் இவற்றில் இல்லை என்று நான் அறிவிக்கிறேன்.", signName: "கையொப்பமிட உங்கள் முழுப் பெயரை எழுதுங்கள்", signatureLbl: "கையொப்பம் (விருப்பமானால்)", signHere: "விரலால் இங்கே கையொப்பமிடுங்கள்", clearSig: "அழி", signLater: "பெட்டிகளைக் கொடுக்கும்போது அச்சிட்ட படிவத்திலும் கையொப்பமிடலாம்.", vInsurance: "Insurance கேள்விக்கு பதிலளியுங்கள்.", vDeclare: "அறிவிப்பை tick செய்யுங்கள்.", vSignName: "கையொப்பமிட உங்கள் பெயரை எழுதுங்கள்.", insideLbl: "உள்ளே இருப்பவை", insuranceLbl: "Insurance", noFormsNote: "உங்கள் அறிவிப்பு முடிந்தது — பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff சரிபார்த்து உங்கள் BL எண்ணைத் தருவார்கள்.",
+      vCountry: "ஒரு நாட்டைத் தேர்ந்தெடுக்கவும்.", vService: "அனுப்பும் முறையைத் தேர்ந்தெடுக்கவும்.", vItems: "குறைந்தது ஒரு பொருளைச் சேர்க்கவும்.",      s2inside: "உங்கள் பெட்டிகளில் என்ன இருக்கிறது?", s2insideHelp: "அனுப்பும் அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை. மதிப்புகளை எங்கள் staff சேர்ப்பார்கள்.", itemN: "பொருள் {n}", itemPh: "உதா: Chocolate", newLbl: "புதியது", usedLbl: "பயன்படுத்தியது", howMany: "எத்தனை", addItem: "+ இன்னொரு பொருள்", removeItem: "நீக்கு", vContents: "ஒவ்வொரு பொருளையும் விவரித்து, புதியதா பயன்படுத்தியதா, எத்தனை என்று சொல்லுங்கள்.", homeLbl: "வீட்டு தொலைபேசி (விருப்பமானால்)", senderIdLbl: "Passport அல்லது NIC எண்", senderIdOptLbl: "Passport அல்லது NIC எண் (விருப்பமானால்)", senderIdHelp: "இலங்கை Customs க்கு தேவை.", vSenderId: "உங்கள் passport அல்லது NIC எண்ணை உள்ளிடுங்கள்.", vHome: "வீட்டு தொலைபேசி எண்ணைச் சரிபாருங்கள், அல்லது காலியாக விடுங்கள்.", signTitle: "Insurance மற்றும் அறிவிப்பு", insuranceQ: "உங்கள் பொருட்களுக்கு insurance வேண்டுமா?", insYes: "ஆம்", insNo: "இல்லை", insuranceNote: "Insurance பற்றிய மேலும் விவரங்களுக்கு Supun ஐ அழையுங்கள்: 03 9357 7228.", declareText: "துப்பாக்கிகள், ஆபத்தான பொருட்கள், இரசாயனங்கள், தடைசெய்யப்பட்ட பொருட்கள் அல்லது வணிக அளவிலான பொருட்கள் இவற்றில் இல்லை என்று நான் அறிவிக்கிறேன்.", signName: "கையொப்பமிட உங்கள் முழுப் பெயரை எழுதுங்கள்", signatureLbl: "கையொப்பம் (விருப்பமானால்)", signHere: "விரலால் இங்கே கையொப்பமிடுங்கள்", clearSig: "அழி", signLater: "பெட்டிகளைக் கொடுக்கும்போது அச்சிட்ட படிவத்திலும் கையொப்பமிடலாம்.", vInsurance: "Insurance கேள்விக்கு பதிலளியுங்கள்.", vDeclare: "அறிவிப்பை tick செய்யுங்கள்.", vSignName: "கையொப்பமிட உங்கள் பெயரை எழுதுங்கள்.", insideLbl: "உள்ளே இருப்பவை", insuranceLbl: "Insurance", noFormsNote: "உங்கள் அறிவிப்பு முடிந்தது — பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff சரிபார்த்து உங்கள் BL எண்ணைத் தருவார்கள்.",
       dgTitle: "Air Freight பாதுகாப்பு சரிபார்ப்பு", dgIntro: "இவை உங்கள் பெட்டிகளில் இல்லை என்பதை உறுதிப்படுத்த ஒவ்வொரு வரியையும் tick செய்யுங்கள்.", dgNo0: "Aerosol கேன்கள், sprays அல்லது வாசனை திரவியங்கள் இல்லை", dgNo1: "தீப்பற்றக்கூடியவை, வெடிபொருட்கள், காந்தங்கள் அல்லது ஆபத்தான பொருட்கள் இல்லை", dgNo2: "எந்த வகை batteries, இயந்திரங்கள், எரிபொருள் அல்லது எண்ணெயும் இல்லை", dgNo3: "சட்டவிரோத போதைப்பொருள், ஆபாசப் பொருட்கள், ஆயுதங்கள் அல்லது துப்பாக்கிகள் இல்லை", dgNo4: "விலையுயர்ந்த நகைகள், தங்கம், இரத்தினங்கள், பணம், credit/bank cards அல்லது passports இல்லை", dgMed: "மருந்துகள் உள்ளனவா?", dgMedHint: "ஆம் எனில், prescription உடன் சொந்த மருந்துகள் மட்டும்.", dgLi: "ஏதேனும் பொருளில் lithium batteries உள்ளனவா?", dgLiHint: "உதா: phone, laptop, camera அல்லது power bank.", dgLiq: "திரவங்கள் உள்ளனவா?", dgDetails: "பொருள் வகை மற்றும் அளவு", dgWarn: "அறிவிக்கப்படாத ஆபத்தான பொருட்களை அகற்ற ஒரு பொருளுக்கு குறைந்தது AUD 250 செலவாகும், விமான நிலைய பாதுகாப்பும் அபராதம் விதிக்கலாம்.", vDgNo: "தயவுசெய்து ஒவ்வொரு வரியையும் tick செய்யுங்கள்.", vDgQ: "ஒவ்வொரு Air Freight கேள்விக்கும் பதிலளியுங்கள்.", vDgDetails: "பொருள் வகை மற்றும் அளவை எழுதுங்கள்.",
       dgHasTitle: "இவை Air Freight இல் அனுப்ப முடியாது. பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff உங்களுடன் சரிபார்ப்பார்கள் (Sea Freight இல் அனுப்பவோ அகற்றவோ வேண்டியிருக்கலாம்):", dgAck: "ஆம், நான் tick செய்யாத பொருட்கள் என் பெட்டிகளில் இருக்கலாம்.", vDgAck: "பெட்டிகளில் இல்லாத வரிகளை tick செய்யுங்கள், அல்லது இருக்கக்கூடியவற்றை உறுதிப்படுத்துங்கள்.", dgItem0: "Aerosol கேன்கள், sprays அல்லது வாசனை திரவியங்கள்", dgItem1: "தீப்பற்றக்கூடியவை, வெடிபொருட்கள், காந்தங்கள் அல்லது ஆபத்தான பொருட்கள்", dgItem2: "Batteries, இயந்திரங்கள், எரிபொருள் அல்லது எண்ணெய்", dgItem3: "சட்டவிரோத போதைப்பொருள், ஆபாசப் பொருட்கள், ஆயுதங்கள் அல்லது துப்பாக்கிகள்", dgItem4: "விலையுயர்ந்த நகைகள், தங்கம், இரத்தினங்கள், பணம், cards அல்லது passports",
       vDelivery: "Delivery முறையைத் தேர்ந்தெடுக்கவும்.", vDay: "ஒரு நாளைத் தேர்ந்தெடுக்கவும்.", vTime: "ஒரு நேரத்தைத் தேர்ந்தெடுக்கவும்.",
@@ -822,7 +833,7 @@
       countries: { sri_lanka: "Sri Lanka", india: "India" },
       services: { sea: "Sea Freight", air: "Air Freight" },
       deliveries: { door: "Door delivery", collect: "கிடங்கிலிருந்து பெறுதல்" },
-      itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "வேறு பொருள்" },
+      itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "வழக்கத்துக்கு மாறான அளவுப் பொருள்" },
       footer: "கேள்விகளா? <a href=\"tel:0434842023\">0434 842 023</a> ஐ அழையுங்கள் அல்லது <a href=\"/#agent\">Transco Agent இடம் கேளுங்கள்</a>."
     }
   };
@@ -1449,7 +1460,16 @@
       submit.disabled = true; submit.textContent = t("checkingCode");
       api("POST", "/auth/login", payload)
         .then(onSignedIn)
-        .catch(function (err) { errBox.textContent = err.message; submit.disabled = false; submit.textContent = t("signInBtn"); });
+        .catch(function (err) {
+          submit.disabled = false; submit.textContent = t("signInBtn");
+          // No account for that number/email: point them to sign up.
+          if (err.reason === "no_account") {
+            errBox.replaceChildren(h("span", { text: t("noAccountYet") + " " }),
+              h("button", { type: "button", class: "link-btn", style: "padding:0", onclick: function () { if (!byEmail) phone.save(); switchMode("register"); }, text: t("signUpNow") }));
+            return;
+          }
+          errBox.textContent = err.message;
+        });
     } },
       seg,
       byEmail
@@ -1798,10 +1818,6 @@
         h("h1", { class: "hello", text: greeting() + (name ? ", " + name : "") + " 👋" }),
         h("p", { class: "page-sub", text: t("howHelp") }),
         blCard,
-        h("button", { type: "button", class: "agent-cta", onclick: function () { openAgent(); } },
-          h("span", { class: "ico", "aria-hidden": "true" }, chatIcon()),
-          h("span", null, h("span", { class: "t", style: "display:block", text: t("askAgent") }), h("span", { class: "s", text: t("askAgentSub") })),
-          h("span", { class: "arrow", "aria-hidden": "true", text: "→" })),
         quick,
         alert ? h("div", { style: "margin-top:16px" }, alert) : null,
         profile.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:16px" },
@@ -1866,22 +1882,16 @@
       row(t("items"), b.items);
       row(t("destination"), [b.destination, b.country].filter(Boolean).join(", "));
       row(t("delivery"), b.delivery);
-      row(t("dropOff"), b.dropOff ? [fmtDate(b.dropOff.date, { weekday: "long", day: "numeric", month: "long" }), fmtTime(b.dropOff.time)].filter(Boolean).join(" · ") : null);
+      row(t("dropOff"), handoverText(b.handover, b.dropOff && b.dropOff.date, b.dropOff && b.dropOff.time, b.pickupNote));
       row(t("notes"), b.notes);
 
+      // Edit (and cancel, inside Edit) while nothing has happened yet.
       var cancelArea = null;
-      if (b.canCancel) {
-        var cancelBtn = h("button", { class: "btn danger block", type: "button", text: t("cancelBooking") });
-        cancelBtn.addEventListener("click", function () {
-          confirmDialog({ title: t("cancelTitle"), body: t("cancelBody"), yes: t("cancelYes"), no: t("cancelNo") }).then(function (ok) {
-            if (!ok) return;
-            cancelBtn.disabled = true;
-            api("POST", "/bookings/" + encodeURIComponent(b.id) + "/cancel").then(function () {
-              viewBooking(id);
-            }).catch(function (err) { cancelBtn.disabled = false; alertInline(cancelArea, err.message); });
-          });
-        });
-        cancelArea = h("div", { style: "margin-top:18px" }, cancelBtn);
+      if (b.edit) {
+        cancelArea = h("div", { style: "margin-top:18px" }, h("a", { class: "btn block", href: "#/bookings/" + encodeURIComponent(b.id) + "/edit", text: "✏️ " + t("editBooking") }));
+      } else if (b.canCancel) {
+        // Older bookings (made in the chat) can't be edited online — cancel only.
+        cancelArea = h("div", { style: "margin-top:18px" }, cancelButton(b, function () { viewBooking(id); }));
       } else if (b.status.key !== "cancelled") {
         cancelArea = h("p", { class: "muted small", style: "margin-top:18px;text-align:center", text: t("cantCancel") });
       }
@@ -1903,6 +1913,112 @@
           h("div", { class: "card" }, h("h2", { style: "font-size:17px;margin:0 0 12px", text: t("details") }), h("dl", { class: "kv" }, rows))),
         cancelArea);
     });
+  }
+
+  // "Cancel this booking" (asks first). done: runs after it's cancelled.
+  function cancelButton(b, done) {
+    var btn = h("button", { class: "btn danger block", type: "button", text: t("cancelBooking") });
+    var wrap = h("div", null, btn);
+    btn.addEventListener("click", function () {
+      confirmDialog({ title: t("cancelTitle"), body: t("cancelBody"), yes: t("cancelYes"), no: t("cancelNo") }).then(function (ok) {
+        if (!ok) return;
+        btn.disabled = true;
+        api("POST", "/bookings/" + encodeURIComponent(b.id) + "/cancel").then(done)
+          .catch(function (err) { btn.disabled = false; alertInline(wrap, err.message); });
+      });
+    });
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------
+  // Edit booking (#/bookings/:id/edit) — boxes, delivery, drop-off or
+  // pickup, notes; and cancel. Reuses the booking form's sections on a
+  // `draft` built from the booking (any new booking in progress is kept
+  // aside and comes back on #/book).
+  // ---------------------------------------------------------------
+  var newBookingStash = null;
+
+  function draftFromBooking(b) {
+    var e = b.edit, d = freshDraft();
+    d._edit = true; d.bookingId = b.id; d.code = b.code;
+    d.canChangeBoxes = e.canChangeBoxes;
+    d.sender = Object.assign({ isMe: true }, blankPerson(), e.sender || {});
+    d.receiver = Object.assign(blankPerson(), e.receiver || {});
+    if (e.contents && e.contents.length) d.contents = e.contents.map(function (c) { return { description: c.description || "", condition: c.condition || "", qty: String(c.qty || 1) }; });
+    d.country = e.country; d.service = e.service; d.deliveryType = e.deliveryType;
+    d.handover = e.handover; d.pickupNote = e.pickupNote || ""; d.notes = e.notes || "";
+    d.date = e.dropOff ? e.dropOff.date : null; d.time = e.dropOff ? e.dropOff.time : null; d.origDate = d.date;
+    (e.items || []).forEach(function (i) {
+      d.qty[i.type] = i.qty;
+      if (i.type === "tv" && i.sizes) d.tvSizes = i.sizes.slice();
+      if (i.type === "other" && i.dims) d.oddDims = i.dims.map(function (x) { return { l: String(x.l), w: String(x.w), h: String(x.h) }; });
+    });
+    return d;
+  }
+
+  function viewBookingEdit(id) {
+    loadAndRender(t("loadingBooking"), function () {
+      return Promise.all([api("GET", "/bookings/" + encodeURIComponent(id)), api("GET", "/booking-options")]);
+    }, function (res) {
+      var b = res[0].booking;
+      if (!b.edit) { go("#/bookings/" + encodeURIComponent(id)); return; }
+      bookingOptions = res[1];
+      if (draft && !draft._edit) newBookingStash = draft;
+      draft = draftFromBooking(b);
+      renderBookingEdit(b);
+    });
+  }
+
+  function renderBookingEdit(b) {
+    var err = h("div", { class: "notice err", role: "alert", hidden: true });
+    var notesInput = h("textarea", { class: "input", id: "notes", maxlength: "300", text: draft.notes });
+    notesInput.addEventListener("input", function () { draft.notes = notesInput.value; });
+    var save = h("button", { class: "btn teal block", type: "submit", text: t("save") });
+    var form = h("form", { novalidate: true, onsubmit: function (ev) {
+      ev.preventDefault();
+      err.hidden = true;
+      var boxes = draft.canChangeBoxes;
+      var s = checkPerson(draft.sender, false, senderIdMode());
+      var r = checkPerson(draft.receiver, true);
+      var badItem = !draft.contents.length || draft.contents.some(function (c) {
+        var q = Number(c.qty);
+        return (c.description || "").trim().length < 2 || !c.condition || !(Math.floor(q) === q && q >= 1 && q <= 999);
+      });
+      var problem = (boxes && !draft.deliveryType) ? t("vDelivery") : (boxes && itemsProblem()) || (badItem ? t("vContents") : null) ||
+        (s ? { msg: s.msg, field: "s-" + s.key } : null) || (r ? { msg: r.msg, field: "r-" + r.key } : null) || (boxes && handoverProblem());
+      if (problem) { flagProblem(problem); return; }
+      save.disabled = true; save.textContent = t("saving");
+      var payload = {
+        sender: personPayload(draft.sender, false), receiver: personPayload(draft.receiver, true),
+        contents: draft.contents.map(function (c) { return { description: c.description.trim(), condition: c.condition, qty: Number(c.qty) }; })
+      };
+      if (boxes) Object.assign(payload, handoverPayload(), { items: selectedItems(), deliveryType: draft.deliveryType, notes: draft.notes.trim() });
+      api("PATCH", "/bookings/" + encodeURIComponent(b.id), payload).then(function () {
+        draft = newBookingStash; newBookingStash = null;
+        go("#/bookings/" + encodeURIComponent(b.id));
+      }).catch(function (e2) {
+        save.disabled = false; save.textContent = t("save");
+        flagProblem(e2.message);
+      });
+    } },
+      draft.canChangeBoxes ? h("div", { class: "card" }, deliverySection()) : null,
+      draft.canChangeBoxes ? h("div", { class: "card" }, h("h2", { class: "section-title", style: "margin-top:0", text: t("s2") }), boxesSection(),
+        h("div", { class: "field", style: "margin-top:16px" }, h("label", { for: "notes", text: t("notesLabel") }), notesInput)) : null,
+      draft.canChangeBoxes ? h("div", { class: "card" }, handoverSection(function () { renderBookingEdit(b); })) : null,
+      // The declaration — can be changed until the BL is issued.
+      h("div", { class: "card" }, contentsEditor()),
+      h("div", { class: "card" }, h("h2", { class: "section-title", style: "margin-top:0", text: t("senderLbl") }), personFields("s", draft.sender, false, senderIdMode())),
+      h("div", { class: "card" }, h("h2", { class: "section-title", style: "margin-top:0", text: t("receiverLbl") }), personFields("r", draft.receiver, true)),
+      err,
+      h("div", { style: "margin-top:16px" }, save));
+    render(
+      backLink("#/bookings/" + encodeURIComponent(b.id)),
+      h("h1", { class: "page-title", style: "margin-top:6px", text: t("editBooking") + (b.code ? " · " + b.code : "") }),
+      h("p", { class: "muted small", style: "margin:0 0 16px", text: draft.canChangeBoxes ? t("editIntro") : t("editDeclOnly") }),
+      h("div", { class: "stack" }, form),
+      b.edit.canCancel ? h("div", { style: "margin-top:28px;padding-top:18px;border-top:1px solid var(--line)" },
+        h("p", { class: "muted small", style: "margin:0 0 10px", text: t("cancelIntro") }),
+        cancelButton(b, function () { draft = newBookingStash; newBookingStash = null; go("#/bookings/" + encodeURIComponent(b.id)); })) : null);
   }
 
   function alertInline(container, message) {
@@ -1928,6 +2044,10 @@
   function freshDraft() {
     return {
       step: 1, country: null, service: null, qty: {}, notes: "", deliveryType: null, date: null, time: null,
+      // One screen-size band per TV, one { l, w, h } (cm) per odd-size item.
+      tvSizes: [], oddDims: [],
+      // "dropoff" (day + time at our warehouse) or "pickup" (we call to arrange).
+      handover: null, pickupNote: "",
       // sender/meSender are filled from booking-options on first use.
       sender: null, meSender: null, receiver: blankPerson(), receiverPick: null,
       // The rest of the declaration — collected now, so nothing is filled
@@ -1962,6 +2082,14 @@
   // (needed for Sri Lanka Customs).
   function checkPerson(p, withId, senderId) {
     if ((p.fullName || "").trim().length < 2) return { msg: t("vName"), key: "fullName" };
+    // The sender (in Australia): street / suburb / state / postcode and an 04 mobile.
+    if (!withId) {
+      if ((p.street || "").trim().length < 3) return { msg: t("vStreet"), key: "street" };
+      if ((p.suburb || "").trim().length < 2) return { msg: t("vSuburb"), key: "suburb" };
+      if (!p.state) return { msg: t("vState"), key: "state" };
+      if (!/^\d{4}$/.test((p.postcode || "").trim())) return { msg: t("vPostcode"), key: "postcode" };
+      if (!validAuMobile(p.mobile)) return { msg: t("vAuMobile"), key: "mobile" };
+    }
     if ((p.address || "").trim().length < 5) return { msg: t("vAddress"), key: "address" };
     if (withId && (p.town || "").trim().length < 2) return { msg: t("vTown"), key: "town" };
     var mobile = (p.mobile || "").trim(), digits = mobile.replace(/\D/g, "");
@@ -1974,6 +2102,24 @@
     if (home && (!/^\+?[\d\s()-]+$/.test(home) || homeDigits.length < 7 || homeDigits.length > 15)) return { msg: t("vHome"), key: "homePhone" };
     return null;
   }
+  // Australian address ⇄ the one-line address the declaration stores:
+  // "18 Sorrell St, Parramatta NSW 2150".
+  var AU_ADDRESS_RE = /^(.+?),\s*([^,]+?)\s+(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+(\d{4})$/i;
+  function splitAuAddress(p) {
+    var m = AU_ADDRESS_RE.exec((p.address || "").trim());
+    p.street = m ? m[1] : (p.address || "").trim();
+    p.suburb = m ? m[2] : ""; p.state = m ? m[3].toUpperCase() : ""; p.postcode = m ? m[4] : "";
+  }
+  function joinAuAddress(p) {
+    return [(p.street || "").trim(), [(p.suburb || "").trim(), p.state || "", (p.postcode || "").trim()].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  }
+  // 04XX XXX XXX (also accepts +61 4XX…).
+  function validAuMobile(v) {
+    var d = String(v || "").replace(/\D/g, "");
+    if (/^614\d{8}$/.test(d)) d = "0" + d.slice(2);
+    return /^04\d{8}$/.test(d);
+  }
+
   function senderIdMode() { return draft.country === "sri_lanka" ? "required" : "optional"; }
 
   // Inputs for one person on the declaration, bound straight to `person`.
@@ -1990,12 +2136,32 @@
       var hint = help ? h("span", { class: "help", id: id + "-help", text: help }) : null;
       return h("div", { class: "field" }, h("label", { for: id, text: label }), helpBelow ? null : hint, el, helpBelow ? hint : null);
     }
+    // The sender is in Australia: address as street / suburb / state /
+    // postcode, mobile as 04XX XXX XXX. Joined into one address on save.
+    var au = prefix === "s";
+    function auAddress() {
+      if (!person.street && !person.suburb) splitAuAddress(person);
+      function sync() { person.address = joinAuAddress(person); }
+      var state = h("select", { class: "input", id: "s-state", autocomplete: "address-level1" },
+        h("option", { value: "", text: t("chooseState") }),
+        ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"].map(function (s) { return h("option", { value: s, text: s }); }));
+      state.value = person.state || "";
+      state.addEventListener("change", function () { person.state = state.value; state.removeAttribute("aria-invalid"); sync(); });
+      var street = field("street", t("street"), { type: "text", maxlength: "120", autocomplete: "address-line1", placeholder: t("streetPh") });
+      var suburb = field("suburb", t("suburb"), { type: "text", maxlength: "60", autocomplete: "address-level2" });
+      var postcode = field("postcode", t("postcode"), { type: "text", inputmode: "numeric", maxlength: "4", autocomplete: "postal-code" });
+      [street, suburb, postcode].forEach(function (f) { f.querySelector("input").addEventListener("input", sync); });
+      return [street, h("div", { class: "grid-2", style: "margin-top:14px" }, suburb,
+        h("div", { class: "grid-2" }, h("div", { class: "field" }, h("label", { for: "s-state", text: t("state") }), state), postcode))];
+    }
+    if (au && person.mobile) person.mobile = formatAuPhone(person.mobile);
     return [
       field("fullName", t("fullNameId"), { type: "text", maxlength: "80", autocomplete: prefix === "s" ? "name" : "off" }),
-      field("address", t("addressLbl"), { maxlength: "200", autocomplete: prefix === "s" ? "street-address" : "off", style: "min-height:72px" }, null, true),
+      au ? auAddress() : field("address", t("addressLbl"), { maxlength: "200", autocomplete: "off", style: "min-height:72px" }, null, true),
       withId ? field("town", t("townLbl"), { type: "text", maxlength: "60", autocomplete: "off" }, t("townHelp")) : null,
       h("div", { class: "grid-2", style: "margin-top:14px" },
-        field("mobile", t("mobileLbl"), { type: "tel", inputmode: "tel", maxlength: "24", autocomplete: prefix === "s" ? "tel" : "off" }, t("mobileHelp"), false, true),
+        au ? field("mobile", t("mobileLbl"), { type: "tel", inputmode: "tel", maxlength: "14", autocomplete: "tel", placeholder: "04XX XXX XXX" }, t("auMobileHelp"), false, true)
+          : field("mobile", t("mobileLbl"), { type: "tel", inputmode: "tel", maxlength: "24", autocomplete: "off" }, t("mobileHelp"), false, true),
         field("email", t("emailLbl"), { type: "email", inputmode: "email", maxlength: "120", autocomplete: prefix === "s" ? "email" : "off", autocapitalize: "off" })),
       h("div", { class: "grid-2", style: "margin-top:14px" },
         withId
@@ -2008,16 +2174,30 @@
   }
 
   // #/book/sri_lanka/sea — the website's "New booking" and shipping-calendar
-  // links can pick the country (and service) up front. Only fills a booking
-  // that hasn't started yet, so a half-done booking is never overwritten.
+  // links can pick the country (and service) up front. With no link choice
+  // it starts on Sri Lanka + Sea Freight (most bookings); the customer can
+  // still change either. Only fills a booking that hasn't started yet, so
+  // a half-done booking is never overwritten.
+  // A booking in progress survives a trip to the Box info page and back
+  // (same tab): saved when they follow the link, picked up again here.
+  var BOOK_DRAFT_KEY = "transco_book_draft";
+  function saveDraftForLater() { try { session(BOOK_DRAFT_KEY, JSON.stringify(draft)); } catch (e) {} }
+  function restoreSavedDraft() {
+    var raw = session(BOOK_DRAFT_KEY);
+    session(BOOK_DRAFT_KEY, null);
+    try { return raw ? Object.assign(freshDraft(), JSON.parse(raw)) : null; } catch (e) { return null; }
+  }
+
   function viewBook(country, service) {
-    if (!draft) draft = freshDraft();
+    // Left an Edit page without saving: back to their own new booking.
+    if (draft && draft._edit) { draft = newBookingStash; newBookingStash = null; }
+    if (!draft) draft = restoreSavedDraft() || freshDraft();
     function preset() {
-      if (!country || draft.step !== 1 || draft.country) return;
-      var c = bookingOptions.countries.filter(function (x) { return x.key === country; })[0];
+      if (draft.step !== 1 || draft.country) return;
+      var c = bookingOptions.countries.filter(function (x) { return x.key === (country || "sri_lanka"); })[0];
       if (!c) return;
       draft.country = c.key;
-      var s = c.services.filter(function (x) { return x.key === service; })[0];
+      var s = c.services.filter(function (x) { return x.key === (service || "sea"); })[0];
       draft.service = s ? s.key : c.services.length === 1 ? c.services[0].key : null;
     }
     if (bookingOptions) { preset(); initDeclaration(); return renderBookStep(); }
@@ -2035,12 +2215,110 @@
   function selectedItems() {
     var c = countryOpt();
     if (!c) return [];
-    return c.itemTypes.filter(function (it) { return draft.qty[it.key] > 0; }).map(function (it) { return { type: it.key, qty: draft.qty[it.key] }; });
+    return c.itemTypes.filter(function (it) { return draft.qty[it.key] > 0; }).map(function (it) {
+      var qty = draft.qty[it.key], item = { type: it.key, qty: qty };
+      if (it.key === "tv") item.sizes = draft.tvSizes.slice(0, qty);
+      if (it.key === "other") item.dims = draft.oddDims.slice(0, qty).map(function (d) { return { l: Number(d.l), w: Number(d.w), h: Number(d.h) }; });
+      return item;
+    });
   }
   function itemLabel(key) { return STRINGS[lang].itemTypes[key] || key; }
-  function itemsText() {
-    return selectedItems().map(function (i) { return i.qty + " × " + itemLabel(i.type); }).join(", ");
+  // Size (L × W × H) and weight limit under each box, as on the Box info page.
+  function boxDesc(key) {
+    var sl = draft.country !== "india";
+    var d = {
+      wine_box: "20 × 23 × 20 cm · max 20 kg", gift_box: "41 × 44 × 32 cm · max 20 kg",
+      tea_chest: "42 × 44 × 63 cm · max " + (sl ? 30 : 50) + " kg", quarter_cbm: "83 × 50 × 52 cm · max 50 kg"
+    }[key];
+    var price = sl && draft.service === "sea" ? BOX_PRICE[key] : null;
+    if (d && price) d += " · $" + price + " " + t("eachLbl") + (key === "tea_chest" ? " (" + t("teaFree") + ")" : "");
+    return d || (key === "tv" ? t("tvDesc") : key === "other" ? t("otherDesc") : null);
   }
+
+  // Rough cost of the boxes alone — the bot's rates (calculate_price_LATEST.js).
+  // Sri Lanka Sea: per box, every 3rd Tea Chest free; TV by size band; odd-size
+  // items $550 per cubic metre. India Sea: 1/2/3 boxes, then the 2→3 step per box.
+  // Air Freight goes by weight, so no estimate. Never includes door delivery
+  // or home pickup — the page says so.
+  var BOX_PRICE = { tea_chest: 75, gift_box: 45, wine_box: 30, quarter_cbm: 150 };
+  var INDIA_PRICE = { general: [400, 600, 800], tea_chest: [600, 900, 1200], quarter_cbm: [600, 900, 1200] };
+  function boxesEstimate() {
+    if (draft.service !== "sea") return null;
+    var q = draft.qty, total = 0, unknown = false;
+    if (draft.country === "india") {
+      Object.keys(INDIA_PRICE).forEach(function (k) {
+        var n = q[k] || 0, p = INDIA_PRICE[k];
+        if (n) total += n <= 3 ? p[n - 1] : p[2] + (n - 3) * (p[2] - p[1]);
+      });
+      if (q.other) unknown = true;
+    } else {
+      for (var p = 1; p <= (q.tea_chest || 0); p++) total += p % 3 === 0 ? 0 : 75;
+      ["gift_box", "wine_box", "quarter_cbm"].forEach(function (k) { total += (q[k] || 0) * BOX_PRICE[k]; });
+      for (var i = 0; i < (q.tv || 0); i++) {
+        var band = TV_SIZES.filter(function (s) { return s.key === draft.tvSizes[i]; })[0];
+        if (band && band.price) total += band.price; else unknown = true;
+      }
+      for (var j = 0; j < (q.other || 0); j++) {
+        var d = draft.oddDims[j] || {};
+        if (validDim(d.l || "") && validDim(d.w || "") && validDim(d.h || "")) total += Math.ceil(d.l * d.w * d.h / 1e6 * 550);
+        else unknown = true;
+      }
+    }
+    return { total: total, unknown: unknown };
+  }
+
+  // The box under the list: approximate cost + what it doesn't include.
+  function estimateBox() {
+    var el = h("div", { class: "notice info", style: "margin-top:14px;display:block", "aria-live": "polite" });
+    function refresh() {
+      var est = boxesEstimate();
+      var any = selectedItems().length > 0;
+      el.hidden = !any;
+      if (!any) return;
+      el.replaceChildren();
+      append(el, [
+        est ? h("div", { style: "display:flex;justify-content:space-between;gap:12px;font-weight:800;font-size:17px" },
+          h("span", { text: "💰 " + t("estTitle") }), h("span", { text: "$" + est.total + (est.unknown ? " + " : "") })) : null,
+        est && est.unknown ? h("div", { class: "small", text: t("estPlus") }) : null,
+        !est ? h("div", { style: "font-weight:700", text: "✈️ " + t("estAir") }) : null,
+        h("p", { class: "small", style: "margin:6px 0 4px", text: t("estNote") }),
+        h("button", { type: "button", class: "link-btn", style: "padding-left:0", onclick: function () { openAgent(); }, text: t("estChat") + " →" })
+      ]);
+    }
+    refresh();
+    return { el: el, refresh: refresh };
+  }
+  // ' (55", 32")' for TVs, ' (120×40×80 cm)' for odd-size items.
+  function itemDetailText(i) {
+    if (i.type === "tv" && i.sizes && i.sizes.length) return " (" + i.sizes.map(tvSizeLabel).join(", ") + ")";
+    if (i.type === "other" && i.dims && i.dims.length) return " (" + i.dims.map(function (d) { return d.l + "×" + d.w + "×" + d.h + " cm"; }).join("; ") + ")";
+    return "";
+  }
+  function itemsText() {
+    return selectedItems().map(function (i) { return i.qty + " × " + itemLabel(i.type) + itemDetailText(i); }).join(", ");
+  }
+  // TV screen-size bands and their Sea Freight prices (the bot's TV price
+  // list). "other" = 56–59" or over 75" — our team confirms that price.
+  var TV_SIZES = [
+    { key: "upto35", label: 'Up to 35"', price: 140 }, { key: "36to45", label: '36" – 45"', price: 220 },
+    { key: "46to55", label: '46" – 55"', price: 300 }, { key: "60to65", label: '60" – 65"', price: 350 },
+    { key: "66to75", label: '66" – 75"', price: 400 }, { key: "other", label: null, price: null }
+  ];
+  function tvSizeOptions() {
+    // Prices are Sri Lanka Sea Freight; Air Freight goes by weight.
+    var showPrice = draft.country === "sri_lanka" && draft.service === "sea";
+    return TV_SIZES.map(function (s) {
+      if (s.key === "other") return { value: s.key, title: t("tvOther"), desc: t("tvOtherDesc") };
+      return { value: s.key, title: s.label, desc: showPrice ? "$" + s.price : null };
+    });
+  }
+  function tvSizeLabel(key) {
+    var s = TV_SIZES.filter(function (x) { return x.key === key; })[0];
+    return !s ? key + '"' : s.key === "other" ? t("tvOther").toLowerCase() : s.label;
+  }
+  function validTvSize(v) { return TV_SIZES.some(function (s) { return s.key === v; }); }
+  function validDim(v) { var n = Number(v); return String(v).trim() !== "" && isFinite(n) && n >= 1 && n <= 500; }
+
 
   function radioGroup(name, options, current, onChange, extraClass) {
     return h("div", { class: "choices " + (extraClass || ""), role: "radiogroup" }, options.map(function (o, idx) {
@@ -2052,15 +2330,18 @@
     }));
   }
 
+  // Sri Lanka boxes are collected from our Wattala warehouse.
+  function collectTitle() { return draft.country === "sri_lanka" ? t("collectSl") : t("collect"); }
+
   function validateStep(step) {
     if (step === 1) {
       if (!draft.country) return t("vCountry");
       if (!draft.service) return t("vService");
+      if (!draft.deliveryType) return t("vDelivery");
     }
     if (step === 2) {
-      var items = selectedItems();
-      if (!items.length) return t("vItems");
-      if (draft.qty.other > 0 && draft.notes.trim().length < 3) return t("vOther");
+      var itemsBad = itemsProblem();
+      if (itemsBad) return itemsBad;
       var badItem = draft.contents.some(function (c) {
         var q = Number(c.qty);
         return (c.description || "").trim().length < 2 || !c.condition || !(Math.floor(q) === q && q >= 1 && q <= 999);
@@ -2075,21 +2356,175 @@
       if (savedReceivers().length && !draft.receiverPick) return t("vPickReceiver");
       var r = checkPerson(draft.receiver, true);
       if (r) return { msg: r.msg, field: "r-" + r.key };
-      if (!draft.deliveryType) return t("vDelivery");
     }
-    if (step === 5) {
+    if (step === 5) return handoverProblem();
+    return null;
+  }
+
+  function personPayload(p, withId) {
+    var out = { fullName: p.fullName.trim(), address: (withId ? p.address : joinAuAddress(p)).trim(), mobile: withId ? p.mobile.trim() : formatAuPhone(p.mobile), email: p.email.trim(), homePhone: (p.homePhone || "").trim() };
+    if (withId) out.town = p.town.trim();
+    var id = (p.idNumber || "").replace(/\s/g, "").toUpperCase();
+    if (withId || id) out.idNumber = id;
+    return out;
+  }
+
+  // The box list with +/− (and TV sizes / odd-size measurements under
+  // their rows). Works on `draft` — the new booking, or the booking being
+  // edited (#/bookings/:id/edit).
+  function boxesSection() {
+    var c = countryOpt();
+    var est = estimateBox();
+    // Under the TV row: one screen-size box per TV. Under the odd-size
+    // row: length / width / height per item. Rebuilt when the count changes.
+    function itemDetails(key, detail) {
+      var qty = draft.qty[key] || 0;
+      detail.hidden = qty === 0;
+      if (!qty) { detail.replaceChildren(); return; }
+      detail.replaceChildren();
+      if (key === "tv") {
+        append(detail, [h("span", { class: "help", text: t("tvHelp") }), Array.from({ length: qty }, function (_, i) {
+          var group = radioGroup("tv-size-" + i, tvSizeOptions(), draft.tvSizes[i] || null, function (v) { draft.tvSizes[i] = v; est.refresh(); }, "sizes");
+          group.setAttribute("aria-labelledby", "tv-size-l-" + i);
+          return h("div", { class: "field" }, h("span", { class: "label", id: "tv-size-l-" + i, text: t("tvSizeN", { n: i + 1 }) }), group);
+        })]);
+      } else {
+        append(detail, [h("span", { class: "help", text: t("oddHelp") }), Array.from({ length: qty }, function (_, i) {
+          if (!draft.oddDims[i]) draft.oddDims[i] = { l: "", w: "", h: "" };
+          var dims = draft.oddDims[i];
+          var labels = { l: t("lenLbl"), w: t("widLbl"), h: t("hgtLbl") };
+          return h("fieldset", { class: "field", style: "border:0;padding:0;margin:0" },
+            h("legend", { class: "label", style: "padding:0", text: t("oddN", { n: i + 1 }) }),
+            h("div", { class: "dims-row" }, ["l", "w", "h"].map(function (k) {
+              var id = "odd-" + i + "-" + k;
+              var input = h("input", { class: "input", id: id, type: "number", inputmode: "decimal", min: "1", max: "500", step: "any", value: dims[k] || "" });
+              input.addEventListener("input", function () { dims[k] = input.value; input.removeAttribute("aria-invalid"); est.refresh(); });
+              return h("div", { class: "field" }, h("label", { for: id, class: "small", text: labels[k] }), input);
+            })));
+        })]);
+      }
+    }
+    return [
+      draft._edit ? null : h("p", { class: "small", style: "margin:-4px 0 12px" }, h("a", { href: "/box-info.html?from=booking", onclick: saveDraftForLater, text: "📦 " + t("boxInfoLink") + " →" })),
+      h("div", { class: "card", style: "padding:4px 16px" }, c.itemTypes.map(function (it) {
+        var qty = draft.qty[it.key] || 0;
+        var out = h("output", { "aria-live": "polite", text: String(qty) });
+        var minus = h("button", { type: "button", "aria-label": t("decrease", { item: itemLabel(it.key) }), disabled: qty === 0, text: "−" });
+        var plus = h("button", { type: "button", "aria-label": t("increase", { item: itemLabel(it.key) }), disabled: qty >= 30, text: "+" });
+        var detail = it.key === "tv" || it.key === "other" ? h("div", { class: "qty-detail" }) : null;
+        if (detail) itemDetails(it.key, detail);
+        function set(n) {
+          draft.qty[it.key] = Math.max(0, Math.min(30, n));
+          out.textContent = String(draft.qty[it.key]);
+          minus.disabled = draft.qty[it.key] === 0; plus.disabled = draft.qty[it.key] >= 30;
+          if (detail) itemDetails(it.key, detail);
+          est.refresh();
+        }
+        minus.addEventListener("click", function () { set((draft.qty[it.key] || 0) - 1); });
+        plus.addEventListener("click", function () { set((draft.qty[it.key] || 0) + 1); });
+        return h("div", { class: "qty-item" },
+          h("div", { class: "qty-row" },
+            h("span", null, h("span", { class: "name", style: "display:block", text: itemLabel(it.key) }), boxDesc(it.key) ? h("span", { class: "muted small", text: boxDesc(it.key) }) : null),
+            h("span", { class: "stepper" }, minus, out, plus)),
+          detail);
+      })),
+      est.el
+    ];
+  }
+
+  // Door delivery or collection at the destination.
+  function deliverySection() {
+    return h("div", { class: "field" }, h("span", { class: "label", text: t("deliveryQ") }),
+      radioGroup("delivery", [
+        { value: "door", title: "🚚 " + t("door"), desc: t("doorDesc") },
+        { value: "collect", title: "🏢 " + collectTitle(), desc: draft.country === "sri_lanka" ? t("collectSlDesc") : t("collectDesc") }
+      ], draft.deliveryType, function (v) { draft.deliveryType = v; }, "two"));
+  }
+
+  // How the boxes reach us, as the bot offers it: dropped off at our
+  // warehouse on a day + time, or a home pickup — Sajith calls to arrange
+  // the day and confirm the fee (no fixed pickup fee yet).
+  function handoverSection(rerender) {
+    var out = [
+      h("h2", { class: "section-title", style: "margin-top:0", text: t("handoverQ") }),
+      h("div", { class: "field" }, radioGroup("handover", [
+        { value: "dropoff", title: "📍 " + t("handDrop"), desc: t("handDropDesc") },
+        { value: "pickup", title: "🚚 " + t("handPick"), desc: t("handPickDesc") }
+      ], draft.handover, function (v) { draft.handover = v; rerender(); }, "two"))
+    ];
+    if (draft.handover === "dropoff") return out.concat(dropOffSection(rerender));
+    if (draft.handover === "pickup") {
+      var note = h("textarea", { class: "input", id: "pickup-note", maxlength: "200", text: draft.pickupNote || "" });
+      note.addEventListener("input", function () { draft.pickupNote = note.value; });
+      out.push(h("div", { class: "notice info", style: "margin-top:14px" }, h("span", { class: "ico", "aria-hidden": "true", text: "📞" }), h("span", { text: t("pickupInfo") })),
+        h("div", { class: "field", style: "margin-top:14px" }, h("label", { for: "pickup-note", text: t("pickupWhen") }), note));
+    }
+    return out;
+  }
+
+  // A day that's full can still be kept by the booking already on it.
+  function dayFull(d) { return d.full && !(draft._edit && d.date === draft.origDate); }
+
+  // Drop-off day and time at the warehouse. rerender: redraws the page
+  // it sits on (the booking form or the Edit booking page).
+  function dropOffSection(rerender) {
+    var dates = bookingOptions.dropOffDates;
+    var dateOpt = dates.filter(function (d) { return d.date === draft.date; })[0];
+    if (dateOpt && dayFull(dateOpt)) { draft.date = null; draft.time = null; dateOpt = null; }
+    return [
+      h("h3", { style: "font-size:16px;margin:18px 0 6px;color:var(--navy)", text: t("s4") }),
+      h("p", { class: "muted small", style: "margin-top:0", text: "📍 " + t("s4where") }),
+      h("ul", { class: "small", style: "margin:0 0 14px;padding-left:20px" }, h("li", { text: t("satNote") }), h("li", { text: t("wkNote") })),
+      !dates.length ? h("div", { class: "notice info" }, h("span", { class: "ico", "aria-hidden": "true", text: "ℹ" }), h("span", { text: t("noDates") })) :
+      h("div", { class: "field" }, h("span", { class: "label", text: t("chooseDay") }),
+        h("div", { class: "date-grid", role: "radiogroup" }, dates.map(function (d, idx) {
+          var id = "date-" + idx;
+          var input = h("input", { type: "radio", name: "date", id: id, value: d.date, checked: draft.date === d.date, disabled: dayFull(d) });
+          input.addEventListener("change", function () { draft.date = d.date; draft.time = d.slots.length === 1 ? d.slots[0] : null; rerender(); });
+          return h("div", { class: "choice" }, input, h("label", { for: id },
+            h("span", { class: "t", text: fmtDate(d.date) }),
+            h("span", { class: "d", text: dayFull(d) ? t("full") : (d.kind === "saturday" ? "11am–3pm" : "5–6pm") })));
+        }))),
+      dateOpt ? h("div", { class: "field" }, h("span", { class: "label", text: t("chooseTime") }),
+        h("div", { class: "slot-grid", role: "radiogroup" }, dateOpt.slots.map(function (s, idx) {
+          var id = "slot-" + idx;
+          var input = h("input", { type: "radio", name: "slot", id: id, value: s, checked: draft.time === s });
+          input.addEventListener("change", function () { draft.time = s; });
+          return h("div", { class: "choice" }, input, h("label", { for: id }, h("span", { class: "t", text: fmtTime(s) })));
+        }))) : null
+    ];
+  }
+
+  // Problems with the box list (shared by the booking form and Edit).
+  function itemsProblem() {
+    if (!selectedItems().length) return t("vItems");
+    for (var ti = 0; ti < (draft.qty.tv || 0); ti++) {
+      if (!validTvSize(draft.tvSizes[ti])) return { msg: t("vTvSize"), field: "tv-size-" + ti + "-0" };
+    }
+    for (var oi = 0; oi < (draft.qty.other || 0); oi++) {
+      var d = draft.oddDims[oi] || {};
+      var badDim = ["l", "w", "h"].filter(function (k) { return !validDim(d[k] || ""); })[0];
+      if (badDim) return { msg: t("vDims"), field: "odd-" + oi + "-" + badDim };
+    }
+    return null;
+  }
+  function handoverProblem() {
+    if (!draft.handover) return { msg: t("vHandover"), field: "handover-0" };
+    if (draft.handover === "dropoff") {
       if (!draft.date) return t("vDay");
       if (!draft.time) return t("vTime");
     }
     return null;
   }
-
-  function personPayload(p, withId) {
-    var out = { fullName: p.fullName.trim(), address: p.address.trim(), mobile: p.mobile.trim(), email: p.email.trim(), homePhone: (p.homePhone || "").trim() };
-    if (withId) out.town = p.town.trim();
-    var id = (p.idNumber || "").replace(/\s/g, "").toUpperCase();
-    if (withId || id) out.idNumber = id;
-    return out;
+  // What the server needs for the drop-off / pickup choice.
+  function handoverPayload() {
+    return draft.handover === "pickup"
+      ? { handover: "pickup", pickupNote: (draft.pickupNote || "").trim() }
+      : { handover: "dropoff", dropOff: { date: draft.date, time: draft.time } };
+  }
+  function handoverText(handover, date, time, note) {
+    if (handover === "pickup") return t("handPick") + (note ? " — " + note : "") + " (" + t("pickupCall") + ")";
+    return date ? [fmtDate(date, { weekday: "long", day: "numeric", month: "long" }), fmtTime(time)].filter(Boolean).join(" · ") : null;
   }
 
   function renderBookStep() {
@@ -2110,36 +2545,18 @@
             renderBookStep();
           }, "two")),
         draft.country ? h("div", { class: "field" }, h("span", { class: "label", text: t("s1service") }),
-          radioGroup("service", countryOpt().services.map(function (s) { return { value: s.key, title: (s.key === "air" ? "✈️ " : "🚢 ") + (STRINGS[lang].services[s.key] || s.label), desc: s.key === "air" ? t("airDesc") : t("seaDesc") }; }), draft.service, function (v) { draft.service = v; }, "two")) : null
+          radioGroup("service", countryOpt().services.map(function (s) { return { value: s.key, title: (s.key === "air" ? "✈️ " : "🚢 ") + (STRINGS[lang].services[s.key] || s.label), desc: s.key === "air" ? t("airDesc") : t("seaDesc") }; }), draft.service, function (v) { draft.service = v; }, "two")) : null,
+        // Door delivery or collection — asked up front, right after the freight.
+        draft.country ? deliverySection() : null
       ];
     } else if (step === 2) {
-      var c = countryOpt();
       body = [
         h("h2", { class: "section-title", style: "margin-top:0", text: t("s2") }),
         h("p", { class: "muted small", style: "margin-top:0", text: t("s2help") }),
-        h("div", { class: "card", style: "padding:4px 16px" }, c.itemTypes.map(function (it) {
-          var qty = draft.qty[it.key] || 0;
-          var out = h("output", { "aria-live": "polite", text: String(qty) });
-          var minus = h("button", { type: "button", "aria-label": t("decrease", { item: itemLabel(it.key) }), disabled: qty === 0, text: "−" });
-          var plus = h("button", { type: "button", "aria-label": t("increase", { item: itemLabel(it.key) }), disabled: qty >= 30, text: "+" });
-          function set(n) {
-            draft.qty[it.key] = Math.max(0, Math.min(30, n));
-            out.textContent = String(draft.qty[it.key]);
-            minus.disabled = draft.qty[it.key] === 0; plus.disabled = draft.qty[it.key] >= 30;
-            notesField.querySelector(".help").hidden = !(draft.qty.other > 0);
-          }
-          minus.addEventListener("click", function () { set((draft.qty[it.key] || 0) - 1); });
-          plus.addEventListener("click", function () { set((draft.qty[it.key] || 0) + 1); });
-          return h("div", { class: "qty-row" }, h("span", { class: "name", text: itemLabel(it.key) }), h("span", { class: "stepper" }, minus, out, plus));
-        }))
-      ];
+      ].concat(boxesSection());
       var notesInput = h("textarea", { class: "input", id: "notes", maxlength: "300", text: draft.notes });
       notesInput.addEventListener("input", function () { draft.notes = notesInput.value; });
-      var notesField = h("div", { class: "field", style: "margin-top:16px" },
-        h("label", { for: "notes", text: t("notesLabel") }),
-        h("span", { class: "help", hidden: !(draft.qty.other > 0), text: t("notesOther") }),
-        notesInput);
-      body.push(notesField);
+      body.push(h("div", { class: "field", style: "margin-top:16px" }, h("label", { for: "notes", text: t("notesLabel") }), notesInput));
       body.push(contentsEditor());
     } else if (step === 3) {
       var meName = (draft.meSender.fullName || "").trim();
@@ -2186,40 +2603,10 @@
           })) : null,
         showForm && draft.receiverPick && draft.receiverPick !== "new"
           ? h("p", { class: "muted small", style: "margin:-6px 0 14px", text: t("receiverCheck") }) : null,
-        showForm ? personFields("r", draft.receiver, true) : null,
-        showForm ? h("div", { class: "field", style: "margin-top:22px" }, h("span", { class: "label", text: t("deliveryQ") }),
-          radioGroup("delivery", [
-            { value: "door", title: "🚚 " + t("door"), desc: t("doorDesc") },
-            { value: "collect", title: "🏢 " + t("collect"), desc: t("collectDesc") }
-          ], draft.deliveryType, function (v) { draft.deliveryType = v; })) : null
+        showForm ? personFields("r", draft.receiver, true) : null
       ];
     } else if (step === 5) {
-      var dates = bookingOptions.dropOffDates;
-      var dateOpt = dates.filter(function (d) { return d.date === draft.date; })[0];
-      if (dateOpt && dateOpt.full) { draft.date = null; draft.time = null; dateOpt = null; }
-      body = [
-        h("h2", { class: "section-title", style: "margin-top:0", text: t("s4") }),
-        h("p", { class: "muted small", style: "margin-top:0", text: "📍 " + t("s4where") }),
-        h("ul", { class: "small", style: "margin:0 0 14px;padding-left:20px" }, h("li", { text: t("satNote") }), h("li", { text: t("wkNote") })),
-        !dates.length ? h("div", { class: "notice info" }, h("span", { class: "ico", "aria-hidden": "true", text: "ℹ" }), h("span", { text: t("noDates") })) :
-        h("div", { class: "field" }, h("span", { class: "label", text: t("chooseDay") }),
-          h("div", { class: "date-grid", role: "radiogroup" }, dates.map(function (d, idx) {
-            var id = "date-" + idx;
-            var input = h("input", { type: "radio", name: "date", id: id, value: d.date, checked: draft.date === d.date, disabled: d.full });
-            input.addEventListener("change", function () { draft.date = d.date; draft.time = d.slots.length === 1 ? d.slots[0] : null; renderBookStep(); });
-            return h("div", { class: "choice" }, input, h("label", { for: id },
-              h("span", { class: "t", text: fmtDate(d.date) }),
-              h("span", { class: "d", text: d.full ? t("full") : (d.kind === "saturday" ? "11am–3pm" : "5–6pm") })));
-          }))),
-        dateOpt ? h("div", { class: "field" }, h("span", { class: "label", text: t("chooseTime") }),
-          h("div", { class: "slot-grid", role: "radiogroup" }, dateOpt.slots.map(function (s, idx) {
-            var id = "slot-" + idx;
-            var input = h("input", { type: "radio", name: "slot", id: id, value: s, checked: draft.time === s });
-            input.addEventListener("change", function () { draft.time = s; });
-            return h("div", { class: "choice" }, input, h("label", { for: id }, h("span", { class: "t", text: fmtTime(s) })));
-          }))) : null,
-        h("p", { class: "muted small", style: "margin-top:14px", text: t("pickupNote") })
-      ];
+      body = handoverSection(renderBookStep);
     } else {
       function reviewRow(label, value, editStep) {
         return h("div", { class: "review-block" },
@@ -2237,11 +2624,8 @@
           draft.notes.trim() ? reviewRow(t("notes"), draft.notes.trim(), 2) : null,
           reviewRow(t("senderLbl"), draft.sender.fullName.trim() + (draft.sender.isMe ? "" : " (" + t("senderOther").toLowerCase() + ")"), 3),
           reviewRow(t("receiverLbl"), draft.receiver.fullName.trim() + ", " + draft.receiver.town.trim(), 4),
-          reviewRow(t("delivery"), STRINGS[lang].deliveries[draft.deliveryType], 4),
-          reviewRow(t("dropOff"), fmtDate(draft.date, { weekday: "long", day: "numeric", month: "long" }) + " · " + fmtTime(draft.time) + (dateOpt5 && dateOpt5.full ? " (" + t("full") + ")" : ""), 5)),
-        h("div", { class: "notice info", style: "margin-top:14px" },
-          h("span", { class: "ico", "aria-hidden": "true", text: "💰" }),
-          h("div", null, h("div", { text: t("priceNote") }), h("button", { type: "button", class: "link-btn", style: "padding-left:0", onclick: function () { openAgent({ message: "I want a price quote", label: t("qPrice") }); }, text: t("askPrice") + " →" }))),
+          reviewRow(t("delivery"), draft.deliveryType === "collect" ? collectTitle() : STRINGS[lang].deliveries[draft.deliveryType], 1),
+          reviewRow(t("dropOff"), handoverText(draft.handover, draft.date, draft.time, (draft.pickupNote || "").trim()) + (draft.handover === "dropoff" && dateOpt5 && dateOpt5.full ? " (" + t("full") + ")" : ""), 5)),
         signOffSection()
       ];
     }
@@ -2278,12 +2662,11 @@
       if (!draft.declarationAccepted) { flagProblem({ msg: t("vDeclare"), field: "declare" }); return; }
       if (draft.signedName.trim().length < 2) { flagProblem({ msg: t("vSignName"), field: "sign-name" }); return; }
       nextBtn.disabled = true; backBtn.disabled = true; nextBtn.textContent = t("creatingBooking");
-      api("POST", "/bookings", {
+      api("POST", "/bookings", Object.assign(handoverPayload(), {
         country: draft.country, service: draft.service, items: selectedItems(),
         sender: Object.assign({ isMe: draft.sender.isMe }, personPayload(draft.sender, false)),
         receiver: personPayload(draft.receiver, true),
         deliveryType: draft.deliveryType, notes: draft.notes.trim(),
-        dropOff: { date: draft.date, time: draft.time },
         contents: draft.contents.map(function (c) { return { description: c.description.trim(), condition: c.condition, qty: Number(c.qty) }; }),
         insurance: draft.insurance, declarationAccepted: draft.declarationAccepted,
         signedName: draft.signedName.trim(), signatureImage: bookSignaturePng(),
@@ -2293,7 +2676,7 @@
           medications: draft.dg.medications, lithium: draft.dg.lithium, lithiumDetails: draft.dg.lithiumDetails.trim(),
           liquids: draft.dg.liquids, liquidsDetails: draft.dg.liquidsDetails.trim()
         } : undefined
-      }).then(function (data) {
+      })).then(function (data) {
         bookSig = { drawn: false, canvas: null };
         var created = data.booking;
         draft = null; bookingOptions = null;
@@ -2304,7 +2687,8 @@
         // customer can pick again without losing the rest of the form.
         if (e2.status === 400) { api("GET", "/booking-options").then(function (o) { bookingOptions = o; }).catch(function () {}); }
         // A sender/receiver detail the server refused: take them to it.
-        if (e2.field === "contents") { draft.step = 2; renderBookStep(); flagProblem(e2.message); return; }
+        if (e2.field === "contents" || e2.field === "items") { draft.step = 2; renderBookStep(); flagProblem(e2.message); return; }
+        if (e2.field === "dropOff") { draft.step = 5; renderBookStep(); flagProblem(e2.message); return; }
         var m = /^(sender|receiver)\.(\w+)$/.exec(e2.field || "");
         if (m) {
           draft.step = m[1] === "sender" ? 3 : 4;
@@ -2789,7 +3173,7 @@
     window.scrollTo({ top: 0 });
 
     switch (section) {
-      case "bookings": return parts[1] ? viewBooking(decodeURIComponent(parts[1])) : viewBookings();
+      case "bookings": return parts[2] === "edit" ? viewBookingEdit(decodeURIComponent(parts[1])) : parts[1] ? viewBooking(decodeURIComponent(parts[1])) : viewBookings();
       case "book": return viewBook(parts[1], parts[2]);
       case "shipments": return parts[1] ? viewShipment(decodeURIComponent(parts[1])) : viewShipments();
       case "documents": return viewDocuments();

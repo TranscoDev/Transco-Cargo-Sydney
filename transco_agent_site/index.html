@@ -380,15 +380,21 @@
     padding: clamp(48px, 7vw, 88px) clamp(20px, 5vw, 64px);
   }
   .agent-heading { text-align: center; max-width: 620px; margin: 0 auto 40px; }
+  /* "Meet your bot" — a bold badge, so the Agent section stands out. */
   .agent-heading .kicker {
     display: inline-block;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--sl-teal-deep);
-    margin-bottom: 10px;
+    color: #fff;
+    background: var(--sl-teal-deep);
+    padding: 9px 20px;
+    border-radius: 999px;
+    box-shadow: 0 8px 22px rgba(12,125,107,0.35);
+    margin-bottom: 16px;
   }
+  .agent-heading .kicker::before { content: "🤖 "; }
   .agent-heading h2 { font-size: clamp(26px, 3.4vw, 34px); margin: 0 0 12px; color: var(--navy); }
   .agent-heading p { color: var(--muted); font-size: 15.5px; line-height: 1.6; margin: 0; }
 
@@ -561,7 +567,7 @@
      launcher in the Agent section, and the chat itself opening
      full-screen (like a messaging app) with a back button. Desktop is
      untouched — every rule below is phone-only. */
-  .hero-ask, .ta-launcher, .ta-mobile-head, .ask-fab { display: none; }
+  .hero-ask, .ta-launcher, .ta-mobile-head { display: none; }
   .ask-box { width: 100%; display: flex; align-items: center; gap: 12px; background: #fff; border: 1.5px solid var(--navy); border-radius: 16px; padding: 12px 14px; min-height: 58px; font-size: 16px; color: var(--muted); text-align: left; cursor: text; font-family: inherit; box-shadow: 0 8px 24px rgba(24,34,51,0.12); }
   .ask-box .ico { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #2c4059, #10141f); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ask-box .go { margin-left: auto; font-size: 18px; color: var(--navy); }
@@ -585,7 +591,7 @@
   .ta-mobile-head .who small { display: block; font-weight: 500; font-size: 12px; color: rgba(255,255,255,0.72); }
   .ta-mobile-head .wa { margin-left: auto; background: #25c96a; color: #fff; text-decoration: none; border-radius: 12px; padding: 0 12px; height: 44px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 700; }
   /* Round floating chat bubble (phones). */
-  .ask-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 900; align-items: center; justify-content: center; width: 62px; height: 62px; padding: 0; border-radius: 50%; border: 3px solid #fff; background: var(--sl-teal-deep); color: #fff; font-family: inherit; box-shadow: 0 10px 28px rgba(12,125,107,0.45); cursor: pointer; opacity: 0; transform: translateY(20px) scale(0.9); pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; }
+  .ask-fab { display: inline-flex; position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 900; align-items: center; justify-content: center; width: 62px; height: 62px; padding: 0; border-radius: 50%; border: 3px solid #fff; background: var(--sl-teal-deep); color: #fff; font-family: inherit; box-shadow: 0 10px 28px rgba(12,125,107,0.45); cursor: pointer; opacity: 0; transform: translateY(20px) scale(0.9); pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; }
   .ask-fab svg { width: 28px; height: 28px; }
   .ask-fab .dot { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; background: #25c96a; border: 2px solid #fff; }
   .ask-fab.show { opacity: 1; transform: none; pointer-events: auto; }
@@ -743,22 +749,6 @@
       </div>
     </div>
   </header>
-
-  <div class="trust-strip">
-    <div class="trust-strip-inner">
-      <div class="trust-facts">
-        <span><b class="tabular">12+</b> Years Experience</span>
-        <span class="trust-sep" aria-hidden="true">|</span>
-        <span><b class="tabular">2</b> Destinations</span>
-        <span class="trust-sep" aria-hidden="true">|</span>
-        <span><b class="tabular">24/7</b> AI Assistance</span>
-      </div>
-      <div class="trust-routes">
-        <span>Sydney → Sri Lanka</span>
-        <span>Sydney → India</span>
-      </div>
-    </div>
-  </div>
 
   <section class="agent-section" id="agent">
     <div class="agent-heading">
@@ -1235,10 +1225,16 @@
     sendPayload({ sessionId: sessionId, message: text }, text);
   });
 
-  // Floating "Ask us": only on phones, only after scrolling past the Agent section.
+  // Floating chat button. Phones: always (the chat opens full-screen).
+  // Computers: whenever the Agent section isn't on screen — tapping it
+  // scrolls there and puts the cursor in the chat box.
+  function agentInView() {
+    var r = document.getElementById("agent").getBoundingClientRect();
+    return r.top < window.innerHeight * 0.6 && r.bottom > window.innerHeight * 0.4;
+  }
   function updateFab() {
     if (!fab) return;
-    fab.classList.toggle("show", isPhone() && !chatOpen);
+    fab.classList.toggle("show", !chatOpen && (isPhone() || !agentInView()));
   }
   window.addEventListener("resize", updateFab);
   setTimeout(updateFab, 0);
@@ -1297,9 +1293,10 @@
 
   renderLaunchChips();
 
-  // Arriving from another page's floating chat button (/#chat) on a
-  // phone: open the chat straight away rather than landing on the hero.
-  if (location.hash === "#chat" && isPhone()) {
+  // Arriving from another page's floating chat button (/#chat): open the
+  // chat straight away (phones) or scroll to it (computers) rather than
+  // landing on the hero.
+  if (location.hash === "#chat") {
     try { history.replaceState(null, "", location.pathname); } catch (e) {}
     openChat(true);
   }

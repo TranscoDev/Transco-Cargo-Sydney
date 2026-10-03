@@ -55,6 +55,8 @@
 
   .choices { display: grid; gap: 10px; }
   .choices.two { grid-template-columns: 1fr 1fr; }
+  .choices.sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 520px) { .choices.sizes { grid-template-columns: 1fr 1fr; } }
   .choice { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; min-height: 58px; }
   .choice .ic { font-size: 24px; line-height: 1; }
   .choice small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
@@ -67,6 +69,12 @@
   .stepper button { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--cream); font-size: 22px; font-weight: 600; color: var(--navy); cursor: pointer; }
   .stepper output { min-width: 28px; text-align: center; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
   .box-row.has { border-color: var(--teal); }
+  .box-detail { background: #fff; border: 1px solid var(--teal); border-radius: var(--radius); padding: 12px; margin: -4px 0 10px; }
+  .box-detail .hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+  .box-detail .field { margin-bottom: 10px; }
+  .box-detail .field:last-child { margin-bottom: 0; }
+  .dims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dims label { font-weight: 400; font-size: 13px; }
 
   .field { margin-bottom: 14px; }
   .field label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
@@ -221,6 +229,11 @@
       "How is it going?": "යවන්නේ කොහොමද?",
       "Sea Freight": "Sea Freight", "Air Freight": "Air Freight",
       "Your boxes": "ඔබේ box", "Tap + for each box you brought today.": "අද ගෙනා හැම box එකටම + ඔබන්න.",
+      "TV prices go by screen size.": "TV මිල screen size එක අනුවයි.", "TV {n}: screen size": "TV {n}: screen size", "Other size": "වෙනත් size එකක්", "56\"–59\" or over 75\" — our team confirms the price": "56\"–59\" හෝ 75\" ට වැඩි — මිල අපේ team එක confirm කරයි",
+      "Anything that isn't one of our standard boxes. Please measure it — it's priced by size.": "අපේ සාමාන්‍ය box වලට අයිති නැති ඕනම දෙයක්. කරුණාකර මනින්න — මිල ගණන් කරන්නේ size එක අනුව.",
+      "Odd-size item {n} (cm)": "අසාමාන්‍ය ප්‍රමාණයේ භාණ්ඩය {n} (cm)", "Length": "දිග", "Width": "පළල", "Height": "උස",
+      "Please choose each TV's screen size.": "කරුණාකර හැම TV එකකම screen size එක තෝරන්න.",
+      "Please enter the length, width and height of each odd-size item in cm (1–500).": "කරුණාකර හැම භාණ්ඩයකම දිග, පළල, උස cm වලින් දාන්න (1–500).",
       "At the destination": "ගමනාන්තයේදී",
       "Pickup from our warehouse": "අපේ ගබඩාවෙන් ගන්නවා", "The receiver collects the boxes.": "Receiver box ගන්න එනවා.",
       "Door delivery": "Door delivery", "Delivered to the receiver's address (extra charge).": "Receiver ගේ ලිපිනයටම (අමතර ගාස්තුවක්).",
@@ -313,6 +326,11 @@
       "How is it going?": "எப்படி அனுப்புகிறீர்கள்?",
       "Sea Freight": "Sea Freight", "Air Freight": "Air Freight",
       "Your boxes": "உங்கள் பெட்டிகள்", "Tap + for each box you brought today.": "இன்று கொண்டு வந்த ஒவ்வொரு பெட்டிக்கும் + அழுத்துங்கள்.",
+      "TV prices go by screen size.": "TV விலை screen size ஐப் பொறுத்தது.", "TV {n}: screen size": "TV {n}: screen size", "Other size": "வேறு size", "56\"–59\" or over 75\" — our team confirms the price": "56\"–59\" அல்லது 75\" க்கு மேல் — விலையை எங்கள் team உறுதிப்படுத்தும்",
+      "Anything that isn't one of our standard boxes. Please measure it — it's priced by size.": "எங்கள் வழக்கமான பெட்டிகளில் இல்லாத எதுவும். தயவுசெய்து அளந்து சொல்லுங்கள் — அளவைப் பொறுத்து விலை.",
+      "Odd-size item {n} (cm)": "வழக்கத்துக்கு மாறான அளவுப் பொருள் {n} (cm)", "Length": "நீளம்", "Width": "அகலம்", "Height": "உயரம்",
+      "Please choose each TV's screen size.": "ஒவ்வொரு TV யின் screen size ஐயும் தேர்ந்தெடுக்கவும்.",
+      "Please enter the length, width and height of each odd-size item in cm (1–500).": "ஒவ்வொரு பொருளின் நீளம், அகலம், உயரத்தை cm இல் உள்ளிடவும் (1–500).",
       "At the destination": "சேருமிடத்தில்",
       "Pickup from our warehouse": "எங்கள் கிடங்கில் சேகரிப்பு", "The receiver collects the boxes.": "பெறுநர் பெட்டிகளைச் சேகரிப்பார்.",
       "Door delivery": "Door delivery", "Delivered to the receiver's address (extra charge).": "பெறுநர் முகவரிக்கே விநியோகம் (கூடுதல் கட்டணம்).",
@@ -382,9 +400,9 @@
   var FALLBACK_OPTIONS = {
     countries: [
       { key: "sri_lanka", label: "Sri Lanka", services: [{ key: "sea", label: "Sea Freight" }, { key: "air", label: "Air Freight" }],
-        itemTypes: [{ key: "tea_chest", label: "Tea Chest" }, { key: "gift_box", label: "Gift Box" }, { key: "wine_box", label: "Wine Box" }, { key: "quarter_cbm", label: "Quarter CBM box" }, { key: "tv", label: "TV" }, { key: "other", label: "Other item" }] },
+        itemTypes: [{ key: "tea_chest", label: "Tea Chest" }, { key: "gift_box", label: "Gift Box" }, { key: "wine_box", label: "Wine Box" }, { key: "quarter_cbm", label: "Quarter CBM box" }, { key: "tv", label: "TV" }, { key: "other", label: "Odd-size item" }] },
       { key: "india", label: "India", services: [{ key: "sea", label: "Sea Freight" }],
-        itemTypes: [{ key: "general", label: "General cargo box" }, { key: "tea_chest", label: "Tea Chest" }, { key: "quarter_cbm", label: "Quarter CBM box" }, { key: "other", label: "Other item" }] }
+        itemTypes: [{ key: "general", label: "General cargo box" }, { key: "tea_chest", label: "Tea Chest" }, { key: "quarter_cbm", label: "Quarter CBM box" }, { key: "other", label: "Odd-size item" }] }
     ]
   };
   var options = FALLBACK_OPTIONS;
@@ -394,6 +412,8 @@
   function fresh() {
     return {
       country: "", service: "", boxes: {}, deliveryType: "",
+      // One screen-size band per TV, one { l, w, h } (cm) per odd-size item.
+      tvSizes: [], oddDims: [],
       sender: emptyPerson(), receiver: emptyPerson(),
       contents: [emptyItem()],
       insurance: null, declarationAccepted: false, signedName: "",
@@ -420,6 +440,8 @@
 
   var state = store(DRAFT_KEY) || fresh();
   if (!state.dg) state.dg = emptyDg();
+  if (!state.tvSizes) state.tvSizes = [];
+  if (!state.oddDims) state.oddDims = [];
   var step = 0;
   var errorText = "";
   var badFields = {};
@@ -495,13 +517,55 @@
       var n = state.boxes[it.key] || 0;
       return '<div class="box-row' + (n ? " has" : "") + '"><span class="name">' + esc(it.label) + "</span>" +
         '<span class="stepper"><button type="button" data-box="' + it.key + '" data-d="-1" aria-label="Fewer ' + esc(it.label) + '">−</button>' +
-        "<output>" + n + '</output><button type="button" data-box="' + it.key + '" data-d="1" aria-label="More ' + esc(it.label) + '">+</button></span></div>';
+        "<output>" + n + '</output><button type="button" data-box="' + it.key + '" data-d="1" aria-label="More ' + esc(it.label) + '">+</button></span></div>' +
+        (n && it.key === "tv" ? renderTvSizes(n) : "") + (n && it.key === "other" ? renderOddDims(n) : "");
     }).join("");
     html += "<h2>" + esc(t("At the destination")) + '</h2><div class="choices">' +
       choice('data-delivery="collect"', state.deliveryType === "collect", "🏭", t("Pickup from our warehouse"), t("The receiver collects the boxes.")) +
       choice('data-delivery="door"', state.deliveryType === "door", "🚚", t("Door delivery"), t("Delivered to the receiver's address (extra charge).")) +
       "</div>";
     return html;
+  }
+
+  // TV screen-size bands and their Sea Freight prices (the bot's TV price
+  // list). "other" = 56–59" or over 75" — our team confirms that price.
+  var TV_SIZES = [
+    { key: "upto35", label: 'Up to 35"', price: 140 }, { key: "36to45", label: '36" – 45"', price: 220 },
+    { key: "46to55", label: '46" – 55"', price: 300 }, { key: "60to65", label: '60" – 65"', price: 350 },
+    { key: "66to75", label: '66" – 75"', price: 400 }, { key: "other", label: null, price: null }
+  ];
+  function validTvSize(v) { return TV_SIZES.some(function (s) { return s.key === v; }); }
+
+  // Under the TV row: pick a screen size per TV (TV prices go by size).
+  function renderTvSizes(n) {
+    // Prices are Sri Lanka Sea Freight; Air Freight goes by weight.
+    var showPrice = state.country === "sri_lanka" && state.service === "sea";
+    var html = '<div class="box-detail"><p class="hint">' + esc(t("TV prices go by screen size.")) + "</p>";
+    for (var i = 0; i < n; i++) {
+      html += '<div class="field' + (badFields["tv." + i] ? " bad" : "") + '"><label id="tv-l-' + i + '">' + esc(t("TV {n}: screen size", { n: i + 1 })) + "</label>" +
+        '<div class="choices sizes" role="group" aria-labelledby="tv-l-' + i + '">' +
+        TV_SIZES.map(function (s) {
+          return s.key === "other"
+            ? choice('data-tv="' + i + '" data-size="other"', state.tvSizes[i] === "other", "", t("Other size"), t("56\"–59\" or over 75\" — our team confirms the price"))
+            : choice('data-tv="' + i + '" data-size="' + s.key + '"', state.tvSizes[i] === s.key, "", s.label, showPrice ? "$" + s.price : "");
+        }).join("") + "</div></div>";
+    }
+    return html + "</div>";
+  }
+
+  // Under the odd-size row: length / width / height (cm) per item.
+  function renderOddDims(n) {
+    var html = '<div class="box-detail"><p class="hint">' + esc(t("Anything that isn't one of our standard boxes. Please measure it — it's priced by size.")) + "</p>";
+    var labels = { l: "Length", w: "Width", h: "Height" };
+    for (var i = 0; i < n; i++) {
+      var d = state.oddDims[i] || {};
+      html += '<div class="field' + (badFields["odd." + i] ? " bad" : "") + '"><label>' + esc(t("Odd-size item {n} (cm)", { n: i + 1 })) + '</label><div class="dims">' +
+        ["l", "w", "h"].map(function (k) {
+          return '<div><label for="odd-' + i + "-" + k + '">' + esc(t(labels[k])) + "</label>" +
+            '<input id="odd-' + i + "-" + k + '" data-odd="' + i + '" data-dim="' + k + '" type="number" inputmode="decimal" min="1" max="500" step="any" value="' + esc(d[k] || "") + '" /></div>';
+        }).join("") + "</div></div>";
+    }
+    return html + "</div>";
   }
 
   function field(group, key, label, opts) {
@@ -680,6 +744,22 @@
         var n = Math.max(0, Math.min(30, (state.boxes[k] || 0) + Number(b.getAttribute("data-d"))));
         if (n) state.boxes[k] = n; else delete state.boxes[k];
         errorText = ""; saveDraft(); render();
+      };
+    });
+    main.querySelectorAll("[data-tv]").forEach(function (b) {
+      b.onclick = function () {
+        var i = Number(b.getAttribute("data-tv"));
+        state.tvSizes[i] = b.getAttribute("data-size");
+        delete badFields["tv." + i];
+        saveDraft(); render();
+      };
+    });
+    main.querySelectorAll("[data-odd]").forEach(function (input) {
+      input.oninput = function () {
+        var i = Number(input.getAttribute("data-odd"));
+        if (!state.oddDims[i]) state.oddDims[i] = { l: "", w: "", h: "" };
+        state.oddDims[i][input.getAttribute("data-dim")] = input.value;
+        saveDraft();
       };
     });
     main.querySelectorAll("[data-delivery]").forEach(function (b) {
@@ -951,6 +1031,19 @@
     return bad;
   }
 
+  function validDim(v) { var n = Number(v); return v != null && String(v).trim() !== "" && isFinite(n) && n >= 1 && n <= 500; }
+
+  // Items to send: TVs carry their screen sizes, odd-size items their L × W × H.
+  function itemsPayload() {
+    var c = country();
+    return c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) {
+      var qty = state.boxes[it.key], item = { type: it.key, qty: qty };
+      if (it.key === "tv") item.sizes = state.tvSizes.slice(0, qty);
+      if (it.key === "other") item.dims = state.oddDims.slice(0, qty).map(function (d) { return { l: Number(d.l), w: Number(d.w), h: Number(d.h) }; });
+      return item;
+    });
+  }
+
   function check(stepName) {
     badFields = {};
     if (stepName === "where") {
@@ -959,6 +1052,15 @@
     }
     if (stepName === "boxes") {
       if (!Object.keys(state.boxes).length) return t("Please add at least one box.");
+      for (var ti = 0; ti < (state.boxes.tv || 0); ti++) {
+        if (!validTvSize(state.tvSizes[ti])) badFields["tv." + ti] = 1;
+      }
+      if (Object.keys(badFields).length) return t("Please choose each TV's screen size.");
+      for (var oi = 0; oi < (state.boxes.other || 0); oi++) {
+        var d = state.oddDims[oi] || {};
+        if (!validDim(d.l) || !validDim(d.w) || !validDim(d.h)) badFields["odd." + oi] = 1;
+      }
+      if (Object.keys(badFields).length) return t("Please enter the length, width and height of each odd-size item in cm (1–500).");
       if (!state.deliveryType) return t("Please choose pickup or door delivery.");
     }
     if (stepName === "sender" || stepName === "receiver") {
@@ -1006,7 +1108,7 @@
     var body = {
       country: state.country,
       service: state.service,
-      items: c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) { return { type: it.key, qty: state.boxes[it.key] }; }),
+      items: itemsPayload(),
       deliveryType: state.deliveryType,
       sender: state.sender,
       receiver: state.receiver,

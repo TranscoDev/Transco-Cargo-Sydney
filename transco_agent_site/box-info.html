@@ -140,7 +140,7 @@
   .page-links a span { margin-left: auto; color: var(--muted); }
 
   /* ---------- Compact chat sidebar ---------- */
-  .chat-side { position: sticky; top: 20px; background: var(--navy); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: 620px; }
+  .chat-side { position: sticky; top: 20px; background: var(--navy); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: min(620px, calc(100vh - 110px)); }
   .chat-side-head { padding: 16px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .chat-side-avatar { width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, #2c4059, #10141f); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .chat-side-head .t { font-weight: 700; font-size: 14.5px; color: #fff; }
@@ -176,9 +176,9 @@
   /* ---------- Phones: floating chat button instead of a chat box at
      the bottom of the page. The same chat opens full-screen, with a
      back button; desktop keeps the sticky sidebar. ---------- */
-  .chat-close, .chat-fab { display: none; }
+  .chat-close { display: none; }
   .chat-close { background: rgba(255,255,255,0.12); border: none; color: #fff; width: 40px; height: 40px; border-radius: 10px; font-size: 19px; cursor: pointer; flex-shrink: 0; }
-  .chat-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 900; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; background: var(--sl-teal-deep); color: #fff; box-shadow: 0 10px 28px rgba(12,125,107,0.45); cursor: pointer; }
+  .chat-fab { display: inline-flex; position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 900; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; background: var(--sl-teal-deep); color: #fff; box-shadow: 0 10px 28px rgba(12,125,107,0.45); cursor: pointer; }
   .chat-fab svg { width: 27px; height: 27px; }
   @media (max-width: 880px) {
     .chat-side { display: none; }
@@ -267,6 +267,10 @@
   <header class="ctry-hero">
     <div class="ctry-hero-inner">
       <div>
+        <!-- Shown only when they came from the booking form (?from=booking):
+             back to the same step, with what they'd filled in. -->
+        <a id="back-to-booking" href="/account.html#/book" style="display:none;align-items:center;gap:6px;margin-bottom:14px;padding:9px 16px;border-radius:999px;background:var(--navy);color:#fff;font-weight:700;font-size:14px;text-decoration:none">← Back to your booking</a>
+        <script>if (/[?&]from=booking\b/.test(location.search)) document.getElementById("back-to-booking").style.display = "inline-flex";</script>
         <h1>Box sizes &amp; prices</h1>
         <p>Compare every box by size, weight limit and price — then pick the one that fits what you're sending.</p>
       </div>
