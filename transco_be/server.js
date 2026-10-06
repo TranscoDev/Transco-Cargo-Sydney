@@ -3764,6 +3764,106 @@ app.get('/api/consolidations/:consolidationId', async (req, res) => {
   }
 });
 
+// Staff fix a shipment typed in wrong — number, PE number, dates. Only the
+// fields sent are changed. A new number also moves onto every HBL in it
+// (they keep a copy of the number, see the /move route).
+const CONSOLIDATION_DATE_FIELDS = {
+  departureDate: 'sydneyCalendarEtd',
+  arrivalDate: 'sydneyCalendarEta',
+  peblEta: 'peblEta',
+  peblDeliveryDate: 'peblDeliveryDate'
+};
+
+app.patch('/api/consolidations/:consolidationId', async (req, res) => {
+  try {
+    const { consolidationId } = req.params;
+    if (!ObjectId.isValid(consolidationId)) return res.status(400).json({ error: 'Invalid shipment id' });
+    const existing = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
+    if (!existing) return res.status(404).json({ error: 'Shipment not found' });
+
+    const body = req.body || {};
+    const set = {};
+
+    let newNumber = null;
+    if (body.batchNumber !== undefined) {
+      const n = Number(body.batchNumber);
+      if (!Number.isInteger(n) || n < 1 || n > 100000) {
+        return res.status(400).json({ error: 'The shipment number must be a whole number, e.g. 59.' });
+      }
+      if (n !== existing.batchNumber) {
+        newNumber = n;
+        set.batchNumber = n;
+        // Keep the month part of the label ("58-SEP" → "60-SEP").
+        const suffix = typeof existing.label === 'string' && existing.label.includes('-')
+          ? existing.label.slice(existing.label.indexOf('-') + 1)
+          : MONTHS_SHORT[getSydneyNow().getUTCMonth()];
+        set.label = `${n}-${suffix}`;
+      }
+    }
+
+    if (body.peNumber !== undefined) {
+      set.peNumber = typeof body.peNumber === 'string' && body.peNumber.trim() ? body.peNumber.trim().slice(0, 40) : null;
+    }
+
+    for (const [key, field] of Object.entries(CONSOLIDATION_DATE_FIELDS)) {
+      if (body[key] === undefined) continue;
+      const d = isoDateOrNull(body[key]);
+      if (d.error) return res.status(400).json({ error: d.error });
+      set[`dates.${field}`] = d.value;
+    }
+
+    if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to change.' });
+    set.updatedAt = new Date().toISOString();
+    set.updatedBy = req.user && req.user.email ? req.user.email : 'staff';
+
+    const updated = await consolidations().findOneAndUpdate(
+      { _id: existing._id },
+      { $set: set },
+      { returnDocument: 'after' }
+    );
+    if (newNumber !== null) {
+      await shipments().updateMany({ consolidationId: existing._id }, { $set: { batchNumber: newNumber } });
+    }
+
+    const importedShipmentCount = await shipments().countDocuments({ consolidationId: existing._id });
+    const result = { ...updated, importedShipmentCount };
+    broadcast('consolidation.updated', { consolidation: result });
+    res.status(200).json({ consolidation: result });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: 'That shipment number is already used by another shipment.' });
+    }
+    console.error('Error updating shipment (consolidation):', err.message);
+    res.status(500).json({ error: 'Failed to update the shipment' });
+  }
+});
+
+// Only an empty shipment can be deleted — one made by mistake. If it has
+// HBLs, staff move them to the right shipment first, so no customer's BL
+// is ever lost.
+app.delete('/api/consolidations/:consolidationId', async (req, res) => {
+  try {
+    const { consolidationId } = req.params;
+    if (!ObjectId.isValid(consolidationId)) return res.status(400).json({ error: 'Invalid shipment id' });
+    const existing = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
+    if (!existing) return res.status(404).json({ error: 'Shipment not found' });
+
+    const inside = await shipments().countDocuments({ consolidationId: existing._id });
+    if (inside > 0) {
+      return res.status(409).json({
+        error: `Shipment ${existing.batchNumber} still has ${inside} HBL${inside === 1 ? '' : 's'}. Move ${inside === 1 ? 'it' : 'them'} to the right shipment first, then delete.`
+      });
+    }
+
+    await consolidations().deleteOne({ _id: existing._id });
+    broadcast('consolidation.deleted', { id: String(existing._id), batchNumber: existing.batchNumber });
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error('Error deleting shipment (consolidation):', err.message);
+    res.status(500).json({ error: 'Failed to delete the shipment' });
+  }
+});
+
 
 // ============================================================
 // RECEIVERS (deduped directory — see receivers() in db.js)

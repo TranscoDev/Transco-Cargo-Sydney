@@ -702,6 +702,40 @@ export async function createConsolidation(input: {
   return mapConsolidation(data.consolidation);
 }
 
+/** Fix a shipment typed in wrong. Send only what changed; dates are YYYY-MM-DD or null. */
+export async function updateConsolidation(
+  consolidationId: string,
+  input: {
+    batchNumber?: number;
+    peNumber?: string | null;
+    departureDate?: string | null;
+    arrivalDate?: string | null;
+    peblEta?: string | null;
+    peblDeliveryDate?: string | null;
+  },
+): Promise<Consolidation> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations/${consolidationId}`, {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; consolidation?: BackendConsolidation };
+  if (!res.ok || !data.consolidation) throw new Error(data.error || `Could not save the shipment (${res.status})`);
+  return mapConsolidation(data.consolidation);
+}
+
+/** Only works for an empty shipment — the backend refuses if it still has HBLs. */
+export async function deleteConsolidation(consolidationId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations/${consolidationId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Could not delete the shipment (${res.status})`);
+  }
+}
+
 interface BackendConsolidationDetail extends BackendConsolidation {
   shipments: BackendShipmentRecord[];
 }
