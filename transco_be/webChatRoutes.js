@@ -129,7 +129,7 @@ module.exports = function createWebChatRouter({
   createCalendarEvent,
   MEDIA_BASE_URL,
   isWebsitePausedOn,
-  MAINTENANCE_MESSAGE,
+  getPauseMessage,
   WELCOME_MENU_ITEMS,
   BOX_TYPE_MENU_ITEMS,
   QUANTITY_MENU_ITEMS,
@@ -282,10 +282,11 @@ module.exports = function createWebChatRouter({
       // staff can pause the publicly-exposed website widget without
       // silencing WhatsApp for genuine customers.
       if (await isWebsitePausedOn()) {
+        const pauseText = await getPauseMessage();
         const pauseMessage = await saveMessage({
           customerId: customer._id,
           senderType: 'CHATBOT',
-          content: MAINTENANCE_MESSAGE,
+          content: pauseText,
           isRead: true,
           replyToMessageId: incoming._id,
           whatsappStatus: null
@@ -294,7 +295,7 @@ module.exports = function createWebChatRouter({
         await broadcastMessageCreated(customer, pauseMessage);
 
         return res.json({
-          reply: MAINTENANCE_MESSAGE,
+          reply: pauseText,
           media: null,
           menu: null,
           handedOff: false

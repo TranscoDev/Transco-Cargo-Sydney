@@ -99,7 +99,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Admin",
-    items: [{ label: "Settings", to: "/console/settings", icon: SettingsIcon }],
+    items: [
+      { label: "Settings", to: "/console/settings", icon: SettingsIcon },
+      { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
+    ],
   },
   {
     label: "Coming later",
@@ -112,7 +115,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Expenses", to: "/console/finance/expenses", icon: Wallet },
       { label: "Reports", to: "/console/finance/reports", icon: BarChart3 },
       { label: "Agent Transco", to: "/console/ai/agent", icon: Bot },
-      { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
     ],
   },
 ];
@@ -142,7 +144,7 @@ function useWaitingConversations() {
 }
 
 /** Walk-in forms (QR) waiting for staff to check the boxes and confirm. */
-function useWalkInsToConfirm() {
+export function useWalkInsToConfirm() {
   const { bookings } = useConversations();
   return bookings.filter((b) => b.channel === "walk_in" && b.walkInStatus !== "finalised" && b.status !== "cancelled").length;
 }

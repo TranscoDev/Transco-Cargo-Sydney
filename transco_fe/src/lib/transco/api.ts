@@ -903,6 +903,34 @@ export async function fetchPauseState(): Promise<PauseState> {
   return (await res.json()) as PauseState;
 }
 
+export interface PauseMessage {
+  message: string;
+  isDefault: boolean;
+  defaultMessage: string;
+}
+
+export async function fetchPauseMessage(): Promise<PauseMessage> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/pause-message`, { headers: authHeaders() });
+  if (!res.ok) {
+    throw new Error(`Failed to load the paused message (${res.status})`);
+  }
+  return (await res.json()) as PauseMessage;
+}
+
+/** An empty message resets it to the built-in default. */
+export async function savePauseMessage(message: string): Promise<PauseMessage> {
+  const res = await fetch(`${API_BASE_URL}/api/settings/pause-message`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to save the paused message (${res.status})`);
+  }
+  return (await res.json()) as PauseMessage;
+}
+
 export interface DashboardSummary {
   todaysBookings: number;
   newCustomersToday: number;
