@@ -8,11 +8,13 @@ import {
   MessageCircle,
   PackageCheck,
   Search,
+  QrCode,
   Ship,
   Sunrise,
   type LucideIcon,
 } from "lucide-react";
 
+import { useWalkInsToConfirm } from "@/components/transco/console-layout";
 import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type StatusTone } from "@/components/transco/page-kit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -92,10 +94,13 @@ interface WorkItem {
 function DashboardBody({ s }: { s: DashboardSummary }) {
   const waiting = s.conversationsWaiting ?? s.unreadConversations;
   const dropOffs = s.todaysDropOffs ?? [];
+  // Same count as the Walk-ins badge in the sidebar, so the two always agree.
+  const walkIns = useWalkInsToConfirm();
 
   const stats: { label: string; value: number | undefined; to: string; search?: BookingsSearch; icon: LucideIcon }[] = [
     { label: "Drop-offs today", value: s.todaysBookings, to: "/console/bookings", icon: CalendarClock },
     { label: "Conversations waiting", value: waiting, to: "/console/conversations", icon: MessageCircle },
+    { label: "Walk-ins to confirm", value: walkIns, to: "/console/walk-ins", icon: QrCode },
     { label: "Declarations to check", value: s.declarationsToCheck, to: "/console/bookings", search: { show: "declarations" }, icon: ClipboardCheck },
     { label: "BLs to assign", value: s.blsToAssign, to: "/console/bookings", search: { show: "bls" }, icon: PackageCheck },
   ];
@@ -108,6 +113,14 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
       to: "/console/conversations",
       icon: MessageCircle,
       tone: "info",
+    },
+    {
+      count: walkIns,
+      label: plural(walkIns, "Confirm 1 walk-in", `Confirm ${walkIns} walk-ins`),
+      hint: "Customers filled the QR form at the counter — check their boxes and confirm.",
+      to: "/console/walk-ins",
+      icon: QrCode,
+      tone: "pending",
     },
     {
       count: s.declarationsToCheck ?? 0,
@@ -134,7 +147,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
       {/* TODAY */}
       <section>
         <SectionHeading>Today</SectionHeading>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {stats
             .filter((st) => st.value !== undefined)
             .map((st) => (
@@ -182,7 +195,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
             </ul>
           ) : (
             <div className="rounded-xl border bg-card">
-              <EmptyState icon={Sunrise} title="You're all caught up" description="No conversations, declarations or BLs are waiting. Everything is clear for now." />
+              <EmptyState icon={Sunrise} title="You're all caught up" description="No conversations, walk-ins, declarations or BLs are waiting. Everything is clear for now." />
             </div>
           )}
         </section>
