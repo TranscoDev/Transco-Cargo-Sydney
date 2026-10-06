@@ -52,6 +52,12 @@ async function connectToDatabase(uri, dbName = 'transco') {
   // Shipping calendar: one entry per country + cutoff date.
   await db.collection('shippingSchedule').createIndex({ country: 1, cutoff: 1 }, { unique: true });
 
+  // WhatsApp message ids we've already handled (_id = the wamid). Meta
+  // sometimes delivers the same message twice; the second insert hits
+  // the _id clash and is skipped. Kept 7 days — redeliveries come within
+  // minutes, never days.
+  await db.collection('processedWhatsAppMessages').createIndex({ receivedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
+
   console.log('Connected to MongoDB');
   return db;
 }
@@ -71,6 +77,10 @@ function customers() {
 
 function messages() {
   return getDb().collection('messages');
+}
+
+function processedWhatsAppMessages() {
+  return getDb().collection('processedWhatsAppMessages');
 }
 
 function users() {
@@ -177,6 +187,7 @@ module.exports = {
   getDb,
   customers,
   messages,
+  processedWhatsAppMessages,
   users,
   bookings,
   settings,

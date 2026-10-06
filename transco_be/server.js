@@ -10,7 +10,7 @@ const { ObjectId } = require('mongodb');
 
 const multer = require('multer');
 
-const { connectToDatabase, customers, messages, users, bookings, settings, shipmentHistory, shipments, consolidations, receivers, campaigns, segments } = require('./db');
+const { connectToDatabase, customers, messages, processedWhatsAppMessages, users, bookings, settings, shipmentHistory, shipments, consolidations, receivers, campaigns, segments } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
@@ -123,6 +123,14 @@ async function isWebsitePausedOn() {
 async function isWhatsAppPausedOn() {
   const doc = await settings().findOne({ _id: 'global' });
   return Boolean(doc?.whatsappPaused);
+}
+
+// Staff can reword the paused reply from the console's Bot settings
+// page. Blank/unset falls back to the built-in 3-language message.
+async function getPauseMessage() {
+  const doc = await settings().findOne({ _id: 'global' });
+  const custom = typeof doc?.pauseMessage === 'string' ? doc.pauseMessage.trim() : '';
+  return custom || MAINTENANCE_MESSAGE;
 }
 
 
@@ -1611,6 +1619,21 @@ app.post('/webhook', async (req, res) => {
       return;
     }
 
+    // Meta can deliver the same message to this webhook more than once.
+    // Claim its id first — a second copy fails the insert and is dropped,
+    // so the customer never gets the same reply twice.
+    if (message.id) {
+      try {
+        await processedWhatsAppMessages().insertOne({ _id: message.id, receivedAt: new Date() });
+      } catch (err) {
+        if (err.code === 11000) {
+          console.log(`Skipping duplicate WhatsApp delivery ${message.id}`);
+          return;
+        }
+        throw err;
+      }
+    }
+
 
     const from = message.from;
 
@@ -1785,7 +1808,7 @@ app.post('/webhook', async (req, res) => {
       await sendAndTrackOutbound(
         customer,
         'CHATBOT',
-        MAINTENANCE_MESSAGE,
+        await getPauseMessage(),
         inboundMessage._id
       );
       return;
@@ -2246,6 +2269,41 @@ app.patch('/api/settings/pause-state', async (req, res) => {
   } catch (err) {
     console.error('Error updating pause state:', err.message);
     res.status(500).json({ error: 'Failed to update pause state' });
+  }
+});
+
+// The reply customers get while a bot is paused. Sending an empty
+// message resets it to the built-in default.
+app.get('/api/settings/pause-message', async (req, res) => {
+  try {
+    const doc = await settings().findOne({ _id: 'global' });
+    const custom = typeof doc?.pauseMessage === 'string' ? doc.pauseMessage.trim() : '';
+    res.status(200).json({ message: custom || MAINTENANCE_MESSAGE, isDefault: !custom, defaultMessage: MAINTENANCE_MESSAGE });
+  } catch (err) {
+    console.error('Error reading pause message:', err.message);
+    res.status(500).json({ error: 'Failed to read pause message' });
+  }
+});
+
+app.put('/api/settings/pause-message', async (req, res) => {
+  try {
+    const { message } = req.body ?? {};
+    if (typeof message !== 'string') {
+      return res.status(400).json({ error: 'message must be a string' });
+    }
+    const trimmed = message.trim();
+    if (trimmed.length > 1000) {
+      return res.status(400).json({ error: 'Message is too long (1000 characters max)' });
+    }
+    await settings().updateOne(
+      { _id: 'global' },
+      trimmed ? { $set: { pauseMessage: trimmed } } : { $unset: { pauseMessage: '' } },
+      { upsert: true }
+    );
+    res.status(200).json({ message: trimmed || MAINTENANCE_MESSAGE, isDefault: !trimmed, defaultMessage: MAINTENANCE_MESSAGE });
+  } catch (err) {
+    console.error('Error saving pause message:', err.message);
+    res.status(500).json({ error: 'Failed to save pause message' });
   }
 });
 
@@ -5979,7 +6037,7 @@ app.use('/api/web-chat', createWebChatRouter({
   createCalendarEvent,
   MEDIA_BASE_URL,
   isWebsitePausedOn,
-  MAINTENANCE_MESSAGE,
+  getPauseMessage,
   WELCOME_MENU_ITEMS,
   BOX_TYPE_MENU_ITEMS,
   QUANTITY_MENU_ITEMS,
