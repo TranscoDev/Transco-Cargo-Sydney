@@ -234,11 +234,14 @@ function DateCard({ date: d, next = false, past = false, onEdit, onDelete }: { d
           <span className="w-24 font-medium text-info-foreground">Sea freight</span>
           <span className="tabular-nums text-foreground">{d.seaArrival ? fmtShort(d.seaArrival) : "To be confirmed"}</span>
         </p>
-        <p className="flex items-center gap-2 text-sm">
-          <Plane className="h-4 w-4 text-success" aria-hidden />
-          <span className="w-24 font-medium text-success-foreground">Air freight</span>
-          <span className="tabular-nums text-foreground">{d.airArrival ? fmtShort(d.airArrival) : "To be confirmed"}</span>
-        </p>
+        {/* India is sea freight only. */}
+        {d.country !== "india" && (
+          <p className="flex items-center gap-2 text-sm">
+            <Plane className="h-4 w-4 text-success" aria-hidden />
+            <span className="w-24 font-medium text-success-foreground">Air freight</span>
+            <span className="tabular-nums text-foreground">{d.airArrival ? fmtShort(d.airArrival) : "To be confirmed"}</span>
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <Button type="button" variant="ghost" size="icon" onClick={onEdit} aria-label="Edit this date" title="Edit">
@@ -257,6 +260,8 @@ function DateForm({ country, existing, onCancel, onSaved }: { country: ScheduleC
   const [sea, setSea] = useState(existing?.seaArrival ?? "");
   const [air, setAir] = useState(existing?.airArrival ?? "");
   const [note, setNote] = useState(existing?.note ?? "");
+  // India is sea freight only.
+  const hasAir = country !== "india";
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ message: string; field: string | null } | null>(null);
 
@@ -268,7 +273,7 @@ function DateForm({ country, existing, onCancel, onSaved }: { country: ScheduleC
     }
     setSaving(true);
     setError(null);
-    const input = { country, cutoff, seaArrival: sea || null, airArrival: air || null, note: note.trim() || null };
+    const input = { country, cutoff, seaArrival: sea || null, airArrival: hasAir ? air || null : null, note: note.trim() || null };
     try {
       if (existing) await updateScheduleDate(existing.id, input);
       else await createScheduleDate(input);
@@ -286,7 +291,7 @@ function DateForm({ country, existing, onCancel, onSaved }: { country: ScheduleC
   return (
     <form onSubmit={save} className="mb-4 rounded-xl border border-primary/40 bg-card p-4 shadow-xs">
       <p className="mb-3 text-sm font-semibold text-foreground">{existing ? "Edit cutoff date" : "New cutoff date"}</p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={cn("grid grid-cols-1 gap-3", hasAir ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="cutoff">Cutoff (hand over by)</Label>
           <Input id="cutoff" type="date" value={cutoff} onChange={(e) => setCutoff(e.target.value)} aria-invalid={bad("cutoff")} required />
@@ -295,10 +300,12 @@ function DateForm({ country, existing, onCancel, onSaved }: { country: ScheduleC
           <Label htmlFor="sea">Sea freight arrives</Label>
           <Input id="sea" type="date" value={sea} min={cutoff || undefined} onChange={(e) => setSea(e.target.value)} aria-invalid={bad("seaArrival")} />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="air">Air freight arrives</Label>
-          <Input id="air" type="date" value={air} min={cutoff || undefined} onChange={(e) => setAir(e.target.value)} aria-invalid={bad("airArrival")} />
-        </div>
+        {hasAir && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="air">Air freight arrives</Label>
+            <Input id="air" type="date" value={air} min={cutoff || undefined} onChange={(e) => setAir(e.target.value)} aria-invalid={bad("airArrival")} />
+          </div>
+        )}
       </div>
       <div className="mt-3 flex flex-col gap-1.5">
         <Label htmlFor="note">Note (optional)</Label>

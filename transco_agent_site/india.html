@@ -685,8 +685,8 @@
       book.appendChild(el("span", null, T("Book")));
       head.appendChild(book);
       body.appendChild(head);
+      // India is sea freight only.
       body.appendChild(row("sea", "🚢", "Sea freight", d.seaArrival));
-      body.appendChild(row("air", "✈️", "Air freight", d.airArrival));
       if (d.note) body.appendChild(el("div", "cut-note", d.note));
       card.appendChild(body);
       list.appendChild(card);

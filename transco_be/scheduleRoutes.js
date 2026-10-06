@@ -73,6 +73,11 @@ function validate(body, { partial = false, existing = null } = {}) {
     value.note = note || null;
   }
 
+  // India is sea freight only — never store an air date for it.
+  if ((value.country ?? (existing && existing.country)) === 'india' && (!partial || 'airArrival' in value)) {
+    value.airArrival = null;
+  }
+
   // Arrival can't be before the cutoff it belongs to.
   const cutoff = value.cutoff ?? (existing && existing.cutoff);
   for (const key of ['seaArrival', 'airArrival']) {

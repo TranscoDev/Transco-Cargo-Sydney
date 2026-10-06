@@ -119,19 +119,22 @@ module.exports = function createScheduleAnswerer({ getSydneyNow }) {
     const label = COUNTRY_LABEL[lang][country];
     if (!dates.length) return { text: t.none(label), hasDates: false };
     const [first, ...rest] = dates;
+    // India is sea freight only — no air line.
+    const hasAir = country !== 'india';
     const lines = [
       t.title(label),
       '',
       t.next(fmt(first.cutoff, lang, true)),
-      t.sea(first.seaArrival ? fmt(first.seaArrival, lang) : t.tbc),
-      t.air(first.airArrival ? fmt(first.airArrival, lang) : t.tbc)
+      t.sea(first.seaArrival ? fmt(first.seaArrival, lang) : t.tbc)
     ];
+    if (hasAir) lines.push(t.air(first.airArrival ? fmt(first.airArrival, lang) : t.tbc));
     if (first.note) lines.push(`📝 ${first.note}`);
     if (rest.length) {
       lines.push('', t.later);
       for (const d of rest.slice(0, 3)) {
         lines.push(
-          `• ${fmt(d.cutoff, lang, true)} — 🚢 ${d.seaArrival ? fmt(d.seaArrival, lang) : t.tbc} · ✈️ ${d.airArrival ? fmt(d.airArrival, lang) : t.tbc}`
+          `• ${fmt(d.cutoff, lang, true)} — 🚢 ${d.seaArrival ? fmt(d.seaArrival, lang) : t.tbc}` +
+            (hasAir ? ` · ✈️ ${d.airArrival ? fmt(d.airArrival, lang) : t.tbc}` : '')
         );
       }
     }
