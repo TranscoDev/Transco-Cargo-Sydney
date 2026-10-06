@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type St
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { fetchDashboardSummary, type DashboardSummary } from "@/lib/transco/api";
+import { getCurrentUser } from "@/lib/transco/auth";
 
 export const Route = createFileRoute("/console/dashboard")({
   component: DashboardPage,
@@ -46,13 +47,16 @@ function DashboardPage() {
   }, [load]);
 
   const today = new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" });
+  // First name only, same as the Settings greeting. No name on the
+  // account → just the greeting, never an email address.
+  const firstName = getCurrentUser()?.name?.trim().split(/\s+/)[0];
 
   return (
     <PageShell>
       <header className="mb-8">
         <p className="text-sm text-muted-foreground">{today}</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-          {greeting()} 👋
+          {greeting()}{firstName ? `, ${firstName}` : ""} 👋
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">Here's what needs your attention today.</p>
       </header>
