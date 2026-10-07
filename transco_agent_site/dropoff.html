@@ -248,6 +248,7 @@
       "Town / city": "නගරය",
       "What's inside?": "ඇතුළේ මොනවද?",
       "List everything in your boxes — Customs needs it. Value is for customs only.": "Box වල තියෙන හැම දෙයක්ම ලියන්න — Customs වලට ඕන. වටිනාකම customs සඳහා පමණයි.",
+      "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.": "👕 ලංකාවට ඇඳුම් යවනවා නම්: පාවිච්චි කරපු ඇඳුම් යවන එක ප්‍රශ්නයක් නෑ. අලුත් ඇඳුම් යවනවා නම් brand label / tag ගලවන්න එපා — label කපපු ඇඳුම්, Sri Lanka Customs commercial purpose එකකට ගෙනාපු බඩු විදිහට සලකලා ලොකු tax එකක් ගහන්න පුළුවන්.",
       "Item {n}": "අයිතමය {n}", "Remove": "ඉවත් කරන්න", "e.g. Chocolate": "උදා: Chocolate",
       "New": "අලුත්", "Used": "පාවිච්චි කළ", "How many": "කීයද", "Value ($)": "වටිනාකම ($)",
       "+ Add another item": "+ තවත් අයිතමයක්", "Total value": "මුළු වටිනාකම",
@@ -345,6 +346,7 @@
       "Town / city": "நகரம்",
       "What's inside?": "உள்ளே என்ன இருக்கிறது?",
       "List everything in your boxes — Customs needs it. Value is for customs only.": "பெட்டிகளில் உள்ள அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை. மதிப்பு customs க்கு மட்டுமே.",
+      "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.": "👕 இலங்கைக்கு ஆடைகள் அனுப்பினால்: பயன்படுத்திய ஆடைகளை அனுப்புவதில் பிரச்சினை இல்லை. புதிய ஆடைகள் அனுப்பினால் brand label / tag ஐ அகற்ற வேண்டாம் — label வெட்டப்பட்ட ஆடைகளை Sri Lanka Customs commercial நோக்கத்திற்கான பொருட்களாக கருதி அதிக வரி விதிக்கலாம்.",
       "Item {n}": "பொருள் {n}", "Remove": "நீக்கு", "e.g. Chocolate": "உதா: Chocolate",
       "New": "புதியது", "Used": "பயன்படுத்தியது", "How many": "எத்தனை", "Value ($)": "மதிப்பு ($)",
       "+ Add another item": "+ இன்னொரு பொருள்", "Total value": "மொத்த மதிப்பு",
@@ -662,8 +664,20 @@
         '<button type="button" data-item="' + i + '" data-cond="used" aria-pressed="' + (c.condition === "used") + '">' + esc(t("Used")) + "</button></div>" +
         '<div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(c.qty) + '" inputmode="numeric" /></div></div></div>';
     }).join("");
+    html += '<div class="note" id="clothes-note" style="margin-top:6px;border-color:#f0d9a8;background:#fff9ec"' + (showClothesWarning() ? "" : " hidden") + ">" + esc(t(CLOTHES_WARNING)) + "</div>";
     html += '<button type="button" class="add" id="add-item">' + esc(t("+ Add another item")) + "</button>";
     return html;
+  }
+
+  // Clothes to Sri Lanka: Customs may tax new clothes with the brand labels
+  // cut off as commercial goods. Warn as soon as one is typed.
+  var CLOTHES_WARNING = "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.";
+  var CLOTHES_WORDS = ["cloth", "garment", "shirt", "dress", "frock", "saree", "sari", "jeans", "trouser", "pants", "skirt", "blouse", "jacket", "ඇඳුම", "ஆடை", "உடை"];
+  function showClothesWarning() {
+    return state.country === "sri_lanka" && state.contents.some(function (c) {
+      var s = String(c.description || "").toLowerCase();
+      return CLOTHES_WORDS.some(function (w) { return s.indexOf(w) !== -1; });
+    });
   }
 
   function renderDg() {
@@ -814,6 +828,8 @@
     main.querySelectorAll("input[data-item]").forEach(function (input) {
       input.oninput = function () {
         state.contents[Number(input.getAttribute("data-item"))][input.getAttribute("data-k")] = input.value;
+        var clothesNote = document.getElementById("clothes-note");
+        if (clothesNote) clothesNote.hidden = !showClothesWarning();
         var total = document.getElementById("total");
         if (total) total.textContent = "$" + (Math.round(totalValue() * 100) / 100);
         saveDraft();
