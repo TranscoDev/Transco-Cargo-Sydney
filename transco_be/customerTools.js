@@ -1056,7 +1056,9 @@ function createCustomerTools({
       destination: updated.destination || null,
       deliveryType: updated.deliveryType || null,
       customerNotes: updated.customerNotes || null,
-      receiver: updated.receiver ? { fullName: updated.receiver.fullName, town: updated.receiver.town } : null
+      receiver: updated.receiver
+        ? { fullName: updated.receiver.fullName, town: updated.receiver.town, address: updated.receiver.address || null, mobile: updated.receiver.mobile || null }
+        : null
     });
     return { ok: true, changed };
   }

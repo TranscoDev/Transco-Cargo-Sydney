@@ -23,6 +23,7 @@ import {
   Ship,
   Sparkles,
   Sun,
+  Truck,
   UserRoundCheck,
   Users,
   Wallet,
@@ -82,6 +83,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       // Customers who came without a booking and filled the QR form.
       { label: "Walk-ins (QR)", to: "/console/walk-ins", icon: QrCode, badge: "walkIns" },
+      // Home pickups and door deliveries, from the bookings.
+      { label: "Pickup & Delivery", to: "/console/pickup-delivery", icon: Truck },
       { label: "Shipping calendar", to: "/console/schedule", icon: CalendarDays },
       { label: "Tracking", to: "/console/tracking", icon: MapPin },
       // "Packaging" = Transco-owned box supplies used on shipments — not

@@ -1724,6 +1724,45 @@ test('home pickup instead of a drop-off slot; the customer can edit their own bo
   assert.equal(late.status, 400);
 });
 
+test('staff arrange a home pickup / door delivery on the booking itself; booking status untouched', async () => {
+  const acct = await signIn('0400555656');
+  const base = { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], ...decl('Kandy') };
+  const made = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, deliveryType: 'door', handover: 'pickup', pickupNote: 'After 5pm' } });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const id = made.body.booking.id;
+  const url = `/api/bookings/${id}/pickup-delivery`;
+  const statusBefore = (await db.collection('bookings').findOne({ _id: new ObjectId(id) })).status;
+
+  // Staff only.
+  assert.equal((await api('PATCH', url, { token: acct.token, body: { kind: 'pickup', status: 'completed' } })).status, 401);
+
+  const set = await api('PATCH', url, { token: staffToken, body: { kind: 'pickup', date: '2026-10-10', time: '17:30', note: 'Call first' } });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  assert.equal(set.body.booking.pickupJob.date, '2026-10-10');
+  // The address the list shows comes along with the booking.
+  assert.ok(set.body.booking.sender.address);
+
+  // Partial update keeps what was set before.
+  await api('PATCH', url, { token: staffToken, body: { kind: 'pickup', status: 'completed' } });
+  await api('PATCH', url, { token: staffToken, body: { kind: 'delivery', status: 'cancelled' } });
+  const b = await db.collection('bookings').findOne({ _id: new ObjectId(id) });
+  assert.deepEqual([b.pickupJob.status, b.pickupJob.date, b.pickupJob.time, b.pickupJob.note], ['completed', '2026-10-10', '17:30', 'Call first']);
+  assert.equal(b.deliveryJob.status, 'cancelled');
+  assert.equal(b.status, statusBefore, 'cancelling the delivery leaves the booking status alone');
+
+  // Bad input.
+  assert.equal((await api('PATCH', url, { token: staffToken, body: { kind: 'pickup', status: 'done' } })).status, 400);
+  assert.equal((await api('PATCH', url, { token: staffToken, body: { kind: 'pickup', date: '10/10/2026' } })).status, 400);
+  assert.equal((await api('PATCH', url, { token: staffToken, body: { kind: 'other', status: 'pending' } })).status, 400);
+
+  // A drop-off / collection booking has no pickup or door delivery to arrange.
+  const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  const dropOff = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, deliveryType: 'collect', handover: 'dropoff', dropOff: nextDropOff(options.body) } });
+  const dUrl = `/api/bookings/${dropOff.body.booking.id}/pickup-delivery`;
+  assert.equal((await api('PATCH', dUrl, { token: staffToken, body: { kind: 'pickup', status: 'completed' } })).status, 400);
+  assert.equal((await api('PATCH', dUrl, { token: staffToken, body: { kind: 'delivery', status: 'completed' } })).status, 400);
+});
+
 test('staff costing: lines, discount and total (the total becomes the price); staff only', async () => {
   const acct = await signIn('0400555876');
   const options = await api('GET', '/api/portal/booking-options', { token: acct.token });

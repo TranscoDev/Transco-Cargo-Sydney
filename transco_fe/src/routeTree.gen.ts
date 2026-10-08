@@ -18,6 +18,7 @@ import { Route as ConsoleCustomersRouteRouteImport } from './routes/console/cust
 import { Route as ConsoleDashboardRouteImport } from './routes/console/dashboard'
 import { Route as ConsoleLeadsRouteImport } from './routes/console.leads'
 import { Route as ConsoleMyTranscoRouteRouteImport } from './routes/console/my-transco/route'
+import { Route as ConsolePickupDeliveryRouteImport } from './routes/console.pickup-delivery'
 import { Route as ConsoleScheduleRouteImport } from './routes/console.schedule'
 import { Route as ConsoleSettingsRouteImport } from './routes/console.settings'
 import { Route as ConsoleShipmentsRouteRouteImport } from './routes/console/shipments/route'
@@ -86,6 +87,11 @@ const ConsoleLeadsRoute = ConsoleLeadsRouteImport.update({
 const ConsoleMyTranscoRouteRoute = ConsoleMyTranscoRouteRouteImport.update({
   id: '/my-transco',
   path: '/my-transco',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsolePickupDeliveryRoute = ConsolePickupDeliveryRouteImport.update({
+  id: '/pickup-delivery',
+  path: '/pickup-delivery',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
 const ConsoleScheduleRoute = ConsoleScheduleRouteImport.update({
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/console/conversations': typeof ConsoleConversationsRoute
   '/console/dashboard': typeof ConsoleDashboardRoute
   '/console/leads': typeof ConsoleLeadsRoute
+  '/console/pickup-delivery': typeof ConsolePickupDeliveryRoute
   '/console/schedule': typeof ConsoleScheduleRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/tracking': typeof ConsoleTrackingRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/console/conversations': typeof ConsoleConversationsRoute
   '/console/dashboard': typeof ConsoleDashboardRoute
   '/console/leads': typeof ConsoleLeadsRoute
+  '/console/pickup-delivery': typeof ConsolePickupDeliveryRoute
   '/console/schedule': typeof ConsoleScheduleRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/tracking': typeof ConsoleTrackingRoute
@@ -292,6 +300,7 @@ export interface FileRoutesById {
   '/console/conversations': typeof ConsoleConversationsRoute
   '/console/dashboard': typeof ConsoleDashboardRoute
   '/console/leads': typeof ConsoleLeadsRoute
+  '/console/pickup-delivery': typeof ConsolePickupDeliveryRoute
   '/console/schedule': typeof ConsoleScheduleRoute
   '/console/settings': typeof ConsoleSettingsRoute
   '/console/tracking': typeof ConsoleTrackingRoute
@@ -329,6 +338,7 @@ export interface FileRouteTypes {
     | '/console/conversations'
     | '/console/dashboard'
     | '/console/leads'
+    | '/console/pickup-delivery'
     | '/console/schedule'
     | '/console/settings'
     | '/console/tracking'
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
     | '/console/conversations'
     | '/console/dashboard'
     | '/console/leads'
+    | '/console/pickup-delivery'
     | '/console/schedule'
     | '/console/settings'
     | '/console/tracking'
@@ -394,6 +405,7 @@ export interface FileRouteTypes {
     | '/console/conversations'
     | '/console/dashboard'
     | '/console/leads'
+    | '/console/pickup-delivery'
     | '/console/schedule'
     | '/console/settings'
     | '/console/tracking'
@@ -488,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/my-transco'
       fullPath: '/console/my-transco'
       preLoaderRoute: typeof ConsoleMyTranscoRouteRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/pickup-delivery': {
+      id: '/console/pickup-delivery'
+      path: '/pickup-delivery'
+      fullPath: '/console/pickup-delivery'
+      preLoaderRoute: typeof ConsolePickupDeliveryRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/schedule': {
@@ -732,6 +751,7 @@ interface ConsoleRouteRouteChildren {
   ConsoleConversationsRoute: typeof ConsoleConversationsRoute
   ConsoleDashboardRoute: typeof ConsoleDashboardRoute
   ConsoleLeadsRoute: typeof ConsoleLeadsRoute
+  ConsolePickupDeliveryRoute: typeof ConsolePickupDeliveryRoute
   ConsoleScheduleRoute: typeof ConsoleScheduleRoute
   ConsoleSettingsRoute: typeof ConsoleSettingsRoute
   ConsoleTrackingRoute: typeof ConsoleTrackingRoute
@@ -756,6 +776,7 @@ const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleConversationsRoute: ConsoleConversationsRoute,
   ConsoleDashboardRoute: ConsoleDashboardRoute,
   ConsoleLeadsRoute: ConsoleLeadsRoute,
+  ConsolePickupDeliveryRoute: ConsolePickupDeliveryRoute,
   ConsoleScheduleRoute: ConsoleScheduleRoute,
   ConsoleSettingsRoute: ConsoleSettingsRoute,
   ConsoleTrackingRoute: ConsoleTrackingRoute,

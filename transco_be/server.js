@@ -3051,6 +3051,118 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
 
 
 // ============================================================
+// PICKUP & DELIVERY (staff) — the arranged day and status
+// ============================================================
+//
+// A home pickup (handover "pickup") is arranged by phone, and a door
+// delivery (deliveryType "door") happens at the destination — neither
+// has a date or progress of its own on the booking. Staff record both
+// here, on the same booking (pickupJob / deliveryJob), so there is never
+// a second record to keep in sync. Separate from the booking status and
+// the other booking PATCHes above, which are untouched: cancelling a
+// pickup does not cancel the booking.
+
+const PICKUP_DELIVERY_STATUSES = ['pending', 'completed', 'cancelled'];
+
+app.patch('/api/bookings/:bookingId/pickup-delivery', async (req, res) => {
+
+  try {
+
+    const { bookingId } = req.params;
+    const body = req.body || {};
+
+    if (!ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking id' });
+    }
+
+    if (!['pickup', 'delivery'].includes(body.kind)) {
+      return res.status(400).json({ error: 'kind must be "pickup" or "delivery"' });
+    }
+
+    const booking = await bookings().findOne(
+      { _id: new ObjectId(bookingId) },
+      { projection: { handover: 1, deliveryType: 1 } }
+    );
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (body.kind === 'pickup' && booking.handover !== 'pickup') {
+      return res.status(400).json({ error: 'This booking is not a home pickup' });
+    }
+    if (body.kind === 'delivery' && booking.deliveryType !== 'door') {
+      return res.status(400).json({ error: 'This booking is not a door delivery' });
+    }
+
+    const field = body.kind === 'pickup' ? 'pickupJob' : 'deliveryJob';
+    const updates = {};
+
+    if ('status' in body) {
+      if (!PICKUP_DELIVERY_STATUSES.includes(body.status)) {
+        return res.status(400).json({ error: 'status must be pending, completed or cancelled' });
+      }
+      updates[`${field}.status`] = body.status;
+    }
+
+    if ('date' in body) {
+      if (body.date !== null && body.date !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+        return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+      }
+      updates[`${field}.date`] = body.date || null;
+    }
+
+    if ('time' in body) {
+      if (body.time !== null && body.time !== '' && !/^\d{2}:\d{2}$/.test(body.time)) {
+        return res.status(400).json({ error: 'time must be HH:MM' });
+      }
+      updates[`${field}.time`] = body.time || null;
+    }
+
+    if ('note' in body) {
+      const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : '';
+      updates[`${field}.note`] = note || null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Nothing to update' });
+    }
+
+    updates[`${field}.updatedAt`] = new Date();
+    updates[`${field}.updatedBy`] = (req.user && req.user.email) || null;
+
+    const updated = await bookings().findOneAndUpdate(
+      { _id: new ObjectId(bookingId) },
+      { $set: updates },
+      { returnDocument: 'after', projection: { 'signature.image': 0 } }
+    );
+
+    broadcast('booking.pickup_delivery_changed', {
+      _id: bookingId,
+      pickupJob: updated.pickupJob || null,
+      deliveryJob: updated.deliveryJob || null
+    });
+
+    res.status(200).json({
+      success: true,
+      booking: { ...updated, resolvedDate: resolvedDateString(updated) }
+    });
+
+  } catch (err) {
+
+    console.error(
+      'Error updating pickup/delivery:',
+      err.message
+    );
+
+    res.status(500).json({
+      error: 'Failed to update pickup/delivery'
+    });
+  }
+});
+
+
+// ============================================================
 // ASSIGN A CUSTOMER'S BL TO A BOOKING (staff)
 // ============================================================
 //

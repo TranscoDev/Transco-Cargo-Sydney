@@ -290,6 +290,36 @@ export interface Booking {
   /** Who the boxes are for, from the online declaration (full details
    * load in the booking details panel). */
   receiver?: { fullName: string; town: string | null } | null | undefined;
+  /** Sender's address from the declaration — where a home pickup happens. */
+  senderAddress?: string | null | undefined;
+  /** Receiver's address and mobile — where a door delivery goes. */
+  receiverAddress?: string | null | undefined;
+  receiverPhone?: string | null | undefined;
+  /** Staff-arranged day and progress of a home pickup / door delivery
+   * (Pickup & Delivery page). Absent until staff first set something. */
+  pickupJob?: PickupDeliveryJob | null | undefined;
+  deliveryJob?: PickupDeliveryJob | null | undefined;
+}
+
+export type PickupDeliveryKind = "pickup" | "delivery";
+export type PickupDeliveryStatus = "pending" | "completed" | "cancelled";
+
+export interface PickupDeliveryJob {
+  status?: PickupDeliveryStatus | null | undefined;
+  /** YYYY-MM-DD, Sydney-local. */
+  date?: string | null | undefined;
+  /** HH:MM. */
+  time?: string | null | undefined;
+  note?: string | null | undefined;
+  updatedAt?: string | null | undefined;
+}
+
+/** PATCH /api/bookings/:id/pickup-delivery — only the keys sent change. */
+export interface PickupDeliveryUpdate {
+  status?: PickupDeliveryStatus;
+  date?: string | null;
+  time?: string | null;
+  note?: string | null;
 }
 
 export type BookingStageStatus = "received" | "not_received";

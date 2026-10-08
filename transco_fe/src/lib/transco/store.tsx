@@ -33,6 +33,7 @@ import {
   setCustomerMode,
   setPauseState as setPauseStateRequest,
   updateBooking as updateBookingRequest,
+  updatePickupDelivery as updatePickupDeliveryRequest,
   assignBookingBl as assignBookingBlRequest,
   updateBookingStatus as updateBookingStatusRequest,
   updateContactInfo as updateContactInfoRequest,
@@ -65,6 +66,9 @@ import type {
   ImportResult,
   Message,
   MessageStatus,
+  PickupDeliveryJob,
+  PickupDeliveryKind,
+  PickupDeliveryUpdate,
   Segment,
   SegmentFilter,
   Shipment,
@@ -123,6 +127,9 @@ interface ConversationsApi {
    * Not optimistic — rejects with the backend's message (e.g. a BL that's
    * already taken) so the form can show it. */
   assignBookingBl: (bookingId: string, hblNumber: string, batchNumber?: number | null) => Promise<void>;
+  /** Arranged day / status of a home pickup or door delivery (Pickup &
+   * Delivery page). Optimistic; rejects (after reverting) on failure. */
+  updatePickupDelivery: (bookingId: string, kind: PickupDeliveryKind, updates: PickupDeliveryUpdate) => Promise<void>;
   /** Set when conversations couldn't be loaded (shown as a banner with Try again). */
   loadError: string | null;
   retryLoad: () => void;
@@ -439,6 +446,28 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, shipmentId, warehouseStatus: "received", declarationStatus: "received" } : b)),
       );
+    },
+    [],
+  );
+
+  const updatePickupDelivery = useCallback(
+    async (bookingId: string, kind: PickupDeliveryKind, updates: PickupDeliveryUpdate) => {
+      const field = kind === "pickup" ? "pickupJob" : "deliveryJob";
+      let previous: PickupDeliveryJob | null | undefined;
+      setBookings((prev) =>
+        prev.map((b) => {
+          if (b.id !== bookingId) return b;
+          previous = b[field];
+          return { ...b, [field]: { ...(b[field] ?? {}), ...updates } };
+        }),
+      );
+      try {
+        const updated = await updatePickupDeliveryRequest(bookingId, kind, updates);
+        setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, [field]: updated[field] } : b)));
+      } catch (err) {
+        setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, [field]: previous } : b)));
+        throw err;
+      }
     },
     [],
   );
@@ -899,15 +928,32 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
             boxCount: number | null;
             destination: string | null;
             customerNotes: string | null;
-            receiver: { fullName: string; town: string | null } | null;
+            receiver: { fullName: string; town: string | null; address?: string | null; mobile?: string | null } | null;
+            deliveryType?: Booking["deliveryType"];
           };
           setBookings((prev) =>
             prev.map((b) =>
               b.id === p._id
-                ? { ...b, boxSummary: p.boxSummary, boxCount: p.boxCount, destination: p.destination, customerNotes: p.customerNotes, receiver: p.receiver }
+                ? {
+                    ...b,
+                    boxSummary: p.boxSummary,
+                    boxCount: p.boxCount,
+                    destination: p.destination,
+                    customerNotes: p.customerNotes,
+                    receiver: p.receiver ? { fullName: p.receiver.fullName, town: p.receiver.town } : p.receiver,
+                    ...(p.receiver && "address" in p.receiver ? { receiverAddress: p.receiver.address ?? null, receiverPhone: p.receiver.mobile ?? null } : {}),
+                    ...(p.deliveryType !== undefined ? { deliveryType: p.deliveryType } : {}),
+                  }
                 : b,
             ),
           );
+          return;
+        }
+
+        // Another staff member set a pickup/delivery day or status.
+        case "booking.pickup_delivery_changed": {
+          const p = event.payload as { _id: string; pickupJob: PickupDeliveryJob | null; deliveryJob: PickupDeliveryJob | null };
+          setBookings((prev) => prev.map((b) => (b.id === p._id ? { ...b, pickupJob: p.pickupJob, deliveryJob: p.deliveryJob } : b)));
           return;
         }
 
@@ -967,6 +1013,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       updateBooking,
       assignBookingBl,
+      updatePickupDelivery,
       loadError,
       retryLoad,
       websitePaused,
@@ -989,6 +1036,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       updateBookingStatus,
       updateBooking,
       assignBookingBl,
+      updatePickupDelivery,
       loadError,
       retryLoad,
       websitePaused,

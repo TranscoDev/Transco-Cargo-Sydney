@@ -4,6 +4,9 @@ import type {
   Booking,
   BookingStatus,
   BookingUpdateInput,
+  PickupDeliveryJob,
+  PickupDeliveryKind,
+  PickupDeliveryUpdate,
   CampaignAttachment,
   Consolidation,
   ConsolidationDetail,
@@ -134,7 +137,10 @@ export interface BackendBooking {
   warehouseStatus?: Booking["warehouseStatus"];
   customerNotes?: string | null;
   declarationSubmittedAt?: string | null;
-  receiver?: { fullName?: string; town?: string } | null;
+  receiver?: { fullName?: string; town?: string; address?: string; mobile?: string } | null;
+  sender?: { address?: string } | null;
+  pickupJob?: PickupDeliveryJob | null;
+  deliveryJob?: PickupDeliveryJob | null;
   walkIn?: { status?: "submitted" | "finalised"; returning?: boolean } | null;
   contents?: unknown[] | null;
   staffConfirm?: { status?: string } | null;
@@ -177,6 +183,11 @@ export function mapBooking(b: BackendBooking): Booking {
     customerNotes: b.customerNotes,
     declarationSubmittedAt: b.declarationSubmittedAt,
     receiver: b.receiver?.fullName ? { fullName: b.receiver.fullName, town: b.receiver.town ?? null } : null,
+    senderAddress: b.sender?.address || null,
+    receiverAddress: b.receiver?.address || null,
+    receiverPhone: b.receiver?.mobile || null,
+    pickupJob: b.pickupJob ?? null,
+    deliveryJob: b.deliveryJob ?? null,
     walkInStatus: b.walkIn?.status ?? null,
     walkInReturning: b.walkIn?.returning ?? null,
     declarationComplete: Boolean(b.declarationSubmittedAt && Array.isArray(b.contents) && b.contents.length),
@@ -500,6 +511,27 @@ export async function updateBooking(
   });
   if (!res.ok) {
     throw new Error(`Failed to update booking (${res.status})`);
+  }
+  const data = (await res.json()) as { booking: BackendBooking };
+  return mapBooking(data.booking);
+}
+
+/** Arranged day / status of a booking's home pickup or door delivery —
+ * its own endpoint, so the booking status and the PATCHes above are
+ * untouched. Returns the updated booking. */
+export async function updatePickupDelivery(
+  bookingId: string,
+  kind: PickupDeliveryKind,
+  updates: PickupDeliveryUpdate,
+): Promise<Booking> {
+  const res = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/pickup-delivery`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ kind, ...updates }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Failed to update pickup/delivery (${res.status})`);
   }
   const data = (await res.json()) as { booking: BackendBooking };
   return mapBooking(data.booking);
