@@ -138,7 +138,7 @@ const byDateTime = (a: Job, b: Job) =>
   (a.time ?? "99:99").localeCompare(b.time ?? "99:99") ||
   a.kind.localeCompare(b.kind);
 
-type Period = "this" | "next" | "custom";
+type Period = "this" | "next" | "custom" | "all";
 type TypeFilter = "all" | PickupDeliveryKind;
 type StatusFilter = "all" | PickupDeliveryStatus;
 
@@ -165,41 +165,51 @@ function PickupDeliveryPage() {
   const jobs = useMemo(() => toJobs(bookings, deliveredShipments), [bookings, deliveredShipments]);
   const openJob = openKey ? (jobs.find((j) => j.key === openKey) ?? null) : null;
 
-  const inThisWeek = (j: Job) => j.date >= thisWeek.from && j.date <= thisWeek.to;
+  // Overall totals — a rough idea of the whole workload, whatever dates
+  // are picked below (cancelled ones left out).
+  const count = (kind: PickupDeliveryKind, s?: PickupDeliveryStatus) =>
+    jobs.filter((j) => j.kind === kind && (s ? j.status === s : j.status !== "cancelled")).length;
   const totals = {
-    pickups: jobs.filter((j) => j.kind === "pickup" && j.status !== "cancelled" && inThisWeek(j))
-      .length,
-    deliveries: jobs.filter(
-      (j) => j.kind === "delivery" && j.status !== "cancelled" && inThisWeek(j),
-    ).length,
-    // Every pickup still to do up to the end of this week, incl. overdue ones.
-    pending: jobs.filter(
-      (j) => j.kind === "pickup" && j.status === "pending" && j.date <= thisWeek.to,
-    ).length,
-    completed: jobs.filter((j) => j.kind === "pickup" && j.status === "completed" && inThisWeek(j))
-      .length,
+    pickups: count("pickup"),
+    deliveries: count("delivery"),
+    pendingPickups: count("pickup", "pending"),
+    pendingDeliveries: count("delivery", "pending"),
+    donePickups: count("pickup", "completed"),
+    doneDeliveries: count("delivery", "completed"),
+  };
+  const showAll = (t: TypeFilter, s: StatusFilter) => {
+    setPeriod("all");
+    setType(t);
+    setStatus(s);
   };
 
-  const range = period === "this" ? thisWeek : period === "next" ? nextWeek : custom;
+  const range =
+    period === "this"
+      ? thisWeek
+      : period === "next"
+        ? nextWeek
+        : period === "all"
+          ? { from: "0000-01-01", to: "9999-12-31" }
+          : custom;
   const matches = (j: Job) =>
     (type === "all" || j.kind === type) && (status === "all" || j.status === status);
+  const showPending = status === "all" || status === "pending";
+  // Pending with no day set yet: always shown, whatever dates are picked —
+  // a door delivery happens weeks after the drop-off day, so it would
+  // otherwise fall out of every week view until someone sets its day.
+  const notSet = showPending
+    ? jobs.filter((j) => matches(j) && j.status === "pending" && !j.dateSet).sort(byDateTime)
+    : [];
+  const unscheduled = (j: Job) => j.status === "pending" && !j.dateSet;
   const inRange = jobs
-    .filter((j) => matches(j) && j.date >= range.from && j.date <= range.to)
+    .filter((j) => matches(j) && !unscheduled(j) && j.date >= range.from && j.date <= range.to)
     .sort(byDateTime);
-  // A pickup (or anything with a set day) not done before this period
-  // still needs doing — kept in view instead of dropping off the list.
-  // Door deliveries without a set day only carry the drop-off day, so
-  // they don't count as late.
+  // A set day that passed without the job being done still needs doing —
+  // kept in view instead of dropping off the list.
   const earlier =
-    range.from <= today && (status === "all" || status === "pending")
+    range.from <= today && showPending
       ? jobs
-          .filter(
-            (j) =>
-              matches(j) &&
-              j.status === "pending" &&
-              j.date < range.from &&
-              (j.kind === "pickup" || j.dateSet),
-          )
+          .filter((j) => matches(j) && j.status === "pending" && j.dateSet && j.date < range.from)
           .sort(byDateTime)
       : [];
 
@@ -210,12 +220,6 @@ function PickupDeliveryPage() {
     else groups.set(j.date, [j]);
   }
 
-  const showPendingPickups = () => {
-    setPeriod("this");
-    setType("pickup");
-    setStatus("pending");
-  };
-
   return (
     <PageShell width="narrow">
       <PageHeader
@@ -224,40 +228,32 @@ function PickupDeliveryPage() {
         description="Home pickups in Sydney and door deliveries to the receiver — taken straight from the bookings."
       />
 
-      {/* This week at a glance — each tile sets the filters below. */}
+      {/* Overall totals — each tile shows its bookings below (all dates). */}
       <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile
-          label="Pickups this week"
+          label="Pickups"
           value={totals.pickups}
-          onClick={() => {
-            setPeriod("this");
-            setType("pickup");
-            setStatus("all");
-          }}
+          hint={`${totals.pendingPickups} pending · ${totals.donePickups} done`}
+          onClick={() => showAll("pickup", "all")}
         />
         <Tile
-          label="Door deliveries this week"
+          label="Door deliveries"
           value={totals.deliveries}
-          onClick={() => {
-            setPeriod("this");
-            setType("delivery");
-            setStatus("all");
-          }}
+          hint={`${totals.pendingDeliveries} pending · ${totals.doneDeliveries} delivered`}
+          onClick={() => showAll("delivery", "all")}
         />
         <Tile
-          label="Pending pickups"
-          value={totals.pending}
-          attention={totals.pending > 0}
-          onClick={showPendingPickups}
+          label="Pending"
+          value={totals.pendingPickups + totals.pendingDeliveries}
+          attention={totals.pendingPickups + totals.pendingDeliveries > 0}
+          hint={`${totals.pendingPickups} pickups · ${totals.pendingDeliveries} deliveries`}
+          onClick={() => showAll("all", "pending")}
         />
         <Tile
-          label="Pickups done this week"
-          value={totals.completed}
-          onClick={() => {
-            setPeriod("this");
-            setType("pickup");
-            setStatus("completed");
-          }}
+          label="Completed"
+          value={totals.donePickups + totals.doneDeliveries}
+          hint={`${totals.donePickups} picked up · ${totals.doneDeliveries} delivered`}
+          onClick={() => showAll("all", "completed")}
         />
       </div>
 
@@ -271,6 +267,7 @@ function PickupDeliveryPage() {
               { value: "this", label: "This week" },
               { value: "next", label: "Next week" },
               { value: "custom", label: "Dates…" },
+              { value: "all", label: "All dates" },
             ]}
           />
           {period === "custom" && (
@@ -324,11 +321,11 @@ function PickupDeliveryPage() {
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          {shortDay(range.from)} – {shortDay(range.to)}
+          {period === "all" ? "All dates" : `${shortDay(range.from)} – ${shortDay(range.to)}`}
         </p>
       </div>
 
-      {inRange.length === 0 && earlier.length === 0 ? (
+      {inRange.length === 0 && earlier.length === 0 && notSet.length === 0 ? (
         <div className="rounded-xl border bg-card">
           <EmptyState
             icon={status === "pending" ? Check : Truck}
@@ -338,6 +335,16 @@ function PickupDeliveryPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-7">
+          {notSet.length > 0 && (
+            <JobGroup
+              heading="Day not set yet"
+              tone="attention"
+              jobs={notSet}
+              showDate
+              dateCaption="booked"
+              onOpen={setOpenKey}
+            />
+          )}
           {earlier.length > 0 && (
             <JobGroup
               heading="Still pending from earlier"
@@ -368,11 +375,13 @@ function Tile({
   label,
   value,
   attention,
+  hint,
   onClick,
 }: {
   label: string;
   value: number;
   attention?: boolean;
+  hint?: string | undefined;
   onClick: () => void;
 }) {
   return (
@@ -390,6 +399,7 @@ function Tile({
         {value}
       </span>
       <span className="block text-xs text-muted-foreground">{label}</span>
+      {hint && <span className="mt-0.5 block text-xs text-muted-foreground/80">{hint}</span>}
     </button>
   );
 }
@@ -438,6 +448,7 @@ function JobGroup({
   tone,
   jobs,
   showDate,
+  dateCaption,
   onOpen,
 }: {
   heading: string;
@@ -445,6 +456,8 @@ function JobGroup({
   tone?: "attention";
   jobs: Job[];
   showDate?: boolean;
+  /** Small word before the date, e.g. "booked" when it isn't the job's own day. */
+  dateCaption?: string;
   onOpen: (key: string) => void;
 }) {
   return (
@@ -463,7 +476,13 @@ function JobGroup({
       </div>
       <ul className="flex flex-col gap-2">
         {jobs.map((j) => (
-          <JobRow key={j.key} job={j} showDate={!!showDate} onOpen={() => onOpen(j.key)} />
+          <JobRow
+            key={j.key}
+            job={j}
+            showDate={!!showDate}
+            dateCaption={dateCaption}
+            onOpen={() => onOpen(j.key)}
+          />
         ))}
       </ul>
     </section>
@@ -481,7 +500,17 @@ function jobPlace(job: Job) {
   };
 }
 
-function JobRow({ job, showDate, onOpen }: { job: Job; showDate: boolean; onOpen: () => void }) {
+function JobRow({
+  job,
+  showDate,
+  dateCaption,
+  onOpen,
+}: {
+  job: Job;
+  showDate: boolean;
+  dateCaption?: string | undefined;
+  onOpen: () => void;
+}) {
   const { updatePickupDelivery } = useConversations();
   const b = job.booking;
   const place = jobPlace(job);
@@ -511,7 +540,12 @@ function JobRow({ job, showDate, onOpen }: { job: Job; showDate: boolean; onOpen
     >
       <div className="w-14 shrink-0 text-center">
         <p className="text-base font-semibold tabular-nums text-foreground">{job.time ?? "—"}</p>
-        {showDate && <p className="text-xs text-muted-foreground">{shortDay(job.date)}</p>}
+        {showDate && (
+          <p className="text-xs text-muted-foreground">
+            {dateCaption && <span className="block">{dateCaption}</span>}
+            {shortDay(job.date)}
+          </p>
+        )}
       </div>
 
       <div className="min-w-0 flex-1">
