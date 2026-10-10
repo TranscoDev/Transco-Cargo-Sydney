@@ -720,7 +720,7 @@ function FinaliseSection({
         <Field id="fin-cbm" label="CBM" value={cbm} onChange={setCbm} />
       </div>
 
-      <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Office use · charges ($)</p>
+      <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Office use · charges ($) <span className="font-normal normal-case tracking-normal">— optional, leave blank if not needed</span></p>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3">
         {OFFICE_FIELDS.map((f) => (
           <Field key={f.key} id={`fin-${f.key}`} label={f.key === "discount" ? "Discount (−)" : f.label} value={office[f.key]} onChange={(v) => setOffice((s) => ({ ...s, [f.key]: v }))} />
