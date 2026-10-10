@@ -459,6 +459,8 @@ function createCustomerTools({
       memberSince: customer.portalJoinedAt || customer.createdAt || null,
       phoneVerified: hasVerifiedPhone(customer),
       hasPassword: Boolean(customer.passwordHash),
+      // Their own Passport/NIC (the default sender's), masked.
+      idNumber: pii.mask(customer.senderDetails && customer.senderDetails.idNumber) || '',
       deletionRequestedAt: customer.deletionRequestedAt || null
     };
   }
@@ -861,14 +863,9 @@ function createCustomerTools({
           mobile: customer.phoneNumber ? `+${customer.phoneNumber}` : '',
           email: customer.email || ''
         };
-    const receivers = (customer.savedReceivers || [])
-      .slice()
-      .sort((a, b) => new Date(b.lastUsedAt || 0) - new Date(a.lastUsedAt || 0))
-      .map(r => ({
-        id: r.id, country: r.country, fullName: r.fullName, address: r.address,
-        town: r.town, mobile: r.mobile, email: r.email, idNumber: pii.mask(r.idNumber), homePhone: r.homePhone || ''
-      }));
-    return { sender, senderSaved: Boolean(saved), receivers };
+    const receivers = (customer.savedReceivers || []).slice().sort(byRecent).map(shownPerson);
+    const senders = (customer.savedSenders || []).slice().sort(byRecent).map(shownPerson);
+    return { sender, senderSaved: Boolean(saved), senders, receivers };
   }
 
   // STAFF ONLY (mounted behind staff auth in staffPortalRoutes.js): every
@@ -1123,6 +1120,16 @@ function createCustomerTools({
   async function rememberDeclarationDetails(customer, { sender, senderIsMe, receiver, country }) {
     const set = {};
     if (senderIsMe) set.senderDetails = { ...pii.sealPerson(sender), updatedAt: new Date() };
+    // Someone else sending: keep them in the account's saved senders.
+    if (!senderIsMe && sender) {
+      const senders = (customer.savedSenders || []).slice();
+      const same = senders.find(r => samePerson(r, sender));
+      const entry = { ...pii.sealPerson(sender), lastUsedAt: new Date() };
+      if (same) Object.assign(same, entry);
+      else senders.push({ id: new ObjectId().toHexString(), ...entry });
+      senders.sort(byRecent);
+      set.savedSenders = senders.slice(0, MAX_SAVED_RECEIVERS);
+    }
 
     const list = (customer.savedReceivers || []).slice();
     const existing = list.find(r => r.country === country && samePerson(r, receiver));
@@ -1286,7 +1293,7 @@ function createCustomerTools({
     const raw = input || {};
     const { error, field, value } = await validateBookingInput({
       ...raw,
-      sender: raw.sender && { ...unmaskId(raw.sender, [customer.senderDetails]), isMe: raw.sender.isMe },
+      sender: raw.sender && { ...unmaskId(raw.sender, [customer.senderDetails, ...(customer.savedSenders || [])]), isMe: raw.sender.isMe },
       receiver: unmaskId(raw.receiver, customer.savedReceivers)
     });
     if (error) return { error, field };
@@ -1382,6 +1389,72 @@ function createCustomerTools({
     return { booking: shapeBooking({ ...booking, status: 'cancelled' }, null) };
   }
 
+  // ---------- saved senders & receivers (My Transco profile) ----------
+
+  // The account holder is the default sender (senderDetails); other
+  // senders and the receivers are lists the customer manages on their
+  // profile — the booking form offers them so nothing is typed twice.
+  // Passport/NIC numbers are stored encrypted and shown masked.
+  const PEOPLE = {
+    senders: { field: 'savedSenders', check: p => validatePerson(p, 'sender', { idNumber: 'optional', homePhone: true }) },
+    receivers: { field: 'savedReceivers', check: p => validatePerson(p, 'receiver', { withId: true, homePhone: true }) }
+  };
+  const byRecent = (a, b) => new Date(b.lastUsedAt || b.updatedAt || 0) - new Date(a.lastUsedAt || a.updatedAt || 0);
+  function shownPerson(r) {
+    return {
+      id: r.id, ...(r.country ? { country: r.country } : {}), fullName: r.fullName, address: r.address, town: r.town || '',
+      mobile: r.mobile, email: r.email, idNumber: pii.mask(r.idNumber) || '', homePhone: r.homePhone || ''
+    };
+  }
+
+  function listPeople(customer) {
+    return {
+      me: declarationDefaults(customer).sender,
+      senders: (customer.savedSenders || []).slice().sort(byRecent).map(shownPerson),
+      receivers: (customer.savedReceivers || []).slice().sort(byRecent).map(shownPerson)
+    };
+  }
+
+  // Add (id null) or change one saved sender / receiver.
+  async function savePerson(customer, kind, id, body) {
+    const spec = PEOPLE[kind];
+    if (!spec) return { notFound: true };
+    const list = (customer[spec.field] || []).slice();
+    const at = id ? list.findIndex(r => r.id === id) : -1;
+    if (id && at === -1) return { notFound: true };
+    if (!id && list.length >= MAX_SAVED_RECEIVERS) return { error: `You can save up to ${MAX_SAVED_RECEIVERS}. Please remove one first.` };
+    const raw = body || {};
+    const country = kind === 'receivers' ? raw.country : null;
+    if (kind === 'receivers' && !COUNTRIES[country]) return { error: 'Please choose the country.', field: 'country' };
+    const checked = spec.check(unmaskId(raw, at === -1 ? [] : [list[at]]));
+    if (checked.error) return checked;
+    const entry = { ...pii.sealPerson(checked.value), ...(country ? { country } : {}), updatedAt: new Date() };
+    if (at === -1) list.push({ id: new ObjectId().toHexString(), ...entry });
+    else list[at] = { ...list[at], ...entry };
+    await customers().updateOne({ _id: customer._id }, { $set: { [spec.field]: list } });
+    return { value: listPeople({ ...customer, [spec.field]: list }) };
+  }
+
+  async function deletePerson(customer, kind, id) {
+    const spec = PEOPLE[kind];
+    const list = spec ? customer[spec.field] || [] : [];
+    if (!list.some(r => r.id === id)) return { notFound: true };
+    const kept = list.filter(r => r.id !== id);
+    await customers().updateOne({ _id: customer._id }, { $set: { [spec.field]: kept } });
+    return { value: listPeople({ ...customer, [spec.field]: kept }) };
+  }
+
+  // The account holder's own Passport/NIC (profile → Personal information).
+  // A masked value sent back unchanged keeps the stored one; '' clears it.
+  async function setOwnIdNumber(customer, value) {
+    if (pii.isMasked(value)) return {};
+    const id = String(value || '').replace(/\s/g, '').toUpperCase();
+    if (id && !/^[A-Z0-9]{5,20}$/.test(id)) return { error: 'Please enter your passport or NIC number (letters and numbers only).', field: 'idNumber' };
+    const base = customer.senderDetails || declarationDefaults(customer).sender;
+    await customers().updateOne({ _id: customer._id }, { $set: { senderDetails: { ...base, idNumber: id ? pii.seal(id) : '', updatedAt: new Date() } } });
+    return {};
+  }
+
   // ---------- privacy ----------
 
   // "Download my data": the account, saved sender/receivers and every
@@ -1399,6 +1472,7 @@ function createCustomerTools({
       profile: publicProfile(customer),
       privacyAcceptedAt: customer.privacyAcceptedAt || null,
       savedSender: pii.maskPerson(customer.senderDetails) || null,
+      savedSenders: (customer.savedSenders || []).map(r => pii.maskPerson(r)),
       savedReceivers: (customer.savedReceivers || []).map(r => pii.maskPerson(r)),
       bookings: bookingList.map(b => {
         const d = declarations.get(b.id) || {};
@@ -1428,6 +1502,10 @@ function createCustomerTools({
   }
 
   return {
+    listPeople,
+    savePerson,
+    deletePerson,
+    setOwnIdNumber,
     exportCustomerData,
     purgeOldIdNumbers,
     ensureCustomerCode,

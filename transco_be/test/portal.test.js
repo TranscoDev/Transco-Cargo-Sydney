@@ -1794,3 +1794,64 @@ test('staff costing: lines, discount and total (the total becomes the price); st
   const bad = await api('PUT', `/api/my-transco/bookings/${id}/costing`, { token: staffToken, body: { lines: [{ label: 'X', amount: -1 }] } });
   assert.equal(bad.status, 400);
 });
+
+test('profile: own Passport/NIC, saved senders and receivers (add / edit / delete); bookings offer and remember them', async () => {
+  const acct = await signIn('0400888001');
+  // Own Passport/NIC on the profile — stored encrypted, shown masked.
+  const own = await api('PATCH', '/api/portal/me', { token: acct.token, body: { idNumber: 'n 7654321' } });
+  assert.equal(own.status, 200, JSON.stringify(own.body));
+  assert.equal(own.body.profile.idNumber, pii.mask('N7654321'));
+  const unchanged = await api('PATCH', '/api/portal/me', { token: acct.token, body: { idNumber: own.body.profile.idNumber, name: 'Own Id Person' } });
+  assert.equal(unchanged.status, 200);
+  const stored = await db.collection('customers').findOne({ phoneNumber: '61400888001' });
+  assert.equal(pii.open(stored.senderDetails.idNumber), 'N7654321', 'masked value kept the real number');
+
+  const sender = { fullName: 'Second Sender', address: '5 Other St, Blacktown NSW 2148', mobile: '0400 777 002', email: 's2@example.com', idNumber: 'P1234567' };
+  const added = await api('POST', '/api/portal/me/people/senders', { token: acct.token, body: sender });
+  assert.equal(added.status, 201, JSON.stringify(added.body));
+  assert.equal(added.body.senders.length, 1);
+  assert.equal(added.body.senders[0].idNumber, pii.mask('P1234567'));
+  const sid = added.body.senders[0].id;
+
+  const noCountry = await api('POST', '/api/portal/me/people/receivers', { token: acct.token, body: { fullName: 'Ravi R', address: '1 Main Rd', town: 'Colombo', mobile: '+94 77 000 0000', email: 'r@example.com', idNumber: '199011112222' } });
+  assert.equal(noCountry.status, 400);
+  const rec = await api('POST', '/api/portal/me/people/receivers', { token: acct.token, body: { country: 'sri_lanka', fullName: 'Ravi R', address: '1 Main Rd', town: 'Colombo', mobile: '+94 77 000 0000', email: 'r@example.com', idNumber: '199011112222' } });
+  assert.equal(rec.status, 201, JSON.stringify(rec.body));
+  const rid = rec.body.receivers[0].id;
+
+  // Edit with the masked number left as it was: the real one is kept.
+  const edited = await api('PUT', `/api/portal/me/people/receivers/${rid}`, { token: acct.token, body: { ...rec.body.receivers[0], town: 'Kandy' } });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  const afterEdit = await db.collection('customers').findOne({ phoneNumber: '61400888001' });
+  assert.equal(afterEdit.savedReceivers[0].town, 'Kandy');
+  assert.equal(pii.open(afterEdit.savedReceivers[0].idNumber), '199011112222');
+
+  // The booking form offers them; a saved sender's masked number works.
+  const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  assert.equal(options.body.declaration.senders.length, 1);
+  const s = options.body.declaration.senders[0];
+  const r = options.body.declaration.receivers[0];
+  const made = await api('POST', '/api/portal/bookings', {
+    token: acct.token,
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'collect', dropOff: nextDropOff(options.body),
+      ...decl('Kandy', { sender: { ...s, isMe: false }, receiver: r }) }
+  });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const b = await db.collection('bookings').findOne({ _id: new ObjectId(made.body.booking.id) });
+  assert.equal(pii.open(b.sender.idNumber), 'P1234567');
+  assert.equal(pii.open(b.receiver.idNumber), '199011112222');
+
+  // A new "someone else" sender is remembered for next time.
+  const third = await api('POST', '/api/portal/bookings', {
+    token: acct.token,
+    body: { country: 'sri_lanka', service: 'sea', items: [{ type: 'tea_chest', qty: 1 }], deliveryType: 'collect', handover: 'pickup',
+      ...decl('Kandy', { sender: { isMe: false, fullName: 'Third Sender', mobile: '0400 777 003', email: 's3@example.com', idNumber: 'P7777777' }, receiver: r }) }
+  });
+  assert.equal(third.status, 201, JSON.stringify(third.body));
+  const people = await api('GET', '/api/portal/me/people', { token: acct.token });
+  assert.deepEqual(people.body.senders.map(x => x.fullName).sort(), ['Second Sender', 'Third Sender']);
+
+  const del = await api('DELETE', `/api/portal/me/people/senders/${sid}`, { token: acct.token });
+  assert.equal(del.status, 200);
+  assert.deepEqual(del.body.senders.map(x => x.fullName), ['Third Sender']);
+});

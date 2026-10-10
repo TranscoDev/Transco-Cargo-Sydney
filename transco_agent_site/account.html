@@ -242,6 +242,27 @@
   .choices.sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   @media (max-width: 520px) { .choices.sizes { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 420px) { .choices.two { grid-template-columns: 1fr; } }
+  .profile-head { display: flex; align-items: center; gap: 14px; }
+  .avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--sl-teal-deep); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 22px; flex-shrink: 0; }
+  .card.menu { padding: 4px 0; }
+  .fold + .fold, .fold + .menu-row { border-top: 1px solid var(--line); }
+  .fold > summary, .menu-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 60px; cursor: pointer; list-style: none; text-decoration: none; color: inherit; }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .menu-ico { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+  .menu-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .menu-title { font-weight: 700; color: var(--navy); font-size: 16px; }
+  .menu-hint { font-size: 13.5px; color: var(--muted); }
+  .menu-hint.warn { color: #9a6200; font-weight: 600; }
+  .menu-chev { font-size: 22px; color: var(--muted); transition: transform 0.15s ease; }
+  .fold[open] > summary .menu-chev { transform: rotate(90deg); }
+  .fold[open] > summary { background: rgba(18,161,137,0.06); }
+  .fold-body { padding: 4px 16px 18px; }
+  .person-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; }
+  .person-main { min-width: 0; overflow-wrap: anywhere; }
+  .person-name { font-weight: 700; color: var(--navy); font-size: 15.5px; margin-bottom: 2px; }
+  .person-card .btn.small { flex-shrink: 0; min-height: 40px; }
+  .person-form { border: 2px solid var(--sl-teal-deep); border-radius: 14px; padding: 14px; background: #fff; }
+  .add-person { border-style: dashed; min-height: 48px; }
   .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .cat-chip { font: inherit; font-size: 14.5px; font-weight: 600; color: var(--navy); background: #fff; border: 1.5px solid #cfd4d8; border-radius: 999px; padding: 9px 14px; cursor: pointer; min-height: 42px; }
   .cat-chip[aria-pressed="true"] { background: var(--sl-teal-deep); border-color: var(--sl-teal-deep); color: #fff; }
@@ -518,6 +539,8 @@
       codeTitle: "Enter your code", codeSub: "We sent a 6-digit code to WhatsApp on {phone}.", codeLabel: "6-digit code", verify: "Sign in",
       resend: "Send a new code", resendIn: "You can ask for a new code in {s} seconds.", changeNumber: "Use a different number",
       agreePre: "I have read and agree to the", privacyPolicy: "Privacy Policy", privacyRequired: "Please tick that you agree to the Privacy Policy.", privacyTitle: "Your data & privacy", privacySub: "Download a copy of everything we hold about you, or ask us to delete your account. Read our", downloadData: "Download my data", deleteAccount: "Delete my account", deleteHelp: "We delete your account and personal details within 30 days. Customs declarations and invoices we must keep by law are kept until that period ends.", deleteTitle: "Delete your account?", deleteBody: "Our team will delete your My Transco account and personal details within 30 days. Shipments already on the way are not affected.", deleteYes: "Yes, delete my account", deleteRequested: "You asked us to delete your account on {d}. Our team will finish this within 30 days.",
+      sendersTitle: "My senders", sendersSub: "You're the default sender. Add family or friends who sometimes send in your name.", receiversTitle: "My receivers", receiversSub: "People you send to. Pick them when booking — no typing again.", youDefault: "You (default)", addSender: "Add a sender", addReceiver: "Add a receiver", noSendersYet: "No other senders saved yet.", noReceiversYet: "No receivers saved yet.", savePerson: "Save", cancel: "Cancel", sendingTo: "Sending to", idShort: "Passport / NIC", removePerson: "Remove", removePersonTitle: "Remove {name}?", removePersonBody: "They will no longer be offered when you book. Bookings already made are not changed.", ownIdLbl: "Passport or NIC number", ownIdHelp: "Used when you're the sender — needed for the Sri Lanka Customs declaration. Stored encrypted.", senderNew: "Someone new",
+      menuDetails: "Personal details", menuDetailsHint: "Name, email, passport, address", menuIdMissing: "Add your passport / NIC number", menuSecurity: "Password & sign-in", menuSendersN: "You + {n} more", menuSendersNone: "Just you so far", menuReceiversN: "{n} saved", menuReceiversNone: "None saved yet",
       noAccountYet: "We couldn't find an account for that. Don't have an account?", signUpNow: "Sign up",
       eachLbl: "each", teaFree: "every 3rd free", estTitle: "Approximate cost for your boxes", estPlus: "Plus the items our team will price (TV size or odd-size measurements still to add).", estAir: "Air Freight is priced by weight when we receive your boxes.", estNote: "This is only an approximate cost for the boxes. It is not your final total — door delivery and home pickup are extra, and the price can change (for example weight, size or extra services).", estChat: "Chat with our agent",
       boxInfoLink: "See box sizes & prices", tvDesc: "Priced by screen size", otherDesc: "Anything that isn't a standard box — our team measures and prices it", handoverQ: "How will we get your boxes?", handDrop: "I'll drop them off", handDropDesc: "At our Seven Hills warehouse", handPick: "Home pickup", handPickDesc: "We collect from the sender's address", pickupInfo: "Please call Sajith on 0468 382 023 to arrange the pickup day and confirm the pickup fee — weekdays after 5pm or any time on weekends.", pickupWhen: "Best days or times for the pickup (optional)", pickupCall: "call Sajith on 0468 382 023 to arrange it", vHandover: "Please choose drop-off or home pickup.", editBooking: "Edit booking", editIntro: "Change your boxes, delivery, drop-off or declaration details. You can change the declaration until your BL number is issued.", editDeclOnly: "Your boxes are with us, so you can now only change the declaration (sender, receiver and items) — until your BL number is issued.", cancelIntro: "Changed your mind? You can cancel this booking.", streetPh: "e.g. Unit 3, 18 Sorrell Street", auMobileHelp: "Australian mobile, e.g. 0412 345 678", vStreet: "Please enter the street address.", vSuburb: "Please enter the suburb.", vState: "Please choose the state.", vPostcode: "Please enter the 4-digit postcode.", vAuMobile: "Please enter an Australian mobile number, e.g. 0412 345 678.",
@@ -550,7 +573,7 @@
       tvHelp: "TV prices go by screen size.", tvSizeN: "TV {n}: screen size", tvOther: "Other size", tvOtherDesc: "56\"–59\" or over 75\" — our team confirms the price",
       oddHelp: "Anything that isn't one of our standard boxes. Please measure it — it's priced by size.", oddN: "Odd-size item {n} (cm)", lenLbl: "Length", widLbl: "Width", hgtLbl: "Height",
       vTvSize: "Please choose each TV's screen size.", vDims: "Please enter the length, width and height of each odd-size item in cm (1–500).",
-      s3sender: "Who is sending the boxes?", declIntro: "These details go on your declaration form — please use names exactly as on the passport or NIC.", senderMe: "Me", senderMeDesc: "The account holder", senderOther: "Someone else", senderOtherDesc: "Just for this booking", senderFirstNote: "Filled in from your profile. Check they match your passport or NIC — we'll remember them for next time.", senderSavedNote: "Your saved details. Any change you make here is remembered for next time.", senderOtherNote: "Used for this booking only — your own saved details stay the same.", fullNameId: "Full name (as on passport or NIC)", addressLbl: "Address", townLbl: "Town or city", townHelp: "Where the receiver lives, e.g. Kandy, Jaffna, Chennai.", mobileLbl: "Mobile number", mobileHelp: "With country code, e.g. +94 77 123 4567", emailLbl: "Email", idLbl: "Passport or NIC number", idHelp: "Needed for the Customs declaration. We store it encrypted — see our Privacy Policy.", s4receiver: "Who is receiving the boxes?", savedReceivers: "Sending to someone you've sent to before?", receiverNew: "Someone new", receiverNewDesc: "Enter their details", receiverCheck: "We've filled in their saved details — please check they're still correct.", deliveryQ: "How will the receiver get the boxes?", senderLbl: "Sender", receiverLbl: "Receiver", vName: "Please enter the full name as on the passport or NIC.", vAddress: "Please enter the full address.", vTown: "Please enter the receiver's town or city.", vMobile: "Please enter a valid mobile number, with country code.", vEmail: "Please enter a valid email address.", vId: "Please enter the passport or NIC number (letters and numbers only).", vPickReceiver: "Please choose a receiver, or \"Someone new\".", declSubmitted: "✓ Submitted", declSubmittedBody: "Your declaration details were sent with this booking. Our team checks them when you drop off your boxes.", declChange: "Need to change a detail? Call us on 0434 842 023.", ns1done: "Declaration details sent ✓", declFormBodyOnline: "Your declaration is part of every online booking — you fill in the sender and receiver details while booking.",
+      s3sender: "Who is sending the boxes?", declIntro: "These details go on your declaration form — please use names exactly as on the passport or NIC.", senderMe: "Me", senderMeDesc: "The account holder", senderOther: "Someone else", senderOtherDesc: "Saved for next time", senderFirstNote: "Filled in from your profile. Check they match your passport or NIC — we'll remember them for next time.", senderSavedNote: "Your saved details. Any change you make here is remembered for next time.", senderOtherNote: "Used for this booking only — your own saved details stay the same.", fullNameId: "Full name (as on passport or NIC)", addressLbl: "Address", townLbl: "Town or city", townHelp: "Where the receiver lives, e.g. Kandy, Jaffna, Chennai.", mobileLbl: "Mobile number", mobileHelp: "With country code, e.g. +94 77 123 4567", emailLbl: "Email", idLbl: "Passport or NIC number", idHelp: "Needed for the Customs declaration. We store it encrypted — see our Privacy Policy.", s4receiver: "Who is receiving the boxes?", savedReceivers: "Sending to someone you've sent to before?", receiverNew: "Someone new", receiverNewDesc: "Enter their details", receiverCheck: "We've filled in their saved details — please check they're still correct.", deliveryQ: "How will the receiver get the boxes?", senderLbl: "Sender", receiverLbl: "Receiver", vName: "Please enter the full name as on the passport or NIC.", vAddress: "Please enter the full address.", vTown: "Please enter the receiver's town or city.", vMobile: "Please enter a valid mobile number, with country code.", vEmail: "Please enter a valid email address.", vId: "Please enter the passport or NIC number (letters and numbers only).", vPickReceiver: "Please choose a receiver, or \"Someone new\".", declSubmitted: "✓ Submitted", declSubmittedBody: "Your declaration details were sent with this booking. Our team checks them when you drop off your boxes.", declChange: "Need to change a detail? Call us on 0434 842 023.", ns1done: "Declaration details sent ✓", declFormBodyOnline: "Your declaration is part of every online booking — you fill in the sender and receiver details while booking.",
       deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "We deliver to the receiver's address", collect: "Collect from warehouse", collectDesc: "The receiver collects from our destination warehouse", collectSl: "Collect from Wattala warehouse", collectSlDesc: "The receiver collects from our Wattala warehouse in Sri Lanka",
       s4: "When will you drop off your boxes?", s4where: "Our warehouse: Unit 1, 79 Station Rd, Seven Hills NSW 2147",
       satNote: "Saturday — walk in any time 11am–3pm", wkNote: "Tuesday to Friday — 5pm to 6pm, by appointment",
@@ -648,6 +671,8 @@
       codeTitle: "ඔයාගේ code එක දාන්න", codeSub: "{phone} WhatsApp එකට ඉලක්කම් 6ක code එකක් එව්වා.", codeLabel: "ඉලක්කම් 6ක code එක", verify: "Sign in",
       resend: "අලුත් code එකක් යවන්න", resendIn: "තත්පර {s}කින් අලුත් code එකක් ඉල්ලන්න පුළුවන්.", changeNumber: "වෙන number එකක් පාවිච්චි කරන්න",
       agreePre: "මම කියවලා එකඟ වෙනවා:", privacyPolicy: "Privacy Policy", privacyRequired: "කරුණාකර Privacy Policy එකට එකඟ බව tick කරන්න.", privacyTitle: "ඔබේ දත්ත සහ පෞද්ගලිකත්වය", privacySub: "අප ළඟ ඔබ ගැන තියෙන සියලු දත්ත download කරගන්න, නැත්නම් account එක delete කරන්න කියන්න. කියවන්න:", downloadData: "මගේ දත්ත download කරන්න", deleteAccount: "මගේ account එක delete කරන්න", deleteHelp: "දින 30ක් ඇතුළත ඔබේ account එක සහ පෞද්ගලික විස්තර delete කරනවා. නීතියෙන් තියාගන්න ඕන customs declaration සහ invoice ඒ කාලය ඉවර වෙනකම් තියාගන්නවා.", deleteTitle: "Account එක delete කරන්නද?", deleteBody: "අපේ team එක දින 30ක් ඇතුළත ඔබේ My Transco account එක සහ පෞද්ගලික විස්තර delete කරනවා. දැනටමත් යන shipments වලට බලපාන්නේ නෑ.", deleteYes: "ඔව්, delete කරන්න", deleteRequested: "ඔබ {d} දින account එක delete කරන්න ඉල්ලුවා. දින 30ක් ඇතුළත අපේ team එක මේක කරනවා.",
+      sendersTitle: "මගේ යවන අය", sendersSub: "ඔබ තමයි default යවන කෙනා. ඔබ වෙනුවෙන් සමහර වෙලාවට යවන පවුලේ අය හෝ යාළුවන් එකතු කරන්න.", receiversTitle: "මගේ ලබන අය", receiversSub: "ඔබ බඩු යවන අය. Booking කරද්දී තෝරන්න — ආයෙ type කරන්න ඕන නෑ.", youDefault: "ඔබ (default)", addSender: "යවන කෙනෙක් එකතු කරන්න", addReceiver: "ලබන කෙනෙක් එකතු කරන්න", noSendersYet: "තවම වෙන යවන අය save කරලා නෑ.", noReceiversYet: "තවම ලබන අය save කරලා නෑ.", savePerson: "Save", cancel: "අවලංගු කරන්න", sendingTo: "යවන්නේ", idShort: "Passport / NIC", removePerson: "ඉවත් කරන්න", removePersonTitle: "{name} ඉවත් කරන්නද?", removePersonBody: "Booking කරද්දී ආයෙ පෙන්නන්නේ නෑ. දැනටමත් කරපු bookings වෙනස් වෙන්නේ නෑ.", ownIdLbl: "Passport හෝ NIC අංකය", ownIdHelp: "ඔබ යවන කෙනා වෙද්දී පාවිච්චි වෙනවා — ශ්‍රී ලංකා Customs declaration එකට ඕන. Encrypt කරලා තියාගන්නවා.", senderNew: "අලුත් කෙනෙක්",
+      menuDetails: "පෞද්ගලික විස්තර", menuDetailsHint: "නම, email, passport, ලිපිනය", menuIdMissing: "ඔබේ passport / NIC අංකය දාන්න", menuSecurity: "Password සහ sign-in", menuSendersN: "ඔබ + තවත් {n}", menuSendersNone: "දැනට ඔබ විතරයි", menuReceiversN: "{n}ක් save කරලා", menuReceiversNone: "තවම කවුරුත් නෑ",
       noAccountYet: "ඒකට account එකක් හම්බුණේ නෑ. Account එකක් නැද්ද?", signUpNow: "Sign up වෙන්න",
       eachLbl: "එකකට", teaFree: "හැම 3වෙනි එකම නොමිලේ", estTitle: "ඔයාගේ පෙට්ටි වලට ආසන්න මිල", estPlus: "ඊට අමතරව අපේ team එක මිල කරන භාණ්ඩ (TV size හෝ මිනුම් තවම දාලා නෑ).", estAir: "Air Freight මිල ඔයාගේ පෙට්ටි ලැබුණාම බර අනුව ගණන් කරනවා.", estNote: "මේක පෙට්ටි වලට විතරක් ආසන්න මිලක්. මේක අවසාන මුළු මිල නෙවෙයි — door delivery සහ home pickup අමතරයි, බර, size හෝ අමතර සේවා අනුව මිල වෙනස් වෙන්න පුළුවන්.", estChat: "Agent එක්ක chat කරන්න",
       boxInfoLink: "Box sizes සහ මිල බලන්න", tvDesc: "Screen size එක අනුව මිල", otherDesc: "සාමාන්‍ය box එකක් නොවන ඕනම දෙයක් — අපේ team එක මැනලා මිල කරනවා", handoverQ: "ඔයාගේ පෙට්ටි අපිට ලැබෙන්නේ කොහොමද?", handDrop: "මම ගෙනත් දෙනවා", handDropDesc: "අපේ Seven Hills warehouse එකට", handPick: "ගෙදරින් ගන්න (Home pickup)", handPickDesc: "යවන කෙනාගේ ලිපිනයෙන් අපි ගන්නවා", pickupInfo: "Pickup දවස arrange කරන්නයි pickup ගාස්තුව confirm කරන්නයි කරුණාකරලා Sajith ට කතා කරන්න 0468 382 023 — සතියේ දින සවස 5න් පස්සේ හෝ සති අන්තයේ ඕනම වෙලාවක.", pickupWhen: "Pickup එකට හොඳ දවස් හෝ වෙලාවන් (අවශ්‍ය නම්)", pickupCall: "arrange කරන්න Sajith ට කතා කරන්න 0468 382 023", vHandover: "කරුණාකරලා ගෙනත් දෙනවද නැත්නම් home pickup ද කියලා තෝරන්න.", editBooking: "Booking එක වෙනස් කරන්න", editIntro: "පෙට්ටි, delivery, drop-off හෝ declaration විස්තර වෙනස් කරන්න. BL අංකය දෙනකම් declaration එක වෙනස් කරන්න පුළුවන්.", editDeclOnly: "ඔයාගේ පෙට්ටි දැන් අප ළඟ, ඒ නිසා දැන් වෙනස් කරන්න පුළුවන් declaration එක (යවන/ලබන කෙනා සහ භාණ්ඩ) විතරයි — BL අංකය දෙනකම්.", cancelIntro: "හිත වෙනස් වුණාද? මේ booking එක cancel කරන්න පුළුවන්.", streetPh: "උදා: Unit 3, 18 Sorrell Street", auMobileHelp: "ඕස්ට්‍රේලියානු mobile, උදා: 0412 345 678", vStreet: "කරුණාකරලා street address එක දාන්න.", vSuburb: "කරුණාකරලා suburb එක දාන්න.", vState: "කරුණාකරලා state එක තෝරන්න.", vPostcode: "කරුණාකරලා ඉලක්කම් 4ක postcode එක දාන්න.", vAuMobile: "කරුණාකරලා ඕස්ට්‍රේලියානු mobile අංකයක් දාන්න, උදා: 0412 345 678.",
@@ -678,7 +703,7 @@
       tvHelp: "TV මිල screen size එක අනුවයි.", tvSizeN: "TV {n}: screen size", tvOther: "වෙනත් size එකක්", tvOtherDesc: "56\"–59\" හෝ 75\" ට වැඩි — මිල අපේ team එක confirm කරයි",
       oddHelp: "අපේ සාමාන්‍ය box වලට අයිති නැති ඕනම දෙයක්. කරුණාකරලා මනින්න — මිල ගණන් කරන්නේ size එක අනුව.", oddN: "අසාමාන්‍ය ප්‍රමාණයේ භාණ්ඩය {n} (cm)", lenLbl: "දිග", widLbl: "පළල", hgtLbl: "උස",
       vTvSize: "කරුණාකරලා හැම TV එකකම screen size එක තෝරන්න.", vDims: "කරුණාකරලා හැම භාණ්ඩයකම දිග, පළල, උස cm වලින් දාන්න (1–500).",
-      s3sender: "පෙට්ටි යවන්නේ කවුද?", declIntro: "මේ විස්තර ඔයාගේ declaration form එකට යනවා — passport එකේ හෝ NIC එකේ තියෙන විදියටම නම් දාන්න.", senderMe: "මම", senderMeDesc: "Account එකේ අයිතිකාරයා", senderOther: "වෙන කෙනෙක්", senderOtherDesc: "මේ booking එකට විතරයි", senderFirstNote: "ඔයාගේ profile එකෙන් පුරවලා තියෙන්නේ. Passport/NIC එකට ගැලපෙනවද බලන්න — ඊළඟ පාරට අපි මතක තියාගන්නවා.", senderSavedNote: "ඔයාගේ save කරපු විස්තර. මෙතන කරන වෙනස්කම් ඊළඟ පාරටත් මතක තියාගන්නවා.", senderOtherNote: "මේ booking එකට විතරයි — ඔයාගේ save කරපු විස්තර වෙනස් වෙන්නේ නෑ.", fullNameId: "සම්පූර්ණ නම (passport/NIC එකේ විදියට)", addressLbl: "ලිපිනය", townLbl: "නගරය", townHelp: "ලබන කෙනා ඉන්න නගරය, උදා: Kandy, Jaffna.", mobileLbl: "Mobile අංකය", mobileHelp: "Country code එකත් එක්ක, උදා: +94 77 123 4567", emailLbl: "Email", idLbl: "Passport හෝ NIC අංකය", idHelp: "Customs declaration එකට ඕන. අපි මේක encrypt කරලා ආරක්ෂිතව තියාගන්නවා — Privacy Policy බලන්න.", s4receiver: "පෙට්ටි ලබන්නේ කවුද?", savedReceivers: "කලින් යවපු කෙනෙක්ටද යවන්නේ?", receiverNew: "අලුත් කෙනෙක්", receiverNewDesc: "එයාගේ විස්තර දාන්න", receiverCheck: "එයාගේ save කරපු විස්තර පුරවලා තියෙනවා — තාම හරිද බලන්න.", deliveryQ: "ලබන කෙනාට පෙට්ටි ලැබෙන්නේ කොහොමද?", senderLbl: "යවන්නා", receiverLbl: "ලබන්නා", vName: "කරුණාකරලා passport/NIC එකේ විදියට සම්පූර්ණ නම දාන්න.", vAddress: "කරුණාකරලා සම්පූර්ණ ලිපිනය දාන්න.", vTown: "කරුණාකරලා ලබන කෙනාගේ නගරය දාන්න.", vMobile: "කරුණාකරලා country code එකත් එක්ක හරි mobile අංකයක් දාන්න.", vEmail: "කරුණාකරලා හරි email ලිපිනයක් දාන්න.", vId: "කරුණාකරලා passport/NIC අංකය දාන්න (අකුරු සහ ඉලක්කම් විතරයි).", vPickReceiver: "කරුණාකරලා ලබන කෙනෙක්ව හෝ \"අලුත් කෙනෙක්\" තෝරන්න.", declSubmitted: "✓ යැව්වා", declSubmittedBody: "ඔයාගේ declaration විස්තර මේ booking එකත් එක්ක ආවා. ඔයා පෙට්ටි ගේනකොට අපේ team එක ඒවා check කරනවා.", declChange: "මොකක් හරි වෙනස් කරන්න ඕනද? 0434 842 023 ට call කරන්න.", ns1done: "Declaration විස්තර යැව්වා ✓", declFormBodyOnline: "හැම online booking එකකම declaration එක තියෙනවා — book කරනකොට යවන්නාගේ සහ ලබන්නාගේ විස්තර දානවා.",
+      s3sender: "පෙට්ටි යවන්නේ කවුද?", declIntro: "මේ විස්තර ඔයාගේ declaration form එකට යනවා — passport එකේ හෝ NIC එකේ තියෙන විදියටම නම් දාන්න.", senderMe: "මම", senderMeDesc: "Account එකේ අයිතිකාරයා", senderOther: "වෙන කෙනෙක්", senderOtherDesc: "ඊළඟ වතාවට save වෙනවා", senderFirstNote: "ඔයාගේ profile එකෙන් පුරවලා තියෙන්නේ. Passport/NIC එකට ගැලපෙනවද බලන්න — ඊළඟ පාරට අපි මතක තියාගන්නවා.", senderSavedNote: "ඔයාගේ save කරපු විස්තර. මෙතන කරන වෙනස්කම් ඊළඟ පාරටත් මතක තියාගන්නවා.", senderOtherNote: "මේ booking එකට විතරයි — ඔයාගේ save කරපු විස්තර වෙනස් වෙන්නේ නෑ.", fullNameId: "සම්පූර්ණ නම (passport/NIC එකේ විදියට)", addressLbl: "ලිපිනය", townLbl: "නගරය", townHelp: "ලබන කෙනා ඉන්න නගරය, උදා: Kandy, Jaffna.", mobileLbl: "Mobile අංකය", mobileHelp: "Country code එකත් එක්ක, උදා: +94 77 123 4567", emailLbl: "Email", idLbl: "Passport හෝ NIC අංකය", idHelp: "Customs declaration එකට ඕන. අපි මේක encrypt කරලා ආරක්ෂිතව තියාගන්නවා — Privacy Policy බලන්න.", s4receiver: "පෙට්ටි ලබන්නේ කවුද?", savedReceivers: "කලින් යවපු කෙනෙක්ටද යවන්නේ?", receiverNew: "අලුත් කෙනෙක්", receiverNewDesc: "එයාගේ විස්තර දාන්න", receiverCheck: "එයාගේ save කරපු විස්තර පුරවලා තියෙනවා — තාම හරිද බලන්න.", deliveryQ: "ලබන කෙනාට පෙට්ටි ලැබෙන්නේ කොහොමද?", senderLbl: "යවන්නා", receiverLbl: "ලබන්නා", vName: "කරුණාකරලා passport/NIC එකේ විදියට සම්පූර්ණ නම දාන්න.", vAddress: "කරුණාකරලා සම්පූර්ණ ලිපිනය දාන්න.", vTown: "කරුණාකරලා ලබන කෙනාගේ නගරය දාන්න.", vMobile: "කරුණාකරලා country code එකත් එක්ක හරි mobile අංකයක් දාන්න.", vEmail: "කරුණාකරලා හරි email ලිපිනයක් දාන්න.", vId: "කරුණාකරලා passport/NIC අංකය දාන්න (අකුරු සහ ඉලක්කම් විතරයි).", vPickReceiver: "කරුණාකරලා ලබන කෙනෙක්ව හෝ \"අලුත් කෙනෙක්\" තෝරන්න.", declSubmitted: "✓ යැව්වා", declSubmittedBody: "ඔයාගේ declaration විස්තර මේ booking එකත් එක්ක ආවා. ඔයා පෙට්ටි ගේනකොට අපේ team එක ඒවා check කරනවා.", declChange: "මොකක් හරි වෙනස් කරන්න ඕනද? 0434 842 023 ට call කරන්න.", ns1done: "Declaration විස්තර යැව්වා ✓", declFormBodyOnline: "හැම online booking එකකම declaration එක තියෙනවා — book කරනකොට යවන්නාගේ සහ ලබන්නාගේ විස්තර දානවා.",
       deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "ලබන කෙනාගේ ලිපිනයට අපි ගෙනත් දෙනවා", collect: "Warehouse එකෙන් ගන්නවා", collectDesc: "ලබන කෙනා අපේ destination warehouse එකෙන් ගන්නවා", collectSl: "Wattala warehouse එකෙන් ගන්නවා", collectSlDesc: "ලබන කෙනා ශ්‍රී ලංකාවේ අපේ Wattala warehouse එකෙන් ගන්නවා",
       s4: "ඔයා පෙට්ටි ගේන්නේ කවදාද?", s4where: "අපේ warehouse එක: Unit 1, 79 Station Rd, Seven Hills NSW 2147",
       satNote: "සෙනසුරාදා — 11am–3pm ඕනම වෙලාවක එන්න", wkNote: "අඟහරුවාදා සිට සිකුරාදා — සවස 5–6, appointment එකෙන්",
@@ -771,6 +796,8 @@
       codeTitle: "உங்கள் code ஐ உள்ளிடுங்கள்", codeSub: "{phone} WhatsApp க்கு 6 இலக்க code அனுப்பினோம்.", codeLabel: "6 இலக்க code", verify: "Sign in",
       resend: "புதிய code அனுப்பு", resendIn: "{s} வினாடிகளில் புதிய code கேட்கலாம்.", changeNumber: "வேறு number ஐப் பயன்படுத்து",
       agreePre: "நான் படித்து ஒப்புக்கொள்கிறேன்:", privacyPolicy: "Privacy Policy", privacyRequired: "Privacy Policy க்கு ஒப்புக்கொள்வதை tick செய்யவும்.", privacyTitle: "உங்கள் தரவு & தனியுரிமை", privacySub: "உங்களைப் பற்றி நாங்கள் வைத்திருக்கும் அனைத்தையும் download செய்யலாம், அல்லது account ஐ நீக்கச் சொல்லலாம். படிக்கவும்:", downloadData: "என் தரவை download செய்", deleteAccount: "என் account ஐ நீக்கு", deleteHelp: "30 நாட்களுக்குள் உங்கள் account மற்றும் தனிப்பட்ட விவரங்களை நீக்குவோம். சட்டப்படி வைத்திருக்க வேண்டிய customs declaration மற்றும் invoice அந்த காலம் முடியும் வரை வைக்கப்படும்.", deleteTitle: "Account ஐ நீக்கவா?", deleteBody: "எங்கள் team 30 நாட்களுக்குள் உங்கள் My Transco account மற்றும் தனிப்பட்ட விவரங்களை நீக்கும். ஏற்கனவே செல்லும் shipments பாதிக்கப்படாது.", deleteYes: "ஆம், நீக்கு", deleteRequested: "{d} அன்று account ஐ நீக்கக் கேட்டீர்கள். 30 நாட்களுக்குள் எங்கள் team இதை முடிக்கும்.",
+      sendersTitle: "என் அனுப்புநர்கள்", sendersSub: "நீங்கள்தான் default அனுப்புநர். உங்கள் பெயரில் சில நேரம் அனுப்பும் குடும்பத்தினர் அல்லது நண்பர்களைச் சேர்க்கவும்.", receiversTitle: "என் பெறுநர்கள்", receiversSub: "நீங்கள் அனுப்பும் நபர்கள். Booking செய்யும்போது தேர்ந்தெடுங்கள் — மீண்டும் type செய்ய வேண்டாம்.", youDefault: "நீங்கள் (default)", addSender: "அனுப்புநரைச் சேர்", addReceiver: "பெறுநரைச் சேர்", noSendersYet: "வேறு அனுப்புநர்கள் இன்னும் சேமிக்கப்படவில்லை.", noReceiversYet: "பெறுநர்கள் இன்னும் சேமிக்கப்படவில்லை.", savePerson: "Save", cancel: "ரத்து", sendingTo: "அனுப்பும் இடம்", idShort: "Passport / NIC", removePerson: "நீக்கு", removePersonTitle: "{name} ஐ நீக்கவா?", removePersonBody: "Booking செய்யும்போது இனி காட்டப்படமாட்டார்கள். ஏற்கனவே செய்த bookings மாறாது.", ownIdLbl: "Passport அல்லது NIC எண்", ownIdHelp: "நீங்கள் அனுப்புநராக இருக்கும்போது பயன்படும் — இலங்கை Customs declaration க்கு தேவை. Encrypt செய்து வைக்கப்படும்.", senderNew: "புதியவர்",
+      menuDetails: "தனிப்பட்ட விவரங்கள்", menuDetailsHint: "பெயர், email, passport, முகவரி", menuIdMissing: "உங்கள் passport / NIC எண்ணைச் சேர்க்கவும்", menuSecurity: "Password & sign-in", menuSendersN: "நீங்கள் + {n} பேர்", menuSendersNone: "இப்போது நீங்கள் மட்டும்", menuReceiversN: "{n} சேமிக்கப்பட்டது", menuReceiversNone: "இன்னும் யாரும் இல்லை",
       noAccountYet: "அதற்கான account கிடைக்கவில்லை. Account இல்லையா?", signUpNow: "Sign up செய்யுங்கள்",
       eachLbl: "ஒன்றுக்கு", teaFree: "ஒவ்வொரு 3வதும் இலவசம்", estTitle: "உங்கள் பெட்டிகளுக்கான தோராயமான விலை", estPlus: "மேலும் எங்கள் team விலையிடும் பொருட்கள் (TV size அல்லது அளவுகள் இன்னும் சேர்க்கப்படவில்லை).", estAir: "Air Freight விலை உங்கள் பெட்டிகளைப் பெற்றதும் எடையைப் பொறுத்து கணக்கிடப்படும்.", estNote: "இது பெட்டிகளுக்கான தோராயமான விலை மட்டுமே. இது உங்கள் இறுதி மொத்தம் அல்ல — door delivery மற்றும் home pickup கூடுதல், விலை மாறலாம் (எ.கா. எடை, அளவு அல்லது கூடுதல் சேவைகள்).", estChat: "எங்கள் agent உடன் chat செய்யுங்கள்",
       boxInfoLink: "Box அளவுகள் & விலைகளைப் பார்", tvDesc: "Screen size ஐப் பொறுத்து விலை", otherDesc: "வழக்கமான பெட்டி அல்லாத எதுவும் — எங்கள் team அளந்து விலையிடும்", handoverQ: "உங்கள் பெட்டிகள் எங்களிடம் எப்படி வரும்?", handDrop: "நானே கொண்டு வருவேன்", handDropDesc: "எங்கள் Seven Hills கிடங்குக்கு", handPick: "வீட்டிலிருந்து எடுத்தல் (Home pickup)", handPickDesc: "அனுப்புபவரின் முகவரியிலிருந்து நாங்கள் எடுப்போம்", pickupInfo: "Pickup நாளை ஏற்பாடு செய்யவும் கட்டணத்தை உறுதிப்படுத்தவும் Sajith ஐ அழையுங்கள் 0468 382 023 — வார நாட்களில் மாலை 5க்குப் பின் அல்லது வார இறுதியில் எப்போதும்.", pickupWhen: "Pickup க்கு வசதியான நாட்கள் அல்லது நேரங்கள் (விருப்பம்)", pickupCall: "ஏற்பாடு செய்ய Sajith ஐ அழையுங்கள் 0468 382 023", vHandover: "கொண்டு வருவதா அல்லது home pickup ஆ என்று தேர்ந்தெடுக்கவும்.", editBooking: "Booking ஐ மாற்று", editIntro: "பெட்டிகள், delivery, drop-off அல்லது declaration விவரங்களை மாற்றுங்கள். BL எண் வழங்கப்படும் வரை declaration ஐ மாற்றலாம்.", editDeclOnly: "உங்கள் பெட்டிகள் எங்களிடம் உள்ளன, எனவே இப்போது declaration (அனுப்புபவர், பெறுபவர், பொருட்கள்) மட்டுமே மாற்றலாம் — BL எண் வழங்கப்படும் வரை.", cancelIntro: "மனம் மாறிவிட்டதா? இந்த booking ஐ cancel செய்யலாம்.", streetPh: "உதா: Unit 3, 18 Sorrell Street", auMobileHelp: "ஆஸ்திரேலிய mobile, உதா: 0412 345 678", vStreet: "தெரு முகவரியை உள்ளிடவும்.", vSuburb: "Suburb ஐ உள்ளிடவும்.", vState: "State ஐத் தேர்ந்தெடுக்கவும்.", vPostcode: "4 இலக்க postcode ஐ உள்ளிடவும்.", vAuMobile: "ஆஸ்திரேலிய mobile எண்ணை உள்ளிடவும், உதா: 0412 345 678.",
@@ -801,7 +828,7 @@
       tvHelp: "TV விலை screen size ஐப் பொறுத்தது.", tvSizeN: "TV {n}: screen size", tvOther: "வேறு size", tvOtherDesc: "56\"–59\" அல்லது 75\" க்கு மேல் — விலையை எங்கள் team உறுதிப்படுத்தும்",
       oddHelp: "எங்கள் வழக்கமான பெட்டிகளில் இல்லாத எதுவும். தயவுசெய்து அளந்து சொல்லுங்கள் — அளவைப் பொறுத்து விலை.", oddN: "வழக்கத்துக்கு மாறான அளவுப் பொருள் {n} (cm)", lenLbl: "நீளம்", widLbl: "அகலம்", hgtLbl: "உயரம்",
       vTvSize: "ஒவ்வொரு TV யின் screen size ஐயும் தேர்ந்தெடுக்கவும்.", vDims: "ஒவ்வொரு பொருளின் நீளம், அகலம், உயரத்தை cm இல் உள்ளிடவும் (1–500).",
-      s3sender: "பெட்டிகளை அனுப்புபவர் யார்?", declIntro: "இந்த விவரங்கள் உங்கள் declaration form இல் இடம்பெறும் — passport அல்லது NIC இல் உள்ளபடியே பெயர்களை எழுதவும்.", senderMe: "நான்", senderMeDesc: "Account உரிமையாளர்", senderOther: "வேறொருவர்", senderOtherDesc: "இந்த booking க்கு மட்டும்", senderFirstNote: "உங்கள் profile இலிருந்து நிரப்பப்பட்டது. உங்கள் passport/NIC உடன் பொருந்துகிறதா எனப் பார்க்கவும் — அடுத்த முறைக்கு நினைவில் வைப்போம்.", senderSavedNote: "நீங்கள் சேமித்த விவரங்கள். இங்கே செய்யும் மாற்றங்கள் அடுத்த முறைக்கும் நினைவில் இருக்கும்.", senderOtherNote: "இந்த booking க்கு மட்டும் — உங்கள் சேமித்த விவரங்கள் மாறாது.", fullNameId: "முழுப் பெயர் (passport/NIC இல் உள்ளபடி)", addressLbl: "முகவரி", townLbl: "நகரம்", townHelp: "பெறுபவர் வசிக்கும் நகரம், உதா: Kandy, Jaffna, Chennai.", mobileLbl: "Mobile எண்", mobileHelp: "Country code உடன், உதா: +94 77 123 4567", emailLbl: "Email", idLbl: "Passport அல்லது NIC எண்", idHelp: "Customs declaration க்கு தேவை. இதை encrypt செய்து பாதுகாப்பாக வைத்திருக்கிறோம் — Privacy Policy ஐப் பார்க்கவும்.", s4receiver: "பெட்டிகளைப் பெறுபவர் யார்?", savedReceivers: "முன்பு அனுப்பிய ஒருவருக்கா அனுப்புகிறீர்கள்?", receiverNew: "புதியவர்", receiverNewDesc: "அவரின் விவரங்களை உள்ளிடவும்", receiverCheck: "அவரின் சேமித்த விவரங்களை நிரப்பியுள்ளோம் — இன்னும் சரியா எனப் பார்க்கவும்.", deliveryQ: "பெறுபவர் பெட்டிகளை எப்படிப் பெறுவார்?", senderLbl: "அனுப்புபவர்", receiverLbl: "பெறுபவர்", vName: "passport/NIC இல் உள்ளபடி முழுப் பெயரை உள்ளிடவும்.", vAddress: "முழு முகவரியை உள்ளிடவும்.", vTown: "பெறுபவரின் நகரத்தை உள்ளிடவும்.", vMobile: "Country code உடன் சரியான mobile எண்ணை உள்ளிடவும்.", vEmail: "சரியான email முகவரியை உள்ளிடவும்.", vId: "passport/NIC எண்ணை உள்ளிடவும் (எழுத்துகள் மற்றும் எண்கள் மட்டும்).", vPickReceiver: "பெறுபவரை அல்லது \"புதியவர்\" என்பதைத் தேர்ந்தெடுக்கவும்.", declSubmitted: "✓ சமர்ப்பிக்கப்பட்டது", declSubmittedBody: "உங்கள் declaration விவரங்கள் இந்த booking உடன் அனுப்பப்பட்டன. நீங்கள் பெட்டிகளைக் கொண்டுவரும்போது எங்கள் குழு சரிபார்க்கும்.", declChange: "ஏதாவது மாற்ற வேண்டுமா? 0434 842 023 க்கு அழைக்கவும்.", ns1done: "Declaration விவரங்கள் அனுப்பப்பட்டன ✓", declFormBodyOnline: "ஒவ்வொரு online booking இலும் declaration அடங்கும் — booking செய்யும்போதே அனுப்புபவர், பெறுபவர் விவரங்களை நிரப்புகிறீர்கள்.",
+      s3sender: "பெட்டிகளை அனுப்புபவர் யார்?", declIntro: "இந்த விவரங்கள் உங்கள் declaration form இல் இடம்பெறும் — passport அல்லது NIC இல் உள்ளபடியே பெயர்களை எழுதவும்.", senderMe: "நான்", senderMeDesc: "Account உரிமையாளர்", senderOther: "வேறொருவர்", senderOtherDesc: "அடுத்த முறைக்கு சேமிக்கப்படும்", senderFirstNote: "உங்கள் profile இலிருந்து நிரப்பப்பட்டது. உங்கள் passport/NIC உடன் பொருந்துகிறதா எனப் பார்க்கவும் — அடுத்த முறைக்கு நினைவில் வைப்போம்.", senderSavedNote: "நீங்கள் சேமித்த விவரங்கள். இங்கே செய்யும் மாற்றங்கள் அடுத்த முறைக்கும் நினைவில் இருக்கும்.", senderOtherNote: "இந்த booking க்கு மட்டும் — உங்கள் சேமித்த விவரங்கள் மாறாது.", fullNameId: "முழுப் பெயர் (passport/NIC இல் உள்ளபடி)", addressLbl: "முகவரி", townLbl: "நகரம்", townHelp: "பெறுபவர் வசிக்கும் நகரம், உதா: Kandy, Jaffna, Chennai.", mobileLbl: "Mobile எண்", mobileHelp: "Country code உடன், உதா: +94 77 123 4567", emailLbl: "Email", idLbl: "Passport அல்லது NIC எண்", idHelp: "Customs declaration க்கு தேவை. இதை encrypt செய்து பாதுகாப்பாக வைத்திருக்கிறோம் — Privacy Policy ஐப் பார்க்கவும்.", s4receiver: "பெட்டிகளைப் பெறுபவர் யார்?", savedReceivers: "முன்பு அனுப்பிய ஒருவருக்கா அனுப்புகிறீர்கள்?", receiverNew: "புதியவர்", receiverNewDesc: "அவரின் விவரங்களை உள்ளிடவும்", receiverCheck: "அவரின் சேமித்த விவரங்களை நிரப்பியுள்ளோம் — இன்னும் சரியா எனப் பார்க்கவும்.", deliveryQ: "பெறுபவர் பெட்டிகளை எப்படிப் பெறுவார்?", senderLbl: "அனுப்புபவர்", receiverLbl: "பெறுபவர்", vName: "passport/NIC இல் உள்ளபடி முழுப் பெயரை உள்ளிடவும்.", vAddress: "முழு முகவரியை உள்ளிடவும்.", vTown: "பெறுபவரின் நகரத்தை உள்ளிடவும்.", vMobile: "Country code உடன் சரியான mobile எண்ணை உள்ளிடவும்.", vEmail: "சரியான email முகவரியை உள்ளிடவும்.", vId: "passport/NIC எண்ணை உள்ளிடவும் (எழுத்துகள் மற்றும் எண்கள் மட்டும்).", vPickReceiver: "பெறுபவரை அல்லது \"புதியவர்\" என்பதைத் தேர்ந்தெடுக்கவும்.", declSubmitted: "✓ சமர்ப்பிக்கப்பட்டது", declSubmittedBody: "உங்கள் declaration விவரங்கள் இந்த booking உடன் அனுப்பப்பட்டன. நீங்கள் பெட்டிகளைக் கொண்டுவரும்போது எங்கள் குழு சரிபார்க்கும்.", declChange: "ஏதாவது மாற்ற வேண்டுமா? 0434 842 023 க்கு அழைக்கவும்.", ns1done: "Declaration விவரங்கள் அனுப்பப்பட்டன ✓", declFormBodyOnline: "ஒவ்வொரு online booking இலும் declaration அடங்கும் — booking செய்யும்போதே அனுப்புபவர், பெறுபவர் விவரங்களை நிரப்புகிறீர்கள்.",
       deliveryLabel: "Delivery", door: "Door delivery", doorDesc: "பெறுபவரின் முகவரிக்கு நாங்கள் கொண்டு சேர்ப்போம்", collect: "கிடங்கிலிருந்து பெறுதல்", collectDesc: "பெறுபவர் எங்கள் சேருமிடக் கிடங்கிலிருந்து பெற்றுக்கொள்வார்", collectSl: "Wattala கிடங்கிலிருந்து பெறுதல்", collectSlDesc: "பெறுபவர் இலங்கையில் உள்ள எங்கள் Wattala கிடங்கிலிருந்து பெற்றுக்கொள்வார்",
       s4: "உங்கள் பெட்டிகளை எப்போது கொண்டு வருவீர்கள்?", s4where: "எங்கள் கிடங்கு: Unit 1, 79 Station Rd, Seven Hills NSW 2147",
       satNote: "சனிக்கிழமை — 11am–3pm எப்போது வேண்டுமானாலும் வாருங்கள்", wkNote: "செவ்வாய் முதல் வெள்ளி — மாலை 5–6, appointment மூலம்",
@@ -2596,20 +2623,27 @@
     } else if (step === 3) {
       var meName = (draft.meSender.fullName || "").trim();
       var senderSaved = Boolean((bookingOptions.declaration || {}).senderSaved);
+      // Me (the default), a sender saved on their profile, or someone new
+      // (saved for next time when they book).
+      var savedSenders = (bookingOptions.declaration || {}).senders || [];
+      if (!draft.senderPick) draft.senderPick = draft.sender.isMe ? "me" : "new";
+      if (draft.senderPick !== "me" && draft.senderPick !== "new" && !savedSenders.some(function (s) { return s.id === draft.senderPick; })) draft.senderPick = "new";
       body = [
         h("h2", { class: "section-title", style: "margin-top:0", text: t("s3sender") }),
         h("p", { class: "muted small", style: "margin-top:0", text: t("declIntro") }),
         h("div", { class: "field" },
-          radioGroup("sender", [
-            { value: "me", title: "🙋 " + t("senderMe"), desc: meName || t("senderMeDesc") },
-            { value: "other", title: "👤 " + t("senderOther"), desc: t("senderOtherDesc") }
-          ], draft.sender.isMe ? "me" : "other", function (v) {
-            var isMe = v === "me";
-            if (isMe === draft.sender.isMe) return;
-            // "Someone else" starts blank; switching back restores the account holder.
-            draft.sender = Object.assign({ isMe: isMe }, isMe ? draft.meSender : blankPerson());
+          radioGroup("sender", [{ value: "me", title: "🙋 " + t("senderMe"), desc: meName || t("senderMeDesc") }]
+            .concat(savedSenders.map(function (s) { return { value: s.id, title: "👤 " + s.fullName, desc: formatAuPhone(s.mobile) }; }))
+            .concat([{ value: "new", title: "➕ " + t("senderNew"), desc: t("senderOtherDesc") }]),
+          draft.senderPick, function (v) {
+            if (v === draft.senderPick) return;
+            draft.senderPick = v;
+            // Switching back to "me" restores the account holder (with any edits).
+            var s = savedSenders.filter(function (x) { return x.id === v; })[0];
+            draft.sender = v === "me" ? Object.assign({ isMe: true }, draft.meSender)
+              : Object.assign({ isMe: false }, blankPerson(), s ? { fullName: s.fullName, address: s.address, mobile: s.mobile, email: s.email, idNumber: s.idNumber, homePhone: s.homePhone || "" } : {});
             renderBookStep();
-          }, "two")),
+          }, savedSenders.length ? "" : "two")),
         h("div", { class: "notice info", style: "margin:14px 0 16px" },
           h("span", { class: "ico", "aria-hidden": "true", text: "ℹ" }),
           h("span", { text: !draft.sender.isMe ? t("senderOtherNote") : senderSaved ? t("senderSavedNote") : t("senderFirstNote") })),
@@ -3081,8 +3115,14 @@
   // ---------------------------------------------------------------
   // Profile
   // ---------------------------------------------------------------
-  function viewProfile() {
-    loadAndRender(t("loading"), function () { return api("GET", "/me"); }, function (data) {
+  // #/profile is a short menu (phone-first: no long scrolling); each row
+  // opens its own page: #/profile/details, /senders, /receivers,
+  // /security, /privacy.
+  function viewProfile(sub) {
+    loadAndRender(t("loading"), function () {
+      return Promise.all([api("GET", "/me"), api("GET", "/me/people").catch(function () { return null; })]);
+    }, function (res) {
+      var data = res[0], people = res[1];
       profile = data.profile;
       var p = profile;
       function input(id, label, value, attrs, help) {
@@ -3093,6 +3133,7 @@
       var phone = input("p-phone", t("phone"), formatAuPhone("+" + p.phoneNumber), { readonly: true, "aria-describedby": "p-phone-help" }, t("phoneHelp"));
       var email = input("p-email", t("email"), p.email, { type: "email", autocomplete: "email", maxlength: "120" },
         p.hasPassword ? t("emailSignInHelp") : t("emailSignInHelpNoPw"));
+      var ownId = input("p-id", t("ownIdLbl"), p.idNumber, { autocapitalize: "characters", spellcheck: "false", autocomplete: "off", maxlength: "20", "aria-describedby": "p-id-help" }, t("ownIdHelp"));
       var street = input("p-street", t("street"), p.address.line1, { autocomplete: "address-line1", maxlength: "120" });
       var suburb = input("p-suburb", t("suburb"), p.address.suburb, { autocomplete: "address-level2", maxlength: "60" });
       var postcode = input("p-postcode", t("postcode"), p.address.postcode, { inputmode: "numeric", autocomplete: "postal-code", maxlength: "4" });
@@ -3106,7 +3147,7 @@
 
       var status = h("div", { role: "status", "aria-live": "polite" });
       var saveBtn = h("button", { class: "btn block", type: "submit", text: t("save") });
-      var fieldMap = { name: name, email: email, state: null, postcode: postcode };
+      var fieldMap = { name: name, email: email, state: null, postcode: postcode, idNumber: ownId };
 
       var form = h("form", { novalidate: true, onsubmit: function (e) {
         e.preventDefault();
@@ -3114,13 +3155,17 @@
         mainEl.querySelectorAll(".field-error").forEach(function (el) { el.textContent = ""; });
         mainEl.querySelectorAll("[aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
         if (name.el.value.trim().length < 2) { markError(name, t("nameInvalid")); return; }
+        var idVal = ownId.el.value.replace(/\s/g, "").toUpperCase();
+        if (idVal && idVal !== (p.idNumber || "") && !/^[A-Z0-9]{5,20}$/.test(idVal)) { markError(ownId, t("vSenderId")); return; }
         saveBtn.disabled = true; saveBtn.textContent = t("saving");
         api("PATCH", "/me", {
           name: name.el.value.trim(), email: email.el.value.trim(),
+          idNumber: idVal === (p.idNumber || "") ? p.idNumber : idVal,
           address: { line1: street.el.value.trim(), suburb: suburb.el.value.trim(), state: stateSel.value, postcode: postcode.el.value.trim() },
           preferredLanguage: langSel.value, contactPreference: contactSel.value
         }).then(function (d) {
           profile = d.profile;
+          p.idNumber = profile.idNumber; ownId.el.value = profile.idNumber || "";
           status.replaceChildren(h("div", { class: "notice ok" }, h("span", { class: "ico", "aria-hidden": "true", text: "✓" }), h("span", { text: t("saved") })));
           if (langSel.value !== lang) { setLang(langSel.value, false); }
         }).catch(function (err) {
@@ -3129,7 +3174,7 @@
           else status.replaceChildren(h("div", { class: "notice err" }, h("span", { class: "ico", "aria-hidden": "true", text: "⚠" }), h("span", { text: err.message })));
         }).finally(function () { saveBtn.disabled = false; saveBtn.textContent = t("save"); });
       } },
-        h("div", { class: "form-section" }, h("h3", { text: t("personal") }), name.field, phone.field, email.field),
+        h("div", { class: "form-section" }, h("h3", { text: t("personal") }), name.field, phone.field, email.field, ownId.field),
         h("div", { class: "form-section" }, h("h3", { text: t("addressTitle") }), street.field,
           h("div", { class: "grid-2", style: "margin-top:14px" }, suburb.field,
             h("div", { class: "grid-2" }, h("div", { class: "field" }, h("label", { for: "p-state", text: t("state") }), stateSel), postcode.field))),
@@ -3170,29 +3215,141 @@
         });
       });
 
+      // One short page of fold-out sections (phone-first: no long scroll,
+      // no extra pages). Tap a row to open it in place; opening one closes
+      // the others. #/profile/<section> opens that one straight away.
+      var nSenders = people ? people.senders.length : null, nReceivers = people ? people.receivers.length : null;
+      var folds = [];
+      function fold(key, icon, title, hint, warn, build) {
+        var body = h("div", { class: "fold-body" });
+        var d = h("details", { class: "fold", id: "fold-" + key },
+          h("summary", null,
+            h("span", { class: "menu-ico", "aria-hidden": "true", text: icon }),
+            h("span", { class: "menu-text" }, h("span", { class: "menu-title", text: title }),
+              hint ? h("span", { class: "menu-hint" + (warn ? " warn" : ""), text: hint }) : null),
+            h("span", { class: "menu-chev", "aria-hidden": "true", text: "›" })),
+          body);
+        var built = false;
+        d.addEventListener("toggle", function () {
+          if (!d.open) return;
+          if (!built) { built = true; append(body, build()); }
+          folds.forEach(function (o) { if (o !== d) o.open = false; });
+          setTimeout(function () { d.scrollIntoView({ block: "start", behavior: "smooth" }); }, 30);
+        });
+        folds.push(d);
+        return d;
+      }
       render(
-        h("h1", { class: "page-title", text: t("profileTitle") }),
-        h("p", { class: "page-sub", text: t("profileSub") }),
-        h("div", { class: "card", style: "margin-bottom:14px" },
-          h("div", { class: "spread" },
-            h("div", null, h("div", { class: "muted small", text: t("customerNo") }), h("div", { class: "ref-big", style: "font-size:22px", text: p.customerCode || "—" })),
-            p.memberSince ? h("div", { class: "muted small", text: t("memberSince", { d: fmtDate(p.memberSince, { month: "long", year: "numeric" }) }) }) : null)),
-        h("div", { class: "card" }, form),
-        p.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:14px" },
+        h("div", { class: "card profile-head" },
+          h("div", { class: "avatar", "aria-hidden": "true", text: (p.name || "?").trim().charAt(0).toUpperCase() }),
+          h("div", { style: "min-width:0" },
+            h("div", { class: "person-name", style: "font-size:18px", text: p.name || t("profileTitle") }),
+            h("div", { class: "muted small", text: [p.customerCode, p.memberSince ? t("memberSince", { d: fmtDate(p.memberSince, { month: "short", year: "numeric" }) }) : null].filter(Boolean).join(" · ") }))),
+        p.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:12px" },
           h("span", { class: "ico", "aria-hidden": "true", text: "📦" }),
           h("div", null, h("div", { text: t("verifyInviteBody") }), h("a", { href: "#/verify", style: "font-weight:700", text: t("verifyInviteBtn") + " →" }))) : null,
-        h("div", { class: "card", style: "margin-top:14px" }, pwForm),
-        privacyCard(p),
+        h("div", { class: "card menu", style: "margin-top:12px" },
+          fold("details", "👤", t("menuDetails"), p.idNumber ? t("menuDetailsHint") : t("menuIdMissing"), !p.idNumber, function () { return form; }),
+          fold("senders", "📤", t("sendersTitle"), nSenders === null ? null : nSenders ? t("menuSendersN", { n: nSenders }) : t("menuSendersNone"), false,
+            function () { return [h("p", { class: "muted small", style: "margin:0 0 10px", text: t("sendersSub") }), peopleSection("senders")]; }),
+          fold("receivers", "📥", t("receiversTitle"), nReceivers === null ? null : nReceivers ? t("menuReceiversN", { n: nReceivers }) : t("menuReceiversNone"), false,
+            function () { return [h("p", { class: "muted small", style: "margin:0 0 10px", text: t("receiversSub") }), peopleSection("receivers")]; }),
+          fold("security", "🔒", t("menuSecurity"), null, false, function () { return [pwForm, h("div", { style: "margin-top:14px" }, signOutAllBtn)]; }),
+          fold("privacy", "🛡️", t("privacyTitle"), null, false, function () { return privacyCard(p, true); }),
+          h("a", { class: "menu-row", href: "#/documents" },
+            h("span", { class: "menu-ico", "aria-hidden": "true", text: "📋" }),
+            h("span", { class: "menu-text" }, h("span", { class: "menu-title", text: t("documentsTitle") })),
+            h("span", { class: "menu-chev", "aria-hidden": "true", text: "›" }))),
         h("div", { class: "stack", style: "margin-top:14px" },
-          h("a", { class: "btn secondary block", href: "#/documents", text: "📋 " + t("documentsTitle") }),
-          h("button", { class: "btn secondary block", type: "button", onclick: function () { signOutLocal(); go("#/signin"); }, text: t("signOut") }),
-          signOutAllBtn));
+          h("button", { class: "btn secondary block", type: "button", onclick: function () { signOutLocal(); go("#/signin"); }, text: t("signOut") })));
+      var want = sub && document.getElementById("fold-" + sub);
+      if (want) want.open = true;
     });
   }
+  // Profile → "My senders" and "My receivers": saved people the booking
+  // form offers, so nothing is typed twice. Phone-first: one card per
+  // person, tap Edit to open its form in place; one form open at a time.
+  function peopleSection(only) {
+    var wrap = h("div", { "aria-live": "polite" }, h("div", { class: only ? "" : "card", style: only ? "" : "margin-top:14px" }, h("p", { class: "muted", style: "margin:0", text: t("loading") })));
+    var people = null, editing = null; // editing: { kind, id|null, person }
+    var countries = STRINGS[lang].countries || STRINGS.en.countries;
+
+    function idLine(p) { return p.idNumber ? t("idShort") + " " + p.idNumber : null; }
+    function personCard(kind, p, title) {
+      var lines = [kind === "receivers" ? [p.town, countries[p.country] || ""].filter(Boolean).join(", ") : (p.address || ""), formatAuPhone(p.mobile), idLine(p)].filter(Boolean);
+      return h("div", { class: "person-card" },
+        h("div", { class: "person-main" },
+          h("div", { class: "person-name", text: title || p.fullName }),
+          lines.map(function (l) { return h("div", { class: "muted small", text: l }); })),
+        p.id ? h("button", { class: "btn secondary small", type: "button", "aria-label": t("edit") + ": " + p.fullName, text: t("edit"),
+          onclick: function () { open(kind, p); } }) : null);
+    }
+    function open(kind, p) {
+      editing = { kind: kind, id: p ? p.id : null, person: Object.assign(blankPerson(), p || {}, { country: p ? p.country : (kind === "receivers" ? "sri_lanka" : null) }) };
+      draw();
+      var f = document.getElementById((kind === "senders" ? "s" : "r") + "-fullName");
+      if (f) { f.focus({ preventScroll: true }); f.scrollIntoView({ block: "center", behavior: "smooth" }); }
+    }
+    function editor() {
+      var kind = editing.kind, p = editing.person, isRec = kind === "receivers";
+      var err = h("div", { role: "alert" });
+      var save = h("button", { class: "btn teal block", type: "submit", text: t("savePerson") });
+      function fail(msg, key) {
+        err.replaceChildren(h("div", { class: "notice err", style: "margin-top:12px" }, h("span", { class: "ico", "aria-hidden": "true", text: "⚠" }), h("span", { text: msg })));
+        var el = key && document.getElementById((isRec ? "r-" : "s-") + key);
+        if (el) { el.setAttribute("aria-invalid", "true"); el.focus(); }
+      }
+      var form = h("form", { class: "person-form", novalidate: true, onsubmit: function (e) {
+        e.preventDefault();
+        var bad = checkPerson(p, isRec, isRec ? null : "optional");
+        if (bad) { fail(bad.msg, bad.key); return; }
+        save.disabled = true; save.textContent = t("saving");
+        var body = personPayload(p, isRec);
+        if (isRec) body.country = p.country;
+        api(editing.id ? "PUT" : "POST", "/me/people/" + kind + (editing.id ? "/" + encodeURIComponent(editing.id) : ""), body).then(function (d) {
+          people = d; editing = null; draw();
+        }).catch(function (e2) { save.disabled = false; save.textContent = t("savePerson"); fail(e2.message, e2.field && String(e2.field).split(".").pop()); });
+      } },
+        h("div", { style: "font-weight:800;font-size:16px;margin-bottom:10px", text: editing.id ? t("edit") + " · " + p.fullName : (isRec ? t("addReceiver") : t("addSender")) }),
+        isRec ? h("div", { class: "field" }, h("span", { class: "label", text: t("sendingTo") }),
+          radioGroup("pc", Object.keys(countries).map(function (k) { return { value: k, title: countries[k] }; }), p.country, function (v) { p.country = v; }, "two")) : null,
+        personFields(isRec ? "r" : "s", p, isRec, isRec ? null : "optional"),
+        err,
+        h("div", { class: "stack", style: "margin-top:16px" }, save,
+          h("button", { class: "btn secondary block", type: "button", text: t("cancel"), onclick: function () { editing = null; draw(); } }),
+          editing.id ? h("button", { class: "link-btn", type: "button", style: "color:var(--danger);align-self:center", text: t("removePerson"), onclick: function () {
+            confirmDialog({ title: t("removePersonTitle", { name: p.fullName }), body: t("removePersonBody"), yes: t("removePerson"), no: t("back") }).then(function (ok) {
+              if (!ok) return;
+              api("DELETE", "/me/people/" + kind + "/" + encodeURIComponent(editing.id)).then(function (d) { people = d; editing = null; draw(); })
+                .catch(function (e3) { fail(e3.message); });
+            });
+          } }) : null));
+      return form;
+    }
+    function group(kind) {
+      var isRec = kind === "receivers", list = people[kind] || [];
+      var items = [];
+      if (!isRec) items.push(people.me && people.me.fullName ? personCard(kind, people.me, "🙋 " + people.me.fullName + " · " + t("youDefault")) : null);
+      list.forEach(function (p) { items.push(editing && editing.kind === kind && editing.id === p.id ? editor() : personCard(kind, p)); });
+      if (!list.length) items.push(h("p", { class: "muted small", style: "margin:4px 0", text: isRec ? t("noReceiversYet") : t("noSendersYet") }));
+      if (editing && editing.kind === kind && !editing.id) items.push(editor());
+      else items.push(h("button", { class: "btn secondary block add-person", type: "button", text: "➕ " + (isRec ? t("addReceiver") : t("addSender")), onclick: function () { open(kind, null); } }));
+      // On its own page the page title already says what this is.
+      return h("div", { class: only ? "" : "card", style: only ? "" : "margin-top:14px" },
+        only ? null : h("h3", { style: "font-size:17px;margin:0 0 4px", text: isRec ? t("receiversTitle") : t("sendersTitle") }),
+        only ? null : h("p", { class: "muted small", style: "margin:0 0 12px", text: isRec ? t("receiversSub") : t("sendersSub") }),
+        h("div", { class: "stack" }, items));
+    }
+    function draw() { wrap.replaceChildren.apply(wrap, (only ? [only] : ["senders", "receivers"]).map(group)); }
+    api("GET", "/me/people").then(function (d) { people = d; draw(); })
+      .catch(function (e) { wrap.replaceChildren(h("div", { class: "notice err", style: "margin-top:14px" }, h("span", { text: e.message }))); });
+    return wrap;
+  }
+
   // Profile → "Your data & privacy": download everything we hold, or ask
   // us to delete the account (staff action it; legal records are kept
   // until their retention period ends — see the Privacy Policy).
-  function privacyCard(p) {
+  function privacyCard(p, bare) {
     var status = h("div", { "aria-live": "polite" });
     function note(kind, text) { status.replaceChildren(h("div", { class: "notice " + kind, style: "margin-top:12px" }, h("span", { text: text }))); }
     var dl = h("button", { class: "btn secondary block", type: "button", text: "⬇️ " + t("downloadData") });
@@ -3217,7 +3374,7 @@
           del.disabled = true;
           api("POST", "/me/delete-request", pw ? { password: pw.input.value } : {}).then(function (r) {
             p.deletionRequestedAt = r.requestedAt;
-            card.replaceWith(privacyCard(p));
+            card.replaceWith(privacyCard(p, bare));
           }).catch(function (err) { note("err", err.message); del.disabled = false; });
         });
       });
@@ -3226,8 +3383,8 @@
         pw ? h("div", { class: "field" }, h("div", { class: "spread" }, h("label", { for: "del-password", text: t("currentPassword") }), pw.toggle), pw.input) : null,
         del);
     }
-    var card = h("div", { class: "card", style: "margin-top:14px" },
-      h("h3", { style: "font-size:16px;margin:0 0 6px", text: t("privacyTitle") }),
+    var card = h(bare ? "div" : "div", { class: bare ? "" : "card", style: bare ? "" : "margin-top:14px" },
+      bare ? null : h("h3", { style: "font-size:16px;margin:0 0 6px", text: t("privacyTitle") }),
       h("p", { class: "muted small", style: "margin:0 0 12px" }, t("privacySub") + " ", h("a", { href: "/privacy.html", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), "."),
       dl, body, status);
     return card;
@@ -3289,7 +3446,7 @@
       case "book": return viewBook(parts[1], parts[2]);
       case "shipments": return parts[1] ? viewShipment(decodeURIComponent(parts[1])) : viewShipments();
       case "documents": return viewDocuments();
-      case "profile": return viewProfile();
+      case "profile": return viewProfile(parts[1]);
       case "verify": return viewVerify();
       default: return viewHome();
     }

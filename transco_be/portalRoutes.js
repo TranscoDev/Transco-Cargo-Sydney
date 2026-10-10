@@ -496,8 +496,26 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       return res.status(409).json({ error: 'This email is already used by another My Transco account.', field: 'email' });
     }
 
+    // Their own Passport/NIC — kept with their sender details (encrypted).
+    if ('idNumber' in body) {
+      const id = await tools.setOwnIdNumber(req.customer, body.idNumber);
+      if (id.error) return res.status(400).json(id);
+      if (Object.keys(set).length === 0) {
+        const fresh = await customers().findOne({ _id: req.customer._id });
+        return res.json({ profile: tools.publicProfile(fresh), needsName: !hasRealName(fresh) });
+      }
+    }
     if (Object.keys(set).length === 0) {
       return res.status(400).json({ error: 'Nothing to save.' });
+    }
+    // Keep the default sender (the account holder) in step with the profile.
+    const fresh = await customers().findOne({ _id: req.customer._id }, { projection: { senderDetails: 1 } });
+    if (fresh && fresh.senderDetails) {
+      if (set.name) set['senderDetails.fullName'] = set.name;
+      if (set.email) set['senderDetails.email'] = set.email;
+      if (set.address && set.address.line1 && set.address.suburb && set.address.state && set.address.postcode) {
+        set['senderDetails.address'] = `${set.address.line1}, ${set.address.suburb} ${set.address.state} ${set.address.postcode}`;
+      }
     }
 
     set.profileUpdatedAt = new Date();
@@ -507,6 +525,29 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       { returnDocument: 'after' }
     );
     res.json({ profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
+  }));
+
+  // ---------- saved senders & receivers ----------
+
+  router.get('/me/people', wrap(async (req, res) => {
+    res.json(tools.listPeople(req.customer));
+  }));
+  router.post('/me/people/:kind', wrap(async (req, res) => {
+    const r = await tools.savePerson(req.customer, req.params.kind, null, req.body);
+    if (r.notFound) return res.status(404).json({ error: 'Not found' });
+    if (r.error) return res.status(400).json(r);
+    res.status(201).json(r.value);
+  }));
+  router.put('/me/people/:kind/:id', wrap(async (req, res) => {
+    const r = await tools.savePerson(req.customer, req.params.kind, req.params.id, req.body);
+    if (r.notFound) return res.status(404).json({ error: 'Not found' });
+    if (r.error) return res.status(400).json(r);
+    res.json(r.value);
+  }));
+  router.delete('/me/people/:kind/:id', wrap(async (req, res) => {
+    const r = await tools.deletePerson(req.customer, req.params.kind, req.params.id);
+    if (r.notFound) return res.status(404).json({ error: 'Not found' });
+    res.json(r.value);
   }));
 
   // ---------- your data (privacy) ----------
