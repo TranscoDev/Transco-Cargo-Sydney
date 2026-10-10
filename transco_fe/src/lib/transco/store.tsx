@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { createMessage, simulatedInbound } from "./mock-data";
-import { logout as clearSession } from "./auth";
+import { canSee, logout as clearSession } from "./auth";
 import {
   contactNumber,
   createManualContact,
@@ -233,6 +233,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Logins without Conversations (e.g. Warehouse) never load chats.
+    if (!canSee("conversations")) return;
     fetchConversations()
       .then((real) => {
         if (cancelled) return;
@@ -291,6 +293,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!canSee("customers")) return;
     fetchSegments()
       .then((real) => {
         if (cancelled) return;
@@ -306,6 +309,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!canSee("bot-controls")) return;
     fetchPauseState()
       .then((state) => {
         if (cancelled) return;

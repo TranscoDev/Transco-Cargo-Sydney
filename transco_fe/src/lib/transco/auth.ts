@@ -11,6 +11,10 @@ export interface StaffUser {
   id: string;
   email: string;
   name: string;
+  /** "admin" | "warehouse" | "custom" | null (older accounts: every page). */
+  role?: string | null;
+  /** Console page keys this login may open; null/undefined = every page. */
+  pages?: string[] | null;
 }
 
 interface StoredSession {
@@ -68,6 +72,41 @@ export function getCurrentUser(): StaffUser | null {
 
 export function isAuthenticated(): boolean {
   return getCurrentUser() !== null;
+}
+
+/** Whether this login may open a console page (see staffAccess.js on the backend). */
+export function canSee(page: string | undefined): boolean {
+  // Settings (own password, theme) is open to every login; its staff
+  // list checks the "settings" page itself.
+  if (!page || page === "settings") return true;
+  const pages = getCurrentUser()?.pages;
+  return !pages || pages.includes(page);
+}
+
+/** Console path → page key, e.g. "/console/bookings/123" → "bookings". */
+export function pageForPath(pathname: string): string | undefined {
+  const rest = pathname.replace(/^\/console\/?/, "");
+  if (!rest) return undefined;
+  if (rest.startsWith("ai/bot-controls")) return "bot-controls";
+  if (rest.startsWith("inventory/activity")) return "packaging";
+  const first = rest.split("/")[0];
+  return first || undefined;
+}
+
+/** Re-reads page access from the server (an admin may have changed it). */
+export async function refreshAccess(): Promise<StaffUser | null> {
+  const session = readStoredSession();
+  if (!session || typeof window === "undefined") return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/session`, { headers: { Authorization: `Bearer ${session.token}` } });
+    if (!res.ok) return session.user;
+    const data = (await res.json()) as { user?: { pages?: string[] | null } };
+    const user = { ...session.user, pages: data.user?.pages ?? null };
+    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, user }));
+    return user;
+  } catch {
+    return session.user;
+  }
 }
 
 /** Used by api.ts to attach Authorization headers on outgoing requests. */

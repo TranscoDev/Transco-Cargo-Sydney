@@ -40,6 +40,7 @@ import type {
   ShipmentStatus,
   ShipmentUpdateInput,
   StaffAccount,
+  StaffAccess,
   TrackingResult,
 } from "./types";
 
@@ -882,10 +883,12 @@ interface BackendStaffAccount {
   email: string;
   name: string;
   createdAt?: string;
+  role?: string | null;
+  pages?: string[];
 }
 
 function mapStaffAccount(s: BackendStaffAccount): StaffAccount {
-  return { id: s._id, email: s.email, name: s.name, createdAt: s.createdAt };
+  return { id: s._id, email: s.email, name: s.name, createdAt: s.createdAt, role: s.role ?? null, pages: s.pages ?? [] };
 }
 
 export async function fetchStaff(): Promise<StaffAccount[]> {
@@ -898,17 +901,46 @@ export async function fetchStaff(): Promise<StaffAccount[]> {
 }
 
 /** Staff list plus whether the signed-in staff member may add/remove staff (the Transco admin only). */
-export async function fetchStaffWithAccess(): Promise<{ staff: StaffAccount[]; canManage: boolean }> {
+export async function fetchStaffWithAccess(): Promise<{
+  staff: StaffAccount[];
+  canManage: boolean;
+  pageOptions: { key: string; label: string }[];
+  warehousePages: string[];
+}> {
   const res = await fetch(`${API_BASE_URL}/api/staff`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`Failed to load staff accounts (${res.status})`);
-  const data = (await res.json()) as { staff: BackendStaffAccount[]; canManage?: boolean };
-  return { staff: data.staff.map(mapStaffAccount), canManage: data.canManage === true };
+  const data = (await res.json()) as {
+    staff: BackendStaffAccount[];
+    canManage?: boolean;
+    pageOptions?: { key: string; label: string }[];
+    warehousePages?: string[];
+  };
+  return {
+    staff: data.staff.map(mapStaffAccount),
+    canManage: data.canManage === true,
+    pageOptions: data.pageOptions ?? [],
+    warehousePages: data.warehousePages ?? [],
+  };
+}
+
+/** Admin only: what a staff member can open (Admin / Warehouse / Custom pages). */
+export async function updateStaffAccess(staffId: string, access: StaffAccess): Promise<StaffAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/staff/${staffId}/access`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(access),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? `Failed to change access (${res.status})`);
+  return mapStaffAccount(data.staff as BackendStaffAccount);
 }
 
 export async function createStaff(info: {
   email: string;
   name: string;
   password: string;
+  role?: StaffAccess["role"];
+  pages?: string[];
 }): Promise<StaffAccount> {
   const res = await fetch(`${API_BASE_URL}/api/staff`, {
     method: "POST",

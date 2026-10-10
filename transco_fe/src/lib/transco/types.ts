@@ -503,13 +503,20 @@ export interface ConsolidationDetail extends Consolidation {
  * type. This is usage/demand data — how many boxes of each type moved
  * through real shipments — NOT Transco's own packaging stock, and NOT
  * confirmed box sales (a customer can bring a box from any shop). */
-/** A staff login — no role/permission tiers exist anywhere in this
- * system, every account has identical access. */
+/** A staff login. role: "admin" | "warehouse" | "custom" | null (older
+ * accounts: every page); pages: the console pages a custom role has. */
 export interface StaffAccount {
   id: string;
   email: string;
   name: string;
   createdAt?: string | undefined;
+  role?: string | null | undefined;
+  pages?: string[] | undefined;
+}
+
+export interface StaffAccess {
+  role: "admin" | "warehouse" | "custom";
+  pages: string[];
 }
 
 export interface PackagingBoxTotals {

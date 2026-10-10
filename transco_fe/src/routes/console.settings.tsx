@@ -16,9 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getCurrentUser } from "@/lib/transco/auth";
-import { changePassword, createStaff, deleteStaff, fetchStaffWithAccess } from "@/lib/transco/api";
+
+// Everyone opens Settings for their own password and theme; the staff
+// list needs the Settings page in their access.
+const hasPage = (page: string) => { const pages = getCurrentUser()?.pages; return !pages || pages.includes(page); };
+import { changePassword, createStaff, deleteStaff, fetchStaffWithAccess, updateStaffAccess } from "@/lib/transco/api";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
-import type { StaffAccount } from "@/lib/transco/types";
+import type { StaffAccess, StaffAccount } from "@/lib/transco/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/console/settings")({
@@ -50,7 +54,7 @@ function SettingsPage() {
         </div>
         <div className="flex flex-col gap-6">
           <AppearanceCard />
-          <StaffAccountsCard currentUserId={me?.id ?? null} />
+          {hasPage("settings") && <StaffAccountsCard currentUserId={me?.id ?? null} />}
         </div>
       </div>
     </PageShell>
@@ -229,6 +233,136 @@ function YourAccountCard({ email, name }: { email: string | null; name: string |
   );
 }
 
+type PageOption = { key: string; label: string };
+
+const ROLE_LABEL: Record<string, string> = { admin: "Admin", warehouse: "Warehouse", custom: "Custom" };
+
+/** Admin / Warehouse / Custom (+ which pages). Shared by Add and Change access. */
+function AccessPicker({
+  value,
+  onChange,
+  pageOptions,
+  warehousePages,
+}: {
+  value: StaffAccess;
+  onChange: (v: StaffAccess) => void;
+  pageOptions: PageOption[];
+  warehousePages: string[];
+}) {
+  const label = (k: string) => pageOptions.find((p) => p.key === k)?.label ?? k;
+  const roles: { key: StaffAccess["role"]; title: string; desc: string }[] = [
+    { key: "warehouse", title: "Warehouse", desc: warehousePages.map(label).join(", ") },
+    { key: "custom", title: "Custom", desc: "Choose the pages" },
+    { key: "admin", title: "Admin", desc: "Every page, and can manage staff" },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>Access</Label>
+      {roles.map((r) => (
+        <label
+          key={r.key}
+          className={cn(
+            "flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5 text-sm",
+            value.role === r.key ? "border-primary bg-primary/5" : "border-border",
+          )}
+        >
+          <input
+            type="radio"
+            name="staff-role"
+            className="mt-0.5"
+            checked={value.role === r.key}
+            onChange={() => onChange({ role: r.key, pages: r.key === "custom" ? value.pages : [] })}
+          />
+          <span>
+            <span className="font-medium text-foreground">{r.title}</span>
+            <span className="block text-xs text-muted-foreground">{r.desc}</span>
+          </span>
+        </label>
+      ))}
+      {value.role === "custom" && (
+        <div className="grid grid-cols-2 gap-1.5 rounded-md bg-secondary/40 p-2.5">
+          {pageOptions.map((p) => (
+            <label key={p.key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={value.pages.includes(p.key)}
+                onChange={(e) =>
+                  onChange({ role: "custom", pages: e.target.checked ? [...value.pages, p.key] : value.pages.filter((x) => x !== p.key) })
+                }
+              />
+              {p.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChangeAccessDialog({
+  member,
+  pageOptions,
+  warehousePages,
+  onSaved,
+}: {
+  member: StaffAccount;
+  pageOptions: PageOption[];
+  warehousePages: string[];
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const initial = (): StaffAccess => ({
+    role: member.role === "warehouse" || member.role === "custom" ? member.role : "admin",
+    pages: member.pages ?? [],
+  });
+  const [access, setAccess] = useState<StaffAccess>(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateStaffAccess(member.id, access);
+      setOpen(false);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to change access");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setAccess(initial());
+          setError(null);
+        }
+        setOpen(next);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button type="button" size="sm" variant="outline" className="h-8">
+          Access
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{member.name} — access</DialogTitle>
+        </DialogHeader>
+        <AccessPicker value={access} onChange={setAccess} pageOptions={pageOptions} warehousePages={warehousePages} />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button type="button" onClick={save} disabled={saving || (access.role === "custom" && !access.pages.length)}>
+            {saving ? "Saving…" : "Save access"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) {
   const [staff, setStaff] = useState<StaffAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,6 +370,8 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
   const [addOpen, setAddOpen] = useState(false);
   // Only the Transco admin adds or removes staff; everyone else sees the list.
   const [canManage, setCanManage] = useState(false);
+  const [pageOptions, setPageOptions] = useState<PageOption[]>([]);
+  const [warehousePages, setWarehousePages] = useState<string[]>([]);
 
   const load = () => {
     setLoading(true);
@@ -243,6 +379,8 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
       .then((data) => {
         setStaff(data.staff);
         setCanManage(data.canManage);
+        setPageOptions(data.pageOptions);
+        setWarehousePages(data.warehousePages);
         setError(null);
       })
       .catch((err) =>
@@ -275,7 +413,17 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
       tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
       title="Staff accounts"
       description={`${staff.length || ""} ${staff.length === 1 ? "person" : "people"} can sign in to the console.`.trim()}
-      action={canManage ? <AddStaffDialog open={addOpen} onOpenChange={setAddOpen} onCreated={load} /> : undefined}
+      action={
+        canManage ? (
+          <AddStaffDialog
+            open={addOpen}
+            onOpenChange={setAddOpen}
+            onCreated={load}
+            pageOptions={pageOptions}
+            warehousePages={warehousePages}
+          />
+        ) : undefined
+      }
     >
         {!loading && !canManage && (
           <p className="mb-3 rounded-lg bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">🔒 Only the Transco admin can add or remove staff members.</p>
@@ -300,7 +448,18 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">{s.email}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    <span className="rounded bg-secondary px-1.5 py-0.5 font-medium text-foreground">
+                      {s.role ? ROLE_LABEL[s.role] ?? s.role : "All pages"}
+                    </span>
+                    {s.role === "custom" && s.pages?.length ? (
+                      <span className="ml-1.5">{s.pages.map((k) => pageOptions.find((p) => p.key === k)?.label ?? k).join(", ")}</span>
+                    ) : null}
+                  </p>
                 </div>
+                {canManage && s.id !== currentUserId && (
+                  <ChangeAccessDialog member={s} pageOptions={pageOptions} warehousePages={warehousePages} onSaved={load} />
+                )}
                 {canManage && s.id !== currentUserId && (
                   <button
                     type="button"
@@ -323,14 +482,19 @@ function AddStaffDialog({
   open,
   onOpenChange,
   onCreated,
+  pageOptions,
+  warehousePages,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  pageOptions: PageOption[];
+  warehousePages: string[];
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [access, setAccess] = useState<StaffAccess>({ role: "warehouse", pages: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -338,6 +502,7 @@ function AddStaffDialog({
     setEmail("");
     setName("");
     setPassword("");
+    setAccess({ role: "warehouse", pages: [] });
     setError(null);
   };
 
@@ -345,7 +510,7 @@ function AddStaffDialog({
     setSaving(true);
     setError(null);
     try {
-      await createStaff({ email, name, password });
+      await createStaff({ email, name, password, role: access.role, pages: access.pages });
       reset();
       onOpenChange(false);
       onCreated();
@@ -398,13 +563,14 @@ function AddStaffDialog({
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <AccessPicker value={access} onChange={setAccess} pageOptions={pageOptions} warehousePages={warehousePages} />
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
           <Button
             type="button"
             onClick={handleCreate}
-            disabled={saving || !email || !name || !password}
+            disabled={saving || !email || !name || !password || (access.role === "custom" && !access.pages.length)}
           >
             {saving ? "Creating…" : "Create Account"}
           </Button>

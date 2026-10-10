@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 
 import { ConsoleLayout } from "@/components/transco/console-layout";
-import { getCurrentUser, logout } from "@/lib/transco/auth";
+import { canSee, getCurrentUser, logout, pageForPath, refreshAccess } from "@/lib/transco/auth";
 import { ConversationsProvider, useConversations } from "@/lib/transco/store";
 
 // This used to be a single flat route (src/routes/console.tsx) that
@@ -36,12 +36,29 @@ export const Route = createFileRoute("/console")({
 function ConsoleRouteComponent() {
   const navigate = useNavigate();
   const [agentName, setAgentName] = useState<string | null>(null);
+  const [, setAccessVersion] = useState(0);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     const user = getCurrentUser();
     if (!user) void navigate({ to: "/" });
-    else setAgentName(user.name);
+    else {
+      setAgentName(user.name);
+      // Page access may have changed since sign-in (Settings → Staff).
+      void refreshAccess().then(() => setAccessVersion((n) => n + 1));
+    }
   }, [navigate]);
+
+  // A login limited to some pages lands on its first page instead of the
+  // dashboard, and sees a short note on any page it doesn't have.
+  const page = pageForPath(pathname);
+  const firstPage = getCurrentUser()?.pages?.[0];
+  useEffect(() => {
+    if (!agentName || !firstPage) return;
+    if (pathname === "/console" || pathname === "/console/" || (page === "dashboard" && !canSee("dashboard"))) {
+      void navigate({ to: "/console/" + firstPage, replace: true });
+    }
+  }, [agentName, firstPage, page, pathname, navigate]);
 
   if (!agentName) return null;
 
@@ -54,7 +71,7 @@ function ConsoleRouteComponent() {
           void navigate({ to: "/" });
         }}
       >
-        <Outlet />
+        {canSee(page) ? <Outlet /> : <NoAccess home={firstPage ? "/console/" + firstPage : "/console/bookings"} />}
       </ConsoleLayoutWithData>
     </ConversationsProvider>
   );
@@ -78,5 +95,17 @@ function ConsoleLayoutWithData({
     >
       {children}
     </ConsoleLayout>
+  );
+}
+
+function NoAccess({ home }: { home: string }) {
+  return (
+    <div className="mx-auto mt-16 max-w-sm rounded-lg border bg-card p-6 text-center">
+      <p className="text-base font-semibold text-foreground">You don't have access to this page</p>
+      <p className="mt-1 text-sm text-muted-foreground">Ask the admin if you need it.</p>
+      <Link to={home} className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+        Go to my pages
+      </Link>
+    </div>
   );
 }

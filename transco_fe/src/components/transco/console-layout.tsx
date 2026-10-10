@@ -34,6 +34,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { cn } from "@/lib/utils";
+import { canSee, getCurrentUser, pageForPath } from "@/lib/transco/auth";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
 import type { PauseState } from "@/lib/transco/api";
 import { useConversations } from "@/lib/transco/store";
@@ -156,14 +157,19 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const waiting = useWaitingConversations();
   const walkIns = useWalkInsToConfirm();
-  const laterGroup = NAV_GROUPS.find((g) => g.later);
+  // Only the pages this login may open (Settings → Staff → page access);
+  // limited logins don't see the "Coming later" group either.
+  const limited = !!getCurrentUser()?.pages;
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canSee(pageForPath(i.to))) }))
+    .filter((g) => g.items.length && !(limited && g.later));
+  const laterGroup = groups.find((g) => g.later);
   const [laterOpen, setLaterOpen] = useState(
     () => !!laterGroup?.items.some((i) => isActive(pathname, i.to)),
   );
 
   return (
     <nav aria-label="Main" className="flex flex-1 flex-col gap-5">
-      {NAV_GROUPS.map((group) => {
+      {groups.map((group) => {
         if (group.later) {
           return (
             <div key={group.label} className="mt-auto border-t border-nav-border pt-4">
@@ -376,7 +382,7 @@ export function ConsoleLayout({
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <DropdownMenu>
+          {canSee("bot-controls") && (<DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -431,7 +437,7 @@ export function ConsoleLayout({
                 Resume All (Website + WhatsApp)
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu>)}
           <button
             type="button"
             onClick={toggleTheme}

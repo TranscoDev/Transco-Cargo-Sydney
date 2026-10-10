@@ -638,13 +638,13 @@ function FinaliseSection({
           {rows.map((r, i) => {
             const bad = badRows.has(i);
             return (
-              <li key={i} className={`grid grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_5rem_1.75rem] items-center gap-1.5 px-2 py-1.5 ${bad ? "bg-attention-soft/40" : ""}`}>
+              <li key={i} className={`grid grid-cols-[minmax(0,1fr)_3.5rem_5rem_1.75rem] items-center gap-1.5 px-2 py-1.5 @lg:grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_5rem_1.75rem] ${bad ? "bg-attention-soft/40" : ""}`}>
                 <Input
                   aria-label={`Item ${i + 1}`}
                   value={r.description}
                   placeholder="Item"
                   onChange={(e) => updateRow(i, { description: e.target.value })}
-                  className="h-8 text-xs"
+                  className="col-span-full h-8 text-xs @lg:col-span-1"
                 />
                 <select
                   aria-label={`Item ${i + 1}: new or used`}
@@ -738,8 +738,9 @@ function FinaliseSection({
 
       {formError && <p className="mt-3 text-xs font-medium text-attention-foreground">{formError}</p>}
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" onClick={submit} disabled={saving} className="flex-1">
+      {/* Phones: the button stays at the bottom of the screen while scrolling the form. */}
+      <div className="sticky bottom-0 z-10 -mx-3 mt-4 flex flex-wrap gap-2 border-t bg-card/95 px-3 py-2 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <Button type="button" onClick={submit} disabled={saving} className="h-11 flex-1 md:h-9">
           {saving ? "Saving…" : finalised ? "Save changes" : "Assign BL & confirm"}
         </Button>
         {finalised && !hasBl && onAssignBl && (

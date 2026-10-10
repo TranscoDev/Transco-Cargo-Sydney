@@ -199,11 +199,16 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// Staff page access (staffAccess.js): a Warehouse or Custom login only
+// reaches the API calls of the console pages it has.
+const staffAccess = require('./staffAccess');
+const pageAccess = staffAccess.createAccessMiddleware({ users, ObjectId });
+
 app.use('/api', (req, res, next) => {
   if (PUBLIC_API_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
     return next();
   }
-  return requireAuth(req, res, next);
+  return requireAuth(req, res, (err) => (err ? next(err) : pageAccess(req, res, next)));
 });
 
 
@@ -1929,7 +1934,10 @@ app.post('/api/auth/login', async (req, res) => {
     const user = {
       id: record._id.toString(),
       email: record.email,
-      name: record.name
+      name: record.name,
+      // Which console pages they see (null = all) — see staffAccess.js.
+      role: record.role || null,
+      pages: staffAccess.effectivePages(record)
     };
 
 
@@ -1991,7 +1999,9 @@ app.get('/api/auth/session', (req, res) => {
     user: {
       id: session.sub,
       email: session.email,
-      name: session.name
+      name: session.name,
+      // Current page access (null = all) — the console refreshes its menu from this.
+      pages: req.staffPages === undefined ? null : req.staffPages
     }
   });
 });
@@ -2084,7 +2094,13 @@ app.get('/api/staff', async (req, res) => {
       .toArray();
 
     // canManage: whether this signed-in staff member may add/remove staff.
-    res.status(200).json({ staff, canManage: await isStaffAdmin(req) });
+    // pageOptions: the console pages a Custom role can be given.
+    res.status(200).json({
+      staff,
+      canManage: await isStaffAdmin(req),
+      pageOptions: Object.entries(staffAccess.PAGES).map(([key, p]) => ({ key, label: p.label })),
+      warehousePages: staffAccess.WAREHOUSE_PAGES
+    });
 
   } catch (err) {
 
@@ -2128,6 +2144,11 @@ app.post('/api/staff', async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Page access: Admin / Warehouse / Custom. No role = every page (as
+    // before roles existed), without the admin's staff management.
+    const access = req.body && req.body.role ? staffAccess.cleanAccess(req.body) : { value: {} };
+    if (access.error) return res.status(400).json({ error: access.error });
+
     const existing = await users().findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(409).json({
@@ -2141,11 +2162,12 @@ app.post('/api/staff', async (req, res) => {
       email: normalizedEmail,
       name: name.trim(),
       passwordHash: hashPassword(password),
+      ...access.value,
       createdAt: now
     });
 
     res.status(201).json({
-      staff: { _id: insertedId, email: normalizedEmail, name: name.trim(), createdAt: now }
+      staff: { _id: insertedId, email: normalizedEmail, name: name.trim(), ...access.value, createdAt: now }
     });
 
   } catch (err) {
@@ -2161,6 +2183,32 @@ app.post('/api/staff', async (req, res) => {
   }
 });
 
+
+// Change a staff member's page access (admin only). You can't take admin
+// away from yourself — that could leave nobody able to manage staff.
+app.patch('/api/staff/:staffId/access', async (req, res) => {
+  try {
+    if (!(await isStaffAdmin(req))) return res.status(403).json({ error: 'Only the Transco admin can change staff access.' });
+    const { staffId } = req.params;
+    if (!ObjectId.isValid(staffId)) return res.status(400).json({ error: 'Invalid staff id' });
+    const access = staffAccess.cleanAccess(req.body);
+    if (access.error) return res.status(400).json({ error: access.error });
+    if (staffId === req.user.sub && access.value.role !== 'admin') {
+      return res.status(400).json({ error: "You can't remove your own admin access." });
+    }
+    const result = await users().findOneAndUpdate(
+      { _id: new ObjectId(staffId) },
+      { $set: { role: access.value.role, pages: access.value.pages, accessUpdatedAt: new Date(), accessUpdatedBy: req.user.email || null } },
+      { returnDocument: 'after', projection: { passwordHash: 0 } }
+    );
+    if (!result) return res.status(404).json({ error: 'Staff member not found' });
+    pageAccess.forget(staffId);
+    res.json({ staff: result });
+  } catch (err) {
+    console.error('Error changing staff access:', err.message);
+    res.status(500).json({ error: 'Failed to change staff access' });
+  }
+});
 
 app.delete('/api/staff/:staffId', async (req, res) => {
 

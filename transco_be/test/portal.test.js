@@ -1855,3 +1855,33 @@ test('profile: own Passport/NIC, saved senders and receivers (add / edit / delet
   assert.equal(del.status, 200);
   assert.deepEqual(del.body.senders.map(x => x.fullName), ['Third Sender']);
 });
+
+test('staff page access: Warehouse sees bookings/walk-ins/shipments only; admin can change it', async () => {
+  // Make the test login an admin for this test.
+  await db.collection('users').updateOne({ email: TEST_STAFF_EMAIL }, { $set: { role: 'admin' } });
+  try {
+    const made = await api('POST', '/api/staff', { token: staffToken, body: { email: 'wh.test@transco.lk', name: 'Warehouse Test', password: 'warehouse-pass-1', role: 'warehouse' } });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const login = await api('POST', '/api/auth/login', { body: { email: 'wh.test@transco.lk', password: 'warehouse-pass-1' } });
+    assert.deepEqual(login.body.user.pages, ['bookings', 'walk-ins', 'shipments']);
+    const wh = login.body.token;
+    assert.equal((await api('GET', '/api/bookings', { token: wh })).status, 200);
+    assert.equal((await api('GET', '/api/customers', { token: wh })).status, 403);
+    assert.equal((await api('GET', '/api/staff', { token: wh })).status, 403);
+    assert.equal((await api('GET', '/api/auth/session', { token: wh })).status, 200);
+
+    // Custom: only Customers.
+    const id = String(made.body.staff._id);
+    const changed = await api('PATCH', `/api/staff/${id}/access`, { token: staffToken, body: { role: 'custom', pages: ['customers'] } });
+    assert.equal(changed.status, 200, JSON.stringify(changed.body));
+    assert.equal((await api('GET', '/api/customers', { token: wh })).status, 200);
+    assert.equal((await api('GET', '/api/bookings', { token: wh })).status, 403);
+    const empty = await api('PATCH', `/api/staff/${id}/access`, { token: staffToken, body: { role: 'custom', pages: [] } });
+    assert.equal(empty.status, 400);
+    // A non-admin can't change access.
+    const notAdmin = await api('PATCH', `/api/staff/${id}/access`, { token: wh, body: { role: 'admin' } });
+    assert.equal(notAdmin.status, 403);
+  } finally {
+    await db.collection('users').updateOne({ email: TEST_STAFF_EMAIL }, { $unset: { role: '' } });
+  }
+});

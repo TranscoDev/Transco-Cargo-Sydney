@@ -203,7 +203,27 @@ function BatchListView({
 
   return (
     <>
-      <div className="overflow-auto rounded-xl border bg-card shadow-xs">
+      {/* Phones: one tappable card per shipment instead of a wide table. */}
+      <ul className="flex flex-col gap-2 md:hidden">
+        {consolidations.map((c) => (
+          <li key={c.id}>
+            <Link
+              to="/console/shipments/batch/$batchId"
+              params={{ batchId: c.id }}
+              className="block rounded-xl border bg-card p-4 shadow-xs active:bg-accent/40"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-base font-semibold text-foreground">Shipment {c.batchNumber}</span>
+                <span className="text-xs text-muted-foreground">{c.dates.peblEta ? `ETA ${c.dates.peblEta}` : c.label}</span>
+              </div>
+              <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+                HBL {c.hblRange.from}–{c.hblRange.to} · {c.importedShipmentCount}/{c.totals.hbl} BLs
+              </p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-auto rounded-xl border bg-card shadow-xs md:block">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
             <tr>
@@ -324,7 +344,28 @@ function AllShipmentsView({
           )}
         </div>
       ) : (
-        <div className="overflow-auto rounded-xl border bg-card shadow-xs">
+        <>
+        <ul className="flex flex-col gap-2 md:hidden">
+          {shipments.map((s) => (
+            <li key={s.id}>
+              <Link
+                to="/console/shipments/$shipmentId"
+                params={{ shipmentId: s.id }}
+                className="block rounded-xl border bg-card p-4 shadow-xs active:bg-accent/40"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-base font-semibold tabular-nums text-foreground">{s.hblNumber || "No BL"}</span>
+                  <StatusBadge tone={shipmentStatus(s.status).tone}>{shipmentStatus(s.status).label}</StatusBadge>
+                </div>
+                <p className="mt-1 text-sm text-foreground">{s.customerName || "—"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {s.batchNumber ? `Shipment ${s.batchNumber}` : s.shipmentNumber} · {s.boxCount ?? s.totalBoxes ?? "—"} boxes · {s.destination || "?"}
+                </p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-auto rounded-xl border bg-card shadow-xs md:block">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
               <tr>
@@ -369,6 +410,7 @@ function AllShipmentsView({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </>
   );

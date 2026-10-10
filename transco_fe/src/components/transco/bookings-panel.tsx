@@ -220,7 +220,7 @@ export function BookingsPanel({
 
         {/* One control row: views on the left, search + date on the right. */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-secondary p-1" role="tablist" aria-label="Which bookings">
+          <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-secondary p-1 [scrollbar-width:none] md:inline-flex md:flex-wrap" role="tablist" aria-label="Which bookings">
             {tabs.map((t) => {
               const active = !q && !pickedDate && view === t.key;
               return (
@@ -235,7 +235,7 @@ export function BookingsPanel({
                     setQuery("");
                   }}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     active ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -431,18 +431,20 @@ function BookingCard({
         (isCancelled || finished) && "opacity-65",
       )}
     >
-      <div className="flex items-center gap-4 px-4 py-3">
-        <div className="w-14 shrink-0 text-center">
+      {/* Phones: time + actions on top, then name, tags and boxes at full
+          width (nothing cut off). Wider screens: one row, as before. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 md:flex-nowrap">
+        <div className="order-1 flex shrink-0 items-baseline gap-1.5 md:block md:w-14 md:text-center">
           <p className="text-base font-semibold tabular-nums text-foreground">{booking.requestedTime || "—"}</p>
           {showDate && <p className="text-xs text-muted-foreground">{shortDay(booking.resolvedDate)}</p>}
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="order-3 min-w-0 basis-full md:order-2 md:basis-auto md:flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <button
               type="button"
               onClick={() => openBooking()}
-              className="truncate text-left text-base font-semibold text-foreground hover:underline"
+              className="text-left text-base font-semibold text-foreground hover:underline md:truncate"
             >
               {booking.customerName || formatPhone(booking.phoneNumber)}
             </button>
@@ -459,10 +461,10 @@ function BookingCard({
             )}
             {booking.channel === "walk_in" && !walkInToFinalise && <span className="text-xs text-muted-foreground">· walk-in</span>}
           </div>
-          {details && <p className="mt-0.5 truncate text-sm text-muted-foreground">{details}</p>}
+          {details && <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground md:truncate">{details}</p>}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="order-2 ml-auto flex shrink-0 items-center gap-1 md:order-3 md:ml-0">
           {next && (
             <Button type="button" size="sm" variant={next.kind === "restore" ? "outline" : "default"} onClick={runNext}>
               {next.label}
