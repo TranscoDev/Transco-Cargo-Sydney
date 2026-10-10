@@ -50,7 +50,7 @@ export function FormsCard({ bookingId }: { bookingId: string }) {
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{f.title}</span>
               <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => setPreview(f)}>
-                <Eye className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Preview &amp; print
+                <Eye className="mr-1.5 h-3.5 w-3.5" aria-hidden /> <span className="sm:hidden">Print</span><span className="hidden sm:inline">Preview &amp; print</span>
               </Button>
             </li>
           ))}

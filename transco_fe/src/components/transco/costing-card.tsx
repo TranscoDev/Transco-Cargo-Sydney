@@ -171,7 +171,7 @@ export function CostingCard({ data, onSaved }: { data: DeclarationPrintData; onS
 
       <div className="flex flex-col gap-2">
         {lines.map((l, i) => (
-          <div key={i} className="grid grid-cols-[minmax(0,1fr)_7rem_2rem] items-center gap-2">
+          <div key={i} className="grid grid-cols-[minmax(0,1fr)_5rem_2rem] sm:grid-cols-[minmax(0,1fr)_7rem_2rem] items-center gap-2">
             <Input aria-label={`Cost line ${i + 1} name`} value={l.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="e.g. Door delivery" />
             <Input aria-label={`Cost line ${i + 1} amount`} inputMode="decimal" value={l.amount} onChange={(e) => update(i, { amount: e.target.value })} placeholder="$" className="text-right tabular-nums" />
             <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${l.label || "line"}`} onClick={() => setLines((s) => s.filter((_, j) => j !== i))}>
@@ -194,7 +194,7 @@ export function CostingCard({ data, onSaved }: { data: DeclarationPrintData; onS
         />
       )}
 
-      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_7rem_2rem] items-center gap-2 border-t pt-3">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_5rem_2rem] sm:grid-cols-[minmax(0,1fr)_7rem_2rem] items-center gap-2 border-t pt-3">
         <Label htmlFor="costing-discount" className="text-sm">Discount</Label>
         <Input id="costing-discount" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0" className="text-right tabular-nums" />
         <span />

@@ -175,12 +175,13 @@ function WalkInRow({ booking: b, bl, onOpen }: { booking: Booking; bl: string | 
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-4 rounded-xl border bg-card px-4 py-3 text-left shadow-xs transition-colors hover:border-primary/40"
+        className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border bg-card px-4 py-3 text-left shadow-xs transition-colors hover:border-primary/40 md:flex-nowrap"
       >
-        <span className="w-12 shrink-0 text-center text-base font-semibold tabular-nums text-foreground">{b.requestedTime}</span>
-        <span className="min-w-0 flex-1">
+        {/* Phones: time + Confirm/BL on top, then the name and boxes at full width. */}
+        <span className="order-1 shrink-0 text-base font-semibold tabular-nums text-foreground md:w-12 md:text-center">{b.requestedTime}</span>
+        <span className="order-3 min-w-0 basis-full md:order-2 md:basis-auto md:flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate text-base font-semibold text-foreground">{b.customerName || formatPhone(b.phoneNumber)}</span>
+            <span className="text-base font-semibold text-foreground md:truncate">{b.customerName || formatPhone(b.phoneNumber)}</span>
             {b.walkInReturning ? <StatusBadge tone="info">Returning</StatusBadge> : <StatusBadge tone="neutral">New customer</StatusBadge>}
             {b.status === "cancelled" ? (
               <StatusBadge tone="neutral">Cancelled</StatusBadge>
@@ -190,17 +191,17 @@ function WalkInRow({ booking: b, bl, onOpen }: { booking: Booking; bl: string | 
               <StatusBadge tone="success">Confirmed</StatusBadge>
             )}
           </span>
-          <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+          <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground md:truncate">
             {[b.boxSummary, b.receiver ? `To ${b.receiver.fullName}${b.receiver.town ? `, ${b.receiver.town}` : ""}` : null, formatPhone(b.phoneNumber)].filter(Boolean).join(" · ")}
           </span>
         </span>
         {bl ? (
-          <span className="shrink-0 text-right">
+          <span className="order-2 ml-auto shrink-0 text-right md:order-3 md:ml-0">
             <span className="block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">BL</span>
             <span className="block text-sm font-semibold tabular-nums text-foreground">{bl}</span>
           </span>
         ) : pending ? (
-          <span className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">Confirm</span>
+          <span className="order-2 ml-auto shrink-0 rounded-md bg-primary px-3 py-1.5 md:order-3 md:ml-0 text-sm font-medium text-primary-foreground">Confirm</span>
         ) : null}
       </button>
     </li>

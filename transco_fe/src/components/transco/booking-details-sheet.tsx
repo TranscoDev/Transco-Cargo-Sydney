@@ -198,7 +198,7 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
           </Button>
         </div>
       ) : !d ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           <Skeleton className="h-120 w-full" />
           <div className="flex flex-col gap-3">
             <Skeleton className="h-32 w-full" />
@@ -206,9 +206,9 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
           </div>
         </div>
       ) : (
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           {/* Left: the work. */}
-          <div className="flex flex-col gap-5 text-sm">
+          <div className="flex min-w-0 flex-col gap-5 text-sm">
             {confirm ? (
               // Re-reads after a costing save, which fills the office-use boxes.
               <FinaliseSection key={`${d.bookingId}-${confirm.status}-${d.costing?.updatedAt ?? ""}`} data={d} onDone={load} />
@@ -539,7 +539,7 @@ function FinaliseSection({
       {hasBl ? (
         <p className="mb-3 text-xs text-muted-foreground">To change the BL or shipment number, use “Weights, price &amp; BL” on the booking.</p>
       ) : (
-        <div className="mb-4 grid grid-cols-[1fr_11rem] gap-3">
+        <div className="mb-4 grid grid-cols-1 gap-3 @sm:grid-cols-[1fr_11rem]">
           <Field id="fin-bl" label="BL number" value={bl} onChange={setBl} inputMode="text" hint="Required — the customer's main reference." />
           <div className="flex flex-col gap-1">
             <Label htmlFor="fin-batch" className="text-xs">Shipment</Label>
@@ -638,7 +638,7 @@ function FinaliseSection({
           {rows.map((r, i) => {
             const bad = badRows.has(i);
             return (
-              <li key={i} className={`grid grid-cols-[minmax(0,1fr)_3.5rem_5rem_1.75rem] items-center gap-1.5 px-2 py-1.5 @lg:grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_5rem_1.75rem] ${bad ? "bg-attention-soft/40" : ""}`}>
+              <li key={i} className={`grid grid-cols-[minmax(0,1fr)_3rem_4.5rem_1.75rem] items-center gap-1.5 px-2 py-1.5 @lg:grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_5rem_1.75rem] ${bad ? "bg-attention-soft/40" : ""}`}>
                 <Input
                   aria-label={`Item ${i + 1}`}
                   value={r.description}
@@ -650,7 +650,7 @@ function FinaliseSection({
                   aria-label={`Item ${i + 1}: new or used`}
                   value={r.condition}
                   onChange={(e) => updateRow(i, { condition: e.target.value as ItemRow["condition"] })}
-                  className="h-8 rounded-md border border-input bg-card px-1.5 text-xs text-foreground"
+                  className="h-8 min-w-0 rounded-md border border-input bg-card px-1 text-xs text-foreground"
                 >
                   <option value="">—</option>
                   <option value="new">New</option>
