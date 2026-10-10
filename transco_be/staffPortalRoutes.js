@@ -23,6 +23,7 @@ const express = require('express');
 const { ObjectId } = require('mongodb');
 const { customers, bookings, shipments, messages } = require('./db');
 const { hasRealName, hasVerifiedPhone } = require('./customerTools');
+const pii = require('./pii');
 const { profileUpdateFromBody, emailTakenByOtherAccount } = require('./portalRoutes');
 const { normalizePhoneNumber } = require('./normalizePhone');
 
@@ -166,11 +167,11 @@ module.exports = function createStaffPortalRouter({ tools }) {
         rawStatus: raw.status || null,
         declarationStatus: raw.declarationStatus === 'received' ? 'received' : 'not_received',
         declarationSubmittedAt: raw.declarationSubmittedAt || null,
-        // Full declaration details — staff see all of it (the customer's
-        // own view only shows names back to them).
-        sender: raw.sender || null,
+        // Declaration details — Passport/NIC masked in this list; the full
+        // number shows (and is logged) when staff open the booking.
+        sender: pii.maskPerson(raw.sender) || null,
         senderIsAccountHolder: raw.senderIsAccountHolder !== false,
-        receiver: raw.receiver || null,
+        receiver: pii.maskPerson(raw.receiver) || null,
         warehouseStatus: raw.warehouseStatus === 'received' ? 'received' : 'not_received',
         staffNotes: raw.notes || null
       };
@@ -310,7 +311,7 @@ module.exports = function createStaffPortalRouter({ tools }) {
   // Everything on one booking's declaration form, for the console's
   // "Print declaration" button. Any booking, not only My Transco ones.
   router.get('/bookings/:bookingId/declaration', wrap(async (req, res) => {
-    const data = await tools.getDeclarationForPrint(req.params.bookingId);
+    const data = await tools.getDeclarationForPrint(req.params.bookingId, { viewer: req.user && req.user.email, what: 'console view' });
     if (!data) return res.status(404).json({ error: 'Booking not found' });
     res.json({ declaration: data });
   }));
@@ -318,7 +319,7 @@ module.exports = function createStaffPortalRouter({ tools }) {
   // ---------- staff edits to a booking ----------
 
   router.get('/bookings/:bookingId/edit', wrap(async (req, res) => {
-    const data = await tools.getBookingForStaffEdit(req.params.bookingId);
+    const data = await tools.getBookingForStaffEdit(req.params.bookingId, { viewer: req.user && req.user.email });
     if (!data) return res.status(404).json({ error: 'Booking not found' });
     res.json({ booking: data });
   }));

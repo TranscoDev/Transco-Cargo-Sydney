@@ -6095,6 +6095,17 @@ const customerTools = createCustomerTools({
   createCalendarEvent
 });
 
+// Privacy retention: remove Passport/NIC numbers from records older than
+// ID_RETENTION_YEARS (off until it's set — the period is still to be
+// confirmed). Checked once an hour after start-up, then daily.
+const ID_RETENTION_YEARS = Number(process.env.ID_RETENTION_YEARS);
+if (Number.isFinite(ID_RETENTION_YEARS) && ID_RETENTION_YEARS >= 1) {
+  const purge = () => customerTools.purgeOldIdNumbers(ID_RETENTION_YEARS)
+    .then(r => { if (r.senders || r.receivers || r.savedReceivers) console.log('[privacy] removed old Passport/NIC numbers', r); })
+    .catch(err => console.error('[privacy] retention run failed:', err.message));
+  setTimeout(() => { purge(); setInterval(purge, 24 * 60 * 60 * 1000).unref(); }, 60 * 60 * 1000).unref();
+}
+
 // Sign-in codes go out over WhatsApp — the channel every Transco
 // customer already uses. Outside WhatsApp's 24-hour customer-service
 // window a business may only start a conversation with an approved

@@ -23,8 +23,26 @@
 
 const { ObjectId } = require('mongodb');
 const {
-  customers, bookings, shipments, consolidations, nextSequence
+  customers, bookings, shipments, consolidations, nextSequence, getDb
 } = require('./db');
+const pii = require('./pii');
+
+// A customer sends back the masked number we showed them ("N••••567")
+// when they didn't change it: swap in the real one it stands for.
+function unmaskId(person, candidates) {
+  if (!person || !pii.isMasked(person.idNumber)) return person;
+  const hit = (candidates || []).find(c => c && c.idNumber && pii.mask(c.idNumber) === person.idNumber);
+  return { ...person, idNumber: hit ? pii.open(hit.idNumber) || '' : '' };
+}
+
+// Every time staff see a full Passport/NIC number, write it down.
+async function logIdAccess(viewer, bookingId, what) {
+  try {
+    await getDb().collection('piiAccessLog').insertOne({ at: new Date(), staff: viewer || 'unknown', bookingId: String(bookingId), what });
+  } catch (err) {
+    console.error('[pii] access log failed:', err.message);
+  }
+}
 
 const DECLARATION_FORM_URL = 'https://transcosydney.com.au/declaration-form';
 
@@ -364,7 +382,8 @@ function validateLithiumDoc(raw) {
 }
 
 function samePerson(a, b) {
-  return (a.idNumber && a.idNumber === b.idNumber) || (a.fullName.toLowerCase() === b.fullName.toLowerCase() && a.mobile.replace(/\D/g, '') === b.mobile.replace(/\D/g, ''));
+  const idA = pii.open(a.idNumber), idB = pii.open(b.idNumber);
+  return (idA && idA === idB) || (a.fullName.toLowerCase() === b.fullName.toLowerCase() && a.mobile.replace(/\D/g, '') === b.mobile.replace(/\D/g, ''));
 }
 
 function createCustomerTools({
@@ -439,7 +458,8 @@ function createCustomerTools({
       contactPreference: customer.contactPreference || 'whatsapp',
       memberSince: customer.portalJoinedAt || customer.createdAt || null,
       phoneVerified: hasVerifiedPhone(customer),
-      hasPassword: Boolean(customer.passwordHash)
+      hasPassword: Boolean(customer.passwordHash),
+      deletionRequestedAt: customer.deletionRequestedAt || null
     };
   }
 
@@ -573,7 +593,7 @@ function createCustomerTools({
     if (!open || !COUNTRIES[booking.country] || !Array.isArray(booking.items)) return null;
     const person = p => p ? {
       fullName: p.fullName || '', address: p.address || '', town: p.town || '', mobile: p.mobile || '',
-      email: p.email || '', idNumber: p.idNumber || '', homePhone: p.homePhone || ''
+      email: p.email || '', idNumber: pii.mask(p.idNumber) || '', homePhone: p.homePhone || ''
     } : null;
     return {
       canChangeBoxes: shaped.canCancel,
@@ -605,15 +625,15 @@ function createCustomerTools({
       return { error: 'This booking can no longer be changed online — its BL has been issued. Please call us on 0434 842 023.' };
     }
     const body = input || {};
-    const sender = validatePerson(body.sender, 'sender', { idNumber: booking.country === 'sri_lanka' ? 'required' : 'optional', homePhone: true });
+    const sender = validatePerson(unmaskId(body.sender, [booking.sender]), 'sender', { idNumber: booking.country === 'sri_lanka' ? 'required' : 'optional', homePhone: true });
     if (sender.error) return sender;
-    const receiver = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true });
+    const receiver = validatePerson(unmaskId(body.receiver, [booking.receiver]), 'receiver', { withId: true, homePhone: true });
     if (receiver.error) return receiver;
     const contents = validateContents(body.contents);
     if (contents.error) return contents;
     const set = {
-      sender: sender.value,
-      receiver: receiver.value,
+      sender: pii.sealPerson(sender.value),
+      receiver: pii.sealPerson(receiver.value),
       destination: receiver.value.town,
       contents: contents.value,
       customerEditedAt: new Date()
@@ -834,7 +854,7 @@ function createCustomerTools({
     const profileAddress = [address.line1, address.suburb, [address.state, address.postcode].filter(Boolean).join(' ')]
       .filter(Boolean).join(', ');
     const sender = saved
-      ? { fullName: saved.fullName, address: saved.address, mobile: saved.mobile, email: saved.email, idNumber: saved.idNumber || '', homePhone: saved.homePhone || '' }
+      ? { fullName: saved.fullName, address: saved.address, mobile: saved.mobile, email: saved.email, idNumber: pii.mask(saved.idNumber) || '', homePhone: saved.homePhone || '' }
       : {
           fullName: hasRealName(customer) ? customer.name : '',
           address: profileAddress,
@@ -846,7 +866,7 @@ function createCustomerTools({
       .sort((a, b) => new Date(b.lastUsedAt || 0) - new Date(a.lastUsedAt || 0))
       .map(r => ({
         id: r.id, country: r.country, fullName: r.fullName, address: r.address,
-        town: r.town, mobile: r.mobile, email: r.email, idNumber: r.idNumber, homePhone: r.homePhone || ''
+        town: r.town, mobile: r.mobile, email: r.email, idNumber: pii.mask(r.idNumber), homePhone: r.homePhone || ''
       }));
     return { sender, senderSaved: Boolean(saved), receivers };
   }
@@ -856,11 +876,14 @@ function createCustomerTools({
   // booking; older ones without online declaration details come back
   // with sender/receiver null so the printout leaves those to be filled
   // in by hand.
-  async function getDeclarationForPrint(bookingId) {
+  async function getDeclarationForPrint(bookingId, { viewer = null, what = 'declaration' } = {}) {
     const _id = toObjectId(bookingId);
     if (!_id) return null;
-    const booking = await bookings().findOne({ _id });
-    if (!booking) return null;
+    const found = await bookings().findOne({ _id });
+    if (!found) return null;
+    // Staff see the full Passport/NIC numbers — each look is logged.
+    const booking = { ...found, sender: pii.openPerson(found.sender), receiver: pii.openPerson(found.receiver) };
+    if (pii.hasId(found.sender) || pii.hasId(found.receiver)) await logIdAccess(viewer, _id, what);
     const [customer, shipment] = await Promise.all([
       booking.customerId ? customers().findOne({ _id: booking.customerId }, { projection: { customerCode: 1, name: 1, phoneNumber: 1 } }) : null,
       shipments().findOne({ bookingId: booking._id }, { projection: { hblNumber: 1, blNumber: 1, consolidationId: 1 } })
@@ -949,11 +972,13 @@ function createCustomerTools({
   // the box types allowed for this booking's country. Bookings made by the
   // chat bot have no country/items — their boxes stay free text (editable
   // in the older Edit booking sheet) and only the declaration is editable.
-  async function getBookingForStaffEdit(bookingId) {
+  async function getBookingForStaffEdit(bookingId, { viewer = null } = {}) {
     const _id = toObjectId(bookingId);
     if (!_id) return null;
-    const b = await bookings().findOne({ _id });
-    if (!b) return null;
+    const found = await bookings().findOne({ _id });
+    if (!found) return null;
+    const b = { ...found, sender: pii.openPerson(found.sender), receiver: pii.openPerson(found.receiver) };
+    if (pii.hasId(found.sender) || pii.hasId(found.receiver)) await logIdAccess(viewer, _id, 'edit');
     const country = COUNTRIES[b.country] ? b.country : null;
     return {
       bookingId: String(b._id),
@@ -1052,15 +1077,15 @@ function createCustomerTools({
     // Merged over what's stored, so fields this editor doesn't show (the
     // sender's Passport/NIC, home phones from the walk-in form) are kept.
     if ('sender' in input) {
-      const s = validatePerson({ ...(b.sender || {}), ...(input.sender || {}) }, 'sender', { idNumber: 'optional', homePhone: true });
+      const s = validatePerson({ ...(pii.openPerson(b.sender) || {}), ...(input.sender || {}) }, 'sender', { idNumber: 'optional', homePhone: true });
       if (s.error) return s;
-      set.sender = s.value;
+      set.sender = pii.sealPerson(s.value);
       changed.push('sender');
     }
     if ('receiver' in input) {
-      const r = validatePerson({ ...(b.receiver || {}), ...(input.receiver || {}) }, 'receiver', { withId: true, homePhone: true });
+      const r = validatePerson({ ...(pii.openPerson(b.receiver) || {}), ...(input.receiver || {}) }, 'receiver', { withId: true, homePhone: true });
       if (r.error) return r;
-      set.receiver = r.value;
+      set.receiver = pii.sealPerson(r.value);
       set.destination = r.value.town;
       changed.push('receiver');
     }
@@ -1097,11 +1122,11 @@ function createCustomerTools({
   // (never someone else's) and add/refresh the receiver in their list.
   async function rememberDeclarationDetails(customer, { sender, senderIsMe, receiver, country }) {
     const set = {};
-    if (senderIsMe) set.senderDetails = { ...sender, updatedAt: new Date() };
+    if (senderIsMe) set.senderDetails = { ...pii.sealPerson(sender), updatedAt: new Date() };
 
     const list = (customer.savedReceivers || []).slice();
     const existing = list.find(r => r.country === country && samePerson(r, receiver));
-    const entry = { ...receiver, country, lastUsedAt: new Date() };
+    const entry = { ...pii.sealPerson(receiver), country, lastUsedAt: new Date() };
     if (existing) {
       Object.assign(existing, entry);
     } else {
@@ -1258,7 +1283,12 @@ function createCustomerTools({
   // comes from the backend sequence — the caller (UI or chat) only ever
   // displays what this returns.
   async function createBooking(customer, input) {
-    const { error, field, value } = await validateBookingInput(input);
+    const raw = input || {};
+    const { error, field, value } = await validateBookingInput({
+      ...raw,
+      sender: raw.sender && { ...unmaskId(raw.sender, [customer.senderDetails]), isMe: raw.sender.isMe },
+      receiver: unmaskId(raw.receiver, customer.savedReceivers)
+    });
     if (error) return { error, field };
 
     const bookingCode = await newBookingCode();
@@ -1283,9 +1313,9 @@ function createCustomerTools({
       items: value.items,
       boxCount: value.items.reduce((n, i) => n + i.qty, 0),
       customerNotes: value.customerNotes,
-      sender: value.sender,
+      sender: pii.sealPerson(value.sender),
       senderIsAccountHolder: value.senderIsMe,
-      receiver: value.receiver,
+      receiver: pii.sealPerson(value.receiver),
       contents: value.contents,
       insurance: value.insurance,
       declarationAccepted: true,
@@ -1352,7 +1382,54 @@ function createCustomerTools({
     return { booking: shapeBooking({ ...booking, status: 'cancelled' }, null) };
   }
 
+  // ---------- privacy ----------
+
+  // "Download my data": the account, saved sender/receivers and every
+  // booking's declaration. Passport/NIC numbers masked.
+  async function exportCustomerData(customer) {
+    const [bookingList, shipmentList, raw] = await Promise.all([
+      getCustomerBookings(customer._id, { limit: 500 }),
+      getCustomerShipments(customer._id, { limit: 500 }),
+      bookings().find({ customerId: customer._id }, { projection: { sender: 1, receiver: 1, contents: 1, insurance: 1, createdAt: 1 } }).toArray()
+    ]);
+    const declarations = new Map(raw.map(b => [String(b._id), b]));
+    return {
+      exportedAt: new Date().toISOString(),
+      note: 'Passport/NIC numbers are shown masked. To get the full numbers or correct anything, contact Transco Cargo.',
+      profile: publicProfile(customer),
+      privacyAcceptedAt: customer.privacyAcceptedAt || null,
+      savedSender: pii.maskPerson(customer.senderDetails) || null,
+      savedReceivers: (customer.savedReceivers || []).map(r => pii.maskPerson(r)),
+      bookings: bookingList.map(b => {
+        const d = declarations.get(b.id) || {};
+        return { ...b, sender: pii.maskPerson(d.sender) || null, receiver: pii.maskPerson(d.receiver) || null, contents: d.contents || [], insurance: d.insurance ?? null };
+      }),
+      shipments: shipmentList
+    };
+  }
+
+  // Retention: Passport/NIC numbers are removed from bookings (and saved
+  // receivers not used since) once they are older than `years`. Run daily
+  // from server.js when ID_RETENTION_YEARS is set.
+  async function purgeOldIdNumbers(years) {
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - years);
+    const old = { createdAt: { $lt: cutoff } };
+    const [s, r] = await Promise.all([
+      bookings().updateMany({ ...old, 'sender.idNumber': { $nin: [null, ''] } }, { $set: { 'sender.idNumber': '', idPurgedAt: new Date() } }),
+      bookings().updateMany({ ...old, 'receiver.idNumber': { $nin: [null, ''] } }, { $set: { 'receiver.idNumber': '', idPurgedAt: new Date() } })
+    ]);
+    const saved = await customers().updateMany(
+      { savedReceivers: { $elemMatch: { lastUsedAt: { $lt: cutoff }, idNumber: { $nin: [null, ''] } } } },
+      { $set: { 'savedReceivers.$[old].idNumber': '' } },
+      { arrayFilters: [{ 'old.lastUsedAt': { $lt: cutoff } }] }
+    );
+    return { senders: s.modifiedCount, receivers: r.modifiedCount, savedReceivers: saved.modifiedCount };
+  }
+
   return {
+    exportCustomerData,
+    purgeOldIdNumbers,
     ensureCustomerCode,
     updateOwnBooking,
     publicProfile,

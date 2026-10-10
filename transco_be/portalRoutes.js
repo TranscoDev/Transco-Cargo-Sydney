@@ -26,6 +26,8 @@ const CONTACT_PREFERENCES = ['whatsapp', 'phone', 'email'];
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
 
 const MIN_PASSWORD_LENGTH = 8;
+// Bump when the Privacy Policy (website /privacy.html) changes materially.
+const PRIVACY_POLICY_VERSION = '2026-10-10';
 const MAX_PASSWORD_LENGTH = 200;
 const LOGIN_MAX_FAILURES = 5;
 const LOGIN_LOCK_MS = 15 * 60 * 1000;
@@ -329,6 +331,9 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       return res.status(400).json({ error: "That email address doesn't look right.", field: 'email' });
     }
 
+    if (body.privacyAccepted !== true) {
+      return res.status(400).json({ error: 'Please tick that you agree to the Privacy Policy.', field: 'privacyAccepted' });
+    }
     const existing = await customers().findOne({ phoneNumber }, { projection: { passwordHash: 1 } });
     if (existing) {
       return res.status(409).json({
@@ -362,7 +367,9 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       preferredLanguage: lang,
       portalJoinedAt: now,
       acquisitionSource: source,
-      lastPortalLoginAt: now
+      lastPortalLoginAt: now,
+      privacyAcceptedAt: now,
+      privacyPolicyVersion: PRIVACY_POLICY_VERSION
     };
     let customer;
     try {
@@ -500,6 +507,33 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       { returnDocument: 'after' }
     );
     res.json({ profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
+  }));
+
+  // ---------- your data (privacy) ----------
+
+  // Download my data: everything we hold for this account, as JSON.
+  // Passport/NIC numbers stay masked (call us for the full numbers).
+  router.get('/me/export', wrap(async (req, res) => {
+    const data = await tools.exportCustomerData(req.customer);
+    res.setHeader('Content-Disposition', `attachment; filename="my-transco-data-${new Date().toISOString().slice(0, 10)}.json"`);
+    res.json(data);
+  }));
+
+  // Delete my account: recorded as a request for staff to action (records
+  // the law makes us keep — customs declarations, invoices — stay until
+  // their retention period ends). Needs the password when there is one.
+  router.post('/me/delete-request', wrap(async (req, res) => {
+    const body = req.body || {};
+    if (req.customer.passwordHash &&
+        !(typeof body.password === 'string' && verifyPassword(body.password, req.customer.passwordHash))) {
+      return res.status(400).json({ error: 'Your password is not right.', field: 'password' });
+    }
+    if (req.customer.deletionRequestedAt) return res.json({ requestedAt: req.customer.deletionRequestedAt });
+    const now = new Date();
+    await customers().updateOne({ _id: req.customer._id }, {
+      $set: { deletionRequestedAt: now, deletionReason: cleanString(body.reason, 300) || null }
+    });
+    res.json({ requestedAt: now });
   }));
 
   // ---------- dashboard ----------

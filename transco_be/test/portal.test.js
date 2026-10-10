@@ -12,6 +12,7 @@ const path = require('node:path');
 const { MongoClient, ObjectId } = require('mongodb');
 
 require('dotenv').config({ quiet: true });
+const pii = require('../pii');
 
 const TEST_DB_NAME = `transco_portal_test_${Date.now()}`;
 const TEST_PORT = 3197;
@@ -551,7 +552,7 @@ test('anonymous chat with a forged customer token behaves like the public chat',
 
 test('password sign-up: a new number gets an account straight away and can book', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400333001', name: 'Priya Nadarajah', password: 'harbour-lights-9' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400333001', name: 'Priya Nadarajah', password: 'harbour-lights-9' }
   });
   assert.equal(reg.status, 201, JSON.stringify(reg.body));
   assert.match(reg.body.profile.customerCode, /^CUS-\d{6}$/);
@@ -574,7 +575,7 @@ test('password sign-up: a new number gets an account straight away and can book'
 test('password sign-up is refused for a number that already has history, and for weak input', async () => {
   await db.collection('customers').insertOne({ phoneNumber: '61400333002', name: 'Existing WhatsApp', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
   const known = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400333002', name: 'Someone Else', password: 'long-enough-pw' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400333002', name: 'Someone Else', password: 'long-enough-pw' }
   });
   assert.equal(known.status, 409);
   assert.equal(known.body.reason, 'known_number');
@@ -582,11 +583,11 @@ test('password sign-up is refused for a number that already has history, and for
   assert.equal(unchanged.name, 'Existing WhatsApp');
   assert.equal(unchanged.passwordHash, undefined);
 
-  const short = await api('POST', '/api/portal/auth/register', { body: { countryCode: '61', phone: '0400333003', name: 'Ann Lee', password: 'short' } });
+  const short = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, countryCode: '61', phone: '0400333003', name: 'Ann Lee', password: 'short' } });
   assert.equal(short.status, 400);
   assert.equal(short.body.field, 'password');
 
-  const again = await api('POST', '/api/portal/auth/register', { body: { countryCode: '61', phone: '0400333001', name: 'Priya N', password: 'another-password' } });
+  const again = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, countryCode: '61', phone: '0400333001', name: 'Priya N', password: 'another-password' } });
   assert.equal(again.status, 409);
   assert.equal(again.body.reason, 'has_account');
 });
@@ -615,7 +616,7 @@ test('password sign-in works, gives one message for every failure, and locks aft
 
 test('an unproven password account never sees other history on its number; a WhatsApp code by the real owner removes the impostor', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400333004', name: 'Impostor', password: 'impostor-pass-1' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400333004', name: 'Impostor', password: 'impostor-pass-1' }
   });
   assert.equal(reg.status, 201);
   const record = await db.collection('customers').findOne({ phoneNumber: '61400333004' });
@@ -649,7 +650,7 @@ test('an unproven password account never sees other history on its number; a Wha
 
 test('a signed-in password customer verifying their own number keeps their password', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400333005', name: 'Kavya Raj', password: 'kavya-password-1' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400333005', name: 'Kavya Raj', password: 'kavya-password-1' }
   });
   await clearOtps('61400333005');
   await api('POST', '/api/portal/auth/request-code', { body: { countryCode: '61', phone: '0400333005' } });
@@ -727,7 +728,7 @@ test('the staff live event stream refuses anonymous and customer connections, an
 
 test('staff My Transco list: staff only; lists accounts, not website visitors or WhatsApp-only contacts', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400555001', name: 'Crm Listed', password: 'crm-listed-pass' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400555001', name: 'Crm Listed', password: 'crm-listed-pass' }
   });
   assert.equal(reg.status, 201);
   await db.collection('customers').insertOne({ phoneNumber: '61400555099', name: 'WhatsApp Only', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
@@ -751,7 +752,7 @@ test('staff My Transco list: staff only; lists accounts, not website visitors or
 
 test('staff profile shows the full history; staff verify / sign-out / unlock / edit work', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400555002', name: 'Crm Profile', password: 'crm-profile-pass' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400555002', name: 'Crm Profile', password: 'crm-profile-pass' }
   });
   const record = await db.collection('customers').findOne({ phoneNumber: '61400555002' });
   await db.collection('bookings').insertOne({
@@ -794,7 +795,7 @@ test('staff profile shows the full history; staff verify / sign-out / unlock / e
 
 test('email: sign up with an email, then sign in with it (any case); wrong password is refused', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400666001', name: 'Email User', password: 'email-user-pass', email: 'Email.User@Example.com' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400666001', name: 'Email User', password: 'email-user-pass', email: 'Email.User@Example.com' }
   });
   assert.equal(reg.status, 201, JSON.stringify(reg.body));
   assert.equal(reg.body.profile.email, 'email.user@example.com');
@@ -812,14 +813,14 @@ test('email: sign up with an email, then sign in with it (any case); wrong passw
 
 test('email: one account per email — refused at sign-up and on profile/staff edits', async () => {
   const dup = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400666002', name: 'Second User', password: 'second-user-pass', email: 'email.user@example.com' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400666002', name: 'Second User', password: 'second-user-pass', email: 'email.user@example.com' }
   });
   assert.equal(dup.status, 409);
   assert.equal(dup.body.reason, 'email_taken');
   assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400666002' }), 0);
 
   const other = await api('POST', '/api/portal/auth/register', {
-    body: { countryCode: '61', phone: '0400666003', name: 'Third User', password: 'third-user-pass' }
+    body: { privacyAccepted: true, countryCode: '61', phone: '0400666003', name: 'Third User', password: 'third-user-pass' }
   });
   const clash = await api('PATCH', '/api/portal/me', { token: other.body.token, body: { email: 'EMAIL.USER@example.com' } });
   assert.equal(clash.status, 409);
@@ -938,7 +939,7 @@ test('declaration: sender details are remembered only for the account holder, re
   assert.equal(options.body.declaration.sender.fullName, 'Decla Ration Perera');
   assert.equal(options.body.declaration.receivers.length, 1);
   const saved = options.body.declaration.receivers[0];
-  assert.equal(saved.idNumber, '199012345678');
+  assert.equal(saved.idNumber, pii.mask('199012345678'), 'customers see their saved numbers masked');
   assert.equal(saved.country, 'sri_lanka');
 
   // Someone else sends this time: their details must not replace the saved ones.
@@ -962,7 +963,7 @@ test('declaration: sender details are remembered only for the account holder, re
   const staffBooking = detail.body.bookings.find(b => b.id === second.body.booking.id);
   assert.equal(staffBooking.sender.fullName, 'Cousin Sender');
   assert.equal(staffBooking.senderIsAccountHolder, false);
-  assert.equal(staffBooking.receiver.idNumber, '199012345678');
+  assert.equal(staffBooking.receiver.idNumber, pii.mask('199012345678'), 'masked in the CRM list; full in the booking');
   assert.ok(staffBooking.declarationSubmittedAt);
 
   assert.equal((await api('GET', `/api/my-transco/bookings/${second.body.booking.id}/declaration`, { token: me.token })).status, 401);
@@ -1242,7 +1243,7 @@ test('walk-in form: a submission is a claim only — no customer is linked or cr
   assert.equal(b.customerId, null);
   assert.equal(b.status, 'pending');
   assert.equal(b.walkIn.status, 'submitted');
-  assert.equal(b.sender.idNumber, 'N10388128');
+  assert.equal(pii.open(b.sender.idNumber), 'N10388128');
   assert.equal(b.contents.length, 2);
   assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61477642088' }), countBefore);
 
@@ -1332,7 +1333,7 @@ test('walk-in finalise: staff only; links/creates the customer by phone and reco
   assert.match(customer.customerCode, /^CUS-\d{6}$/);
   assert.equal(customer.email, 'newwalkin@example.com');
   assert.equal(customer.address.line1, 'Unit 3, 18 Sorrell Street, Parramatta NSW 2150');
-  assert.equal(customer.senderDetails.idNumber, 'N10388128');
+  assert.equal(pii.open(customer.senderDetails.idNumber), 'N10388128');
   const accounts = await api('GET', '/api/my-transco/customers', { token: staffToken });
   assert.ok(JSON.stringify(accounts.body).includes(String(customer._id)));
   // ...and they find it in My Transco after signing in with their number.
@@ -1340,7 +1341,7 @@ test('walk-in finalise: staff only; links/creates the customer by phone and reco
   const portalSummary = await api('GET', '/api/portal/summary', { token: walkInAccount.token });
   assert.equal(portalSummary.body.latestBl.blNumber, 'WALKIN-001');
   const defaults = await api('GET', '/api/portal/booking-options', { token: walkInAccount.token });
-  assert.equal(defaults.body.declaration.sender.idNumber, 'N10388128');
+  assert.equal(defaults.body.declaration.sender.idNumber, pii.mask('N10388128'));
   assert.equal(defaults.body.declaration.receivers[0].fullName, 'Walk In Receiver');
 
   // Next time from the same phone, staff see "Returning".
@@ -1447,7 +1448,7 @@ test('staff edits keep the walk-in sender Passport/NIC and home phone', async ()
   assert.equal(edit.status, 200, JSON.stringify(edit.body));
   const after = await db.collection('bookings').findOne({ _id: b._id });
   assert.equal(after.sender.fullName, 'Walk In Sender Fixed');
-  assert.equal(after.sender.idNumber, 'N10388128');
+  assert.equal(pii.open(after.sender.idNumber), 'N10388128');
   assert.equal(after.sender.homePhone, '02 9600 1234');
 });
 
@@ -1476,7 +1477,8 @@ test('My Transco bookings collect the full declaration; at drop-off staff only v
   assert.equal(b.contents.length, 2);
   assert.equal(b.contents[0].value, null, 'the customer never enters values');
   assert.equal(b.insurance, true);
-  assert.equal(b.sender.idNumber, 'N1234567');
+  assert.equal(pii.open(b.sender.idNumber), 'N1234567');
+  if (pii.enabled()) assert.ok(pii.isSealed(b.sender.idNumber) && pii.isSealed(b.receiver.idNumber), 'stored encrypted');
   assert.equal(b.sender.homePhone, '02 9600 0000');
   assert.equal(b.signature.name, 'Alpha Sender');
 

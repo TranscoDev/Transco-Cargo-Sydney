@@ -25,6 +25,7 @@ const {
   COUNTRIES, SERVICE_LABELS, ITEM_TYPES, ITEM_LABELS, DELIVERY_LABELS, itemDetail
 } = require('./customerTools');
 const { normalizePhoneNumber } = require('./normalizePhone');
+const pii = require('./pii');
 const { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf } = require('./formsPdf');
 
 const IP_WINDOW_MS = 15 * 60 * 1000;
@@ -146,11 +147,13 @@ function itemsLine(items) {
 }
 
 function summaryHtml(b) {
+  // Office email: the walk-in summary. Passport/NIC numbers are left off
+  // (email isn't a safe place for them) — staff see them in the console.
   const person = (title, p, withId) => p ? `
     <h3 style="margin:16px 0 4px;font-size:14px">${title}</h3>
     <p style="margin:0;line-height:1.5">${esc(p.fullName)}<br>${esc([p.address, p.town].filter(Boolean).join(', '))}<br>
     Mobile: ${esc(p.mobile)}${p.homePhone ? ` · Home: ${esc(p.homePhone)}` : ''}<br>Email: ${esc(p.email)}
-    ${p.idNumber ? `<br>Passport / NIC: ${esc(p.idNumber)}` : ''}</p>` : '';
+    ${p.idNumber ? `<br>Passport / NIC: ${esc(pii.mask(p.idNumber))}` : ''}</p>` : '';
   const rows = (b.contents || []).map((c, i) =>
     `<tr><td style="padding:4px 8px;border:1px solid #ddd">${i + 1}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(c.description)}${c.condition ? ` (${c.condition})` : ''}</td>` +
     `<td style="padding:4px 8px;border:1px solid #ddd;text-align:center">${c.qty}</td><td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${money(c.value)}</td></tr>`
@@ -227,9 +230,9 @@ module.exports = function createWalkInRouters({
       items: v.items,
       boxCount: v.items.reduce((n, i) => n + i.qty, 0),
       customerNotes: v.notes,
-      sender: v.sender,
+      sender: pii.sealPerson(v.sender),
       senderIsAccountHolder: true,
-      receiver: v.receiver,
+      receiver: pii.sealPerson(v.receiver),
       contents: v.contents,
       insurance: v.insurance,
       declarationAccepted: true,
@@ -463,7 +466,7 @@ module.exports = function createWalkInRouters({
   const formsRouter = express.Router();
 
   async function loadForPrint(req, res) {
-    const d = await tools.getDeclarationForPrint(req.params.bookingId);
+    const d = await tools.getDeclarationForPrint(req.params.bookingId, { viewer: req.user && req.user.email, what: `forms ${req.path.split('/').pop()}` });
     if (!d) { res.status(404).json({ error: 'Booking not found' }); return null; }
     return d;
   }
