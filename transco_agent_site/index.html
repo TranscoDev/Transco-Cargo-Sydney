@@ -254,6 +254,17 @@
     transition: transform 0.15s ease, background 0.15s ease;
   }
   .book-cta:hover { transform: translateY(-2px); background: var(--navy-soft); }
+  /* Under "New booking": opens the Transco Agent chat (any time, day or night). */
+  .chat-cta {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 13px 22px; border-radius: 14px;
+    background: #fff; color: var(--navy); font-weight: 700; font-size: 15.5px;
+    border: 2px solid var(--sl-teal); text-decoration: none;
+    box-shadow: 0 6px 18px rgba(18,161,137,0.18);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .chat-cta:hover { transform: translateY(-2px); background: #effaf7; }
+  .chat-cta:focus-visible { outline: 3px solid var(--sl-teal); outline-offset: 2px; }
   .book-cta:focus-visible, .country-cta:focus-visible { outline: 3px solid var(--sl-teal); outline-offset: 2px; }
   /* Same treatment the real site uses on its own "View Sri Lanka /
      View India" buttons — the actual national flag as a tinted
@@ -751,6 +762,7 @@
             <a class="country-cta in" href="/india.html"><span class="flag">🇮🇳</span> Ship to India</a>
           </div>
           <a class="book-cta" href="/account.html#/book"><span aria-hidden="true">📝</span> New booking</a>
+          <a class="chat-cta" href="#agent"><span aria-hidden="true">💬</span> Chat with our assistant · 24/7</a>
         </div>
       </div>
     </div>
