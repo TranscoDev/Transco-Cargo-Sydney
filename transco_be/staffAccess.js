@@ -26,7 +26,8 @@ const PAGES = {
   leads: { label: 'Leads', api: ['/customers', '/leads'] },
   'my-transco': { label: 'Online Accounts', api: ['/my-transco'] },
   settings: { label: 'Settings (staff list)', api: ['/settings', '/staff'] },
-  'bot-controls': { label: 'Bot settings', api: ['/settings'] }
+  'bot-controls': { label: 'Bot settings', api: ['/settings'] },
+  notices: { label: 'Website notices', api: ['/notices'] }
 };
 const PAGE_KEYS = Object.keys(PAGES);
 const ROLES = ['admin', 'warehouse', 'custom'];

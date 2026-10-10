@@ -115,19 +115,34 @@ const MAINTENANCE_MESSAGE =
   "ආයුබෝවන්! අපේ chat assistant එක temporary maintenance එකක් සඳහා නවත්වලා තියෙනවා — ඉක්මනින්ම නැවත ලැබෙනවා. හදිසි නම් 0468 382 023 අමතන්න.\n\n" +
   "வணக்கம்! எங்கள் chat assistant தற்காலிகமாக maintenance காரணமாக நிறுத்தப்பட்டுள்ளது — விரைவில் மீண்டும் வரும். அவசரமெனில் 0468 382 023 ஐ அழைக்கவும்.";
 
-async function isWebsitePausedOn() {
+// The console's on/off switches themselves.
+async function websitePauseFlag() {
   const doc = await settings().findOne({ _id: 'global' });
   return Boolean(doc?.websitePaused);
 }
 
-async function isWhatsAppPausedOn() {
+async function whatsappPauseFlag() {
   const doc = await settings().findOne({ _id: 'global' });
   return Boolean(doc?.whatsappPaused);
 }
 
+// Whether the bot replies: the switch, or a closure notice that pauses
+// the bot right now (console → Notices; it ends on its own).
+const notices = require('./notices');
+async function isWebsitePausedOn() {
+  return (await websitePauseFlag()) || Boolean(await notices.activeBotClosure());
+}
+
+async function isWhatsAppPausedOn() {
+  return (await whatsappPauseFlag()) || Boolean(await notices.activeBotClosure());
+}
+
 // Staff can reword the paused reply from the console's Bot settings
 // page. Blank/unset falls back to the built-in 3-language message.
+// During a bot-pausing closure, the closure's own message is used.
 async function getPauseMessage() {
+  const closure = await notices.activeBotClosure();
+  if (closure) return notices.closureBotMessage(closure);
   const doc = await settings().findOne({ _id: 'global' });
   const custom = typeof doc?.pauseMessage === 'string' ? doc.pauseMessage.trim() : '';
   return custom || MAINTENANCE_MESSAGE;
@@ -2274,8 +2289,8 @@ app.delete('/api/staff/:staffId', async (req, res) => {
 
 app.get('/api/settings/pause-state', async (req, res) => {
   try {
-    const websitePaused = await isWebsitePausedOn();
-    const whatsappPaused = await isWhatsAppPausedOn();
+    const websitePaused = await websitePauseFlag();
+    const whatsappPaused = await whatsappPauseFlag();
     res.status(200).json({ websitePaused, whatsappPaused });
   } catch (err) {
     console.error('Error reading pause state:', err.message);
@@ -2307,8 +2322,8 @@ app.patch('/api/settings/pause-state', async (req, res) => {
       { upsert: true }
     );
 
-    const newWebsitePaused = await isWebsitePausedOn();
-    const newWhatsappPaused = await isWhatsAppPausedOn();
+    const newWebsitePaused = await websitePauseFlag();
+    const newWhatsappPaused = await whatsappPauseFlag();
 
     broadcast('settings.pause_state_changed', { websitePaused: newWebsitePaused, whatsappPaused: newWhatsappPaused });
 
@@ -6294,6 +6309,12 @@ const walkInRouters = require('./walkInRoutes')({
 });
 app.use('/api/public', walkInRouters.publicRouter);
 app.use('/api/walk-ins', walkInRouters.staffRouter);
+
+// Website notices: /api/public/notices (the website banner) and the
+// console's Notices page (/api/notices, staff only).
+const noticeRouters = notices.createNoticeRouters();
+app.use('/api/public', noticeRouters.publicRouter);
+app.use('/api/notices', noticeRouters.staffRouter);
 app.use('/api/forms', walkInRouters.formsRouter);
 
 const createWebChatRouter = require('./webChatRoutes');

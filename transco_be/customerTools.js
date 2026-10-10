@@ -26,6 +26,7 @@ const {
   customers, bookings, shipments, consolidations, nextSequence, getDb
 } = require('./db');
 const pii = require('./pii');
+const { blockedDates } = require('./notices');
 
 // A customer sends back the masked number we showed them ("N••••567")
 // when they didn't change it: swap in the real one it stands for.
@@ -1188,6 +1189,10 @@ function createCustomerTools({
       }
       if (slots.length) candidates.push({ date: isoDate(d), day: dow, kind, slots });
     }
+    // Days inside a closure notice that blocks dates (console → Notices) aren't offered.
+    const closed = candidates.length ? await blockedDates(candidates[0].date, candidates[candidates.length - 1].date) : new Set();
+    const open = candidates.filter(c => !closed.has(c.date));
+    candidates.length = 0; candidates.push(...open);
     const load = await weekdayLoad(candidates.filter(c => c.kind === 'weekday').map(c => c.date));
     const dropOffDates = candidates.map(c => ({
       ...c,

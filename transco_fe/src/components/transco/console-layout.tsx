@@ -9,6 +9,7 @@ import {
   Globe,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   MapPin,
   Menu,
   MessageCircle,
@@ -106,6 +107,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Settings", to: "/console/settings", icon: SettingsIcon },
       { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
+      { label: "Website notices", to: "/console/notices", icon: Megaphone },
     ],
   },
   {

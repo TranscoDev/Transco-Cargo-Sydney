@@ -1885,3 +1885,40 @@ test('staff page access: Warehouse sees bookings/walk-ins/shipments only; admin 
     await db.collection('users').updateOne({ email: TEST_STAFF_EMAIL }, { $unset: { role: '' } });
   }
 });
+
+test('website notices: scheduled banners, closures block drop-off days, staff only', async () => {
+  const acct = await signIn('0400888222');
+  const before = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  const day = before.body.dropOffDates[1].date; // a future drop-off day
+  const now = Date.now();
+  const offer = await api('POST', '/api/notices', { token: staffToken, body: {
+    kind: 'offer', theme: 'offer', message: { en: '10% off Tea Chests this week!' },
+    startsAt: new Date(now - 60000).toISOString(), endsAt: new Date(now + 86400000).toISOString()
+  } });
+  assert.equal(offer.status, 201, JSON.stringify(offer.body));
+  const later = await api('POST', '/api/notices', { token: staffToken, body: {
+    kind: 'info', message: { en: 'Not shown yet — starts next week' },
+    startsAt: new Date(now + 7 * 86400000).toISOString(), endsAt: new Date(now + 8 * 86400000).toISOString()
+  } });
+  assert.equal(later.status, 201);
+  const closure = await api('POST', '/api/notices', { token: staffToken, body: {
+    kind: 'closure', theme: 'christmas', message: { en: 'We are closed for the holidays.' }, pauseBot: false, blockDates: true,
+    startsAt: `${day}T00:00:00+11:00`, endsAt: `${day}T23:59:00+11:00`
+  } });
+  assert.equal(closure.status, 201, JSON.stringify(closure.body));
+  assert.equal(closure.body.notice.dismissible, false, 'closures always show');
+
+  const shown = await api('GET', '/api/public/notices');
+  assert.equal(shown.status, 200);
+  assert.deepEqual(shown.body.notices.map(n => n.message.en), ['10% off Tea Chests this week!']);
+
+  const after = await api('GET', '/api/portal/booking-options', { token: acct.token });
+  assert.ok(!after.body.dropOffDates.some(d => d.date === day), 'closed day not offered');
+
+  const bad = await api('POST', '/api/notices', { token: staffToken, body: { kind: 'offer', message: { en: 'Backwards dates' }, startsAt: new Date(now).toISOString(), endsAt: new Date(now - 1000).toISOString() } });
+  assert.equal(bad.status, 400);
+  assert.equal((await api('GET', '/api/notices')).status, 401);
+
+  for (const n of [offer, later, closure]) await api('DELETE', `/api/notices/${n.body.notice.id}`, { token: staffToken });
+  assert.equal((await api('GET', '/api/public/notices')).body.notices.length, 0);
+});
