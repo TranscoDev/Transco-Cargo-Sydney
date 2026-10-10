@@ -27,10 +27,12 @@ const INDIA_SEA: Record<string, [number, number, number]> = {
 
 type Line = { label: string; amount: string };
 
+export const tvSizeLabel = (s: string) => TV_BANDS[s]?.label ?? "other size";
+
 // Odd-size items: $550 per cubic metre (Sri Lanka Sea).
 const ODD_TO_MEASURE = "Odd-size item (to measure)";
 const oddLabel = (l: number, w: number, h: number) => `Odd-size item ${l}×${w}×${h} cm`;
-const oddPrice = (l: number, w: number, h: number) => String(Math.ceil(((l * w * h) / 1e6) * 550));
+export const oddPrice = (l: number, w: number, h: number) => String(Math.ceil(((l * w * h) / 1e6) * 550));
 
 /** L × W × H (cm) → a priced odd-size line; fills the first "(to measure)" line. */
 function OddSizeCalc({ onAdd }: { onAdd: (line: Line) => void }) {

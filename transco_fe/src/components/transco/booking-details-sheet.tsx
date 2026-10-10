@@ -1,4 +1,4 @@
-import { CostingCard } from "@/components/transco/costing-card";
+import { CostingCard, oddPrice, tvSizeLabel } from "@/components/transco/costing-card";
 import { HandoverTags } from "@/components/transco/handover-tags";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -17,7 +17,7 @@ import {
   type DeclarationPrintData,
 } from "@/lib/transco/declaration-print";
 import { finaliseWalkIn } from "@/lib/transco/api";
-import { formatDate } from "@/lib/transco/my-transco";
+import { formatDate, saveBookingDetails } from "@/lib/transco/my-transco";
 import { friendlyError, notify } from "@/lib/transco/notify";
 import { BookingDetailsEditor } from "@/components/transco/booking-details-editor";
 import { FormsCard, PrintPreviewDialog } from "@/components/transco/forms-print";
@@ -329,6 +329,19 @@ const OFFICE_FIELDS = [
 
 type OfficeKey = (typeof OFFICE_FIELDS)[number]["key"] | "total";
 
+type Dims = { l: string; w: string; h: string };
+const dimOk = (s: string) => s.trim() !== "" && Number.isFinite(Number(s)) && Number(s) >= 1 && Number(s) <= 500;
+const dimsOk = (d: Dims) => dimOk(d.l) && dimOk(d.w) && dimOk(d.h);
+// Box types per destination (backend ITEM_TYPES / ITEM_LABELS).
+const BOX_LABELS: Record<string, string> = {
+  tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box",
+  tv: "TV", general: "General cargo box", other: "Odd-size item",
+};
+const BOX_TYPES: Record<string, string[]> = {
+  sri_lanka: ["tea_chest", "gift_box", "wine_box", "quarter_cbm", "tv", "other"],
+  india: ["general", "tea_chest", "quarter_cbm", "other"],
+};
+
 type ItemRow = { category: string | null; description: string; condition: "new" | "used" | ""; qty: string; value: string };
 
 function asText(n: number | null | undefined) {
@@ -372,6 +385,27 @@ function FinaliseSection({
     data.contents.map((c) => ({ category: c.category ?? null, description: c.description, condition: c.condition ?? "", qty: String(c.qty), value: asText(c.value) })),
   );
   const [badRows, setBadRows] = useState<Set<number>>(() => new Set());
+  // Odd-size items: the customer only gives a count — staff measure each
+  // one here (L × W × H cm); saved on the booking, priced at $550 per CBM.
+  const oddItem = data.items.find((i) => i.type === "other");
+  const [odd, setOdd] = useState<Dims[]>(() =>
+    Array.from({ length: oddItem?.qty ?? 0 }, (_, k) => {
+      const m = oddItem?.dims?.[k];
+      return m ? { l: String(m.l), w: String(m.w), h: String(m.h) } : { l: "", w: "", h: "" };
+    }),
+  );
+  const [badOdd, setBadOdd] = useState(false);
+  // Staff can change the box list at the counter (add an odd-size item, a
+  // box the customer forgot, …). Saved with the BL.
+  const boxTypes = BOX_TYPES[data.countryKey ?? ""] ?? [];
+  const [boxes, setBoxes] = useState<Record<string, number>>(() => Object.fromEntries(data.items.map((i) => [i.type, i.qty])));
+  const setBoxQty = (type: string, qty: number) => {
+    const n = Math.max(0, Math.min(30, qty));
+    setBoxes((b) => ({ ...b, [type]: n }));
+    if (type === "other") setOdd((s) => Array.from({ length: n }, (_, k) => s[k] ?? { l: "", w: "", h: "" }));
+  };
+  const shownBoxes = Object.keys(boxes).filter((t) => (boxes[t] ?? 0) > 0 || data.items.some((i) => i.type === t));
+  const boxesChanged = Object.entries(boxes).some(([t, q]) => q !== (data.items.find((i) => i.type === t)?.qty ?? 0));
   const [insurance, setInsurance] = useState<boolean | null>(data.insurance);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -423,6 +457,19 @@ function FinaliseSection({
       setFormError(`Check the item${bad.size === 1 ? "" : "s"} marked in red — each needs a description, how many, and a value (0 is fine).`);
       return;
     }
+    const oddStarted = odd.some((d) => d.l.trim() || d.w.trim() || d.h.trim());
+    const oddDims = odd.map((d) => ({ l: Math.round(Number(d.l)), w: Math.round(Number(d.w)), h: Math.round(Number(d.h)) }));
+    if (oddStarted && !odd.every(dimsOk)) {
+      setBadOdd(true);
+      setFormError("Enter the length, width and height (1–500 cm) of every odd-size item, or leave them all empty.");
+      return;
+    }
+    setBadOdd(false);
+    const oddChanged = oddStarted && JSON.stringify(oddDims) !== JSON.stringify(oddItem?.dims ?? []);
+    if (boxesChanged && !Object.values(boxes).some((q) => q > 0)) {
+      setFormError("Keep at least one box.");
+      return;
+    }
     const values = { weight: asNumber(weight), cbm: asNumber(cbm), freight: n("freight"), pickup: n("pickup"), doorToDoor: n("doorToDoor"), discount: n("discount"), total: n("total") };
     if (Object.values(values).some((v) => Number.isNaN(v))) {
       setFormError("Numbers only, please (0 or more).");
@@ -430,6 +477,19 @@ function FinaliseSection({
     }
     setSaving(true);
     try {
+      if (oddChanged || boxesChanged) {
+        await saveBookingDetails(data.bookingId, {
+          items: Object.entries(boxes)
+            .filter(([, qty]) => qty > 0)
+            .map(([type, qty]) => {
+              const before = data.items.find((i) => i.type === type);
+              // TV sizes only while the count matches; odd-size dims when all measured.
+              const sizes = before?.sizes && before.sizes.length === qty ? { sizes: before.sizes } : {};
+              const dims = type === "other" && oddStarted ? { dims: oddDims } : {};
+              return { type, qty, ...sizes, ...dims };
+            }),
+        });
+      }
       const result = await finaliseWalkIn(data.bookingId, {
         ...(blNumber ? { hblNumber: blNumber, batchNumber } : {}),
         contents,
@@ -485,6 +545,90 @@ function FinaliseSection({
             <Label htmlFor="fin-batch" className="text-xs">Shipment</Label>
             <ShipmentPicker id="fin-batch" value={batch} onChange={setBatch} className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground" />
           </div>
+        </div>
+      )}
+
+      {(data.items.length > 0 || boxTypes.length > 0) && (
+        <div className="mb-4">
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Boxes</p>
+          <ul className="divide-y rounded-md border bg-card text-sm">
+            {shownBoxes.map((type) => {
+              const qty = boxes[type] ?? 0;
+              const before = data.items.find((i) => i.type === type);
+              const label = BOX_LABELS[type] ?? before?.label ?? type;
+              return (
+              <li key={type} className={`px-2.5 py-1.5 ${qty === 0 ? "opacity-60" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    <span className="font-medium text-foreground">{label}</span>
+                    {type === "tv" && before?.sizes?.length && before.sizes.length === qty ? (
+                      <span className="text-muted-foreground"> · {before.sizes.map(tvSizeLabel).join(", ")}</span>
+                    ) : null}
+                  </span>
+                  {boxTypes.includes(type) ? (
+                    <span className="flex items-center gap-1">
+                      <Button type="button" variant="outline" size="icon" className="h-7 w-7" aria-label={`One less ${label}`} disabled={qty === 0} onClick={() => setBoxQty(type, qty - 1)}>
+                        −
+                      </Button>
+                      <span className="w-6 text-center font-semibold tabular-nums">{qty}</span>
+                      <Button type="button" variant="outline" size="icon" className="h-7 w-7" aria-label={`One more ${label}`} disabled={qty >= 30} onClick={() => setBoxQty(type, qty + 1)}>
+                        +
+                      </Button>
+                    </span>
+                  ) : (
+                    <span className="font-semibold tabular-nums">× {qty}</span>
+                  )}
+                </div>
+                {type === "other" && qty > 0 && (
+                  <div className="mt-1.5 flex flex-col gap-1.5">
+                    <p className="text-xs text-muted-foreground">Measure each item (cm) — $550 per CBM. Saved when you confirm.</p>
+                    {odd.map((d, k) => {
+                      const cbm = dimsOk(d) ? (Number(d.l) * Number(d.w) * Number(d.h)) / 1e6 : null;
+                      return (
+                        <div key={k} className="flex flex-wrap items-center gap-1.5">
+                          <span className="w-14 text-xs text-muted-foreground">Item {k + 1}</span>
+                          {(["l", "w", "h"] as const).map((key) => (
+                            <Input
+                              key={key}
+                              aria-label={`Odd-size item ${k + 1} ${{ l: "length", w: "width", h: "height" }[key]} cm`}
+                              placeholder={{ l: "L", w: "W", h: "H" }[key]}
+                              inputMode="decimal"
+                              value={d[key]}
+                              aria-invalid={(badOdd && !dimOk(d[key])) || undefined}
+                              onChange={(e) => setOdd((s) => s.map((x, j) => (j === k ? { ...x, [key]: e.target.value } : x)))}
+                              className="h-8 w-16 px-1.5 text-center text-xs tabular-nums"
+                            />
+                          ))}
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            {cbm !== null ? `${cbm.toFixed(3)} CBM · $${oddPrice(Number(d.l), Number(d.w), Number(d.h))}` : "cm"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </li>
+              );
+            })}
+            {boxTypes.some((t) => !shownBoxes.includes(t)) && (
+              <li className="px-2.5 py-1.5">
+                <select
+                  aria-label="Add a box"
+                  value=""
+                  onChange={(e) => e.target.value && setBoxQty(e.target.value, 1)}
+                  className="h-8 rounded-md border border-input bg-card px-1.5 text-xs font-medium text-primary"
+                >
+                  <option value="">+ Add box…</option>
+                  {boxTypes.filter((t) => !shownBoxes.includes(t)).map((t) => (
+                    <option key={t} value={t}>
+                      {BOX_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+              </li>
+            )}
+          </ul>
+          {boxesChanged && <p className="mt-1 text-xs text-muted-foreground">Box changes are saved when you confirm.</p>}
         </div>
       )}
 
