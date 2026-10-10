@@ -329,7 +329,7 @@ const OFFICE_FIELDS = [
 
 type OfficeKey = (typeof OFFICE_FIELDS)[number]["key"] | "total";
 
-type ItemRow = { description: string; condition: "new" | "used"; qty: string; value: string };
+type ItemRow = { category: string | null; description: string; condition: "new" | "used" | ""; qty: string; value: string };
 
 function asText(n: number | null | undefined) {
   return typeof n === "number" ? String(n) : "";
@@ -369,7 +369,7 @@ function FinaliseSection({
   // values), and can add/remove/change items when the customer does at
   // the counter.
   const [rows, setRows] = useState<ItemRow[]>(() =>
-    data.contents.map((c) => ({ description: c.description, condition: c.condition, qty: String(c.qty), value: asText(c.value) })),
+    data.contents.map((c) => ({ category: c.category ?? null, description: c.description, condition: c.condition ?? "", qty: String(c.qty), value: asText(c.value) })),
   );
   const [badRows, setBadRows] = useState<Set<number>>(() => new Set());
   const [insurance, setInsurance] = useState<boolean | null>(data.insurance);
@@ -380,7 +380,10 @@ function FinaliseSection({
     return s + (v !== null && !Number.isNaN(v) ? v : 0);
   }, 0);
   const updateRow = (i: number, patch: Partial<ItemRow>) => {
-    setRows((s) => s.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+    // Renaming an item or changing new/used makes it a plain item (only
+    // "others" keeps its category, as its description is free text).
+    const plain = ("description" in patch || "condition" in patch);
+    setRows((s) => s.map((r, j) => (j === i ? { ...r, ...patch, ...(plain && r.category !== "others" ? { category: null } : {}) } : r)));
     if (badRows.has(i)) setBadRows((s) => new Set([...s].filter((j) => j !== i)));
   };
 
@@ -413,7 +416,7 @@ function FinaliseSection({
       const qty = Number(r.qty);
       const value = asNumber(r.value);
       if (r.description.trim().length < 2 || !Number.isInteger(qty) || qty < 1 || qty > 999 || value === null || Number.isNaN(value)) bad.add(i);
-      return { description: r.description.trim(), condition: r.condition, qty, value: value ?? 0 };
+      return { ...(r.category ? { category: r.category } : {}), description: r.description.trim(), condition: r.condition || null, qty, value: value ?? 0 };
     });
     setBadRows(bad);
     if (bad.size) {
@@ -502,9 +505,10 @@ function FinaliseSection({
                 <select
                   aria-label={`Item ${i + 1}: new or used`}
                   value={r.condition}
-                  onChange={(e) => updateRow(i, { condition: e.target.value as "new" | "used" })}
+                  onChange={(e) => updateRow(i, { condition: e.target.value as ItemRow["condition"] })}
                   className="h-8 rounded-md border border-input bg-card px-1.5 text-xs text-foreground"
                 >
+                  <option value="">—</option>
                   <option value="new">New</option>
                   <option value="used">Used</option>
                 </select>
@@ -541,7 +545,7 @@ function FinaliseSection({
           <li className="flex items-center justify-between gap-2 px-2.5 py-1.5">
             <button
               type="button"
-              onClick={() => setRows((s) => [...s, { description: "", condition: "new", qty: "1", value: "" }])}
+              onClick={() => setRows((s) => [...s, { category: null, description: "", condition: "", qty: "1", value: "" }])}
               className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
             >
               <Plus className="h-3.5 w-3.5" aria-hidden /> Add item
@@ -683,7 +687,7 @@ function ContentsSection({ contents }: { contents: DeclarationPrintData["content
           {contents.map((c, i) => (
             <tr key={i} className="border-t">
               <td className="py-1 pr-2 font-medium text-foreground">
-                {c.description} <span className="font-normal text-muted-foreground">· {c.condition}</span>
+                {c.description} {c.condition ? <span className="font-normal text-muted-foreground">· {c.condition}</span> : null}
               </td>
               <td className="py-1 text-center tabular-nums">{c.qty}</td>
               <td className="py-1 text-right tabular-nums">{typeof c.value === "number" ? `${c.value}` : "—"}</td>

@@ -298,7 +298,7 @@ async function addShippingDeclaration(doc, d) {
 
 const signedDateOf = d => (d.signature && d.signature.signedAt) || d.declarationSubmittedAt || d.createdAt;
 const signedNameOf = d => (d.signature && d.signature.name) || (d.sender && d.sender.fullName) || '';
-const itemLine = c => `${c.description} - ${c.condition === 'used' ? 'used' : 'new'}`;
+const itemLine = c => `${c.description}${c.condition ? ` - ${c.condition}` : ''}`;
 const valueText = v => (typeof v === 'number' ? `$${money(v)}` : '');
 const phones = p => [p.mobile, p.homePhone].filter(Boolean).map(ph).join(' / ');
 function chunks(list, size) {

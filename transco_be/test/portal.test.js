@@ -1636,7 +1636,7 @@ test('staff move a BL to the right shipment without duplicating it, and the move
   assert.equal((await db.collection('shipments').findOne({ _id: before._id })).consolidationId, null);
 });
 
-test('online booking: TVs need their screen size, odd-size items their L × W × H', async () => {
+test('online booking: TVs need their screen size; odd-size items are just a count (staff measure)', async () => {
   const acct = await signIn('0400555432');
   const options = await api('GET', '/api/portal/booking-options', { token: acct.token });
   const base = { country: 'sri_lanka', service: 'sea', deliveryType: 'collect', dropOff: nextDropOff(options.body), ...decl('Kandy') };
@@ -1644,8 +1644,16 @@ test('online booking: TVs need their screen size, odd-size items their L × W ×
   const noSize = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, items: [{ type: 'tv', qty: 2, sizes: ['46to55'] }] } });
   assert.equal(noSize.status, 400);
   assert.equal(noSize.body.field, 'items');
-  const noDims = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, items: [{ type: 'other', qty: 1 }] } });
-  assert.equal(noDims.body.field, 'items');
+  // Categories (UPB declaration): value optional; "others" needs a description.
+  const contents = [{ category: 'food', qty: 4 }, { category: 'used_clothing', qty: 10, value: 50 }, { category: 'others', description: 'Kitchen utensils', qty: 1 }];
+  const noOthersText = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, contents: [{ category: 'others', qty: 1 }], items: [{ type: 'other', qty: 1 }] } });
+  assert.equal(noOthersText.body.field, 'contents');
+  const countOnly = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, contents, items: [{ type: 'other', qty: 2 }] } });
+  assert.equal(countOnly.status, 201, JSON.stringify(countOnly.body));
+  const co = await db.collection('bookings').findOne({ _id: new ObjectId(countOnly.body.booking.id) });
+  assert.deepEqual(co.items, [{ type: 'other', qty: 2 }]);
+  assert.deepEqual(co.contents.map(c => [c.category, c.description, c.condition, c.qty, c.value]),
+    [['food', 'Food', null, 4, null], ['used_clothing', 'Clothing', 'used', 10, 50], ['others', 'Kitchen utensils', null, 1, null]]);
 
   const made = await api('POST', '/api/portal/bookings', {
     token: acct.token,

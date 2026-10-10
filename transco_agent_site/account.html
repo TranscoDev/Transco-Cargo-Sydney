@@ -242,6 +242,11 @@
   .choices.sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   @media (max-width: 520px) { .choices.sizes { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 420px) { .choices.two { grid-template-columns: 1fr; } }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat-chip { font: inherit; font-size: 14.5px; font-weight: 600; color: var(--navy); background: #fff; border: 1.5px solid #cfd4d8; border-radius: 999px; padding: 9px 14px; cursor: pointer; min-height: 42px; }
+  .cat-chip[aria-pressed="true"] { background: var(--sl-teal-deep); border-color: var(--sl-teal-deep); color: #fff; }
+  .cat-chip[aria-pressed="true"]::before { content: "✓ "; }
+  .notice.ins-rec { display: block; background: #fff4d6; border: 2px solid #e0a100; color: #5a3b00; }
   .choice { position: relative; }
   .choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .choice label { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 1.5px solid #cfd4d8; border-radius: 14px; background: #fff; cursor: pointer; min-height: 56px; justify-content: center; }
@@ -513,8 +518,8 @@
       codeTitle: "Enter your code", codeSub: "We sent a 6-digit code to WhatsApp on {phone}.", codeLabel: "6-digit code", verify: "Sign in",
       resend: "Send a new code", resendIn: "You can ask for a new code in {s} seconds.", changeNumber: "Use a different number",
       noAccountYet: "We couldn't find an account for that. Don't have an account?", signUpNow: "Sign up",
-      eachLbl: "each", teaFree: "every 3rd free", estTitle: "Approximate cost for your boxes", estPlus: "Plus the items our team will price (TV size or odd-size measurements still to add).", estAir: "Air Freight is priced by weight when we receive your boxes.", estNote: "This is only an approximate cost for the boxes. It is not your final total — door delivery and home pickup are extra, and the price can change (for example weight, size or extra services). For a rough idea of your full price, chat with our agent.", estChat: "Chat with our agent",
-      boxInfoLink: "See box sizes & prices", tvDesc: "Priced by screen size", otherDesc: "Anything that isn't a standard box", handoverQ: "How will we get your boxes?", handDrop: "I'll drop them off", handDropDesc: "At our Seven Hills warehouse", handPick: "Home pickup", handPickDesc: "We collect from the sender's address", pickupInfo: "Please call Sajith on 0468 382 023 to arrange the pickup day and confirm the pickup fee — weekdays after 5pm or any time on weekends.", pickupWhen: "Best days or times for the pickup (optional)", pickupCall: "call Sajith on 0468 382 023 to arrange it", vHandover: "Please choose drop-off or home pickup.", editBooking: "Edit booking", editIntro: "Change your boxes, delivery, drop-off or declaration details. You can change the declaration until your BL number is issued.", editDeclOnly: "Your boxes are with us, so you can now only change the declaration (sender, receiver and items) — until your BL number is issued.", cancelIntro: "Changed your mind? You can cancel this booking.", streetPh: "e.g. Unit 3, 18 Sorrell Street", auMobileHelp: "Australian mobile, e.g. 0412 345 678", vStreet: "Please enter the street address.", vSuburb: "Please enter the suburb.", vState: "Please choose the state.", vPostcode: "Please enter the 4-digit postcode.", vAuMobile: "Please enter an Australian mobile number, e.g. 0412 345 678.",
+      eachLbl: "each", teaFree: "every 3rd free", estTitle: "Approximate cost for your boxes", estPlus: "Plus the items our team will price (TV size or odd-size measurements still to add).", estAir: "Air Freight is priced by weight when we receive your boxes.", estNote: "This is only an approximate cost for the boxes. It is not your final total — door delivery and home pickup are extra, and the price can change (for example weight, size or extra services).", estChat: "Chat with our agent",
+      boxInfoLink: "See box sizes & prices", tvDesc: "Priced by screen size", otherDesc: "Anything that isn't a standard box — our team measures and prices it", handoverQ: "How will we get your boxes?", handDrop: "I'll drop them off", handDropDesc: "At our Seven Hills warehouse", handPick: "Home pickup", handPickDesc: "We collect from the sender's address", pickupInfo: "Please call Sajith on 0468 382 023 to arrange the pickup day and confirm the pickup fee — weekdays after 5pm or any time on weekends.", pickupWhen: "Best days or times for the pickup (optional)", pickupCall: "call Sajith on 0468 382 023 to arrange it", vHandover: "Please choose drop-off or home pickup.", editBooking: "Edit booking", editIntro: "Change your boxes, delivery, drop-off or declaration details. You can change the declaration until your BL number is issued.", editDeclOnly: "Your boxes are with us, so you can now only change the declaration (sender, receiver and items) — until your BL number is issued.", cancelIntro: "Changed your mind? You can cancel this booking.", streetPh: "e.g. Unit 3, 18 Sorrell Street", auMobileHelp: "Australian mobile, e.g. 0412 345 678", vStreet: "Please enter the street address.", vSuburb: "Please enter the suburb.", vState: "Please choose the state.", vPostcode: "Please enter the 4-digit postcode.", vAuMobile: "Please enter an Australian mobile number, e.g. 0412 345 678.",
       noAccountNote: "New here? Signing in creates your account. You can still chat with Transco Agent without signing in.",
       backToChat: "Back to Transco Agent",
       whyTitle: "What you get",
@@ -552,7 +557,7 @@
       noDates: "No drop-off days are available online right now. Please call us on 0434 842 023.",
       s5: "Please check your booking", s5sub: "Nothing is booked until you confirm.", edit: "Edit", confirmBooking: "Confirm booking", next: "Continue",
       vCountry: "Please choose a country.", vService: "Please choose how it should travel.", vItems: "Please add at least one item.",
-      s2inside: "What's inside your boxes?", s2insideHelp: "List everything you're sending — Customs needs it. Our staff add the values.", clothesWarn: "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.", itemN: "Item {n}", itemPh: "e.g. Chocolate", newLbl: "New", usedLbl: "Used", howMany: "How many", addItem: "+ Add another item", removeItem: "Remove", vContents: "Please describe each item, say new or used, and how many.", homeLbl: "Home phone (optional)", senderIdLbl: "Passport or NIC number", senderIdOptLbl: "Passport or NIC number (optional)", senderIdHelp: "Needed for Sri Lanka Customs.", vSenderId: "Please enter your passport or NIC number (letters and numbers only).", vHome: "Please check the home phone number, or leave it empty.", signTitle: "Insurance & declaration", insuranceQ: "Do you want your goods insured?", insYes: "Yes", insNo: "No", insuranceNote: "For insurance, please contact Supun on 03 9357 7228 for more details.", declareText: "I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.", signName: "Type your full name to sign", signatureLbl: "Signature (optional)", signHere: "Sign here with your finger", clearSig: "Clear", signLater: "You can also sign the printed form when you drop off.", vInsurance: "Please answer the insurance question.", vDeclare: "Please tick the declaration.", vSignName: "Please type your full name to sign.", insideLbl: "What's inside", insuranceLbl: "Insurance", noFormsNote: "Your declaration is done — at drop-off our staff just check your boxes and give you your BL number.",
+      s2inside: "What's inside your boxes?", s2insideHelp: "Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.", cats: { food: "Food", new_clothing: "New clothing", used_clothing: "Used clothing", new_toys: "New toys", used_toys: "Used toys", medicine: "Medicine", electrical: "Electrical", electronics: "Electronics", others: "Others" }, othersWhat: "What is it?", othersPh: "e.g. Kitchen utensils", valueAud: "Value (AUD)", optional: "Optional", estByTeam: "priced by our team", estApprox: "Approximate", estExtras: "home pickup / door delivery extra", insRecTitle: "We recommend insurance", insRecText: "You're sending a TV or electrical / electronic items. These can be damaged in transit, so it's better to use insurance.", clothesWarn: "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.", itemN: "Item {n}", itemPh: "e.g. Chocolate", newLbl: "New", usedLbl: "Used", howMany: "How many", addItem: "+ Add another item", removeItem: "Remove", vContents: "For each item, enter how many (and for Others, what it is). A value must be a number.", homeLbl: "Home phone (optional)", senderIdLbl: "Passport or NIC number", senderIdOptLbl: "Passport or NIC number (optional)", senderIdHelp: "Needed for Sri Lanka Customs.", vSenderId: "Please enter your passport or NIC number (letters and numbers only).", vHome: "Please check the home phone number, or leave it empty.", signTitle: "Insurance & declaration", insuranceQ: "Do you want your goods insured?", insYes: "Yes", insNo: "No", insuranceNote: "For insurance, please contact Supun on 03 9357 7228 for more details.", declareText: "I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.", signName: "Type your full name to sign", signatureLbl: "Signature (optional)", signHere: "Sign here with your finger", clearSig: "Clear", signLater: "You can also sign the printed form when you drop off.", vInsurance: "Please answer the insurance question.", vDeclare: "Please tick the declaration.", vSignName: "Please type your full name to sign.", insideLbl: "What's inside", insuranceLbl: "Insurance", noFormsNote: "Your declaration is done — at drop-off our staff just check your boxes and give you your BL number.",
       dgTitle: "Air Freight safety check", dgIntro: "Tick each line to confirm it is NOT in your boxes.", dgNo0: "No aerosol cans, sprays or perfumes", dgNo1: "No flammable items, explosives, magnets or hazardous items", dgNo2: "No batteries, engines, fuel or oil of any type", dgNo3: "No illicit drugs, pornography, weapons or firearms", dgNo4: "No precious jewellery, gold, precious stones, money, credit/bank cards or passports", dgMed: "Any medications?", dgMedHint: "If yes, only personal medication with a prescription.", dgLi: "Lithium batteries in any product?", dgLiHint: "For example a phone, laptop, camera or power bank.", dgLiq: "Any liquids?", dgDetails: "Type of product and quantity", dgWarn: "Undeclared dangerous goods cost at least AUD 250 per item to remove, and airport security may also fine you.", vDgNo: "Please tick each line to confirm it is not in your boxes.", vDgQ: "Please answer each Air Freight question.", vDgDetails: "Please write the type of product and quantity.",
       dgHasTitle: "These can't go by Air Freight. Our staff will check them with you at drop-off (they may need to go by Sea Freight or be taken out):", dgAck: "Yes, my boxes may contain the items I didn't tick.", vDgAck: "Please tick the lines that are not in your boxes, or confirm the ones that may be.", dgItem0: "Aerosol cans, sprays or perfumes", dgItem1: "Flammable items, explosives, magnets or hazardous items", dgItem2: "Batteries, engines, fuel or oil", dgItem3: "Illicit drugs, pornography, weapons or firearms", dgItem4: "Precious jewellery, gold, precious stones, money, cards or passports",
       vDelivery: "Please choose a delivery option.", vDay: "Please choose a day.", vTime: "Please choose a time.",
@@ -642,8 +647,8 @@
       codeTitle: "ඔයාගේ code එක දාන්න", codeSub: "{phone} WhatsApp එකට ඉලක්කම් 6ක code එකක් එව්වා.", codeLabel: "ඉලක්කම් 6ක code එක", verify: "Sign in",
       resend: "අලුත් code එකක් යවන්න", resendIn: "තත්පර {s}කින් අලුත් code එකක් ඉල්ලන්න පුළුවන්.", changeNumber: "වෙන number එකක් පාවිච්චි කරන්න",
       noAccountYet: "ඒකට account එකක් හම්බුණේ නෑ. Account එකක් නැද්ද?", signUpNow: "Sign up වෙන්න",
-      eachLbl: "එකකට", teaFree: "හැම 3වෙනි එකම නොමිලේ", estTitle: "ඔයාගේ පෙට්ටි වලට ආසන්න මිල", estPlus: "ඊට අමතරව අපේ team එක මිල කරන භාණ්ඩ (TV size හෝ මිනුම් තවම දාලා නෑ).", estAir: "Air Freight මිල ඔයාගේ පෙට්ටි ලැබුණාම බර අනුව ගණන් කරනවා.", estNote: "මේක පෙට්ටි වලට විතරක් ආසන්න මිලක්. මේක අවසාන මුළු මිල නෙවෙයි — door delivery සහ home pickup අමතරයි, බර, size හෝ අමතර සේවා අනුව මිල වෙනස් වෙන්න පුළුවන්. මුළු මිල ගැන දළ අදහසක් ගන්න අපේ agent එක්ක chat කරන්න.", estChat: "Agent එක්ක chat කරන්න",
-      boxInfoLink: "Box sizes සහ මිල බලන්න", tvDesc: "Screen size එක අනුව මිල", otherDesc: "සාමාන්‍ය box එකක් නොවන ඕනම දෙයක්", handoverQ: "ඔයාගේ පෙට්ටි අපිට ලැබෙන්නේ කොහොමද?", handDrop: "මම ගෙනත් දෙනවා", handDropDesc: "අපේ Seven Hills warehouse එකට", handPick: "ගෙදරින් ගන්න (Home pickup)", handPickDesc: "යවන කෙනාගේ ලිපිනයෙන් අපි ගන්නවා", pickupInfo: "Pickup දවස arrange කරන්නයි pickup ගාස්තුව confirm කරන්නයි කරුණාකරලා Sajith ට කතා කරන්න 0468 382 023 — සතියේ දින සවස 5න් පස්සේ හෝ සති අන්තයේ ඕනම වෙලාවක.", pickupWhen: "Pickup එකට හොඳ දවස් හෝ වෙලාවන් (අවශ්‍ය නම්)", pickupCall: "arrange කරන්න Sajith ට කතා කරන්න 0468 382 023", vHandover: "කරුණාකරලා ගෙනත් දෙනවද නැත්නම් home pickup ද කියලා තෝරන්න.", editBooking: "Booking එක වෙනස් කරන්න", editIntro: "පෙට්ටි, delivery, drop-off හෝ declaration විස්තර වෙනස් කරන්න. BL අංකය දෙනකම් declaration එක වෙනස් කරන්න පුළුවන්.", editDeclOnly: "ඔයාගේ පෙට්ටි දැන් අප ළඟ, ඒ නිසා දැන් වෙනස් කරන්න පුළුවන් declaration එක (යවන/ලබන කෙනා සහ භාණ්ඩ) විතරයි — BL අංකය දෙනකම්.", cancelIntro: "හිත වෙනස් වුණාද? මේ booking එක cancel කරන්න පුළුවන්.", streetPh: "උදා: Unit 3, 18 Sorrell Street", auMobileHelp: "ඕස්ට්‍රේලියානු mobile, උදා: 0412 345 678", vStreet: "කරුණාකරලා street address එක දාන්න.", vSuburb: "කරුණාකරලා suburb එක දාන්න.", vState: "කරුණාකරලා state එක තෝරන්න.", vPostcode: "කරුණාකරලා ඉලක්කම් 4ක postcode එක දාන්න.", vAuMobile: "කරුණාකරලා ඕස්ට්‍රේලියානු mobile අංකයක් දාන්න, උදා: 0412 345 678.",
+      eachLbl: "එකකට", teaFree: "හැම 3වෙනි එකම නොමිලේ", estTitle: "ඔයාගේ පෙට්ටි වලට ආසන්න මිල", estPlus: "ඊට අමතරව අපේ team එක මිල කරන භාණ්ඩ (TV size හෝ මිනුම් තවම දාලා නෑ).", estAir: "Air Freight මිල ඔයාගේ පෙට්ටි ලැබුණාම බර අනුව ගණන් කරනවා.", estNote: "මේක පෙට්ටි වලට විතරක් ආසන්න මිලක්. මේක අවසාන මුළු මිල නෙවෙයි — door delivery සහ home pickup අමතරයි, බර, size හෝ අමතර සේවා අනුව මිල වෙනස් වෙන්න පුළුවන්.", estChat: "Agent එක්ක chat කරන්න",
+      boxInfoLink: "Box sizes සහ මිල බලන්න", tvDesc: "Screen size එක අනුව මිල", otherDesc: "සාමාන්‍ය box එකක් නොවන ඕනම දෙයක් — අපේ team එක මැනලා මිල කරනවා", handoverQ: "ඔයාගේ පෙට්ටි අපිට ලැබෙන්නේ කොහොමද?", handDrop: "මම ගෙනත් දෙනවා", handDropDesc: "අපේ Seven Hills warehouse එකට", handPick: "ගෙදරින් ගන්න (Home pickup)", handPickDesc: "යවන කෙනාගේ ලිපිනයෙන් අපි ගන්නවා", pickupInfo: "Pickup දවස arrange කරන්නයි pickup ගාස්තුව confirm කරන්නයි කරුණාකරලා Sajith ට කතා කරන්න 0468 382 023 — සතියේ දින සවස 5න් පස්සේ හෝ සති අන්තයේ ඕනම වෙලාවක.", pickupWhen: "Pickup එකට හොඳ දවස් හෝ වෙලාවන් (අවශ්‍ය නම්)", pickupCall: "arrange කරන්න Sajith ට කතා කරන්න 0468 382 023", vHandover: "කරුණාකරලා ගෙනත් දෙනවද නැත්නම් home pickup ද කියලා තෝරන්න.", editBooking: "Booking එක වෙනස් කරන්න", editIntro: "පෙට්ටි, delivery, drop-off හෝ declaration විස්තර වෙනස් කරන්න. BL අංකය දෙනකම් declaration එක වෙනස් කරන්න පුළුවන්.", editDeclOnly: "ඔයාගේ පෙට්ටි දැන් අප ළඟ, ඒ නිසා දැන් වෙනස් කරන්න පුළුවන් declaration එක (යවන/ලබන කෙනා සහ භාණ්ඩ) විතරයි — BL අංකය දෙනකම්.", cancelIntro: "හිත වෙනස් වුණාද? මේ booking එක cancel කරන්න පුළුවන්.", streetPh: "උදා: Unit 3, 18 Sorrell Street", auMobileHelp: "ඕස්ට්‍රේලියානු mobile, උදා: 0412 345 678", vStreet: "කරුණාකරලා street address එක දාන්න.", vSuburb: "කරුණාකරලා suburb එක දාන්න.", vState: "කරුණාකරලා state එක තෝරන්න.", vPostcode: "කරුණාකරලා ඉලක්කම් 4ක postcode එක දාන්න.", vAuMobile: "කරුණාකරලා ඕස්ට්‍රේලියානු mobile අංකයක් දාන්න, උදා: 0412 345 678.",
       noAccountNote: "අලුත්ද? Sign in වුණාම ඔයාගේ account එක හැදෙනවා. Sign in නොවී Transco Agent එක්ක chat කරන්නත් පුළුවන්.",
       backToChat: "Transco Agent වෙත ආපහු",
       whyTitle: "ඔයාට ලැබෙන දේ",
@@ -678,7 +683,7 @@
       full: "පිරිලා", chooseDay: "දවසක් තෝරන්න", chooseTime: "වෙලාවක් තෝරන්න", pickupNote: "ගෙදරින් pickup එකක් ඕනද? Sajith ට 0468 382 023 අමතන්න.",
       noDates: "දැන් online drop-off දවස් නෑ. කරුණාකරලා 0434 842 023 අමතන්න.",
       s5: "කරුණාකරලා ඔයාගේ booking එක check කරන්න", s5sub: "ඔයා confirm කරනකම් මුකුත් book වෙන්නේ නෑ.", edit: "වෙනස් කරන්න", confirmBooking: "Booking එක confirm කරන්න", next: "ඉදිරියට",
-      vCountry: "කරුණාකරලා රටක් තෝරන්න.", vService: "කරුණාකරලා යවන විදිය තෝරන්න.", vItems: "කරුණාකරලා අඩුම තරමේ එක භාණ්ඩයක් එකතු කරන්න.",      s2inside: "ඔබේ box ඇතුළේ මොනවද?", s2insideHelp: "යවන හැම දෙයක්ම ලියන්න — Customs වලට ඕන. වටිනාකම අපේ staff දානවා.", clothesWarn: "👕 ලංකාවට ඇඳුම් යවනවා නම්: පාවිච්චි කරපු ඇඳුම් යවන එක ප්‍රශ්නයක් නෑ. අලුත් ඇඳුම් යවනවා නම් brand label / tag ගලවන්න එපා — label කපපු ඇඳුම්, Sri Lanka Customs commercial purpose එකකට ගෙනාපු බඩු විදිහට සලකලා ලොකු tax එකක් ගහන්න පුළුවන්.", itemN: "අයිතමය {n}", itemPh: "උදා: Chocolate", newLbl: "අලුත්", usedLbl: "පාවිච්චි කළ", howMany: "කීයද", addItem: "+ තවත් අයිතමයක්", removeItem: "ඉවත් කරන්න", vContents: "කරුණාකර හැම අයිතමයක්ම විස්තර කරලා, අලුත්ද පාවිච්චි කළද, කීයද කියන්න.", homeLbl: "ගෙදර දුරකථනය (අවශ්‍ය නම් පමණයි)", senderIdLbl: "Passport හෝ NIC අංකය", senderIdOptLbl: "Passport හෝ NIC අංකය (අවශ්‍ය නම් පමණයි)", senderIdHelp: "ශ්‍රී ලංකා Customs වලට ඕන.", vSenderId: "කරුණාකර ඔබේ passport හෝ NIC අංකය දාන්න.", vHome: "කරුණාකර ගෙදර දුරකථන අංකය බලන්න, නැත්නම් හිස්ව තියන්න.", signTitle: "Insurance සහ ප්‍රකාශය", insuranceQ: "ඔබේ බඩු insure කරන්න ඕනද?", insYes: "ඔව්", insNo: "නැහැ", insuranceNote: "Insurance සඳහා වැඩි විස්තර Supun ගෙන් අහන්න: 03 9357 7228.", declareText: "ගිනි අවි, අනතුරුදායක බඩු, රසායන, තහනම් බඩු හෝ වාණිජ ප්‍රමාණයේ බඩු මේවායේ නැති බව මම ප්‍රකාශ කරමි.", signName: "අත්සන් කිරීමට ඔබේ සම්පූර්ණ නම ලියන්න", signatureLbl: "අත්සන (අවශ්‍ය නම් පමණයි)", signHere: "ඇඟිල්ලෙන් මෙතන අත්සන් කරන්න", clearSig: "මකන්න", signLater: "Box දාන්න එද්දී print කළ පෝරමයේත් අත්සන් කරන්න පුළුවන්.", vInsurance: "කරුණාකර insurance ප්‍රශ්නයට උත්තර දෙන්න.", vDeclare: "කරුණාකර ප්‍රකාශය tick කරන්න.", vSignName: "කරුණාකර අත්සන් කිරීමට ඔබේ නම ලියන්න.", insideLbl: "ඇතුළේ තියෙන දේ", insuranceLbl: "Insurance", noFormsNote: "ඔබේ ප්‍රකාශය ඉවරයි — box දාන්න එද්දී අපේ staff box බලලා ඔබේ BL අංකය දෙනවා.",
+      vCountry: "කරුණාකරලා රටක් තෝරන්න.", vService: "කරුණාකරලා යවන විදිය තෝරන්න.", vItems: "කරුණාකරලා අඩුම තරමේ එක භාණ්ඩයක් එකතු කරන්න.",      s2inside: "ඔබේ box ඇතුළේ මොනවද?", s2insideHelp: "යවන හැම දෙයක්ම තෝරන්න — Customs වලට ඕන. වටිනාකම දාන්න ඕන නෑ; අපේ staff දානවා.", cats: { food: "ආහාර", new_clothing: "අලුත් ඇඳුම්", used_clothing: "පාවිච්චි කළ ඇඳුම්", new_toys: "අලුත් සෙල්ලම් බඩු", used_toys: "පාවිච්චි කළ සෙල්ලම් බඩු", medicine: "බෙහෙත්", electrical: "විදුලි උපකරණ", electronics: "ඉලෙක්ට්‍රොනික උපකරණ", others: "වෙනත්" }, othersWhat: "මොකක්ද?", othersPh: "උදා: කුස්සියේ බඩු", valueAud: "වටිනාකම (AUD)", optional: "අවශ්‍ය නෑ", estByTeam: "අපේ team එක මිල කරනවා", estApprox: "ආසන්න මිල", estExtras: "home pickup / door delivery අමතරයි", insRecTitle: "Insurance කරන්න අපි නිර්දේශ කරනවා", insRecText: "ඔබ TV එකක් හෝ විදුලි / ඉලෙක්ට්‍රොනික බඩු යවනවා. ප්‍රවාහනයේදී මේවාට හානි වෙන්න පුළුවන් නිසා insurance කරන එක හොඳයි.", clothesWarn: "👕 ලංකාවට ඇඳුම් යවනවා නම්: පාවිච්චි කරපු ඇඳුම් යවන එක ප්‍රශ්නයක් නෑ. අලුත් ඇඳුම් යවනවා නම් brand label / tag ගලවන්න එපා — label කපපු ඇඳුම්, Sri Lanka Customs commercial purpose එකකට ගෙනාපු බඩු විදිහට සලකලා ලොකු tax එකක් ගහන්න පුළුවන්.", itemN: "අයිතමය {n}", itemPh: "උදා: Chocolate", newLbl: "අලුත්", usedLbl: "පාවිච්චි කළ", howMany: "කීයද", addItem: "+ තවත් අයිතමයක්", removeItem: "ඉවත් කරන්න", vContents: "හැම එකකටම කීයද කියලා දාන්න (වෙනත් නම් මොකක්ද කියලත්). වටිනාකම අංකයක් වෙන්න ඕන.", homeLbl: "ගෙදර දුරකථනය (අවශ්‍ය නම් පමණයි)", senderIdLbl: "Passport හෝ NIC අංකය", senderIdOptLbl: "Passport හෝ NIC අංකය (අවශ්‍ය නම් පමණයි)", senderIdHelp: "ශ්‍රී ලංකා Customs වලට ඕන.", vSenderId: "කරුණාකර ඔබේ passport හෝ NIC අංකය දාන්න.", vHome: "කරුණාකර ගෙදර දුරකථන අංකය බලන්න, නැත්නම් හිස්ව තියන්න.", signTitle: "Insurance සහ ප්‍රකාශය", insuranceQ: "ඔබේ බඩු insure කරන්න ඕනද?", insYes: "ඔව්", insNo: "නැහැ", insuranceNote: "Insurance සඳහා වැඩි විස්තර Supun ගෙන් අහන්න: 03 9357 7228.", declareText: "ගිනි අවි, අනතුරුදායක බඩු, රසායන, තහනම් බඩු හෝ වාණිජ ප්‍රමාණයේ බඩු මේවායේ නැති බව මම ප්‍රකාශ කරමි.", signName: "අත්සන් කිරීමට ඔබේ සම්පූර්ණ නම ලියන්න", signatureLbl: "අත්සන (අවශ්‍ය නම් පමණයි)", signHere: "ඇඟිල්ලෙන් මෙතන අත්සන් කරන්න", clearSig: "මකන්න", signLater: "Box දාන්න එද්දී print කළ පෝරමයේත් අත්සන් කරන්න පුළුවන්.", vInsurance: "කරුණාකර insurance ප්‍රශ්නයට උත්තර දෙන්න.", vDeclare: "කරුණාකර ප්‍රකාශය tick කරන්න.", vSignName: "කරුණාකර අත්සන් කිරීමට ඔබේ නම ලියන්න.", insideLbl: "ඇතුළේ තියෙන දේ", insuranceLbl: "Insurance", noFormsNote: "ඔබේ ප්‍රකාශය ඉවරයි — box දාන්න එද්දී අපේ staff box බලලා ඔබේ BL අංකය දෙනවා.",
       dgTitle: "Air Freight ආරක්ෂක පරීක්ෂාව", dgIntro: "ඔබේ box වල මේවා නැති බව තහවුරු කිරීමට හැම පේළියක්ම tick කරන්න.", dgNo0: "Aerosol කෑන්, sprays හෝ සුවඳ විලවුන් නැත", dgNo1: "ගිනි ගන්නා බඩු, පුපුරණ ද්‍රව්‍ය, චුම්බක හෝ අනතුරුදායක බඩු නැත", dgNo2: "කිසිම වර්ගයක batteries, එන්ජින්, ඉන්ධන හෝ තෙල් නැත", dgNo3: "නීති විරෝධී මත්ද්‍රව්‍ය, අසභ්‍ය දේ, ආයුධ හෝ ගිනි අවි නැත", dgNo4: "වටිනා ස්වර්ණාභරණ, රත්තරන්, මැණික්, මුදල්, credit/bank cards හෝ passports නැත", dgMed: "බෙහෙත් තියෙනවද?", dgMedHint: "ඔව් නම්, prescription එකක් සමඟ පුද්ගලික බෙහෙත් පමණයි.", dgLi: "කිසියම් භාණ්ඩයක lithium batteries තියෙනවද?", dgLiHint: "උදා: phone, laptop, camera හෝ power bank.", dgLiq: "ද්‍රව තියෙනවද?", dgDetails: "භාණ්ඩ වර්ගය සහ ප්‍රමාණය", dgWarn: "ප්‍රකාශ නොකළ අනතුරුදායක බඩු ඉවත් කිරීමට එක බඩුවකට අවම AUD 250ක් වැය වෙනවා, ගුවන්තොටුපොළ ආරක්ෂාවෙනුත් දඩ ගැසිය හැක.", vDgNo: "කරුණාකර හැම පේළියක්ම tick කරන්න.", vDgQ: "කරුණාකර හැම Air Freight ප්‍රශ්නයකටම උත්තර දෙන්න.", vDgDetails: "කරුණාකර භාණ්ඩ වර්ගය සහ ප්‍රමාණය ලියන්න.",
       dgHasTitle: "මේවා Air Freight වලින් යවන්න බෑ. Box දාන්න එද්දී අපේ staff ඔබත් එක්ක මේවා බලනවා (Sea Freight වලින් යවන්න හෝ ඉවත් කරන්න වෙන්න පුළුවන්):", dgAck: "ඔව්, මම tick නොකළ බඩු මගේ box වල තියෙන්න පුළුවන්.", vDgAck: "කරුණාකර box වල නැති පේළි tick කරන්න, නැත්නම් තියෙන්න පුළුවන් ඒවා තහවුරු කරන්න.", dgItem0: "Aerosol කෑන්, sprays හෝ සුවඳ විලවුන්", dgItem1: "ගිනි ගන්නා බඩු, පුපුරණ ද්‍රව්‍ය, චුම්බක හෝ අනතුරුදායක බඩු", dgItem2: "Batteries, එන්ජින්, ඉන්ධන හෝ තෙල්", dgItem3: "නීති විරෝධී මත්ද්‍රව්‍ය, අසභ්‍ය දේ, ආයුධ හෝ ගිනි අවි", dgItem4: "වටිනා ස්වර්ණාභරණ, රත්තරන්, මැණික්, මුදල්, cards හෝ passports",
       vDelivery: "කරුණාකරලා delivery විදියක් තෝරන්න.", vDay: "කරුණාකරලා දවසක් තෝරන්න.", vTime: "කරුණාකරලා වෙලාවක් තෝරන්න.",
@@ -764,8 +769,8 @@
       codeTitle: "உங்கள் code ஐ உள்ளிடுங்கள்", codeSub: "{phone} WhatsApp க்கு 6 இலக்க code அனுப்பினோம்.", codeLabel: "6 இலக்க code", verify: "Sign in",
       resend: "புதிய code அனுப்பு", resendIn: "{s} வினாடிகளில் புதிய code கேட்கலாம்.", changeNumber: "வேறு number ஐப் பயன்படுத்து",
       noAccountYet: "அதற்கான account கிடைக்கவில்லை. Account இல்லையா?", signUpNow: "Sign up செய்யுங்கள்",
-      eachLbl: "ஒன்றுக்கு", teaFree: "ஒவ்வொரு 3வதும் இலவசம்", estTitle: "உங்கள் பெட்டிகளுக்கான தோராயமான விலை", estPlus: "மேலும் எங்கள் team விலையிடும் பொருட்கள் (TV size அல்லது அளவுகள் இன்னும் சேர்க்கப்படவில்லை).", estAir: "Air Freight விலை உங்கள் பெட்டிகளைப் பெற்றதும் எடையைப் பொறுத்து கணக்கிடப்படும்.", estNote: "இது பெட்டிகளுக்கான தோராயமான விலை மட்டுமே. இது உங்கள் இறுதி மொத்தம் அல்ல — door delivery மற்றும் home pickup கூடுதல், விலை மாறலாம் (எ.கா. எடை, அளவு அல்லது கூடுதல் சேவைகள்). முழு விலையைப் பற்றி தோராயமாக அறிய எங்கள் agent உடன் chat செய்யுங்கள்.", estChat: "எங்கள் agent உடன் chat செய்யுங்கள்",
-      boxInfoLink: "Box அளவுகள் & விலைகளைப் பார்", tvDesc: "Screen size ஐப் பொறுத்து விலை", otherDesc: "வழக்கமான பெட்டி அல்லாத எதுவும்", handoverQ: "உங்கள் பெட்டிகள் எங்களிடம் எப்படி வரும்?", handDrop: "நானே கொண்டு வருவேன்", handDropDesc: "எங்கள் Seven Hills கிடங்குக்கு", handPick: "வீட்டிலிருந்து எடுத்தல் (Home pickup)", handPickDesc: "அனுப்புபவரின் முகவரியிலிருந்து நாங்கள் எடுப்போம்", pickupInfo: "Pickup நாளை ஏற்பாடு செய்யவும் கட்டணத்தை உறுதிப்படுத்தவும் Sajith ஐ அழையுங்கள் 0468 382 023 — வார நாட்களில் மாலை 5க்குப் பின் அல்லது வார இறுதியில் எப்போதும்.", pickupWhen: "Pickup க்கு வசதியான நாட்கள் அல்லது நேரங்கள் (விருப்பம்)", pickupCall: "ஏற்பாடு செய்ய Sajith ஐ அழையுங்கள் 0468 382 023", vHandover: "கொண்டு வருவதா அல்லது home pickup ஆ என்று தேர்ந்தெடுக்கவும்.", editBooking: "Booking ஐ மாற்று", editIntro: "பெட்டிகள், delivery, drop-off அல்லது declaration விவரங்களை மாற்றுங்கள். BL எண் வழங்கப்படும் வரை declaration ஐ மாற்றலாம்.", editDeclOnly: "உங்கள் பெட்டிகள் எங்களிடம் உள்ளன, எனவே இப்போது declaration (அனுப்புபவர், பெறுபவர், பொருட்கள்) மட்டுமே மாற்றலாம் — BL எண் வழங்கப்படும் வரை.", cancelIntro: "மனம் மாறிவிட்டதா? இந்த booking ஐ cancel செய்யலாம்.", streetPh: "உதா: Unit 3, 18 Sorrell Street", auMobileHelp: "ஆஸ்திரேலிய mobile, உதா: 0412 345 678", vStreet: "தெரு முகவரியை உள்ளிடவும்.", vSuburb: "Suburb ஐ உள்ளிடவும்.", vState: "State ஐத் தேர்ந்தெடுக்கவும்.", vPostcode: "4 இலக்க postcode ஐ உள்ளிடவும்.", vAuMobile: "ஆஸ்திரேலிய mobile எண்ணை உள்ளிடவும், உதா: 0412 345 678.",
+      eachLbl: "ஒன்றுக்கு", teaFree: "ஒவ்வொரு 3வதும் இலவசம்", estTitle: "உங்கள் பெட்டிகளுக்கான தோராயமான விலை", estPlus: "மேலும் எங்கள் team விலையிடும் பொருட்கள் (TV size அல்லது அளவுகள் இன்னும் சேர்க்கப்படவில்லை).", estAir: "Air Freight விலை உங்கள் பெட்டிகளைப் பெற்றதும் எடையைப் பொறுத்து கணக்கிடப்படும்.", estNote: "இது பெட்டிகளுக்கான தோராயமான விலை மட்டுமே. இது உங்கள் இறுதி மொத்தம் அல்ல — door delivery மற்றும் home pickup கூடுதல், விலை மாறலாம் (எ.கா. எடை, அளவு அல்லது கூடுதல் சேவைகள்).", estChat: "எங்கள் agent உடன் chat செய்யுங்கள்",
+      boxInfoLink: "Box அளவுகள் & விலைகளைப் பார்", tvDesc: "Screen size ஐப் பொறுத்து விலை", otherDesc: "வழக்கமான பெட்டி அல்லாத எதுவும் — எங்கள் team அளந்து விலையிடும்", handoverQ: "உங்கள் பெட்டிகள் எங்களிடம் எப்படி வரும்?", handDrop: "நானே கொண்டு வருவேன்", handDropDesc: "எங்கள் Seven Hills கிடங்குக்கு", handPick: "வீட்டிலிருந்து எடுத்தல் (Home pickup)", handPickDesc: "அனுப்புபவரின் முகவரியிலிருந்து நாங்கள் எடுப்போம்", pickupInfo: "Pickup நாளை ஏற்பாடு செய்யவும் கட்டணத்தை உறுதிப்படுத்தவும் Sajith ஐ அழையுங்கள் 0468 382 023 — வார நாட்களில் மாலை 5க்குப் பின் அல்லது வார இறுதியில் எப்போதும்.", pickupWhen: "Pickup க்கு வசதியான நாட்கள் அல்லது நேரங்கள் (விருப்பம்)", pickupCall: "ஏற்பாடு செய்ய Sajith ஐ அழையுங்கள் 0468 382 023", vHandover: "கொண்டு வருவதா அல்லது home pickup ஆ என்று தேர்ந்தெடுக்கவும்.", editBooking: "Booking ஐ மாற்று", editIntro: "பெட்டிகள், delivery, drop-off அல்லது declaration விவரங்களை மாற்றுங்கள். BL எண் வழங்கப்படும் வரை declaration ஐ மாற்றலாம்.", editDeclOnly: "உங்கள் பெட்டிகள் எங்களிடம் உள்ளன, எனவே இப்போது declaration (அனுப்புபவர், பெறுபவர், பொருட்கள்) மட்டுமே மாற்றலாம் — BL எண் வழங்கப்படும் வரை.", cancelIntro: "மனம் மாறிவிட்டதா? இந்த booking ஐ cancel செய்யலாம்.", streetPh: "உதா: Unit 3, 18 Sorrell Street", auMobileHelp: "ஆஸ்திரேலிய mobile, உதா: 0412 345 678", vStreet: "தெரு முகவரியை உள்ளிடவும்.", vSuburb: "Suburb ஐ உள்ளிடவும்.", vState: "State ஐத் தேர்ந்தெடுக்கவும்.", vPostcode: "4 இலக்க postcode ஐ உள்ளிடவும்.", vAuMobile: "ஆஸ்திரேலிய mobile எண்ணை உள்ளிடவும், உதா: 0412 345 678.",
       noAccountNote: "புதியவரா? Sign in செய்தால் உங்கள் account உருவாகும். Sign in செய்யாமலும் Transco Agent உடன் chat செய்யலாம்.",
       backToChat: "Transco Agent க்குத் திரும்பு",
       whyTitle: "உங்களுக்குக் கிடைப்பவை",
@@ -800,7 +805,7 @@
       full: "நிரம்பியது", chooseDay: "ஒரு நாளைத் தேர்ந்தெடுங்கள்", chooseTime: "ஒரு நேரத்தைத் தேர்ந்தெடுங்கள்", pickupNote: "வீட்டிலிருந்து pickup வேண்டுமா? Sajith ஐ 0468 382 023 இல் அழையுங்கள்.",
       noDates: "இப்போது online இல் drop-off நாட்கள் இல்லை. 0434 842 023 ஐ அழையுங்கள்.",
       s5: "உங்கள் booking ஐச் சரிபாருங்கள்", s5sub: "நீங்கள் confirm செய்யும் வரை எதுவும் book ஆகாது.", edit: "மாற்று", confirmBooking: "Booking ஐ confirm செய்", next: "தொடர்",
-      vCountry: "ஒரு நாட்டைத் தேர்ந்தெடுக்கவும்.", vService: "அனுப்பும் முறையைத் தேர்ந்தெடுக்கவும்.", vItems: "குறைந்தது ஒரு பொருளைச் சேர்க்கவும்.",      s2inside: "உங்கள் பெட்டிகளில் என்ன இருக்கிறது?", s2insideHelp: "அனுப்பும் அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை. மதிப்புகளை எங்கள் staff சேர்ப்பார்கள்.", clothesWarn: "👕 இலங்கைக்கு ஆடைகள் அனுப்பினால்: பயன்படுத்திய ஆடைகளை அனுப்புவதில் பிரச்சினை இல்லை. புதிய ஆடைகள் அனுப்பினால் brand label / tag ஐ அகற்ற வேண்டாம் — label வெட்டப்பட்ட ஆடைகளை Sri Lanka Customs commercial நோக்கத்திற்கான பொருட்களாக கருதி அதிக வரி விதிக்கலாம்.", itemN: "பொருள் {n}", itemPh: "உதா: Chocolate", newLbl: "புதியது", usedLbl: "பயன்படுத்தியது", howMany: "எத்தனை", addItem: "+ இன்னொரு பொருள்", removeItem: "நீக்கு", vContents: "ஒவ்வொரு பொருளையும் விவரித்து, புதியதா பயன்படுத்தியதா, எத்தனை என்று சொல்லுங்கள்.", homeLbl: "வீட்டு தொலைபேசி (விருப்பமானால்)", senderIdLbl: "Passport அல்லது NIC எண்", senderIdOptLbl: "Passport அல்லது NIC எண் (விருப்பமானால்)", senderIdHelp: "இலங்கை Customs க்கு தேவை.", vSenderId: "உங்கள் passport அல்லது NIC எண்ணை உள்ளிடுங்கள்.", vHome: "வீட்டு தொலைபேசி எண்ணைச் சரிபாருங்கள், அல்லது காலியாக விடுங்கள்.", signTitle: "Insurance மற்றும் அறிவிப்பு", insuranceQ: "உங்கள் பொருட்களுக்கு insurance வேண்டுமா?", insYes: "ஆம்", insNo: "இல்லை", insuranceNote: "Insurance பற்றிய மேலும் விவரங்களுக்கு Supun ஐ அழையுங்கள்: 03 9357 7228.", declareText: "துப்பாக்கிகள், ஆபத்தான பொருட்கள், இரசாயனங்கள், தடைசெய்யப்பட்ட பொருட்கள் அல்லது வணிக அளவிலான பொருட்கள் இவற்றில் இல்லை என்று நான் அறிவிக்கிறேன்.", signName: "கையொப்பமிட உங்கள் முழுப் பெயரை எழுதுங்கள்", signatureLbl: "கையொப்பம் (விருப்பமானால்)", signHere: "விரலால் இங்கே கையொப்பமிடுங்கள்", clearSig: "அழி", signLater: "பெட்டிகளைக் கொடுக்கும்போது அச்சிட்ட படிவத்திலும் கையொப்பமிடலாம்.", vInsurance: "Insurance கேள்விக்கு பதிலளியுங்கள்.", vDeclare: "அறிவிப்பை tick செய்யுங்கள்.", vSignName: "கையொப்பமிட உங்கள் பெயரை எழுதுங்கள்.", insideLbl: "உள்ளே இருப்பவை", insuranceLbl: "Insurance", noFormsNote: "உங்கள் அறிவிப்பு முடிந்தது — பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff சரிபார்த்து உங்கள் BL எண்ணைத் தருவார்கள்.",
+      vCountry: "ஒரு நாட்டைத் தேர்ந்தெடுக்கவும்.", vService: "அனுப்பும் முறையைத் தேர்ந்தெடுக்கவும்.", vItems: "குறைந்தது ஒரு பொருளைச் சேர்க்கவும்.",      s2inside: "உங்கள் பெட்டிகளில் என்ன இருக்கிறது?", s2insideHelp: "அனுப்பும் அனைத்தையும் தேர்ந்தெடுங்கள் — Customs க்கு தேவை. மதிப்பு கட்டாயமில்லை; எங்கள் staff சேர்ப்பார்கள்.", cats: { food: "உணவு", new_clothing: "புதிய ஆடைகள்", used_clothing: "பயன்படுத்திய ஆடைகள்", new_toys: "புதிய பொம்மைகள்", used_toys: "பயன்படுத்திய பொம்மைகள்", medicine: "மருந்து", electrical: "மின் சாதனங்கள்", electronics: "இலத்திரனியல் பொருட்கள்", others: "மற்றவை" }, othersWhat: "அது என்ன?", othersPh: "உதா: சமையலறை பாத்திரங்கள்", valueAud: "மதிப்பு (AUD)", optional: "கட்டாயமில்லை", estByTeam: "எங்கள் team விலையிடும்", estApprox: "தோராயமாக", estExtras: "home pickup / door delivery கூடுதல்", insRecTitle: "Insurance செய்ய பரிந்துரைக்கிறோம்", insRecText: "நீங்கள் TV அல்லது மின் / இலத்திரனியல் பொருட்களை அனுப்புகிறீர்கள். போக்குவரத்தில் இவை சேதமடையலாம், எனவே insurance செய்வது நல்லது.", clothesWarn: "👕 இலங்கைக்கு ஆடைகள் அனுப்பினால்: பயன்படுத்திய ஆடைகளை அனுப்புவதில் பிரச்சினை இல்லை. புதிய ஆடைகள் அனுப்பினால் brand label / tag ஐ அகற்ற வேண்டாம் — label வெட்டப்பட்ட ஆடைகளை Sri Lanka Customs commercial நோக்கத்திற்கான பொருட்களாக கருதி அதிக வரி விதிக்கலாம்.", itemN: "பொருள் {n}", itemPh: "உதா: Chocolate", newLbl: "புதியது", usedLbl: "பயன்படுத்தியது", howMany: "எத்தனை", addItem: "+ இன்னொரு பொருள்", removeItem: "நீக்கு", vContents: "ஒவ்வொன்றுக்கும் எத்தனை என்று உள்ளிடவும் (மற்றவை என்றால் அது என்ன என்றும்). மதிப்பு ஒரு எண்ணாக இருக்க வேண்டும்.", homeLbl: "வீட்டு தொலைபேசி (விருப்பமானால்)", senderIdLbl: "Passport அல்லது NIC எண்", senderIdOptLbl: "Passport அல்லது NIC எண் (விருப்பமானால்)", senderIdHelp: "இலங்கை Customs க்கு தேவை.", vSenderId: "உங்கள் passport அல்லது NIC எண்ணை உள்ளிடுங்கள்.", vHome: "வீட்டு தொலைபேசி எண்ணைச் சரிபாருங்கள், அல்லது காலியாக விடுங்கள்.", signTitle: "Insurance மற்றும் அறிவிப்பு", insuranceQ: "உங்கள் பொருட்களுக்கு insurance வேண்டுமா?", insYes: "ஆம்", insNo: "இல்லை", insuranceNote: "Insurance பற்றிய மேலும் விவரங்களுக்கு Supun ஐ அழையுங்கள்: 03 9357 7228.", declareText: "துப்பாக்கிகள், ஆபத்தான பொருட்கள், இரசாயனங்கள், தடைசெய்யப்பட்ட பொருட்கள் அல்லது வணிக அளவிலான பொருட்கள் இவற்றில் இல்லை என்று நான் அறிவிக்கிறேன்.", signName: "கையொப்பமிட உங்கள் முழுப் பெயரை எழுதுங்கள்", signatureLbl: "கையொப்பம் (விருப்பமானால்)", signHere: "விரலால் இங்கே கையொப்பமிடுங்கள்", clearSig: "அழி", signLater: "பெட்டிகளைக் கொடுக்கும்போது அச்சிட்ட படிவத்திலும் கையொப்பமிடலாம்.", vInsurance: "Insurance கேள்விக்கு பதிலளியுங்கள்.", vDeclare: "அறிவிப்பை tick செய்யுங்கள்.", vSignName: "கையொப்பமிட உங்கள் பெயரை எழுதுங்கள்.", insideLbl: "உள்ளே இருப்பவை", insuranceLbl: "Insurance", noFormsNote: "உங்கள் அறிவிப்பு முடிந்தது — பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff சரிபார்த்து உங்கள் BL எண்ணைத் தருவார்கள்.",
       dgTitle: "Air Freight பாதுகாப்பு சரிபார்ப்பு", dgIntro: "இவை உங்கள் பெட்டிகளில் இல்லை என்பதை உறுதிப்படுத்த ஒவ்வொரு வரியையும் tick செய்யுங்கள்.", dgNo0: "Aerosol கேன்கள், sprays அல்லது வாசனை திரவியங்கள் இல்லை", dgNo1: "தீப்பற்றக்கூடியவை, வெடிபொருட்கள், காந்தங்கள் அல்லது ஆபத்தான பொருட்கள் இல்லை", dgNo2: "எந்த வகை batteries, இயந்திரங்கள், எரிபொருள் அல்லது எண்ணெயும் இல்லை", dgNo3: "சட்டவிரோத போதைப்பொருள், ஆபாசப் பொருட்கள், ஆயுதங்கள் அல்லது துப்பாக்கிகள் இல்லை", dgNo4: "விலையுயர்ந்த நகைகள், தங்கம், இரத்தினங்கள், பணம், credit/bank cards அல்லது passports இல்லை", dgMed: "மருந்துகள் உள்ளனவா?", dgMedHint: "ஆம் எனில், prescription உடன் சொந்த மருந்துகள் மட்டும்.", dgLi: "ஏதேனும் பொருளில் lithium batteries உள்ளனவா?", dgLiHint: "உதா: phone, laptop, camera அல்லது power bank.", dgLiq: "திரவங்கள் உள்ளனவா?", dgDetails: "பொருள் வகை மற்றும் அளவு", dgWarn: "அறிவிக்கப்படாத ஆபத்தான பொருட்களை அகற்ற ஒரு பொருளுக்கு குறைந்தது AUD 250 செலவாகும், விமான நிலைய பாதுகாப்பும் அபராதம் விதிக்கலாம்.", vDgNo: "தயவுசெய்து ஒவ்வொரு வரியையும் tick செய்யுங்கள்.", vDgQ: "ஒவ்வொரு Air Freight கேள்விக்கும் பதிலளியுங்கள்.", vDgDetails: "பொருள் வகை மற்றும் அளவை எழுதுங்கள்.",
       dgHasTitle: "இவை Air Freight இல் அனுப்ப முடியாது. பெட்டிகளைக் கொடுக்கும்போது எங்கள் staff உங்களுடன் சரிபார்ப்பார்கள் (Sea Freight இல் அனுப்பவோ அகற்றவோ வேண்டியிருக்கலாம்):", dgAck: "ஆம், நான் tick செய்யாத பொருட்கள் என் பெட்டிகளில் இருக்கலாம்.", vDgAck: "பெட்டிகளில் இல்லாத வரிகளை tick செய்யுங்கள், அல்லது இருக்கக்கூடியவற்றை உறுதிப்படுத்துங்கள்.", dgItem0: "Aerosol கேன்கள், sprays அல்லது வாசனை திரவியங்கள்", dgItem1: "தீப்பற்றக்கூடியவை, வெடிபொருட்கள், காந்தங்கள் அல்லது ஆபத்தான பொருட்கள்", dgItem2: "Batteries, இயந்திரங்கள், எரிபொருள் அல்லது எண்ணெய்", dgItem3: "சட்டவிரோத போதைப்பொருள், ஆபாசப் பொருட்கள், ஆயுதங்கள் அல்லது துப்பாக்கிகள்", dgItem4: "விலையுயர்ந்த நகைகள், தங்கம், இரத்தினங்கள், பணம், cards அல்லது passports",
       vDelivery: "Delivery முறையைத் தேர்ந்தெடுக்கவும்.", vDay: "ஒரு நாளைத் தேர்ந்தெடுக்கவும்.", vTime: "ஒரு நேரத்தைத் தேர்ந்தெடுக்கவும்.",
@@ -1947,7 +1952,17 @@
     d.canChangeBoxes = e.canChangeBoxes;
     d.sender = Object.assign({ isMe: true }, blankPerson(), e.sender || {});
     d.receiver = Object.assign(blankPerson(), e.receiver || {});
-    if (e.contents && e.contents.length) d.contents = e.contents.map(function (c) { return { description: c.description || "", condition: c.condition || "", qty: String(c.qty || 1) }; });
+    if (e.contents && e.contents.length) {
+      // One row per category (older bookings may list several free-text items).
+      d.contents = [];
+      e.contents.map(contentRow).forEach(function (c) {
+        var same = d.contents.filter(function (x) { return x.category === c.category; })[0];
+        if (!same) { d.contents.push(c); return; }
+        same.qty = String(Number(same.qty) + Number(c.qty));
+        if (c.description) same.description = (same.description ? same.description + ", " : "") + c.description;
+        if (c.value !== "") same.value = String(Number(same.value || 0) + Number(c.value));
+      });
+    }
     d.country = e.country; d.service = e.service; d.deliveryType = e.deliveryType;
     d.handover = e.handover; d.pickupNote = e.pickupNote || ""; d.notes = e.notes || "";
     d.date = e.dropOff ? e.dropOff.date : null; d.time = e.dropOff ? e.dropOff.time : null; d.origDate = d.date;
@@ -1983,17 +1998,14 @@
       var boxes = draft.canChangeBoxes;
       var s = checkPerson(draft.sender, false, senderIdMode());
       var r = checkPerson(draft.receiver, true);
-      var badItem = !draft.contents.length || draft.contents.some(function (c) {
-        var q = Number(c.qty);
-        return (c.description || "").trim().length < 2 || !c.condition || !(Math.floor(q) === q && q >= 1 && q <= 999);
-      });
+      var badItem = contentsBad();
       var problem = (boxes && !draft.deliveryType) ? t("vDelivery") : (boxes && itemsProblem()) || (badItem ? t("vContents") : null) ||
         (s ? { msg: s.msg, field: "s-" + s.key } : null) || (r ? { msg: r.msg, field: "r-" + r.key } : null) || (boxes && handoverProblem());
       if (problem) { flagProblem(problem); return; }
       save.disabled = true; save.textContent = t("saving");
       var payload = {
         sender: personPayload(draft.sender, false), receiver: personPayload(draft.receiver, true),
-        contents: draft.contents.map(function (c) { return { description: c.description.trim(), condition: c.condition, qty: Number(c.qty) }; })
+        contents: contentsPayload()
       };
       if (boxes) Object.assign(payload, handoverPayload(), { items: selectedItems(), deliveryType: draft.deliveryType, notes: draft.notes.trim() });
       api("PATCH", "/bookings/" + encodeURIComponent(b.id), payload).then(function () {
@@ -2042,7 +2054,38 @@
   // the external declaration form for online bookings.
 
   function blankPerson() { return { fullName: "", address: "", town: "", mobile: "", email: "", idNumber: "", homePhone: "" }; }
-  function blankItem() { return { description: "", condition: "", qty: "1" }; }
+  // What's inside the boxes — the UPB Gift Cargo Declaration categories.
+  // Clothes and toys carry new/used in the category itself.
+  var CONTENT_CATS = ["food", "new_clothing", "used_clothing", "new_toys", "used_toys", "medicine", "electrical", "electronics", "others"];
+  function catLabel(key) { return (STRINGS[lang].cats || STRINGS.en.cats)[key] || key; }
+  // A booking saved before categories (free-text rows) shows as "Others".
+  function contentRow(c) {
+    var cat = CONTENT_CATS.indexOf(c.category) !== -1 ? c.category : "others";
+    var desc = cat === "others" ? (c.description || "") + (c.category ? "" : c.condition === "used" ? " (used)" : "") : "";
+    return { category: cat, description: desc, qty: String(c.qty || 1), value: c.value === null || c.value === undefined ? "" : String(c.value) };
+  }
+  function contentsPayload() {
+    return draft.contents.map(function (c) {
+      var out = { category: c.category, qty: Number(c.qty) };
+      if (c.category === "others") out.description = c.description.trim();
+      if (String(c.value).trim() !== "") out.value = Number(c.value);
+      return out;
+    });
+  }
+  function contentsBad() {
+    if (!draft.contents.length) return true;
+    return draft.contents.some(function (c) {
+      var q = Number(c.qty), v = String(c.value || "").trim();
+      return (c.category === "others" && (c.description || "").trim().length < 2) ||
+        !(Math.floor(q) === q && q >= 1 && q <= 999) ||
+        (v !== "" && !(isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100000));
+    });
+  }
+  // TVs, electrical or electronic goods: insurance is recommended (and
+  // pre-ticked — the customer can still say No).
+  function needsInsurance() {
+    return (draft.qty.tv || 0) > 0 || draft.contents.some(function (c) { return c.category === "electrical" || c.category === "electronics"; });
+  }
 
   function freshDraft() {
     return {
@@ -2055,7 +2098,7 @@
       sender: null, meSender: null, receiver: blankPerson(), receiverPick: null,
       // The rest of the declaration — collected now, so nothing is filled
       // in again at drop-off (staff only value the items and give the BL).
-      contents: [blankItem()], insurance: null, declarationAccepted: false, signedName: "",
+      contents: [], insurance: null, declarationAccepted: false, signedName: "",
       // Air Freight: the Dangerous & Restricted Goods Checklist answers.
       dg: { no: [false, false, false, false, false], medications: null, lithium: null, lithiumDetails: "", liquids: null, liquidsDetails: "" }
     };
@@ -2221,7 +2264,6 @@
     return c.itemTypes.filter(function (it) { return draft.qty[it.key] > 0; }).map(function (it) {
       var qty = draft.qty[it.key], item = { type: it.key, qty: qty };
       if (it.key === "tv") item.sizes = draft.tvSizes.slice(0, qty);
-      if (it.key === "other") item.dims = draft.oddDims.slice(0, qty).map(function (d) { return { l: Number(d.l), w: Number(d.w), h: Number(d.h) }; });
       return item;
     });
   }
@@ -2245,29 +2287,31 @@
   // or home pickup — the page says so.
   var BOX_PRICE = { tea_chest: 75, gift_box: 45, wine_box: 30, quarter_cbm: 150 };
   var INDIA_PRICE = { general: [400, 600, 800], tea_chest: [600, 900, 1200], quarter_cbm: [600, 900, 1200] };
+  // Returns { total, unknown, lines: [{ label, amount|null }] } — amount
+  // null = our team prices it (odd-size items, a TV size not chosen yet).
   function boxesEstimate() {
     if (draft.service !== "sea") return null;
-    var q = draft.qty, total = 0, unknown = false;
+    var q = draft.qty, total = 0, unknown = false, lines = [];
+    function line(label, amount) { lines.push({ label: label, amount: amount }); if (amount === null) unknown = true; else total += amount; }
     if (draft.country === "india") {
       Object.keys(INDIA_PRICE).forEach(function (k) {
         var n = q[k] || 0, p = INDIA_PRICE[k];
-        if (n) total += n <= 3 ? p[n - 1] : p[2] + (n - 3) * (p[2] - p[1]);
+        if (n) line(n + " × " + itemLabel(k), n <= 3 ? p[n - 1] : p[2] + (n - 3) * (p[2] - p[1]));
       });
-      if (q.other) unknown = true;
     } else {
-      for (var p = 1; p <= (q.tea_chest || 0); p++) total += p % 3 === 0 ? 0 : 75;
-      ["gift_box", "wine_box", "quarter_cbm"].forEach(function (k) { total += (q[k] || 0) * BOX_PRICE[k]; });
+      if (q.tea_chest) {
+        var tea = 0;
+        for (var p = 1; p <= q.tea_chest; p++) tea += p % 3 === 0 ? 0 : 75;
+        line(q.tea_chest + " × " + itemLabel("tea_chest") + (q.tea_chest >= 3 ? " (" + t("teaFree") + ")" : ""), tea);
+      }
+      ["gift_box", "wine_box", "quarter_cbm"].forEach(function (k) { if (q[k]) line(q[k] + " × " + itemLabel(k), q[k] * BOX_PRICE[k]); });
       for (var i = 0; i < (q.tv || 0); i++) {
         var band = TV_SIZES.filter(function (s) { return s.key === draft.tvSizes[i]; })[0];
-        if (band && band.price) total += band.price; else unknown = true;
-      }
-      for (var j = 0; j < (q.other || 0); j++) {
-        var d = draft.oddDims[j] || {};
-        if (validDim(d.l || "") && validDim(d.w || "") && validDim(d.h || "")) total += Math.ceil(d.l * d.w * d.h / 1e6 * 550);
-        else unknown = true;
+        line(itemLabel("tv") + (band && band.label ? " " + band.label : ""), band && band.price ? band.price : null);
       }
     }
-    return { total: total, unknown: unknown };
+    if (q.other) line(q.other + " × " + itemLabel("other"), null);
+    return { total: total, unknown: unknown, lines: lines };
   }
 
   // The box under the list: approximate cost + what it doesn't include.
@@ -2279,13 +2323,17 @@
       el.hidden = !any;
       if (!any) return;
       el.replaceChildren();
+      var row = "display:flex;justify-content:space-between;gap:12px";
       append(el, [
-        est ? h("div", { style: "display:flex;justify-content:space-between;gap:12px;font-weight:800;font-size:17px" },
-          h("span", { text: "💰 " + t("estTitle") }), h("span", { text: "$" + est.total + (est.unknown ? " + " : "") })) : null,
-        est && est.unknown ? h("div", { class: "small", text: t("estPlus") }) : null,
+        est ? h("div", { style: "font-weight:800;font-size:17px;margin-bottom:6px", text: "💰 " + t("estTitle") }) : null,
+        est ? h("div", { class: "small", style: "border-bottom:1px solid currentColor;padding-bottom:6px;margin-bottom:6px" }, est.lines.map(function (l) {
+          return h("div", { style: row }, h("span", { text: l.label }), h("span", { style: "white-space:nowrap", text: l.amount === null ? t("estByTeam") : "$" + l.amount }));
+        })) : null,
+        est ? h("div", { style: row + ";font-weight:800;font-size:17px" },
+          h("span", { text: t("estApprox") }), h("span", { text: "$" + est.total + (est.unknown ? " +" : "") })) : null,
+        est ? h("div", { class: "small", style: "margin-top:2px", text: "+ " + t("estExtras") }) : null,
         !est ? h("div", { style: "font-weight:700", text: "✈️ " + t("estAir") }) : null,
-        h("p", { class: "small", style: "margin:6px 0 4px", text: t("estNote") }),
-        h("button", { type: "button", class: "link-btn", style: "padding-left:0", onclick: function () { openAgent(); }, text: t("estChat") + " →" })
+        h("p", { class: "small", style: "margin:6px 0 0", text: t("estNote") })
       ]);
     }
     refresh();
@@ -2345,11 +2393,7 @@
     if (step === 2) {
       var itemsBad = itemsProblem();
       if (itemsBad) return itemsBad;
-      var badItem = draft.contents.some(function (c) {
-        var q = Number(c.qty);
-        return (c.description || "").trim().length < 2 || !c.condition || !(Math.floor(q) === q && q >= 1 && q <= 999);
-      });
-      if (!draft.contents.length || badItem) return t("vContents");
+      if (contentsBad()) return t("vContents");
     }
     if (step === 3) {
       var s = checkPerson(draft.sender, false, senderIdMode());
@@ -2385,27 +2429,11 @@
       detail.hidden = qty === 0;
       if (!qty) { detail.replaceChildren(); return; }
       detail.replaceChildren();
-      if (key === "tv") {
-        append(detail, [h("span", { class: "help", text: t("tvHelp") }), Array.from({ length: qty }, function (_, i) {
-          var group = radioGroup("tv-size-" + i, tvSizeOptions(), draft.tvSizes[i] || null, function (v) { draft.tvSizes[i] = v; est.refresh(); }, "sizes");
-          group.setAttribute("aria-labelledby", "tv-size-l-" + i);
-          return h("div", { class: "field" }, h("span", { class: "label", id: "tv-size-l-" + i, text: t("tvSizeN", { n: i + 1 }) }), group);
-        })]);
-      } else {
-        append(detail, [h("span", { class: "help", text: t("oddHelp") }), Array.from({ length: qty }, function (_, i) {
-          if (!draft.oddDims[i]) draft.oddDims[i] = { l: "", w: "", h: "" };
-          var dims = draft.oddDims[i];
-          var labels = { l: t("lenLbl"), w: t("widLbl"), h: t("hgtLbl") };
-          return h("fieldset", { class: "field", style: "border:0;padding:0;margin:0" },
-            h("legend", { class: "label", style: "padding:0", text: t("oddN", { n: i + 1 }) }),
-            h("div", { class: "dims-row" }, ["l", "w", "h"].map(function (k) {
-              var id = "odd-" + i + "-" + k;
-              var input = h("input", { class: "input", id: id, type: "number", inputmode: "decimal", min: "1", max: "500", step: "any", value: dims[k] || "" });
-              input.addEventListener("input", function () { dims[k] = input.value; input.removeAttribute("aria-invalid"); est.refresh(); });
-              return h("div", { class: "field" }, h("label", { for: id, class: "small", text: labels[k] }), input);
-            })));
-        })]);
-      }
+      append(detail, [h("span", { class: "help", text: t("tvHelp") }), Array.from({ length: qty }, function (_, i) {
+        var group = radioGroup("tv-size-" + i, tvSizeOptions(), draft.tvSizes[i] || null, function (v) { draft.tvSizes[i] = v; est.refresh(); }, "sizes");
+        group.setAttribute("aria-labelledby", "tv-size-l-" + i);
+        return h("div", { class: "field" }, h("span", { class: "label", id: "tv-size-l-" + i, text: t("tvSizeN", { n: i + 1 }) }), group);
+      })]);
     }
     return [
       draft._edit ? null : h("p", { class: "small", style: "margin:-4px 0 12px" }, h("a", { href: "/box-info.html?from=booking", onclick: saveDraftForLater, text: "📦 " + t("boxInfoLink") + " →" })),
@@ -2414,7 +2442,8 @@
         var out = h("output", { "aria-live": "polite", text: String(qty) });
         var minus = h("button", { type: "button", "aria-label": t("decrease", { item: itemLabel(it.key) }), disabled: qty === 0, text: "−" });
         var plus = h("button", { type: "button", "aria-label": t("increase", { item: itemLabel(it.key) }), disabled: qty >= 30, text: "+" });
-        var detail = it.key === "tv" || it.key === "other" ? h("div", { class: "qty-detail" }) : null;
+        // TVs pick a screen size; odd-size items are just a count (staff measure them).
+        var detail = it.key === "tv" ? h("div", { class: "qty-detail" }) : null;
         if (detail) itemDetails(it.key, detail);
         function set(n) {
           draft.qty[it.key] = Math.max(0, Math.min(30, n));
@@ -2503,11 +2532,6 @@
     if (!selectedItems().length) return t("vItems");
     for (var ti = 0; ti < (draft.qty.tv || 0); ti++) {
       if (!validTvSize(draft.tvSizes[ti])) return { msg: t("vTvSize"), field: "tv-size-" + ti + "-0" };
-    }
-    for (var oi = 0; oi < (draft.qty.other || 0); oi++) {
-      var d = draft.oddDims[oi] || {};
-      var badDim = ["l", "w", "h"].filter(function (k) { return !validDim(d[k] || ""); })[0];
-      if (badDim) return { msg: t("vDims"), field: "odd-" + oi + "-" + badDim };
     }
     return null;
   }
@@ -2623,7 +2647,9 @@
         h("div", { class: "card" },
           reviewRow(t("service"), (STRINGS[lang].services[draft.service] || draft.service) + " · " + (STRINGS[lang].countries[draft.country] || draft.country), 1),
           reviewRow(t("items"), itemsText(), 2),
-          reviewRow(t("insideLbl"), draft.contents.map(function (c) { return c.qty + " × " + c.description.trim() + (c.condition === "used" ? " (" + t("usedLbl").toLowerCase() + ")" : ""); }).join(", "), 2),
+          reviewRow(t("insideLbl"), draft.contents.map(function (c) {
+            return c.qty + " × " + (c.category === "others" ? c.description.trim() : catLabel(c.category)) + (String(c.value).trim() !== "" ? " ($" + Number(c.value) + ")" : "");
+          }).join(", "), 2),
           draft.notes.trim() ? reviewRow(t("notes"), draft.notes.trim(), 2) : null,
           reviewRow(t("senderLbl"), draft.sender.fullName.trim() + (draft.sender.isMe ? "" : " (" + t("senderOther").toLowerCase() + ")"), 3),
           reviewRow(t("receiverLbl"), draft.receiver.fullName.trim() + ", " + draft.receiver.town.trim(), 4),
@@ -2670,7 +2696,7 @@
         sender: Object.assign({ isMe: draft.sender.isMe }, personPayload(draft.sender, false)),
         receiver: personPayload(draft.receiver, true),
         deliveryType: draft.deliveryType, notes: draft.notes.trim(),
-        contents: draft.contents.map(function (c) { return { description: c.description.trim(), condition: c.condition, qty: Number(c.qty) }; }),
+        contents: contentsPayload(),
         insurance: draft.insurance, declarationAccepted: draft.declarationAccepted,
         signedName: draft.signedName.trim(), signatureImage: bookSignaturePng(),
         dangerousGoods: draft.service === "air" ? {
@@ -2717,50 +2743,57 @@
     window.scrollTo({ top: 0 });
   }
 
-  // "What's inside your boxes?" — item, new/used, how many (no values:
-  // staff add those at drop-off).
+  // "What's inside your boxes?" — tap each category being sent, then how
+  // many and (optionally) the value. Staff must fill any missing values.
   function contentsEditor() {
-    // Clothes to Sri Lanka: warn as soon as one is typed (see clothesWarn).
-    var clothesNote = h("div", { class: "notice warn", style: "margin-top:12px" },
-      h("span", { text: t("clothesWarn") }));
-    function refreshClothes() {
-      clothesNote.hidden = !(draft.country === "sri_lanka" && draft.contents.some(function (c) { return mentionsClothes(c.description); }));
-    }
-    var list = h("div", { class: "stack", style: "margin-top:10px" }, draft.contents.map(function (c, i) {
-      var desc = h("input", { class: "input", id: "item-" + i, value: c.description, maxlength: "60", placeholder: t("itemPh"), "aria-label": t("itemN", { n: i + 1 }) });
-      desc.addEventListener("input", function () { c.description = desc.value; refreshClothes(); });
-      var qty = h("input", { class: "input", id: "qty-" + i, value: c.qty, inputmode: "numeric", maxlength: "3", "aria-label": t("howMany") + " — " + t("itemN", { n: i + 1 }) });
-      qty.addEventListener("input", function () { c.qty = qty.value; });
-      var cond = radioGroup("cond-" + i, [{ value: "new", title: t("newLbl") }, { value: "used", title: t("usedLbl") }], c.condition, function (v) { c.condition = v; }, "two");
-      var remove = draft.contents.length > 1
-        ? h("button", { type: "button", class: "link-btn", style: "color:var(--danger);padding:0", onclick: function () { draft.contents.splice(i, 1); renderBookStep(); }, text: t("removeItem") })
-        : null;
-      return h("div", { class: "card", style: "padding:14px" },
-        h("div", { class: "spread", style: "margin-bottom:8px" }, h("span", { class: "muted small", style: "font-weight:700", text: t("itemN", { n: i + 1 }) }), remove),
-        desc,
-        h("div", { class: "grid-2", style: "margin-top:10px;align-items:end" },
-          h("div", null, cond),
-          h("div", { class: "field" }, h("label", { for: "qty-" + i, text: t("howMany") }), qty)));
-    }));
-    var add = h("button", { type: "button", class: "btn secondary block", style: "margin-top:12px;border-style:dashed", text: t("addItem") });
-    add.addEventListener("click", function () {
-      draft.contents.push(blankItem());
-      renderBookStep();
-      var last = document.getElementById("item-" + (draft.contents.length - 1));
-      if (last) last.focus();
+    // Older drafts (free-text rows) → category rows.
+    draft.contents = draft.contents.filter(function (c) { return c.category || (c.description || "").trim(); }).map(function (c) {
+      return c.category && "value" in c ? c : contentRow(c);
     });
-    refreshClothes();
+    // Clothes to Sri Lanka: warn as soon as clothing is picked (see clothesWarn).
+    var clothesNote = h("div", { class: "notice warn", style: "margin-top:12px" }, h("span", { text: t("clothesWarn") }));
+    var rows = h("div", { class: "stack", style: "margin-top:12px" });
+    function rowFor(c) { return draft.contents.filter(function (x) { return x.category === c; })[0]; }
+    function drawRows() {
+      clothesNote.hidden = !(draft.country === "sri_lanka" && (rowFor("new_clothing") || rowFor("used_clothing")));
+      rows.replaceChildren();
+      CONTENT_CATS.forEach(function (key) {
+        var c = rowFor(key);
+        if (!c) return;
+        var qty = h("input", { class: "input", id: "qty-" + key, value: c.qty, inputmode: "numeric", maxlength: "3" });
+        qty.addEventListener("input", function () { c.qty = qty.value; qty.removeAttribute("aria-invalid"); });
+        var val = h("input", { class: "input", id: "val-" + key, value: c.value, inputmode: "decimal", maxlength: "8", placeholder: t("optional") });
+        val.addEventListener("input", function () { c.value = val.value; val.removeAttribute("aria-invalid"); });
+        var desc = null;
+        if (key === "others") {
+          desc = h("input", { class: "input", id: "item-others", value: c.description, maxlength: "120", placeholder: t("othersPh") });
+          desc.addEventListener("input", function () { c.description = desc.value; desc.removeAttribute("aria-invalid"); });
+        }
+        rows.appendChild(h("div", { class: "card", style: "padding:14px" },
+          h("div", { style: "font-weight:700;margin-bottom:8px", text: "✓ " + catLabel(key) }),
+          desc ? h("div", { class: "field", style: "margin-bottom:10px" }, h("label", { for: "item-others", text: t("othersWhat") }), desc) : null,
+          h("div", { class: "grid-2", style: "align-items:end" },
+            h("div", { class: "field" }, h("label", { for: "qty-" + key, text: t("howMany") }), qty),
+            h("div", { class: "field" }, h("label", { for: "val-" + key, text: t("valueAud") }), val))));
+      });
+    }
+    var chips = h("div", { class: "cat-chips", role: "group", "aria-label": t("s2inside") }, CONTENT_CATS.map(function (key) {
+      var b = h("button", { type: "button", class: "cat-chip", "aria-pressed": String(!!rowFor(key)), text: catLabel(key) });
+      b.addEventListener("click", function () {
+        var c = rowFor(key);
+        if (c) draft.contents.splice(draft.contents.indexOf(c), 1);
+        else draft.contents.push({ category: key, description: "", qty: "1", value: "" });
+        b.setAttribute("aria-pressed", String(!c));
+        drawRows();
+        if (!c) { var f = document.getElementById(key === "others" ? "item-others" : "qty-" + key); if (f) f.focus({ preventScroll: true }); }
+      });
+      return b;
+    }));
+    drawRows();
     return h("div", { style: "margin-top:22px" },
       h("h3", { style: "font-size:16px;margin:0 0 4px", text: t("s2inside") }),
-      h("p", { class: "muted small", style: "margin:0", text: t("s2insideHelp") }),
-      list, clothesNote, add);
-  }
-
-  // English, Sinhala and Tamil words for clothes.
-  var CLOTHES_WORDS = ["cloth", "garment", "shirt", "dress", "frock", "saree", "sari", "jeans", "trouser", "pants", "skirt", "blouse", "jacket", "ඇඳුම", "ஆடை", "உடை"];
-  function mentionsClothes(text) {
-    var s = String(text || "").toLowerCase();
-    return CLOTHES_WORDS.some(function (w) { return s.indexOf(w) !== -1; });
+      h("p", { class: "muted small", style: "margin:0 0 10px", text: t("s2insideHelp") }),
+      chips, rows, clothesNote);
   }
 
   // Insurance answer, the prohibited-goods declaration, typed name and an
@@ -2771,6 +2804,14 @@
     name.addEventListener("input", function () { draft.signedName = name.value; });
     var tick = h("input", { type: "checkbox", id: "declare", checked: draft.declarationAccepted, style: "width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:var(--sl-teal-deep)" });
     tick.addEventListener("change", function () { draft.declarationAccepted = tick.checked; });
+    // TV / electrical / electronics: insurance starts on Yes (the customer
+    // can still pick No). If those items go, an untouched auto-Yes goes too.
+    var recommend = needsInsurance();
+    if (recommend && draft.insurance === null) { draft.insurance = true; draft.insAuto = true; }
+    if (!recommend && draft.insAuto) { draft.insurance = null; draft.insAuto = false; }
+    var insRec = recommend ? h("div", { class: "notice ins-rec", role: "note", style: "margin-bottom:12px" },
+      h("div", { style: "font-weight:800;font-size:16px", text: "⚠️ " + t("insRecTitle") }),
+      h("div", { style: "margin-top:4px;font-weight:600", text: t("insRecText") })) : null;
     var insNote = h("div", { class: "notice info", style: "margin-top:10px", hidden: draft.insurance !== true },
       h("span", { class: "ico", "aria-hidden": "true", text: "🛡️" }), h("span", { text: t("insuranceNote") }));
     var canvas = h("canvas", { id: "book-sig", style: "display:block;width:100%;height:150px;touch-action:none;background:#fff;border:1.5px dashed #b9b4a8;border-radius:12px", "aria-label": t("signHere") });
@@ -2779,10 +2820,11 @@
     return h("div", { class: "card", style: "margin-top:16px" },
       draft.service === "air" ? dgSection() : null,
       h("h2", { style: "font-size:17px;margin:0 0 12px", text: t("signTitle") }),
+      insRec,
       h("div", { class: "field" }, h("span", { class: "label", text: t("insuranceQ") }),
         radioGroup("ins", [{ value: "yes", title: t("insYes") }, { value: "no", title: t("insNo") }],
           draft.insurance === null ? null : draft.insurance ? "yes" : "no",
-          function (v) { draft.insurance = v === "yes"; insNote.hidden = !draft.insurance; }, "two"),
+          function (v) { draft.insurance = v === "yes"; draft.insAuto = false; insNote.hidden = !draft.insurance; }, "two"),
         insNote),
       h("label", { for: "declare", style: "display:flex;gap:12px;align-items:flex-start;margin-top:18px;font-size:15px;cursor:pointer" }, tick, h("span", { text: t("declareText") })),
       h("div", { class: "field", style: "margin-top:16px" }, h("label", { for: "sign-name", text: t("signName") }), name),

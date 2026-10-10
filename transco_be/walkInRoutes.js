@@ -152,7 +152,7 @@ function summaryHtml(b) {
     Mobile: ${esc(p.mobile)}${p.homePhone ? ` · Home: ${esc(p.homePhone)}` : ''}<br>Email: ${esc(p.email)}
     ${p.idNumber ? `<br>Passport / NIC: ${esc(p.idNumber)}` : ''}</p>` : '';
   const rows = (b.contents || []).map((c, i) =>
-    `<tr><td style="padding:4px 8px;border:1px solid #ddd">${i + 1}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(c.description)} (${c.condition})</td>` +
+    `<tr><td style="padding:4px 8px;border:1px solid #ddd">${i + 1}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(c.description)}${c.condition ? ` (${c.condition})` : ''}</td>` +
     `<td style="padding:4px 8px;border:1px solid #ddd;text-align:center">${c.qty}</td><td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${money(c.value)}</td></tr>`
   ).join('');
   return `

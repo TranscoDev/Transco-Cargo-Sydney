@@ -27,6 +27,50 @@ const INDIA_SEA: Record<string, [number, number, number]> = {
 
 type Line = { label: string; amount: string };
 
+// Odd-size items: $550 per cubic metre (Sri Lanka Sea).
+const ODD_TO_MEASURE = "Odd-size item (to measure)";
+const oddLabel = (l: number, w: number, h: number) => `Odd-size item ${l}×${w}×${h} cm`;
+const oddPrice = (l: number, w: number, h: number) => String(Math.ceil(((l * w * h) / 1e6) * 550));
+
+/** L × W × H (cm) → a priced odd-size line; fills the first "(to measure)" line. */
+function OddSizeCalc({ onAdd }: { onAdd: (line: Line) => void }) {
+  const [dims, setDims] = useState({ l: "", w: "", h: "" });
+  const valid = (s: string) => s.trim() !== "" && Number.isFinite(Number(s)) && Number(s) >= 1 && Number(s) <= 500;
+  const ok = valid(dims.l) && valid(dims.w) && valid(dims.h);
+  const l = Math.round(Number(dims.l)), w = Math.round(Number(dims.w)), h = Math.round(Number(dims.h));
+  return (
+    <div className="mt-3 rounded-md border border-dashed p-2.5">
+      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Odd-size calculator · $550 per CBM</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(["l", "w", "h"] as const).map((k) => (
+          <Input
+            key={k}
+            aria-label={{ l: "Length cm", w: "Width cm", h: "Height cm" }[k]}
+            placeholder={{ l: "L cm", w: "W cm", h: "H cm" }[k]}
+            inputMode="decimal"
+            value={dims[k]}
+            onChange={(e) => setDims((d) => ({ ...d, [k]: e.target.value }))}
+            className="h-8 w-20 text-center text-xs tabular-nums"
+          />
+        ))}
+        <span className="text-xs tabular-nums text-muted-foreground">{ok ? `= $${oddPrice(l, w, h)}` : ""}</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!ok}
+          onClick={() => {
+            onAdd({ label: oddLabel(l, w, h), amount: oddPrice(l, w, h) });
+            setDims({ l: "", w: "", h: "" });
+          }}
+        >
+          Add to costing
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** Suggested cost lines from the customer's boxes (empty amount = staff to fill in). */
 function suggestedLines(d: DeclarationPrintData): Line[] {
   const lines: Line[] = [];
@@ -53,8 +97,9 @@ function suggestedLines(d: DeclarationPrintData): Line[] {
       });
       if (!i.sizes?.length) lines.push({ label: name, amount: "" });
     } else if (i.type === "other") {
-      (i.dims ?? []).forEach((m) => lines.push({ label: `Odd-size item ${m.l}×${m.w}×${m.h} cm`, amount: String(Math.ceil(((m.l * m.w * m.h) / 1e6) * 550)) }));
-      if (!i.dims?.length) lines.push({ label: name, amount: "" });
+      (i.dims ?? []).forEach((m) => lines.push({ label: oddLabel(m.l, m.w, m.h), amount: oddPrice(m.l, m.w, m.h) }));
+      // The customer only gives a count — one line each for staff to measure.
+      for (let n = (i.dims ?? []).length; n < i.qty; n++) lines.push({ label: ODD_TO_MEASURE, amount: "" });
     } else {
       lines.push({ label: name, amount: "" });
     }
@@ -136,6 +181,16 @@ export function CostingCard({ data, onSaved }: { data: DeclarationPrintData; onS
           <Plus className="mr-1 h-4 w-4" /> Add cost line
         </Button>
       </div>
+      {data.items.some((i) => i.type === "other") && (
+        <OddSizeCalc
+          onAdd={(line) =>
+            setLines((s) => {
+              const at = s.findIndex((l) => l.label === ODD_TO_MEASURE);
+              return at === -1 ? [...s, line] : s.map((l, j) => (j === at ? line : l));
+            })
+          }
+        />
+      )}
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)_7rem_2rem] items-center gap-2 border-t pt-3">
         <Label htmlFor="costing-discount" className="text-sm">Discount</Label>

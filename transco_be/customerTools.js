@@ -202,8 +202,8 @@ function cleanDims(raw, qty) {
 
 // Box list for a country — shared by the customer booking form and staff
 // edits. Returns { error } or { value: [{ type, qty, sizes?, dims? }] }
-// (types merged). requireDetails: TVs need each screen size and odd-size
-// items each L × W × H (the online booking); otherwise they're kept when given.
+// (types merged). requireDetails: TVs need each screen size (the online
+// booking); otherwise sizes are kept when given.
 function validateItems(country, rawItems, { requireDetails = false } = {}) {
   if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 10) {
     return { error: 'Please add at least one item.' };
@@ -220,7 +220,9 @@ function validateItems(country, rawItems, { requireDetails = false } = {}) {
       if (!sizes) return { error: "Please choose each TV's screen size." };
       item.sizes = sizes;
     }
-    if (type === 'other' && (requireDetails || raw.dims !== undefined)) {
+    // Odd-size items: the customer only gives a count — staff measure and
+    // price them. Measurements are still kept when sent (walk-in form).
+    if (type === 'other' && raw.dims !== undefined) {
       const dims = cleanDims(raw.dims, qty);
       if (!dims) return { error: `Please give the length, width and height of each odd-size item in cm (${DIM_CM.min}–${DIM_CM.max}).` };
       item.dims = dims;
@@ -253,21 +255,44 @@ function oneLine(value, max) {
   return cleanText(String(value || '').replace(/\s*\n\s*/g, ', '), max);
 }
 
-// The customer's own list of what's inside: description, new/used and
-// quantity. The value (AUD) is a staff field — added at Confirm, never
-// asked of the customer.
+// What's inside — the UPB Gift Cargo Declaration categories. Clothes and
+// toys carry new/used; "others" needs the customer's own description.
+const CONTENT_CATEGORIES = {
+  food: { description: 'Food', condition: null },
+  new_clothing: { description: 'Clothing', condition: 'new' },
+  used_clothing: { description: 'Clothing', condition: 'used' },
+  new_toys: { description: 'Toys', condition: 'new' },
+  used_toys: { description: 'Toys', condition: 'used' },
+  medicine: { description: 'Medicine', condition: null },
+  electrical: { description: 'Electrical items', condition: null },
+  electronics: { description: 'Electronics', condition: null },
+  others: { description: null, condition: null }
+};
+
+// The customer's own list of what's inside. New form: { category, qty,
+// value?, description (others only) }. Older rows / staff edits:
+// { description, condition?, qty, category? }. The value (AUD) is optional
+// here — staff must fill every value before Confirm.
 function validateContents(raw) {
   if (!Array.isArray(raw) || raw.length === 0) return { error: "Please add at least one item you're sending.", field: 'contents' };
   if (raw.length > MAX_CONTENT_ROWS) return { error: `Please list up to ${MAX_CONTENT_ROWS} items. For more, ask our staff.`, field: 'contents' };
   const rows = [];
   for (const r of raw) {
-    const description = oneLine(r && r.description, 60);
-    if (description.length < 2) return { error: 'Please describe each item (for example "Chocolate").', field: 'contents' };
-    const condition = r && r.condition === 'used' ? 'used' : r && r.condition === 'new' ? 'new' : null;
-    if (!condition) return { error: `Please say whether "${description}" is new or used.`, field: 'contents' };
+    const cat = r && Object.prototype.hasOwnProperty.call(CONTENT_CATEGORIES, r.category) ? r.category : null;
+    const fixed = cat ? CONTENT_CATEGORIES[cat] : null;
+    const description = fixed && fixed.description ? fixed.description : oneLine(r && r.description, 120);
+    if (description.length < 2) return { error: cat === 'others' ? 'Please say what the "Others" items are.' : 'Please describe each item (for example "Chocolate").', field: 'contents' };
+    const condition = fixed && fixed.description ? fixed.condition
+      : r && r.condition === 'used' ? 'used' : r && r.condition === 'new' ? 'new' : null;
     const qty = Number(r && r.qty);
     if (!Number.isInteger(qty) || qty < 1 || qty > 999) return { error: `Please enter how many "${description}" (1-999).`, field: 'contents' };
-    rows.push({ description, condition, qty, value: null });
+    let value = null;
+    if (r && r.value !== undefined && r.value !== null && r.value !== '') {
+      value = Number(r.value);
+      if (!Number.isFinite(value) || value < 0 || value > 100000) return { error: `The value of "${description}" must be a number in AUD.`, field: 'contents' };
+      value = Math.round(value * 100) / 100;
+    }
+    rows.push({ ...(cat ? { category: cat } : {}), description, condition, qty, value });
   }
   return { value: rows };
 }
@@ -555,7 +580,7 @@ function createCustomerTools({
       canCancel: shaped.canCancel,
       sender: person(booking.sender),
       receiver: person(booking.receiver),
-      contents: (booking.contents || []).map(c => ({ description: c.description, condition: c.condition, qty: c.qty })),
+      contents: (booking.contents || []).map(c => ({ category: c.category || null, description: c.description, condition: c.condition, qty: c.qty, value: typeof c.value === 'number' ? c.value : null })),
       country: booking.country,
       service: booking.serviceType,
       items: booking.items,
@@ -596,6 +621,11 @@ function createCustomerTools({
     if (editable.canChangeBoxes) {
       const items = validateItems(booking.country, body.items, { requireDetails: true });
       if (items.error) return { error: items.error, field: 'items' };
+      // Keep staff's odd-size measurements while that count is unchanged.
+      for (const item of items.value) {
+        const before = (booking.items || []).find(i => i.type === item.type && i.qty === item.qty);
+        if (before && !item.dims && before.dims) item.dims = before.dims;
+      }
       if (!DELIVERY_LABELS[body.deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
       const handover = await validateHandover(body, { date: booking.requestedDateISO });
       if (handover.error) return handover;

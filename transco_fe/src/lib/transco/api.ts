@@ -204,7 +204,7 @@ export interface WalkInFinaliseInput {
   /** Staff's value (AUD) for each item, in the customer's list order — required. */
   contentValues?: number[];
   /** The full item list, as edited by staff at the counter (each with its value). */
-  contents?: { description: string; condition: "new" | "used"; qty: number; value: number }[];
+  contents?: { category?: string; description: string; condition: "new" | "used" | null; qty: number; value: number }[];
   /** The customer's insurance answer, if staff changed it at the counter. */
   insurance?: boolean;
   weight?: number | null;

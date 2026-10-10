@@ -39,10 +39,13 @@ export interface DangerousGoods {
 }
 
 export interface DeclarationContentRow {
+  /** UPB category key (food, new_clothing, … others); absent on older bookings. */
+  category?: string | null;
   description: string;
-  condition: "new" | "used";
+  /** null for categories without new/used (food, medicine, electronics …). */
+  condition: "new" | "used" | null;
   qty: number;
-  /** Staff-entered at Confirm (the customer never enters values). */
+  /** Optional from the customer; staff must fill every value at Confirm. */
   value: number | null;
 }
 
