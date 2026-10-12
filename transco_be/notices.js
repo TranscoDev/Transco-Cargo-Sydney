@@ -86,6 +86,15 @@ async function blockedDates(fromISO, toISO) {
   return blocked;
 }
 
+// Closures that block drop-off days from now on (for the booking form's
+// notice): first and last closed Sydney date + the message.
+async function upcomingClosures(now = new Date(), days = 60) {
+  const until = new Date(now.getTime() + days * 86400000);
+  const fmt = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  const list = await notices().find({ enabled: true, kind: 'closure', blockDates: true, endsAt: { $gt: now }, startsAt: { $lt: until } }).sort({ startsAt: 1 }).toArray();
+  return list.map(n => ({ from: fmt(n.startsAt > now ? n.startsAt : now), to: fmt(new Date(n.endsAt.getTime() - 1)), message: n.message, title: n.title || '' }));
+}
+
 function createNoticeRouters() {
   const publicRouter = express.Router();
   // What the website shows now (cached briefly by browsers).
@@ -138,4 +147,4 @@ function createNoticeRouters() {
   return { publicRouter, staffRouter };
 }
 
-module.exports = { createNoticeRouters, activeNotices, activeBotClosure, closureBotMessage, blockedDates, validate, THEMES, KINDS };
+module.exports = { createNoticeRouters, activeNotices, activeBotClosure, closureBotMessage, blockedDates, upcomingClosures, validate, THEMES, KINDS };

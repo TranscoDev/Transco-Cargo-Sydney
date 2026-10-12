@@ -26,7 +26,7 @@ const {
   customers, bookings, shipments, consolidations, nextSequence, getDb
 } = require('./db');
 const pii = require('./pii');
-const { blockedDates } = require('./notices');
+const { blockedDates, upcomingClosures } = require('./notices');
 
 // A customer sends back the masked number we showed them ("N••••567")
 // when they didn't change it: swap in the real one it stands for.
@@ -92,6 +92,9 @@ const DROP_OFF_SLOTS = {
 };
 const WEEKDAY_DAILY_CAP = 3;
 const BOOKING_WINDOW_DAYS = 14;
+// Past a closure the list keeps going until it has this many open days (up to MAX_WINDOW_DAYS ahead).
+const MIN_OPEN_DAYS = 10;
+const MAX_WINDOW_DAYS = 60;
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
@@ -1174,8 +1177,12 @@ function createCustomerTools({
     const today = sydneyToday();
     const nowSydney = getSydneyNow();
     const nowMinutes = nowSydney.getUTCHours() * 60 + nowSydney.getUTCMinutes();
+    // Days inside a closure notice that blocks dates (console → Notices)
+    // aren't offered — and the list looks further ahead past a closure, so
+    // there are always enough open days to choose from after it.
+    const closed = await blockedDates(isoDate(today), isoDate(new Date(today.getTime() + MAX_WINDOW_DAYS * 86400000)));
     const candidates = [];
-    for (let i = 0; i <= BOOKING_WINDOW_DAYS; i++) {
+    for (let i = 0; i <= MAX_WINDOW_DAYS && (i <= BOOKING_WINDOW_DAYS || candidates.length < MIN_OPEN_DAYS); i++) {
       const d = new Date(today.getTime() + i * 86400000);
       const dow = DAY_NAMES[d.getUTCDay()];
       if (dow === 'sunday' || dow === 'monday') continue;
@@ -1187,12 +1194,8 @@ function createCustomerTools({
           return h * 60 + m > nowMinutes + 30;
         });
       }
-      if (slots.length) candidates.push({ date: isoDate(d), day: dow, kind, slots });
+      if (slots.length && !closed.has(isoDate(d))) candidates.push({ date: isoDate(d), day: dow, kind, slots });
     }
-    // Days inside a closure notice that blocks dates (console → Notices) aren't offered.
-    const closed = candidates.length ? await blockedDates(candidates[0].date, candidates[candidates.length - 1].date) : new Set();
-    const open = candidates.filter(c => !closed.has(c.date));
-    candidates.length = 0; candidates.push(...open);
     const load = await weekdayLoad(candidates.filter(c => c.kind === 'weekday').map(c => c.date));
     const dropOffDates = candidates.map(c => ({
       ...c,
@@ -1207,7 +1210,10 @@ function createCustomerTools({
         itemTypes: ITEM_TYPES[key].map(t => ({ key: t, label: ITEM_LABELS[t][0] }))
       })),
       deliveryTypes: Object.entries(DELIVERY_LABELS).map(([key, label]) => ({ key, label })),
-      dropOffDates
+      dropOffDates,
+      // Closures that block drop-off days, with the first day open again —
+      // the booking form says so on its first step.
+      closures: (await upcomingClosures()).map(c => ({ ...c, reopens: (dropOffDates.find(d => d.date > c.to) || {}).date || null }))
     };
   }
 

@@ -2032,3 +2032,23 @@ test('walk-in: a Sri Lankan number typed as 07… finds the +94 account (no dupl
   // An Australian 04… number is still Australian.
   assert.deepEqual((await api('GET', '/api/public/dropoff/account?mobile=0477555101')).body, { hasAccount: true });
 });
+
+test('a long closure: booking dates jump past it (always enough days) and the form gets the closure + reopen date', async () => {
+  const acct = await signIn('0400888333');
+  const start = new Date(Date.now() + 86400000), end = new Date(Date.now() + 22 * 86400000);
+  const closure = await api('POST', '/api/notices', { token: staffToken, body: {
+    kind: 'closure', theme: 'christmas', message: { en: 'Closed for the holidays.' }, blockDates: true,
+    startsAt: start.toISOString(), endsAt: end.toISOString() } });
+  assert.equal(closure.status, 201, JSON.stringify(closure.body));
+  try {
+    const o = await api('GET', '/api/portal/booking-options', { token: acct.token });
+    const c = o.body.closures.find(x => x.message.en === 'Closed for the holidays.');
+    assert.ok(c, 'closure sent to the form');
+    assert.ok(c.reopens && c.reopens > c.to, 'reopen date after the closure');
+    const after = o.body.dropOffDates.filter(d => d.date > c.to);
+    assert.ok(after.length >= 10 - o.body.dropOffDates.filter(d => d.date < c.from).length, 'enough open days after the closure');
+    assert.ok(!o.body.dropOffDates.some(d => d.date >= c.from && d.date <= c.to), 'no closed day offered');
+  } finally {
+    await api('DELETE', `/api/notices/${closure.body.notice.id}`, { token: staffToken });
+  }
+});
