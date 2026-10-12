@@ -552,7 +552,7 @@ test('anonymous chat with a forged customer token behaves like the public chat',
 
 test('password sign-up: a new number gets an account straight away and can book', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400333001', name: 'Priya Nadarajah', password: 'harbour-lights-9' }
+    body: { privacyAccepted: true, email: `reg553@example.com`, countryCode: '61', phone: '0400333001', name: 'Priya Nadarajah', password: 'harbour-lights-9' }
   });
   assert.equal(reg.status, 201, JSON.stringify(reg.body));
   assert.match(reg.body.profile.customerCode, /^CUS-\d{6}$/);
@@ -575,7 +575,7 @@ test('password sign-up: a new number gets an account straight away and can book'
 test('password sign-up is refused for a number that already has history, and for weak input', async () => {
   await db.collection('customers').insertOne({ phoneNumber: '61400333002', name: 'Existing WhatsApp', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
   const known = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400333002', name: 'Someone Else', password: 'long-enough-pw' }
+    body: { privacyAccepted: true, email: `reg576@example.com`, countryCode: '61', phone: '0400333002', name: 'Someone Else', password: 'long-enough-pw' }
   });
   assert.equal(known.status, 409);
   assert.equal(known.body.reason, 'known_number');
@@ -583,11 +583,11 @@ test('password sign-up is refused for a number that already has history, and for
   assert.equal(unchanged.name, 'Existing WhatsApp');
   assert.equal(unchanged.passwordHash, undefined);
 
-  const short = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, countryCode: '61', phone: '0400333003', name: 'Ann Lee', password: 'short' } });
+  const short = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, email: `reg585@example.com`, countryCode: '61', phone: '0400333003', name: 'Ann Lee', password: 'short' } });
   assert.equal(short.status, 400);
   assert.equal(short.body.field, 'password');
 
-  const again = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, countryCode: '61', phone: '0400333001', name: 'Priya N', password: 'another-password' } });
+  const again = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, email: `reg589@example.com`, countryCode: '61', phone: '0400333001', name: 'Priya N', password: 'another-password' } });
   assert.equal(again.status, 409);
   assert.equal(again.body.reason, 'has_account');
 });
@@ -616,7 +616,7 @@ test('password sign-in works, gives one message for every failure, and locks aft
 
 test('an unproven password account never sees other history on its number; a WhatsApp code by the real owner removes the impostor', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400333004', name: 'Impostor', password: 'impostor-pass-1' }
+    body: { privacyAccepted: true, email: `reg617@example.com`, countryCode: '61', phone: '0400333004', name: 'Impostor', password: 'impostor-pass-1' }
   });
   assert.equal(reg.status, 201);
   const record = await db.collection('customers').findOne({ phoneNumber: '61400333004' });
@@ -650,7 +650,7 @@ test('an unproven password account never sees other history on its number; a Wha
 
 test('a signed-in password customer verifying their own number keeps their password', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400333005', name: 'Kavya Raj', password: 'kavya-password-1' }
+    body: { privacyAccepted: true, email: `reg651@example.com`, countryCode: '61', phone: '0400333005', name: 'Kavya Raj', password: 'kavya-password-1' }
   });
   await clearOtps('61400333005');
   await api('POST', '/api/portal/auth/request-code', { body: { countryCode: '61', phone: '0400333005' } });
@@ -728,7 +728,7 @@ test('the staff live event stream refuses anonymous and customer connections, an
 
 test('staff My Transco list: staff only; lists accounts, not website visitors or WhatsApp-only contacts', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400555001', name: 'Crm Listed', password: 'crm-listed-pass' }
+    body: { privacyAccepted: true, email: `reg729@example.com`, countryCode: '61', phone: '0400555001', name: 'Crm Listed', password: 'crm-listed-pass' }
   });
   assert.equal(reg.status, 201);
   await db.collection('customers').insertOne({ phoneNumber: '61400555099', name: 'WhatsApp Only', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
@@ -752,7 +752,7 @@ test('staff My Transco list: staff only; lists accounts, not website visitors or
 
 test('staff profile shows the full history; staff verify / sign-out / unlock / edit work', async () => {
   const reg = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400555002', name: 'Crm Profile', password: 'crm-profile-pass' }
+    body: { privacyAccepted: true, email: `reg753@example.com`, countryCode: '61', phone: '0400555002', name: 'Crm Profile', password: 'crm-profile-pass' }
   });
   const record = await db.collection('customers').findOne({ phoneNumber: '61400555002' });
   await db.collection('bookings').insertOne({
@@ -820,7 +820,7 @@ test('email: one account per email — refused at sign-up and on profile/staff e
   assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400666002' }), 0);
 
   const other = await api('POST', '/api/portal/auth/register', {
-    body: { privacyAccepted: true, countryCode: '61', phone: '0400666003', name: 'Third User', password: 'third-user-pass' }
+    body: { privacyAccepted: true, email: `reg821@example.com`, countryCode: '61', phone: '0400666003', name: 'Third User', password: 'third-user-pass' }
   });
   const clash = await api('PATCH', '/api/portal/me', { token: other.body.token, body: { email: 'EMAIL.USER@example.com' } });
   assert.equal(clash.status, 409);
@@ -1921,4 +1921,34 @@ test('website notices: scheduled banners, closures block drop-off days, staff on
 
   for (const n of [offer, later, closure]) await api('DELETE', `/api/notices/${n.body.notice.id}`, { token: staffToken });
   assert.equal((await api('GET', '/api/public/notices')).body.notices.length, 0);
+});
+
+test('sign-up needs an email; forgot password link resets it (single use) and signs in', async () => {
+  const noEmail = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, countryCode: '94', phone: '0779876543', name: 'Kamal Silva', password: 'kamal-pass-123' } });
+  assert.equal(noEmail.status, 400);
+  assert.equal(noEmail.body.field, 'email');
+  const reg = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, email: 'kamal@example.com', countryCode: '94', phone: '0779876543', name: 'Kamal Silva', password: 'kamal-pass-123' } });
+  assert.equal(reg.status, 201, JSON.stringify(reg.body));
+  // Sign in with the email or the Sri Lankan mobile.
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'kamal@example.com', password: 'kamal-pass-123' } })).status, 200);
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { countryCode: '94', phone: '077 987 6543', password: 'kamal-pass-123' } })).status, 200);
+
+  // Same answer for unknown emails (doesn't reveal who has an account).
+  assert.deepEqual((await api('POST', '/api/portal/auth/forgot-password', { body: { email: 'nobody@example.com' } })).body, { sent: true });
+  assert.deepEqual((await api('POST', '/api/portal/auth/forgot-password', { body: { email: 'kamal@example.com' } })).body, { sent: true });
+  const c = await db.collection('customers').findOne({ email: 'kamal@example.com' });
+  assert.ok(c.passwordReset && c.passwordReset.hash && c.passwordReset.hash.length === 64, 'only a hash is stored');
+
+  // Use a known token (the real one is only in the email).
+  const token = 'test-reset-token-abcdefghijklmnopqrstuvwxyz';
+  await db.collection('customers').updateOne({ _id: c._id }, { $set: { 'passwordReset.hash': require('crypto').createHash('sha256').update(token).digest('hex') } });
+  const short = await api('POST', '/api/portal/auth/reset-password', { body: { token, password: 'short' } });
+  assert.equal(short.status, 400);
+  const ok = await api('POST', '/api/portal/auth/reset-password', { body: { token, password: 'brand-new-pass-1' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.ok(ok.body.token);
+  const again = await api('POST', '/api/portal/auth/reset-password', { body: { token, password: 'another-pass-22' } });
+  assert.equal(again.body.reason, 'bad_link', 'single use');
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'kamal@example.com', password: 'brand-new-pass-1' } })).status, 200);
+  assert.equal((await api('GET', '/api/portal/me', { token: reg.body.token })).status, 401, 'old sessions signed out');
 });

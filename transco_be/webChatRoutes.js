@@ -428,10 +428,20 @@ module.exports = function createWebChatRouter({
         return res.status(502).json({ error: 'No reply from assistant — please try again.' });
       }
 
-      const needsAttention = rawReply.startsWith(HANDOFF_MARKER);
+      // Answers to the customer's other questions can come after [[ALSO]]
+      // (on a menu reply) — on the website they go above the question.
+      let alsoText = '';
+      let mainReply = rawReply;
+      if (rawReply.includes('[[ALSO]]')) {
+        const [mainPart, ...rest] = rawReply.split('[[ALSO]]');
+        mainReply = mainPart;
+        alsoText = rest.join('\n\n').trim();
+      }
+
+      const needsAttention = mainReply.startsWith(HANDOFF_MARKER);
       let cleanContent = needsAttention
-        ? rawReply.slice(HANDOFF_MARKER.length).trimStart()
-        : rawReply;
+        ? mainReply.slice(HANDOFF_MARKER.length).trimStart()
+        : mainReply;
 
       // The customer stated (or corrected) their real name in
       // conversation — not necessarily as part of completing a
@@ -512,6 +522,8 @@ module.exports = function createWebChatRouter({
         cleanContent = cleanContent.split(SHOW_FREIGHT_MODE_MENU_MARKER).join('').trim();
         menu = { items: FREIGHT_MODE_MENU_ITEMS };
       }
+
+      if (alsoText) cleanContent = `${alsoText}\n\n${cleanContent}`;
 
       // Strip the booking marker so it never leaks to the customer as
       // raw text. If the customer gave a name + phone for this booking

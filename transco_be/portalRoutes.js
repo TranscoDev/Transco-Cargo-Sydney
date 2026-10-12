@@ -13,8 +13,15 @@
 // Error messages are written for customers (they're shown as-is in the
 // UI) — no stack traces, no database wording.
 
+const crypto = require('crypto');
 const express = require('express');
 const { customers, customerOtps } = require('./db');
+
+// "Forgot password" links: single use, 30 minutes. Only a hash of the
+// token is stored, so a database leak can't be used to reset passwords.
+const RESET_TTL_MS = 30 * 60 * 1000;
+const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
+const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { OTP_TTL_MS, OTP_MAX_ATTEMPTS } = require('./customerAuth');
 const { hasRealName } = require('./customerTools');
@@ -137,7 +144,7 @@ async function emailTakenByOtherAccount(email, excludeId) {
   return Boolean(await customers().findOne(q, { projection: { _id: 1 } }));
 }
 
-module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessage, hashPassword, verifyPassword }) {
+module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessage, sendCustomerEmail, hashPassword, verifyPassword }) {
   const router = express.Router();
   const ipLimited = createIpLimiter(IP_WINDOW_MS, IP_MAX_REQUESTS);
 
@@ -324,10 +331,10 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     if (!validPassword(body.password)) {
       return res.status(400).json({ error: `Please choose a password with at least ${MIN_PASSWORD_LENGTH} characters.`, field: 'password' });
     }
-    // Optional, but recommended: lets them sign in even after changing
-    // their phone number.
+    // Email is how customers sign in and reset a forgotten password.
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    if (email && (email.length > 120 || !EMAIL_RE.test(email))) {
+    if (!email) return res.status(400).json({ error: 'Please enter your email — you will use it to sign in.', field: 'email' });
+    if (email.length > 120 || !EMAIL_RE.test(email)) {
       return res.status(400).json({ error: "That email address doesn't look right.", field: 'email' });
     }
 
@@ -408,7 +415,7 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       reason: 'no_account'
     };
     const noPassword = {
-      error: 'This number has no password yet. Sign in with a WhatsApp code below, or call us on 0434 842 023.',
+      error: 'This account has no password yet. Tap "Forgot password?" to set one by email, or call us on 0434 842 023.',
       reason: 'no_password'
     };
     let customer = null;
@@ -452,6 +459,65 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       profile: tools.publicProfile(updated),
       needsName: !hasRealName(updated)
     });
+  }));
+
+  // ---------- forgot password (email link) ----------
+
+  // Always answers the same way, whether or not the email has an account,
+  // so the form can't be used to find out who is a customer.
+  router.post('/auth/forgot-password', wrap(async (req, res) => {
+    if (ipLimited(clientIp(req))) {
+      return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+    }
+    const email = typeof (req.body || {}).email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "That email address doesn't look right.", field: 'email' });
+    const matches = await customers().find({
+      email, $or: [{ passwordHash: { $exists: true } }, { portalJoinedAt: { $exists: true } }]
+    }).limit(2).toArray();
+    if (matches.length === 1) {
+      const c = matches[0];
+      const token = crypto.randomBytes(32).toString('base64url');
+      await customers().updateOne({ _id: c._id }, { $set: { passwordReset: { hash: hashToken(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) } } });
+      const link = `${PORTAL_SITE_URL}/account.html#/reset/${token}`;
+      const name = hasRealName(c) ? c.name.split(' ')[0] : 'there';
+      await sendCustomerEmail({
+        to: email,
+        subject: 'Reset your My Transco password',
+        html: `<p>Hi ${name.replace(/[<>&"]/g, '')},</p>` +
+          `<p>Tap the button below to choose a new password for your My Transco account. The link works for 30 minutes and can be used once.</p>` +
+          `<p><a href="${link}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#0c7d6b;color:#fff;font-weight:700;text-decoration:none">Choose a new password</a></p>` +
+          `<p style="color:#6b7480;font-size:13px">If you didn't ask for this, you can ignore this email — your password won't change.<br>Transco Cargo Sydney · 0434 842 023</p>`
+      });
+    }
+    res.json({ sent: true });
+  }));
+
+  // Sets the new password from the emailed link and signs them in.
+  router.post('/auth/reset-password', wrap(async (req, res) => {
+    if (ipLimited(clientIp(req))) {
+      return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+    }
+    const body = req.body || {};
+    if (!validPassword(body.password)) {
+      return res.status(400).json({ error: `Please choose a password with at least ${MIN_PASSWORD_LENGTH} characters.`, field: 'password' });
+    }
+    const hash = typeof body.token === 'string' && body.token.length >= 20 ? hashToken(body.token) : null;
+    const customer = hash ? await customers().findOne({ 'passwordReset.hash': hash }) : null;
+    if (!customer || !customer.passwordReset || customer.passwordReset.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'This link has expired or was already used. Please ask for a new one.', reason: 'bad_link' });
+    }
+    const updated = await customers().findOneAndUpdate(
+      { _id: customer._id },
+      {
+        $set: { passwordHash: hashPassword(body.password), passwordUpdatedAt: new Date(), lastPortalLoginAt: new Date(), portalLoginFailures: 0, portalJoinedAt: customer.portalJoinedAt || new Date() },
+        $unset: { passwordReset: '', portalLockedUntil: '' },
+        // Sign out every other device.
+        $inc: { portalTokenVersion: 1 }
+      },
+      { returnDocument: 'after' }
+    );
+    await tools.ensureCustomerCode(updated);
+    res.json({ token: customerAuth.signCustomerToken(updated), profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
   }));
 
   // Everything below requires a signed-in customer.

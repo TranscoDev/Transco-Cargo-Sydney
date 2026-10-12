@@ -583,6 +583,29 @@ async function sendBookingEmail(booking) {
   }
 }
 
+// Emails to CUSTOMERS (My Transco password reset). Needs a sender on a
+// domain verified in Resend (CUSTOMER_EMAIL_FROM, e.g. "Transco Cargo
+// <noreply@transcosydney.com.au>") — Resend's test sender only delivers
+// to the Resend account owner. Returns true when Resend accepted it.
+async function sendCustomerEmail({ to, subject, html }) {
+  if (!RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not configured — customer email not sent.');
+    return false;
+  }
+  try {
+    await axios.post('https://api.resend.com/emails', {
+      from: process.env.CUSTOMER_EMAIL_FROM || 'Transco Cargo <onboarding@resend.dev>',
+      to,
+      subject,
+      html
+    }, { headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' } });
+    return true;
+  } catch (err) {
+    console.error('Customer email failed:', err.response?.data ?? err.message);
+    return false;
+  }
+}
+
 
 // ============================================================
 // BOOKING NOTIFICATION — STAFF WHATSAPP
@@ -969,6 +992,19 @@ async function sendAndTrackOutbound(
   const SHOW_PICKUP_DELIVERY_MENU_INDIA_MARKER = '[[SHOW_PICKUP_DELIVERY_MENU_INDIA]]';
   const SHOW_COUNTRY_MENU_MARKER = '[[SHOW_COUNTRY_MENU]]';
   const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
+  const ALSO_MARKER = '[[ALSO]]';
+
+  // A menu reply can carry answers to the customer's other questions
+  // after [[ALSO]] — send those first as their own message, so the menu
+  // is the last thing they see and can tap.
+  if (typeof content === 'string' && content.includes(ALSO_MARKER)) {
+    const [mainPart, ...rest] = content.split(ALSO_MARKER);
+    const extraText = rest.join('\n\n').trim();
+    if (extraText) {
+      await sendAndTrackOutbound(customer, senderType, extraText, replyToMessageId, true);
+    }
+    content = mainPart;
+  }
 
   const needsAttention = content.startsWith(HANDOFF_MARKER);
 
@@ -5404,11 +5440,47 @@ async function sendTypingIndicator(inboundWhatsAppMessageId) {
 // NORMAL WHATSAPP TEXT
 // ============================================================
 
+// WhatsApp text messages max out at 4096 characters. A reply answering
+// several questions at once can be longer, so it's sent in parts, split
+// at paragraph breaks.
+const WHATSAPP_TEXT_LIMIT = 4000;
+
+function splitLongText(text) {
+  if (typeof text !== 'string' || text.length <= WHATSAPP_TEXT_LIMIT) return [text];
+  const parts = [];
+  let current = '';
+  for (const para of text.split('\n\n')) {
+    const candidate = current ? `${current}\n\n${para}` : para;
+    if (candidate.length <= WHATSAPP_TEXT_LIMIT) {
+      current = candidate;
+      continue;
+    }
+    if (current) parts.push(current);
+    // A single paragraph over the limit is cut at the limit.
+    let rest = para;
+    while (rest.length > WHATSAPP_TEXT_LIMIT) {
+      parts.push(rest.slice(0, WHATSAPP_TEXT_LIMIT));
+      rest = rest.slice(WHATSAPP_TEXT_LIMIT);
+    }
+    current = rest;
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
 async function sendWhatsAppMessage(
   to,
   text,
   bizOpaqueCallbackData
 ) {
+
+  const parts = splitLongText(text);
+  if (parts.length > 1) {
+    for (const part of parts) {
+      await sendWhatsAppMessage(to, part, bizOpaqueCallbackData);
+    }
+    return;
+  }
 
   const payload = {
 
@@ -6221,6 +6293,7 @@ app.use('/api/portal', createPortalRouter({
   customerAuth,
   tools: customerTools,
   sendOtpMessage,
+  sendCustomerEmail,
   hashPassword,
   verifyPassword
 }));
