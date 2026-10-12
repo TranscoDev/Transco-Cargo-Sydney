@@ -263,6 +263,7 @@
   .fab-has-bot svg { display: none; }
   .fab-bot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; transform: scale(1.16); transform-origin: 50% 50%; pointer-events: none; }
 </style>
+<script src="/chat-links.js"></script>
 </head>
 <body>
 
@@ -526,6 +527,7 @@
   var sendBtn = document.getElementById("cs-send");
 
   function renderMessageHtml(text) {
+    if (window.TranscoChatLinks) return TranscoChatLinks.html(text);
     var escaped = String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return escaped.replace(/\*([^*\n]+?)\*/g, "<strong>$1</strong>");
   }

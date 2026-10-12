@@ -410,6 +410,7 @@
   .footer-mini a { color: var(--navy); font-weight: 600; }
 </style>
 <script src="/phone-format.js"></script>
+<script src="/chat-links.js"></script>
 </head>
 <body>
   <a class="sr-only" href="#main">Skip to content</a>
@@ -1153,7 +1154,19 @@
   function addAgentMessage(text, kind, media, persist) {
     if (agent.empty) { agent.empty.remove(); agent.empty = null; }
     var el = h("div", { class: "ag-msg " + kind });
-    el.appendChild(formattedText(text));
+    if (window.TranscoChatLinks) {
+      // Links become tappable buttons; ones to this page open in place.
+      el.innerHTML = TranscoChatLinks.html(text);
+      Array.prototype.forEach.call(el.querySelectorAll('a[href^="/account.html#"]'), function (a) {
+        a.addEventListener("click", function (e) {
+          e.preventDefault();
+          location.hash = a.getAttribute("href").slice("/account.html".length);
+          if (!isWide()) closeAgent();
+        });
+      });
+    } else {
+      el.appendChild(formattedText(text));
+    }
     if (media && media.videoUrl) el.appendChild(h("video", { src: media.videoUrl, controls: true }));
     if (media && media.flyerUrl) el.appendChild(h("img", { src: media.flyerUrl, alt: "Promotional flyer" }));
     agent.body.appendChild(el);
