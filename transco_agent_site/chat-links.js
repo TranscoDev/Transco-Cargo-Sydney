@@ -52,7 +52,7 @@
 
   function button(info) {
     var text = info.key ? ICONS[info.key] + " " + label(info.key) + " →" : info.text + " ↗";
-    return '<a class="tc-linkbtn" href="' + esc(info.href) + '"' +
+    return '<a class="tc-linkbtn tc-' + (info.key || "open") + '" href="' + esc(info.href) + '"' +
       (info.external ? ' target="_blank" rel="noopener"' : "") + ">" + esc(text) + "</a>";
   }
 
@@ -80,6 +80,9 @@
       out += info ? button(info) : esc(raw);
       out += textHtml(trail);
       last = m.index + m[0].length;
+      // The button sits on its own line with its own spacing, so line
+      // breaks right after it would only add empty space.
+      if (info && !trail) while (s.charAt(last) === "\n") last++;
     }
     return out + textHtml(s.slice(last));
   }
@@ -88,10 +91,18 @@
     var css = document.createElement("style");
     css.id = "tc-linkbtn-css";
     css.textContent =
-      ".tc-linkbtn{display:inline-flex;align-items:center;gap:4px;margin:6px 0 2px;padding:9px 14px;border-radius:999px;" +
-      "background:#0c7d6b;color:#fff !important;font-weight:700;font-size:15px;line-height:1.2;text-decoration:none !important;" +
-      "white-space:normal;word-break:normal;max-width:100%;}" +
-      ".tc-linkbtn:hover{background:#0a6a5b}.tc-linkbtn:focus-visible{outline:3px solid #7fd6c6;outline-offset:2px}" +
+      // Soft tinted buttons, one colour per kind, each on its own line.
+      ".tc-linkbtn{--bg:#e6f6f2;--fg:#0b6b5c;--bd:#a8dfd2;display:flex;width:fit-content;align-items:center;gap:4px;margin:8px 0 14px;padding:8px 14px;border-radius:12px;" +
+      "background:var(--bg);color:var(--fg) !important;border:1.5px solid var(--bd);font-weight:700;font-size:15px;line-height:1.25;text-decoration:none !important;" +
+      "white-space:normal;word-break:normal;max-width:100%;transition:filter .15s,transform .15s}" +
+      ".tc-linkbtn:hover{filter:brightness(.96)}.tc-linkbtn:active{transform:scale(.98)}.tc-linkbtn:focus-visible{outline:3px solid var(--bd);outline-offset:2px}" +
+      ".tc-book{--bg:#e6f6f2;--fg:#0b6b5c;--bd:#a8dfd2}" +
+      ".tc-dropoff{--bg:#fff4e0;--fg:#9a5a00;--bd:#f5cf8e}" +
+      ".tc-account,.tc-profile{--bg:#eaf1ff;--fg:#2450a8;--bd:#b9cdf5}" +
+      ".tc-track,.tc-boxes{--bg:#f2ecff;--fg:#5b3aa8;--bd:#d3c4f5}" +
+      ".tc-whatsapp{--bg:#e7f8ec;--fg:#1a7a3c;--bd:#a9e2bd}" +
+      ".tc-contact{--bg:#fdecef;--fg:#a8324a;--bd:#f3bdc8}" +
+      ".tc-privacy,.tc-open{--bg:#f1f3f5;--fg:#3d4a57;--bd:#d5dbe1}" +
       ".tc-tel{color:inherit;font-weight:700;text-decoration:underline;white-space:nowrap}";
     (document.head || document.documentElement).appendChild(css);
   }
