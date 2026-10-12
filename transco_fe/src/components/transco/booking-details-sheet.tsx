@@ -1,4 +1,5 @@
 import { CostingCard, oddPrice, tvSizeLabel } from "@/components/transco/costing-card";
+import { InviteCard } from "@/components/transco/invite-card";
 import { HandoverTags } from "@/components/transco/handover-tags";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -264,6 +265,12 @@ function BookingInfo({ d }: { d: DeclarationPrintData }) {
     ) : walkIn?.status === "submitted" ? (
       <p className="mt-2 text-xs text-muted-foreground">Linked to the customer's profile by phone number when you finalise.</p>
     ) : null}
+    {walkIn?.wantsAccount && walkIn.status === "submitted" && (
+      <p className="mt-2 rounded-md bg-info-soft px-2.5 py-1.5 text-xs text-info-foreground">
+        🔐 They created a My Transco account on the form{walkIn.accountEmail ? ` (${walkIn.accountEmail})` : ""} — it switches on when you confirm.
+      </p>
+    )}
+    {d.customer.id && <InviteCard bookingId={d.bookingId} phoneNumber={d.customer.phoneNumber} />}
   </Section>
 
   <div className="flex flex-wrap items-center gap-2">

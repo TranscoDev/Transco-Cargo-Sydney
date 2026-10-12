@@ -19,8 +19,14 @@
 // themselves, whose view of an unverified number is scoped down (see
 // scope() in customerTools.js).
 
+const crypto = require('crypto');
 const express = require('express');
 const { ObjectId } = require('mongodb');
+
+// Invite links (see POST /bookings/:id/invite): only a hash is stored.
+const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
+const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 const { customers, bookings, shipments, messages } = require('./db');
 const { hasRealName, hasVerifiedPhone } = require('./customerTools');
 const pii = require('./pii');
@@ -317,6 +323,24 @@ module.exports = function createStaffPortalRouter({ tools }) {
   }));
 
   // ---------- staff edits to a booking ----------
+
+  // "Invite to My Transco": a personal link (24 hours, single use) that
+  // opens sign-up with this customer's number already confirmed — or
+  // signs them straight in if they already have an account. Staff show it
+  // as a QR at the counter or send it themselves.
+  router.post('/bookings/:bookingId/invite', wrap(async (req, res) => {
+    if (!ObjectId.isValid(req.params.bookingId)) return res.status(404).json({ error: 'Booking not found' });
+    const b = await bookings().findOne({ _id: new ObjectId(req.params.bookingId) }, { projection: { customerId: 1, phoneNumber: 1 } });
+    if (!b) return res.status(404).json({ error: 'Booking not found' });
+    const customer = b.customerId
+      ? await customers().findOne({ _id: b.customerId })
+      : (b.phoneNumber ? await customers().findOne({ phoneNumber: normalizePhoneNumber(b.phoneNumber) || b.phoneNumber }) : null);
+    if (!customer) return res.status(409).json({ error: 'Confirm the booking first — that links it to the customer.' });
+    const token = crypto.randomBytes(24).toString('base64url');
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+    await customers().updateOne({ _id: customer._id }, { $set: { invite: { hash: hashToken(token), expiresAt, createdBy: (req.user && req.user.email) || null } } });
+    res.json({ link: `${PORTAL_SITE_URL}/account.html#/join/${token}`, expiresAt, hasAccount: Boolean(customer.passwordHash), name: customer.name || null });
+  }));
 
   router.get('/bookings/:bookingId/edit', wrap(async (req, res) => {
     const data = await tools.getBookingForStaffEdit(req.params.bookingId, { viewer: req.user && req.user.email });

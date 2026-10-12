@@ -242,6 +242,12 @@
   .choices.sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   @media (max-width: 520px) { .choices.sizes { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 420px) { .choices.two { grid-template-columns: 1fr; } }
+  .welcome-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; background: none; border: 0; border-top: 1px solid var(--line); text-align: left; font: inherit; color: inherit; text-decoration: none; cursor: pointer; min-height: 68px; }
+  .welcome-row:first-child { border-top: 0; }
+  .w-ico { font-size: 26px; width: 34px; text-align: center; }
+  .w-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .w-text b { font-size: 16.5px; color: var(--navy); }
+  .w-chev { font-size: 24px; color: var(--muted); }
   .profile-head { display: flex; align-items: center; gap: 14px; }
   .avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--sl-teal-deep); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 22px; flex-shrink: 0; }
   .card.menu { padding: 4px 0; }
@@ -542,6 +548,7 @@
       sendersTitle: "My senders", sendersSub: "You're the default sender. Add family or friends who sometimes send in your name.", receiversTitle: "My receivers", receiversSub: "People you send to. Pick them when booking — no typing again.", youDefault: "You (default)", addSender: "Add a sender", addReceiver: "Add a receiver", noSendersYet: "No other senders saved yet.", noReceiversYet: "No receivers saved yet.", savePerson: "Save", cancel: "Cancel", sendingTo: "Sending to", idShort: "Passport / NIC", removePerson: "Remove", removePersonTitle: "Remove {name}?", removePersonBody: "They will no longer be offered when you book. Bookings already made are not changed.", ownIdLbl: "Passport or NIC number", ownIdHelp: "Used when you're the sender — needed for the Sri Lanka Customs declaration. Stored encrypted.", senderNew: "Someone new",
       menuDetails: "Personal details", menuDetailsHint: "Name, email, passport, address", menuIdMissing: "Add your passport / NIC number", menuSecurity: "Password & sign-in", menuSendersN: "You + {n} more", menuSendersNone: "Just you so far", menuReceiversN: "{n} saved", menuReceiversNone: "None saved yet",
       loginIdLbl: "Email or mobile number", loginIdPh: "you@example.com or 04XX XXX XXX", loginIdInvalid: "Please enter your email, or your mobile number.", forgotLink: "Forgot password?", forgotTitle: "Reset your password", forgotSub: "Enter your email and we'll send you a link to choose a new password.", sendReset: "Send reset link", sending: "Sending…", resetSent: "Check your email. If {email} has a My Transco account, we've sent a link — it works for 30 minutes.", forgotNoEmail: "No email on your account? Call us on 0434 842 023 and we'll help.", backToSignIn: "Back to sign in", resetTitle: "Choose a new password", resetSub: "You'll be signed in straight after.", resetBtn: "Save new password", resetAgain: "Send a new link", emailRequired: "Please enter your email — you will use it to sign in.", addEmailTitle: "Add your email", addEmailSub: "From now on you can sign in with your email. Add it once — it also lets you reset your password.", saveContinue: "Save and continue", later: "Later",
+      joinTitle: "Create your account", joinSub: "Your number is already confirmed — just add the rest.", confirmed: "confirmed", joinExpiredTitle: "This link has expired", joinExpiredSub: "For your safety, links work once and only for a limited time. Send Hi to us on WhatsApp for a new one, or sign in with your email.", openWhatsApp: "Open WhatsApp", signInEmailInstead: "Sign in with email instead", signedInFromLink: "Signed in", hiName: "Hi {name} 👋", whatToDo: "What would you like to do?", welcomeBookDesc: "Drop-off or home pickup", welcomeProfileDesc: "Bookings, shipments, senders & receivers", welcomeChat: "Chat with our agent", welcomeChatDesc: "Prices, tracking, questions · 24/7", goHome: "Go to my home page",
       noAccountYet: "We couldn't find an account for that. Don't have an account?", signUpNow: "Sign up",
       eachLbl: "each", teaFree: "every 3rd free", estTitle: "Approximate cost for your boxes", estPlus: "Plus the items our team will price (TV size or odd-size measurements still to add).", estAir: "Air Freight is priced by weight when we receive your boxes.", estNote: "This is only an approximate cost for the boxes. It is not your final total — door delivery and home pickup are extra, and the price can change (for example weight, size or extra services).", estChat: "Chat with our agent",
       boxInfoLink: "See box sizes & prices", tvDesc: "Priced by screen size", otherDesc: "Anything that isn't a standard box — our team measures and prices it", handoverQ: "How will we get your boxes?", handDrop: "I'll drop them off", handDropDesc: "At our Seven Hills warehouse", handPick: "Home pickup", handPickDesc: "We collect from the sender's address", pickupInfo: "Please call Sajith on 0468 382 023 to arrange the pickup day and confirm the pickup fee — weekdays after 5pm or any time on weekends.", pickupWhen: "Best days or times for the pickup (optional)", pickupCall: "call Sajith on 0468 382 023 to arrange it", vHandover: "Please choose drop-off or home pickup.", editBooking: "Edit booking", editIntro: "Change your boxes, delivery, drop-off or declaration details. You can change the declaration until your BL number is issued.", editDeclOnly: "Your boxes are with us, so you can now only change the declaration (sender, receiver and items) — until your BL number is issued.", cancelIntro: "Changed your mind? You can cancel this booking.", streetPh: "e.g. Unit 3, 18 Sorrell Street", auMobileHelp: "Australian mobile, e.g. 0412 345 678", vStreet: "Please enter the street address.", vSuburb: "Please enter the suburb.", vState: "Please choose the state.", vPostcode: "Please enter the 4-digit postcode.", vAuMobile: "Please enter an Australian mobile number, e.g. 0412 345 678.",
@@ -675,6 +682,7 @@
       sendersTitle: "මගේ යවන අය", sendersSub: "ඔබ තමයි default යවන කෙනා. ඔබ වෙනුවෙන් සමහර වෙලාවට යවන පවුලේ අය හෝ යාළුවන් එකතු කරන්න.", receiversTitle: "මගේ ලබන අය", receiversSub: "ඔබ බඩු යවන අය. Booking කරද්දී තෝරන්න — ආයෙ type කරන්න ඕන නෑ.", youDefault: "ඔබ (default)", addSender: "යවන කෙනෙක් එකතු කරන්න", addReceiver: "ලබන කෙනෙක් එකතු කරන්න", noSendersYet: "තවම වෙන යවන අය save කරලා නෑ.", noReceiversYet: "තවම ලබන අය save කරලා නෑ.", savePerson: "Save", cancel: "අවලංගු කරන්න", sendingTo: "යවන්නේ", idShort: "Passport / NIC", removePerson: "ඉවත් කරන්න", removePersonTitle: "{name} ඉවත් කරන්නද?", removePersonBody: "Booking කරද්දී ආයෙ පෙන්නන්නේ නෑ. දැනටමත් කරපු bookings වෙනස් වෙන්නේ නෑ.", ownIdLbl: "Passport හෝ NIC අංකය", ownIdHelp: "ඔබ යවන කෙනා වෙද්දී පාවිච්චි වෙනවා — ශ්‍රී ලංකා Customs declaration එකට ඕන. Encrypt කරලා තියාගන්නවා.", senderNew: "අලුත් කෙනෙක්",
       menuDetails: "පෞද්ගලික විස්තර", menuDetailsHint: "නම, email, passport, ලිපිනය", menuIdMissing: "ඔබේ passport / NIC අංකය දාන්න", menuSecurity: "Password සහ sign-in", menuSendersN: "ඔබ + තවත් {n}", menuSendersNone: "දැනට ඔබ විතරයි", menuReceiversN: "{n}ක් save කරලා", menuReceiversNone: "තවම කවුරුත් නෑ",
       loginIdLbl: "Email හෝ mobile number", loginIdPh: "you@example.com හෝ 07X XXX XXXX", loginIdInvalid: "කරුණාකර ඔබේ email එක හෝ mobile number එක දාන්න.", forgotLink: "Password අමතකද?", forgotTitle: "Password එක reset කරන්න", forgotSub: "ඔබේ email එක දාන්න, අලුත් password එකක් තෝරන්න link එකක් එවනවා.", sendReset: "Reset link එක එවන්න", sending: "එවනවා…", resetSent: "ඔබේ email බලන්න. {email} එකට My Transco account එකක් තියෙනවා නම් link එකක් එව්වා — විනාඩි 30ක් වැඩ කරනවා.", forgotNoEmail: "Account එකේ email එකක් නැද්ද? 0434 842 023 අමතන්න, අපි උදව් කරන්නම්.", backToSignIn: "Sign in එකට ආපහු", resetTitle: "අලුත් password එකක් තෝරන්න", resetSub: "ඊට පස්සේ ඔබ sign in වෙනවා.", resetBtn: "අලුත් password එක save කරන්න", resetAgain: "අලුත් link එකක් එවන්න", emailRequired: "කරුණාකර ඔබේ email එක දාන්න — sign in වෙන්න ඕන.", addEmailTitle: "ඔබේ email එක එකතු කරන්න", addEmailSub: "දැන් ඉඳන් email එකෙන් sign in වෙන්න පුළුවන්. එක පාරක් දාන්න — password reset කරන්නත් පුළුවන්.", saveContinue: "Save කරලා ඉස්සරහට", later: "පස්සේ",
+      joinTitle: "ඔබේ account එක හදන්න", joinSub: "ඔබේ number එක දැනටමත් confirm කරලා — ඉතුරු ටික විතරක් දාන්න.", confirmed: "confirm කළා", joinExpiredTitle: "මේ link එක කල් ඉකුත් වෙලා", joinExpiredSub: "ආරක්ෂාවට link එකක් එක පාරයි, ටික කාලයකටයි වැඩ කරන්නේ. අලුත් එකක් ගන්න WhatsApp එකෙන් Hi කියන්න, නැත්නම් email එකෙන් sign in වෙන්න.", openWhatsApp: "WhatsApp open කරන්න", signInEmailInstead: "Email එකෙන් sign in වෙන්න", signedInFromLink: "Sign in වුණා", hiName: "ආයුබෝවන් {name} 👋", whatToDo: "ඔබට මොකක්ද කරන්න ඕන?", welcomeBookDesc: "Drop-off හෝ home pickup", welcomeProfileDesc: "Bookings, shipments, යවන අය සහ ලබන අය", welcomeChat: "අපේ agent එක්ක chat කරන්න", welcomeChatDesc: "මිල, tracking, ප්‍රශ්න · 24/7", goHome: "මගේ home page එකට",
       noAccountYet: "ඒකට account එකක් හම්බුණේ නෑ. Account එකක් නැද්ද?", signUpNow: "Sign up වෙන්න",
       eachLbl: "එකකට", teaFree: "හැම 3වෙනි එකම නොමිලේ", estTitle: "ඔයාගේ පෙට්ටි වලට ආසන්න මිල", estPlus: "ඊට අමතරව අපේ team එක මිල කරන භාණ්ඩ (TV size හෝ මිනුම් තවම දාලා නෑ).", estAir: "Air Freight මිල ඔයාගේ පෙට්ටි ලැබුණාම බර අනුව ගණන් කරනවා.", estNote: "මේක පෙට්ටි වලට විතරක් ආසන්න මිලක්. මේක අවසාන මුළු මිල නෙවෙයි — door delivery සහ home pickup අමතරයි, බර, size හෝ අමතර සේවා අනුව මිල වෙනස් වෙන්න පුළුවන්.", estChat: "Agent එක්ක chat කරන්න",
       boxInfoLink: "Box sizes සහ මිල බලන්න", tvDesc: "Screen size එක අනුව මිල", otherDesc: "සාමාන්‍ය box එකක් නොවන ඕනම දෙයක් — අපේ team එක මැනලා මිල කරනවා", handoverQ: "ඔයාගේ පෙට්ටි අපිට ලැබෙන්නේ කොහොමද?", handDrop: "මම ගෙනත් දෙනවා", handDropDesc: "අපේ Seven Hills warehouse එකට", handPick: "ගෙදරින් ගන්න (Home pickup)", handPickDesc: "යවන කෙනාගේ ලිපිනයෙන් අපි ගන්නවා", pickupInfo: "Pickup දවස arrange කරන්නයි pickup ගාස්තුව confirm කරන්නයි කරුණාකරලා Sajith ට කතා කරන්න 0468 382 023 — සතියේ දින සවස 5න් පස්සේ හෝ සති අන්තයේ ඕනම වෙලාවක.", pickupWhen: "Pickup එකට හොඳ දවස් හෝ වෙලාවන් (අවශ්‍ය නම්)", pickupCall: "arrange කරන්න Sajith ට කතා කරන්න 0468 382 023", vHandover: "කරුණාකරලා ගෙනත් දෙනවද නැත්නම් home pickup ද කියලා තෝරන්න.", editBooking: "Booking එක වෙනස් කරන්න", editIntro: "පෙට්ටි, delivery, drop-off හෝ declaration විස්තර වෙනස් කරන්න. BL අංකය දෙනකම් declaration එක වෙනස් කරන්න පුළුවන්.", editDeclOnly: "ඔයාගේ පෙට්ටි දැන් අප ළඟ, ඒ නිසා දැන් වෙනස් කරන්න පුළුවන් declaration එක (යවන/ලබන කෙනා සහ භාණ්ඩ) විතරයි — BL අංකය දෙනකම්.", cancelIntro: "හිත වෙනස් වුණාද? මේ booking එක cancel කරන්න පුළුවන්.", streetPh: "උදා: Unit 3, 18 Sorrell Street", auMobileHelp: "ඕස්ට්‍රේලියානු mobile, උදා: 0412 345 678", vStreet: "කරුණාකරලා street address එක දාන්න.", vSuburb: "කරුණාකරලා suburb එක දාන්න.", vState: "කරුණාකරලා state එක තෝරන්න.", vPostcode: "කරුණාකරලා ඉලක්කම් 4ක postcode එක දාන්න.", vAuMobile: "කරුණාකරලා ඕස්ට්‍රේලියානු mobile අංකයක් දාන්න, උදා: 0412 345 678.",
@@ -801,6 +809,7 @@
       sendersTitle: "என் அனுப்புநர்கள்", sendersSub: "நீங்கள்தான் default அனுப்புநர். உங்கள் பெயரில் சில நேரம் அனுப்பும் குடும்பத்தினர் அல்லது நண்பர்களைச் சேர்க்கவும்.", receiversTitle: "என் பெறுநர்கள்", receiversSub: "நீங்கள் அனுப்பும் நபர்கள். Booking செய்யும்போது தேர்ந்தெடுங்கள் — மீண்டும் type செய்ய வேண்டாம்.", youDefault: "நீங்கள் (default)", addSender: "அனுப்புநரைச் சேர்", addReceiver: "பெறுநரைச் சேர்", noSendersYet: "வேறு அனுப்புநர்கள் இன்னும் சேமிக்கப்படவில்லை.", noReceiversYet: "பெறுநர்கள் இன்னும் சேமிக்கப்படவில்லை.", savePerson: "Save", cancel: "ரத்து", sendingTo: "அனுப்பும் இடம்", idShort: "Passport / NIC", removePerson: "நீக்கு", removePersonTitle: "{name} ஐ நீக்கவா?", removePersonBody: "Booking செய்யும்போது இனி காட்டப்படமாட்டார்கள். ஏற்கனவே செய்த bookings மாறாது.", ownIdLbl: "Passport அல்லது NIC எண்", ownIdHelp: "நீங்கள் அனுப்புநராக இருக்கும்போது பயன்படும் — இலங்கை Customs declaration க்கு தேவை. Encrypt செய்து வைக்கப்படும்.", senderNew: "புதியவர்",
       menuDetails: "தனிப்பட்ட விவரங்கள்", menuDetailsHint: "பெயர், email, passport, முகவரி", menuIdMissing: "உங்கள் passport / NIC எண்ணைச் சேர்க்கவும்", menuSecurity: "Password & sign-in", menuSendersN: "நீங்கள் + {n} பேர்", menuSendersNone: "இப்போது நீங்கள் மட்டும்", menuReceiversN: "{n} சேமிக்கப்பட்டது", menuReceiversNone: "இன்னும் யாரும் இல்லை",
       loginIdLbl: "Email அல்லது mobile number", loginIdPh: "you@example.com அல்லது 04XX XXX XXX", loginIdInvalid: "உங்கள் email அல்லது mobile number ஐ உள்ளிடவும்.", forgotLink: "Password மறந்துவிட்டதா?", forgotTitle: "Password ஐ reset செய்யுங்கள்", forgotSub: "உங்கள் email ஐ உள்ளிடுங்கள், புதிய password தேர்வு செய்ய link அனுப்புவோம்.", sendReset: "Reset link அனுப்பு", sending: "அனுப்புகிறது…", resetSent: "உங்கள் email ஐப் பாருங்கள். {email} க்கு My Transco account இருந்தால் link அனுப்பியுள்ளோம் — 30 நிமிடங்கள் வேலை செய்யும்.", forgotNoEmail: "Account இல் email இல்லையா? 0434 842 023 ஐ அழையுங்கள், உதவுவோம்.", backToSignIn: "Sign in க்குத் திரும்பு", resetTitle: "புதிய password ஐத் தேர்வு செய்யுங்கள்", resetSub: "அதன் பிறகு நீங்கள் sign in ஆகிவிடுவீர்கள்.", resetBtn: "புதிய password ஐ save செய்", resetAgain: "புதிய link அனுப்பு", emailRequired: "உங்கள் email ஐ உள்ளிடவும் — sign in செய்ய தேவை.", addEmailTitle: "உங்கள் email ஐச் சேர்க்கவும்", addEmailSub: "இனி email மூலம் sign in செய்யலாம். ஒருமுறை சேர்க்கவும் — password reset செய்யவும் உதவும்.", saveContinue: "Save செய்து தொடர்", later: "பிறகு",
+      joinTitle: "உங்கள் account ஐ உருவாக்குங்கள்", joinSub: "உங்கள் number ஏற்கனவே உறுதிசெய்யப்பட்டது — மீதியை மட்டும் சேர்க்கவும்.", confirmed: "உறுதிசெய்யப்பட்டது", joinExpiredTitle: "இந்த link காலாவதியானது", joinExpiredSub: "பாதுகாப்புக்காக link ஒருமுறை, குறுகிய நேரம் மட்டுமே வேலை செய்யும். புதியதைப் பெற WhatsApp இல் Hi அனுப்புங்கள், அல்லது email மூலம் sign in செய்யுங்கள்.", openWhatsApp: "WhatsApp ஐத் திற", signInEmailInstead: "Email மூலம் sign in செய்", signedInFromLink: "Sign in ஆனது", hiName: "வணக்கம் {name} 👋", whatToDo: "என்ன செய்ய விரும்புகிறீர்கள்?", welcomeBookDesc: "Drop-off அல்லது home pickup", welcomeProfileDesc: "Bookings, shipments, அனுப்புநர்கள் & பெறுநர்கள்", welcomeChat: "எங்கள் agent உடன் chat செய்", welcomeChatDesc: "விலை, tracking, கேள்விகள் · 24/7", goHome: "என் home page க்கு",
       noAccountYet: "அதற்கான account கிடைக்கவில்லை. Account இல்லையா?", signUpNow: "Sign up செய்யுங்கள்",
       eachLbl: "ஒன்றுக்கு", teaFree: "ஒவ்வொரு 3வதும் இலவசம்", estTitle: "உங்கள் பெட்டிகளுக்கான தோராயமான விலை", estPlus: "மேலும் எங்கள் team விலையிடும் பொருட்கள் (TV size அல்லது அளவுகள் இன்னும் சேர்க்கப்படவில்லை).", estAir: "Air Freight விலை உங்கள் பெட்டிகளைப் பெற்றதும் எடையைப் பொறுத்து கணக்கிடப்படும்.", estNote: "இது பெட்டிகளுக்கான தோராயமான விலை மட்டுமே. இது உங்கள் இறுதி மொத்தம் அல்ல — door delivery மற்றும் home pickup கூடுதல், விலை மாறலாம் (எ.கா. எடை, அளவு அல்லது கூடுதல் சேவைகள்).", estChat: "எங்கள் agent உடன் chat செய்யுங்கள்",
       boxInfoLink: "Box அளவுகள் & விலைகளைப் பார்", tvDesc: "Screen size ஐப் பொறுத்து விலை", otherDesc: "வழக்கமான பெட்டி அல்லாத எதுவும் — எங்கள் team அளந்து விலையிடும்", handoverQ: "உங்கள் பெட்டிகள் எங்களிடம் எப்படி வரும்?", handDrop: "நானே கொண்டு வருவேன்", handDropDesc: "எங்கள் Seven Hills கிடங்குக்கு", handPick: "வீட்டிலிருந்து எடுத்தல் (Home pickup)", handPickDesc: "அனுப்புபவரின் முகவரியிலிருந்து நாங்கள் எடுப்போம்", pickupInfo: "Pickup நாளை ஏற்பாடு செய்யவும் கட்டணத்தை உறுதிப்படுத்தவும் Sajith ஐ அழையுங்கள் 0468 382 023 — வார நாட்களில் மாலை 5க்குப் பின் அல்லது வார இறுதியில் எப்போதும்.", pickupWhen: "Pickup க்கு வசதியான நாட்கள் அல்லது நேரங்கள் (விருப்பம்)", pickupCall: "ஏற்பாடு செய்ய Sajith ஐ அழையுங்கள் 0468 382 023", vHandover: "கொண்டு வருவதா அல்லது home pickup ஆ என்று தேர்ந்தெடுக்கவும்.", editBooking: "Booking ஐ மாற்று", editIntro: "பெட்டிகள், delivery, drop-off அல்லது declaration விவரங்களை மாற்றுங்கள். BL எண் வழங்கப்படும் வரை declaration ஐ மாற்றலாம்.", editDeclOnly: "உங்கள் பெட்டிகள் எங்களிடம் உள்ளன, எனவே இப்போது declaration (அனுப்புபவர், பெறுபவர், பொருட்கள்) மட்டுமே மாற்றலாம் — BL எண் வழங்கப்படும் வரை.", cancelIntro: "மனம் மாறிவிட்டதா? இந்த booking ஐ cancel செய்யலாம்.", streetPh: "உதா: Unit 3, 18 Sorrell Street", auMobileHelp: "ஆஸ்திரேலிய mobile, உதா: 0412 345 678", vStreet: "தெரு முகவரியை உள்ளிடவும்.", vSuburb: "Suburb ஐ உள்ளிடவும்.", vState: "State ஐத் தேர்ந்தெடுக்கவும்.", vPostcode: "4 இலக்க postcode ஐ உள்ளிடவும்.", vAuMobile: "ஆஸ்திரேலிய mobile எண்ணை உள்ளிடவும், உதா: 0412 345 678.",
@@ -1400,6 +1409,8 @@
   function nextAfterSignIn() {
     var next = new URLSearchParams(location.search).get("next");
     if (next === "chat") { location.href = "/#agent"; return; }
+    // Signed in from a personal link: "what would you like to do?" first.
+    if (session("transco_joined")) { session("transco_joined", null); go("#/welcome"); return; }
     go("#/home");
   }
 
@@ -1590,6 +1601,93 @@
       h("p", { class: "page-sub", text: t("resetSub") }),
       form));
     pw.input.focus();
+  }
+
+
+  // #/join/<token> — a personal link from our staff (or, later, the
+  // WhatsApp bot). It proves the phone is theirs: an existing account is
+  // signed straight in; otherwise sign-up opens with the number confirmed.
+  var WA_LINK = "https://wa.me/15556703261?text=Hi"; // test number until the real one is connected
+  function viewJoin(inviteToken) {
+    renderChrome(null);
+    render(h("div", { class: "auth-wrap stack" }, h("div", { class: "card", style: "text-align:center" }, h("p", { class: "muted", text: t("loading") }))));
+    api("GET", "/auth/invite/" + encodeURIComponent(inviteToken)).then(function (info) {
+      if (info.hasAccount) {
+        return api("POST", "/auth/invite", { token: inviteToken }).then(function (data) {
+          history.replaceState(null, "", "#/welcome"); session("transco_joined", "1"); onSignedIn(data);
+        });
+      }
+      viewJoinSignup(inviteToken, info);
+    }).catch(function () { viewJoinExpired(); });
+  }
+
+  function viewJoinSignup(inviteToken, info) {
+    var name = h("input", { class: "input", id: "join-name", type: "text", autocomplete: "name", maxlength: "80", value: info.name || "" });
+    var email = h("input", { class: "input", id: "join-email", type: "email", inputmode: "email", autocomplete: "email", autocapitalize: "off", maxlength: "120", value: info.email || "" });
+    var pw = passwordInput("join-password", "new-password");
+    var agree = h("input", { type: "checkbox", id: "join-privacy", style: "width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:var(--sl-teal-deep)" });
+    var errBox = h("div", { class: "field-error", role: "alert" });
+    var submit = h("button", { class: "btn teal block", type: "submit", text: t("createAccount") });
+    var form = h("form", { novalidate: true, onsubmit: function (e) {
+      e.preventDefault();
+      errBox.textContent = "";
+      if (name.value.trim().length < 2) { errBox.textContent = t("nameInvalid"); name.focus(); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) { errBox.textContent = email.value.trim() ? t("emailInvalid") : t("emailRequired"); email.focus(); return; }
+      if (pw.input.value.length < 8) { errBox.textContent = t("passwordShort"); pw.input.focus(); return; }
+      if (!agree.checked) { errBox.textContent = t("privacyRequired"); agree.focus(); return; }
+      submit.disabled = true; submit.textContent = t("creatingAccount");
+      api("POST", "/auth/invite", { token: inviteToken, name: name.value.trim(), email: email.value.trim(), password: pw.input.value, privacyAccepted: true })
+        .then(function (data) { history.replaceState(null, "", "#/welcome"); session("transco_joined", "1"); onSignedIn(data); })
+        .catch(function (err) {
+          submit.disabled = false; submit.textContent = t("createAccount");
+          if (err.reason === "bad_link") return viewJoinExpired();
+          errBox.textContent = err.message;
+        });
+    } },
+      h("div", { class: "field" }, h("span", { class: "label", text: t("phone") }),
+        h("div", { class: "spread", style: "border:1.5px solid #cfe9e2;background:#f2fbf8;border-radius:12px;padding:12px 14px" },
+          h("span", { style: "font-size:16px", text: formatAuPhone("+" + info.phoneNumber) }), h("span", { style: "color:#0b5c4f;font-weight:700;font-size:13px", text: "✓ " + t("confirmed") }))),
+      h("div", { class: "field" }, h("label", { for: "join-name", text: t("yourName") }), name),
+      h("div", { class: "field" }, h("label", { for: "join-email", text: t("regEmail") }), email, h("span", { class: "help", text: t("regEmailHelp") })),
+      h("div", { class: "field" }, h("div", { class: "spread" }, h("label", { for: "join-password", text: t("choosePassword") }), pw.toggle), pw.input, h("span", { class: "help", text: t("passwordHelp") })),
+      h("label", { for: "join-privacy", style: "display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:15px;cursor:pointer" }, agree,
+        h("span", null, t("agreePre") + " ", h("a", { href: "/privacy.html", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), ".")),
+      errBox, h("div", { style: "margin-top:16px" }, submit));
+    render(h("div", { class: "auth-wrap stack" }, h("div", { class: "card" },
+      h("h1", { class: "page-title", text: t("joinTitle") }),
+      h("p", { class: "page-sub", text: t("joinSub") }),
+      form)));
+    (name.value ? email : name).focus();
+  }
+
+  function viewJoinExpired() {
+    renderChrome(null);
+    render(h("div", { class: "auth-wrap stack" }, h("div", { class: "card", style: "text-align:center" },
+      h("div", { style: "font-size:44px", "aria-hidden": "true", text: "⌛" }),
+      h("h1", { class: "page-title", text: t("joinExpiredTitle") }),
+      h("p", { class: "page-sub", text: t("joinExpiredSub") }),
+      h("a", { class: "btn teal block", href: WA_LINK, target: "_blank", rel: "noopener", text: "💬 " + t("openWhatsApp") }),
+      h("a", { class: "btn secondary block", style: "margin-top:10px", href: "#/signin", text: t("signInEmailInstead") }))));
+  }
+
+  // #/welcome — right after a link signed them in: what to do next.
+  function viewWelcome() {
+    var p = profile || {};
+    function row(icon, title, desc, onClick, href) {
+      return h(href ? "a" : "button", Object.assign({ class: "welcome-row" }, href ? { href: href } : { type: "button", onclick: onClick }),
+        h("span", { class: "w-ico", "aria-hidden": "true", text: icon }),
+        h("span", { class: "w-text" }, h("b", { text: title }), h("span", { class: "muted small", text: desc })),
+        h("span", { class: "w-chev", "aria-hidden": "true", text: "›" }));
+    }
+    render(
+      h("p", { class: "muted small", style: "margin:0 0 2px", text: "✓ " + t("signedInFromLink") }),
+      h("h1", { class: "page-title", text: t("hiName", { name: (p.name || "").split(" ")[0] || "" }) }),
+      h("p", { class: "page-sub", text: t("whatToDo") }),
+      h("div", { class: "card", style: "padding:4px 0" },
+        row("📝", t("qBook"), t("welcomeBookDesc"), null, "#/book"),
+        row("👤", t("navProfile"), t("welcomeProfileDesc"), null, "#/profile"),
+        row("💬", t("welcomeChat"), t("welcomeChatDesc"), function () { openAgent(); })),
+      h("p", { style: "text-align:center;margin-top:14px" }, h("a", { href: "#/home", class: "link-btn", text: t("goHome") })));
   }
 
   // Signed in on an older account with no email: asked once to add one
@@ -3509,6 +3607,7 @@
     var section = parts[0] || "home";
 
     if (section === "reset" && parts[1]) return viewReset(decodeURIComponent(parts[1]));
+    if (section === "join" && parts[1]) return viewJoin(decodeURIComponent(parts[1]));
 
     // Just signed in for the first time — finish the one-question
     // welcome (their name) before anything else.
@@ -3539,6 +3638,7 @@
       case "documents": return viewDocuments();
       case "profile": return viewProfile(parts[1]);
       case "verify": return viewVerify();
+      case "welcome": return viewWelcome();
       default: return viewHome();
     }
   }

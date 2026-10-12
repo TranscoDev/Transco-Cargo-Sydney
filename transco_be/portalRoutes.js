@@ -520,6 +520,46 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     res.json({ token: customerAuth.signCustomerToken(updated), profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
   }));
 
+  // ---------- staff invite link (#/join/<token>) ----------
+
+  async function customerForInvite(token) {
+    if (typeof token !== 'string' || token.length < 20) return null;
+    const c = await customers().findOne({ 'invite.hash': hashToken(token) });
+    return c && c.invite.expiresAt > new Date() ? c : null;
+  }
+
+  // What the join page shows: their number (they own it — the link proves
+  // it), the name we have, and whether they already have an account.
+  router.get('/auth/invite/:token', wrap(async (req, res) => {
+    if (ipLimited(clientIp(req))) return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+    const c = await customerForInvite(req.params.token);
+    if (!c) return res.status(404).json({ error: 'This link has expired or was already used.', reason: 'bad_link' });
+    res.json({ phoneNumber: c.phoneNumber, name: hasRealName(c) ? c.name : '', email: c.email || '', hasAccount: Boolean(c.passwordHash) });
+  }));
+
+  // Use the link: an existing account is simply signed in; otherwise the
+  // account is created with the email + password they chose. Single use.
+  router.post('/auth/invite', wrap(async (req, res) => {
+    if (ipLimited(clientIp(req))) return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+    const body = req.body || {};
+    const c = await customerForInvite(body.token);
+    if (!c) return res.status(400).json({ error: 'This link has expired or was already used.', reason: 'bad_link' });
+    const now = new Date();
+    const set = { lastPortalLoginAt: now, phoneVerified: true, phoneVerifiedAt: c.phoneVerifiedAt || now, portalJoinedAt: c.portalJoinedAt || now };
+    if (!c.passwordHash) {
+      const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      if (!EMAIL_RE.test(email) || email.length > 120) return res.status(400).json({ error: "That email address doesn't look right.", field: 'email' });
+      if (await emailTakenByOtherAccount(email, c._id)) return res.status(409).json({ error: 'This email is already used by another My Transco account.', field: 'email' });
+      if (!validPassword(body.password)) return res.status(400).json({ error: `Please choose a password with at least ${MIN_PASSWORD_LENGTH} characters.`, field: 'password' });
+      if (body.privacyAccepted !== true) return res.status(400).json({ error: 'Please tick that you agree to the Privacy Policy.', field: 'privacyAccepted' });
+      const name = cleanString(body.name, 80);
+      Object.assign(set, { email, passwordHash: hashPassword(body.password), privacyAcceptedAt: now, privacyPolicyVersion: PRIVACY_POLICY_VERSION, ...(name && name.length >= 2 ? { name } : {}) });
+    }
+    const updated = await customers().findOneAndUpdate({ _id: c._id }, { $set: set, $unset: { invite: '' } }, { returnDocument: 'after' });
+    await tools.ensureCustomerCode(updated);
+    res.json({ token: customerAuth.signCustomerToken(updated), profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
+  }));
+
   // Everything below requires a signed-in customer.
   router.use(customerAuth.requireCustomer);
 

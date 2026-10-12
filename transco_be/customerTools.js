@@ -924,7 +924,7 @@ function createCustomerTools({
       officeUse: booking.officeUse || null,
       collectionCentre: booking.collectionCentre || null,
       walkIn: booking.walkIn
-        ? { status: booking.walkIn.status, submittedAt: booking.walkIn.submittedAt || null, finalisedAt: booking.walkIn.finalisedAt || null, finalisedBy: booking.walkIn.finalisedBy || null, returning: Boolean(booking.walkIn.returning) }
+        ? { status: booking.walkIn.status, submittedAt: booking.walkIn.submittedAt || null, finalisedAt: booking.walkIn.finalisedAt || null, finalisedBy: booking.walkIn.finalisedBy || null, returning: Boolean(booking.walkIn.returning), wantsAccount: Boolean(booking.walkIn.wantsAccount), accountEmail: booking.walkIn.accountEmail || null }
         : null,
       // Staff's drop-off confirmation (values + BL), for walk-ins and for
       // bookings whose full declaration was filled online. Null when there's

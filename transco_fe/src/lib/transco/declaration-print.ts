@@ -94,6 +94,9 @@ export interface DeclarationPrintData {
     finalisedAt: string | null;
     finalisedBy: string | null;
     returning: boolean;
+    /** The customer made a My Transco account on the form (switches on at confirm). */
+    wantsAccount?: boolean;
+    accountEmail?: string | null;
   } | null;
   /** Staff confirmation at drop-off (values + BL) — walk-ins and bookings with a full online declaration. */
   confirm: { status: "submitted" | "finalised"; finalisedAt: string | null; finalisedBy: string | null } | null;

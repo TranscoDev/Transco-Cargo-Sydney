@@ -112,6 +112,8 @@
 
   .note { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; margin-bottom: 14px; }
   .note.info { background: var(--teal-soft); border-color: #9ad8c9; }
+  .acct-box { background: #fff; border: 2px solid var(--teal); border-radius: var(--radius); padding: 16px; }
+  .linkish { background: none; border: 0; padding: 0; color: #0c7d6b; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   .check { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; font-size: 15px; }
   .check input { width: 24px; height: 24px; margin: 1px 0 0; accent-color: var(--teal); flex-shrink: 0; }
   .check.bad { border-color: var(--red); }
@@ -181,6 +183,21 @@
   // the same way the rest of the site writes them.
   var T = {
     si: {
+      "Welcome back!": "ආයෙත් සාදරයෙන් පිළිගන්නවා!",
+      "You already have a My Transco account. This drop-off will appear in it after our staff confirm it.": "ඔබට දැනටමත් My Transco account එකක් තියෙනවා. අපේ staff confirm කළාම මේ drop-off එක ඒකේ පේනවා.",
+      "No My Transco account for now.": "දැනට My Transco account එකක් නෑ.",
+      "Create one after all": "එකක් හදන්න",
+      "Last step": "අන්තිම පියවර",
+      "Create your My Transco account": "ඔබේ My Transco account එක හදන්න",
+      "Track these boxes and book faster next time. Your account starts when our staff confirm your drop-off.": "මේ box track කරන්න, ඊළඟ පාර ඉක්මනින් book කරන්න. අපේ staff drop-off එක confirm කළාම account එක පටන් ගන්නවා.",
+      "Choose a password": "Password එකක් තෝරන්න",
+      "At least 8 characters": "අකුරු 8කට වැඩි",
+      "I agree to the": "මම එකඟයි:",
+      "Privacy Policy": "Privacy Policy",
+      "Skip — just send the form": "Skip කරන්න — form එක විතරක් යවන්න",
+      "Your My Transco account ({email}) will be ready as soon as our staff confirm your boxes. Then sign in with your email and password.": "අපේ staff ඔබේ box confirm කළ ගමන් ඔබේ My Transco account එක ({email}) සූදානම්. ඊට පස්සේ email එක සහ password එකෙන් sign in වෙන්න.",
+      "Please choose a password with at least 8 characters.": "කරුණාකර අකුරු 8කට වැඩි password එකක් තෝරන්න.",
+      "Please tick that you agree to the Privacy Policy.": "කරුණාකර Privacy Policy එකට එකඟ බව tick කරන්න.",
       "We'll check your boxes with you and give you your BL number.": "අපි ඔබත් එක්ක box බලලා ඔබේ BL අංකය දෙනවා.",
       "List everything in your boxes — Customs needs it.": "Box වල තියෙන හැම දෙයක්ම ලියන්න — Customs වලට ඕන.",
       "Signed in to My Transco — your saved details are filled in.": "My Transco වලට sign in වුණා — ඔබේ විස්තර පුරවලා තියෙනවා.",
@@ -279,6 +296,21 @@
       "Couldn't send. Please check your internet and try again, or ask our staff.": "යවන්න බැරි වුණා. Internet බලලා ආයෙත් උත්සාහ කරන්න, නැත්නම් staff ගෙන් අහන්න."
     },
     ta: {
+      "Welcome back!": "மீண்டும் வருக!",
+      "You already have a My Transco account. This drop-off will appear in it after our staff confirm it.": "உங்களுக்கு ஏற்கனவே My Transco account உள்ளது. எங்கள் staff உறுதிசெய்த பின் இந்த drop-off அதில் தெரியும்.",
+      "No My Transco account for now.": "இப்போதைக்கு My Transco account இல்லை.",
+      "Create one after all": "ஒன்றை உருவாக்கு",
+      "Last step": "கடைசி படி",
+      "Create your My Transco account": "உங்கள் My Transco account ஐ உருவாக்குங்கள்",
+      "Track these boxes and book faster next time. Your account starts when our staff confirm your drop-off.": "இந்தப் பெட்டிகளை track செய்யுங்கள், அடுத்த முறை விரைவாக book செய்யுங்கள். எங்கள் staff drop-off ஐ உறுதிசெய்ததும் account தொடங்கும்.",
+      "Choose a password": "Password ஐத் தேர்வு செய்யுங்கள்",
+      "At least 8 characters": "குறைந்தது 8 எழுத்துகள்",
+      "I agree to the": "நான் ஒப்புக்கொள்கிறேன்:",
+      "Privacy Policy": "Privacy Policy",
+      "Skip — just send the form": "தவிர் — form ஐ மட்டும் அனுப்பு",
+      "Your My Transco account ({email}) will be ready as soon as our staff confirm your boxes. Then sign in with your email and password.": "எங்கள் staff உங்கள் பெட்டிகளை உறுதிசெய்ததும் உங்கள் My Transco account ({email}) தயாராகும். பிறகு email மற்றும் password மூலம் sign in செய்யுங்கள்.",
+      "Please choose a password with at least 8 characters.": "குறைந்தது 8 எழுத்துகள் கொண்ட password ஐத் தேர்வு செய்யுங்கள்.",
+      "Please tick that you agree to the Privacy Policy.": "Privacy Policy க்கு ஒப்புக்கொள்வதை tick செய்யுங்கள்.",
       "We'll check your boxes with you and give you your BL number.": "உங்களுடன் பெட்டிகளைச் சரிபார்த்து உங்கள் BL எண்ணைத் தருவோம்.",
       "List everything in your boxes — Customs needs it.": "பெட்டிகளில் உள்ள அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை.",
       "Signed in to My Transco — your saved details are filled in.": "My Transco இல் உள்நுழைந்துள்ளீர்கள் — உங்கள் விவரங்கள் நிரப்பப்பட்டுள்ளன.",
@@ -449,6 +481,21 @@
   var badFields = {};
   var sending = false;
   var result = null;
+  // My Transco account on the form: asked only when the sender's mobile
+  // has no account yet (checked after the sender step). It switches on
+  // when staff confirm the drop-off at the counter.
+  var acctCheck = { mobile: "", hasAccount: null };
+  var newAcct = { email: "", password: "", agree: false, skip: false, created: false };
+  function checkAccount() {
+    var m = String(state.sender.mobile || "").trim();
+    if (!m || m === acctCheck.mobile) return;
+    acctCheck = { mobile: m, hasAccount: null };
+    fetch(API_ORIGIN + "/api/public/dropoff/account?mobile=" + encodeURIComponent(m))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d && acctCheck.mobile === m) { acctCheck.hasAccount = !!d.hasAccount; if (STEPS[step] === "finish") render(); } })
+      .catch(function () {});
+  }
+  function accountStepOn() { return acctCheck.hasAccount === false && !newAcct.skip; }
   var signature = { drawn: false, canvas: null };
   var last = store(LAST_KEY);
 
@@ -723,7 +770,29 @@
     html += '<div style="margin-top:18px">' + field("_sign", "signedName", "Type your full name to sign") + "</div>";
     html += '<div class="field"><label>' + esc(t("Signature")) + ' <span class="opt">(' + esc(t("optional")) + ')</span></label><div class="sig-wrap"><canvas id="sig"></canvas><div class="ph" id="sig-ph">' + esc(t("Sign here with your finger")) + "</div></div>" +
       '<div class="sig-actions"><span>' + esc(t("You can also sign the printed form at the counter.")) + '</span><button type="button" id="sig-clear">' + esc(t("Clear")) + "</button></div></div>";
+    html += renderAccountStep();
     return html;
+  }
+
+  function renderAccountStep() {
+    if (acctCheck.hasAccount === true) {
+      return '<div class="note" style="margin-top:18px;background:#e7f7f3;border-color:#bfe6dc">👋 <b>' + esc(t("Welcome back!")) + "</b> " +
+        esc(t("You already have a My Transco account. This drop-off will appear in it after our staff confirm it.")) + "</div>";
+    }
+    if (acctCheck.hasAccount !== false) return "";
+    if (newAcct.skip) {
+      return '<p class="lead" style="margin-top:18px;font-size:14px">' + esc(t("No My Transco account for now.")) +
+        ' <button type="button" id="na-unskip" class="linkish">' + esc(t("Create one after all")) + "</button></p>";
+    }
+    if (!newAcct.email && state.sender.email) newAcct.email = state.sender.email;
+    return '<div class="acct-box" style="margin-top:22px">' +
+      '<p style="margin:0;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--teal-deep, #0c7d6b)">' + esc(t("Last step")) + "</p>" +
+      '<h2 style="margin:4px 0 4px">' + esc(t("Create your My Transco account")) + "</h2>" +
+      '<p class="lead" style="margin:0 0 10px;font-size:14px">' + esc(t("Track these boxes and book faster next time. Your account starts when our staff confirm your drop-off.")) + "</p>" +
+      '<div class="field' + (badFields["account.email"] ? " bad" : "") + '"><label for="na-email">' + esc(t("Email")) + '</label><input id="na-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(newAcct.email) + '" /></div>' +
+      '<div class="field' + (badFields["account.password"] ? " bad" : "") + '"><label for="na-pw">' + esc(t("Choose a password")) + '</label><input id="na-pw" type="password" autocomplete="new-password" placeholder="' + esc(t("At least 8 characters")) + '" value="' + esc(newAcct.password) + '" /></div>' +
+      '<label class="check' + (badFields["account.privacyAccepted"] ? " bad" : "") + '"><input type="checkbox" id="na-agree"' + (newAcct.agree ? " checked" : "") + " /><span>" + esc(t("I agree to the")) + ' <a href="/privacy.html" target="_blank" rel="noopener">' + esc(t("Privacy Policy")) + "</a>.</span></label>" +
+      '<p style="text-align:center;margin:12px 0 0"><button type="button" id="na-skip" class="linkish">' + esc(t("Skip — just send the form")) + "</button></p></div>";
   }
 
   function renderDone() {
@@ -733,6 +802,7 @@
       '<p class="lead" style="font-size:17px;color:var(--ink);font-weight:600">' + esc(t("Please show this screen to our staff.")) + "</p>" +
       '<div class="code">' + esc(result.bookingCode) + "</div>" +
       '<p class="lead">' + esc(t("We'll check your boxes with you and give you your BL number.")) + "</p>" +
+      (newAcct.created ? '<div class="note" style="margin:12px 0;background:#e8f0fb;border-color:#c9d8f1;text-align:left">🔐 ' + esc(t("Your My Transco account ({email}) will be ready as soon as our staff confirm your boxes. Then sign in with your email and password.", { email: newAcct.email })) + "</div>" : "") +
       '<div class="summary"><div><b>' + esc(t("Sending to")) + "</b> " + esc(c ? t(c.label) : "") + "</div><div><b>" + esc(t("Boxes")) + "</b> " + esc(boxes) + "</div><div><b>" + esc(t("Receiver ")) + "</b> " + esc(state.receiver.fullName) + "</div></div>" +
       '<button type="button" class="btn back" id="again" style="width:100%;margin-top:22px">' + esc(t("Fill another form")) + "</button></div>";
   }
@@ -806,6 +876,17 @@
         if (r) { state.receiver = Object.assign(emptyPerson(), pick(r)); badFields = {}; saveDraft(); render(); }
       };
     });
+    // My Transco account step.
+    var naE = document.getElementById("na-email");
+    if (naE) naE.oninput = function () { newAcct.email = naE.value; delete badFields["account.email"]; };
+    var naP = document.getElementById("na-pw");
+    if (naP) naP.oninput = function () { newAcct.password = naP.value; delete badFields["account.password"]; };
+    var naA = document.getElementById("na-agree");
+    if (naA) naA.onchange = function () { newAcct.agree = naA.checked; delete badFields["account.privacyAccepted"]; };
+    var naS = document.getElementById("na-skip");
+    if (naS) naS.onclick = function () { newAcct.skip = true; render(); };
+    var naU = document.getElementById("na-unskip");
+    if (naU) naU.onclick = function () { newAcct.skip = false; render(); };
     // "Been here before?" — WhatsApp code.
     var ko = document.getElementById("known-open");
     if (ko) ko.onclick = function () {
@@ -1104,6 +1185,11 @@
       if (state.insurance === null) return t("Please answer the insurance question.");
       if (!state.declarationAccepted) { badFields.declarationAccepted = 1; return t("Please tick the declaration."); }
       if (String(state.signedName).trim().length < 2) { badFields["_sign.signedName"] = 1; return t("Please type your full name to sign."); }
+      if (accountStepOn()) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(newAcct.email).trim())) { badFields["account.email"] = 1; return t("Please check the email address."); }
+        if (String(newAcct.password).length < 8) { badFields["account.password"] = 1; return t("Please choose a password with at least 8 characters."); }
+        if (!newAcct.agree) { badFields["account.privacyAccepted"] = 1; return t("Please tick that you agree to the Privacy Policy."); }
+      }
     }
     return "";
   }
@@ -1134,6 +1220,7 @@
       signedName: state.signedName,
       signatureImage: signaturePng()
     };
+    if (accountStepOn()) body.account = { email: String(newAcct.email).trim(), password: newAcct.password, privacyAccepted: true };
     if (state.service === "air") {
       body.dangerousGoods = {
         notInBoxes: state.dg.no.slice(),
@@ -1154,6 +1241,7 @@
           return;
         }
         result = r.data;
+        newAcct.created = !!body.account;
         // Remembered on THIS phone only, for next time.
         store(LAST_KEY, { country: state.country, sender: state.sender, receiver: state.receiver });
         last = store(LAST_KEY);
@@ -1173,7 +1261,9 @@
     if (problem) { errorText = problem; render(); window.scrollTo(0, 0); return; }
     errorText = "";
     if (step === STEPS.length - 1) return submit();
-    step += 1; render(); window.scrollTo(0, 0);
+    step += 1;
+    if (STEPS[step - 1] === "sender") checkAccount();
+    render(); window.scrollTo(0, 0);
   };
   backBtn.onclick = function () { if (step > 0) { step -= 1; errorText = ""; badFields = {}; render(); window.scrollTo(0, 0); } };
 

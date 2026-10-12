@@ -1952,3 +1952,48 @@ test('sign-up needs an email; forgot password link resets it (single use) and si
   assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'kamal@example.com', password: 'brand-new-pass-1' } })).status, 200);
   assert.equal((await api('GET', '/api/portal/me', { token: reg.body.token })).status, 401, 'old sessions signed out');
 });
+
+test('walk-in form can create a My Transco account — switched on when staff confirm; staff invite link', async () => {
+  const sender = { ...walkInForm().sender, mobile: '0477 555 101', email: 'walkin.acct@example.com' };
+  const before = await api('GET', '/api/public/dropoff/account?mobile=' + encodeURIComponent('0477 555 101'));
+  assert.deepEqual(before.body, { hasAccount: false });
+
+  const sent = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender, account: { email: 'my.account@example.com', password: 'walkin-pass-1', privacyAccepted: true } }) });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  const b = await db.collection('bookings').findOne({ bookingCode: sent.body.bookingCode });
+  assert.equal(b.walkIn.wantsAccount, true);
+  assert.ok(!JSON.stringify(b).includes('passwordHash'), 'no password hash on the booking');
+  // Not usable until staff confirm.
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'my.account@example.com', password: 'walkin-pass-1' } })).status, 401);
+
+  const fin = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-ACCT-1', contentValues: [10, 20] } });
+  assert.equal(fin.status, 200, JSON.stringify(fin.body));
+  const login = await api('POST', '/api/portal/auth/login', { body: { email: 'my.account@example.com', password: 'walkin-pass-1' } });
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  assert.equal(login.body.profile.phoneVerified, true);
+  assert.equal(await db.collection('pendingAccounts').countDocuments({ bookingId: b._id }), 0);
+  assert.deepEqual((await api('GET', '/api/public/dropoff/account?mobile=0477555101')).body, { hasAccount: true });
+
+  // Staff invite for a walk-in who skipped the account step.
+  const sent2 = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender: { ...sender, mobile: '0477 555 202', email: 'skip@example.com' } }) });
+  const b2 = await db.collection('bookings').findOne({ bookingCode: sent2.body.bookingCode });
+  const early = await api('POST', `/api/my-transco/bookings/${b2._id}/invite`, { token: staffToken });
+  assert.equal(early.status, 409, 'needs the confirmed customer');
+  await api('POST', `/api/walk-ins/${b2._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-ACCT-2', contentValues: [10, 20] } });
+  const inv = await api('POST', `/api/my-transco/bookings/${b2._id}/invite`, { token: staffToken });
+  assert.equal(inv.status, 200, JSON.stringify(inv.body));
+  assert.equal(inv.body.hasAccount, false);
+  const token = inv.body.link.split('#/join/')[1];
+  const info = await api('GET', `/api/portal/auth/invite/${token}`);
+  assert.equal(info.body.phoneNumber, '61477555202');
+  const joined = await api('POST', '/api/portal/auth/invite', { body: { token, email: 'joined@example.com', password: 'joined-pass-1', privacyAccepted: true } });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  assert.equal((await api('POST', '/api/portal/auth/invite', { body: { token } })).body.reason, 'bad_link', 'single use');
+
+  // A second invite for someone who has an account just signs them in.
+  const inv2 = await api('POST', `/api/my-transco/bookings/${b2._id}/invite`, { token: staffToken });
+  assert.equal(inv2.body.hasAccount, true);
+  const signedIn = await api('POST', '/api/portal/auth/invite', { body: { token: inv2.body.link.split('#/join/')[1] } });
+  assert.equal(signedIn.status, 200);
+  assert.ok(signedIn.body.token);
+});

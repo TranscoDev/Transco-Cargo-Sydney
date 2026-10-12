@@ -19,7 +19,7 @@
 
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { customers, bookings, shipments } = require('./db');
+const { customers, bookings, shipments, getDb } = require('./db');
 const {
   validatePerson, validateItems, validateContents, validateSignOff, validateDangerousGoods, validateLithiumDoc, cleanText, hasRealName,
   COUNTRIES, SERVICE_LABELS, ITEM_TYPES, ITEM_LABELS, DELIVERY_LABELS, itemDetail
@@ -172,10 +172,23 @@ function summaryHtml(b) {
 
 // ---------- routers ----------
 
+// A new walk-in customer can create their My Transco account on the form
+// (email + password). It's kept apart from the booking (so the password
+// hash never reaches staff screens) and switched on only when staff
+// confirm the walk-in face to face — that proves the number is theirs.
+const pendingAccounts = () => getDb().collection('pendingAccounts');
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 module.exports = function createWalkInRouters({
-  tools, assignBl, getSydneyNow, broadcast, withoutSignInSecrets, sendEmail, staffEmail
+  tools, assignBl, getSydneyNow, broadcast, withoutSignInSecrets, sendEmail, staffEmail, hashPassword
 }) {
   const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+  // Does this mobile already have a My Transco account (a password)?
+  async function hasAccount(phoneNumber) {
+    if (!phoneNumber) return false;
+    return Boolean(await customers().findOne({ phoneNumber, passwordHash: { $exists: true } }, { projection: { _id: 1 } }));
+  }
 
   // ----- public: the customer's phone -----
   const publicRouter = express.Router();
@@ -194,6 +207,13 @@ module.exports = function createWalkInRouters({
     });
   });
 
+  // The form asks for an account only when the number has none yet.
+  publicRouter.get('/dropoff/account', wrap(async (req, res) => {
+    if (tooManyFromIp(req)) return res.status(429).json({ error: 'Too many requests.' });
+    const phoneNumber = normalizePhoneNumber(String(req.query.mobile || ''));
+    res.json({ hasAccount: await hasAccount(phoneNumber) });
+  }));
+
   publicRouter.post('/dropoff', wrap(async (req, res) => {
     if (tooManyFromIp(req)) {
       return res.status(429).json({ error: 'Too many forms sent from this phone. Please ask our staff for help.' });
@@ -211,6 +231,21 @@ module.exports = function createWalkInRouters({
     // Staff-only hint for the Walk-ins page ("Returning" vs "New") — nothing
     // is linked and nothing about that customer is sent back to the phone.
     const returning = Boolean(await customers().findOne({ phoneNumber }, { projection: { _id: 1 } }));
+
+    // Optional: create a My Transco account (new numbers only).
+    let account = null;
+    const a = req.body && req.body.account;
+    if (a && !(await hasAccount(phoneNumber))) {
+      const email = typeof a.email === 'string' ? a.email.trim().toLowerCase() : '';
+      if (!EMAIL_RE.test(email) || email.length > 120) return res.status(400).json({ error: "That email address doesn't look right.", field: 'account.email' });
+      if (typeof a.password !== 'string' || a.password.length < 8 || a.password.length > 200) {
+        return res.status(400).json({ error: 'Please choose a password with at least 8 characters.', field: 'account.password' });
+      }
+      if (a.privacyAccepted !== true) return res.status(400).json({ error: 'Please tick that you agree to the Privacy Policy.', field: 'account.privacyAccepted' });
+      const taken = await customers().findOne({ email, phoneNumber: { $ne: phoneNumber }, passwordHash: { $exists: true } }, { projection: { _id: 1 } });
+      if (taken) return res.status(409).json({ error: 'This email is already used by another My Transco account. Use a different email, or skip this step.', field: 'account.email' });
+      account = { email, passwordHash: hashPassword(a.password) };
+    }
 
     const booking = {
       bookingCode: await tools.newBookingCode(),
@@ -242,13 +277,16 @@ module.exports = function createWalkInRouters({
       declarationStatus: 'not_received',
       warehouseStatus: 'not_received',
       channel: 'walk_in',
-      walkIn: { status: 'submitted', submittedAt: now, returning },
+      walkIn: { status: 'submitted', submittedAt: now, returning, ...(account ? { wantsAccount: true, accountEmail: account.email } : {}) },
       status: 'pending',
       createdAt: now
     };
 
     const { insertedId } = await bookings().insertOne(booking);
     booking._id = insertedId;
+    if (account) {
+      await pendingAccounts().insertOne({ bookingId: insertedId, phoneNumber, ...account, privacyAcceptedAt: now, createdAt: now });
+    }
 
     // Live in the console straight away (no signature image — it's only
     // loaded when the booking is opened or printed).
@@ -376,8 +414,23 @@ module.exports = function createWalkInRouters({
         address: { line1: b.sender.address, suburb: '', state: '', postcode: '' }
       };
       if (!customer.portalJoinedAt) fill.portalJoinedAt = now;
+      // The account they made on the form switches on now (staff have
+      // seen them at the counter, so the number is proven theirs).
+      const pending = await pendingAccounts().findOne({ bookingId: b._id });
+      if (pending && !customer.passwordHash) {
+        const emailTaken = await customers().findOne({ email: pending.email, _id: { $ne: customer._id }, passwordHash: { $exists: true } }, { projection: { _id: 1 } });
+        Object.assign(fill, {
+          passwordHash: pending.passwordHash,
+          ...(emailTaken ? {} : { email: pending.email }),
+          privacyAcceptedAt: pending.privacyAcceptedAt,
+          phoneVerified: true,
+          phoneVerifiedAt: now,
+          phoneVerifiedBy: 'walk_in_confirm'
+        });
+      }
+      if (pending) await pendingAccounts().deleteOne({ _id: pending._id });
       // Email signs in to My Transco too — never take one another account uses.
-      if (b.sender.email && b.sender.email !== customer.email) {
+      if (!fill.email && b.sender.email && b.sender.email !== customer.email) {
         const taken = await customers().findOne({ email: b.sender.email, _id: { $ne: customer._id }, channel: { $ne: 'website' } }, { projection: { _id: 1 } });
         if (!taken) fill.email = b.sender.email;
       }

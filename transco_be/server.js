@@ -6378,7 +6378,8 @@ const walkInRouters = require('./walkInRoutes')({
   broadcast,
   withoutSignInSecrets,
   sendEmail,
-  staffEmail: STAFF_NOTIFICATION_EMAIL
+  staffEmail: STAFF_NOTIFICATION_EMAIL,
+  hashPassword
 });
 app.use('/api/public', walkInRouters.publicRouter);
 app.use('/api/walk-ins', walkInRouters.staffRouter);
