@@ -789,7 +789,7 @@
           <button class="quick-item" onclick="quickStart('I want a price quote', false)">💰 Get a Price Quote</button>
           <button class="quick-item" onclick="quickStart('I want to track my shipment', false)">📦 Track a Shipment</button>
           <button class="quick-item" onclick="quickStart('What is your shipping schedule?', false)">🗓️ Shipping Calendar</button>
-          <button class="quick-item" onclick="quickStart('Send me the Declaration Form', false)">📋 Declaration Form</button>
+          <button class="quick-item" onclick="quickStart('How do I book a drop-off?', false)">📝 How to book</button>
           <button class="quick-item" onclick="startWithCountry('sri_lanka', false)">🇱🇰 Shipping to Sri Lanka</button>
           <button class="quick-item" onclick="startWithCountry('india', false)">🇮🇳 Shipping to India</button>
         </div>
@@ -828,7 +828,7 @@
             <button class="ta-suggestion-card" onclick="quickStart('I want a price quote', false)"><span class="emoji">🧮</span><span class="label">Shipping Calculator</span></button>
             <button class="ta-suggestion-card" onclick="quickStart('I want to track my shipment', false)"><span class="emoji">📦</span><span class="label">Track a Shipment</span></button>
             <button class="ta-suggestion-card" onclick="quickStart('What is your shipping schedule?', false)"><span class="emoji">📅</span><span class="label">Shipping Calendar</span></button>
-            <button class="ta-suggestion-card" onclick="quickStart('Send me the Declaration Form', false)"><span class="emoji">📋</span><span class="label">Declaration Form</span></button>
+            <button class="ta-suggestion-card" onclick="quickStart('How do I book a drop-off?', false)"><span class="emoji">📝</span><span class="label">How to book</span></button>
             <button class="ta-suggestion-card" onclick="startWithCountry('sri_lanka', false)"><span class="emoji">🇱🇰</span><span class="label">Shipping to Sri Lanka</span></button>
             <button class="ta-suggestion-card" onclick="startWithCountry('india', false)"><span class="emoji">🇮🇳</span><span class="label">Shipping to India</span></button>
           </div>
@@ -1270,7 +1270,7 @@
       : [["💰", "Get a price", function () { window.quickStart("I want a price quote", false); }],
          ["📦", "Track a shipment", function () { window.quickStart("I want to track my shipment", false); }],
          ["🗓️", "Shipping calendar", function () { window.quickStart("What is your shipping schedule?", false); }],
-         ["📋", "Declaration form", function () { window.quickStart("Send me the Declaration Form", false); }]];
+         ["📝", "How to book", function () { window.quickStart("How do I book a drop-off?", false); }]];
     wrap.replaceChildren.apply(wrap, items.map(function (it) {
       var b = document.createElement("button");
       b.type = "button";

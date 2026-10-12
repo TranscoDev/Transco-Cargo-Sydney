@@ -18,15 +18,8 @@
 // Staff see everything on the customer record — unlike the customer
 // themselves, whose view of an unverified number is scoped down (see
 // scope() in customerTools.js).
-
-const crypto = require('crypto');
 const express = require('express');
 const { ObjectId } = require('mongodb');
-
-// Invite links (see POST /bookings/:id/invite): only a hash is stored.
-const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
-const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
-const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 const { customers, bookings, shipments, messages } = require('./db');
 const { hasRealName, hasVerifiedPhone } = require('./customerTools');
 const pii = require('./pii');
@@ -336,10 +329,8 @@ module.exports = function createStaffPortalRouter({ tools }) {
       ? await customers().findOne({ _id: b.customerId })
       : (b.phoneNumber ? await customers().findOne({ phoneNumber: normalizePhoneNumber(b.phoneNumber) || b.phoneNumber }) : null);
     if (!customer) return res.status(409).json({ error: 'Confirm the booking first — that links it to the customer.' });
-    const token = crypto.randomBytes(24).toString('base64url');
-    const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-    await customers().updateOne({ _id: customer._id }, { $set: { invite: { hash: hashToken(token), expiresAt, createdBy: (req.user && req.user.email) || null } } });
-    res.json({ link: `${PORTAL_SITE_URL}/account.html#/join/${token}`, expiresAt, hasAccount: Boolean(customer.passwordHash), name: customer.name || null });
+    const invite = await tools.createInviteLink(customer, (req.user && req.user.email) || null);
+    res.json({ ...invite, name: customer.name || null });
   }));
 
   router.get('/bookings/:bookingId/edit', wrap(async (req, res) => {

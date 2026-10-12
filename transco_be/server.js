@@ -15,7 +15,7 @@ const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
 const { createCustomerAuth } = require('./customerAuth');
-const { createCustomerTools } = require('./customerTools');
+const { createCustomerTools, hasRealName } = require('./customerTools');
 
 // Memory storage — files are small (a customer sheet, not a video) and
 // this only ever runs the parse-then-discard import flow, never needs to
@@ -1727,12 +1727,20 @@ app.post('/webhook', async (req, res) => {
     // round-trip — reply directly with the link, same reasoning as
     // askTypedQuantity above.
     let askWebsiteLink = false;
+    // A welcome-menu tap answered with a website link (MENU_LINK_REPLIES).
+    let menuLinkReply = null;
 
     if (!text && message.type === 'interactive' && message.interactive?.list_reply) {
       const tappedId = message.interactive.list_reply.id;
 
       if (tappedId === 'menu_price') {
         showBoxTypeMenu = true;
+        menuLinkReply = MENU_LINK_REPLIES.menu_price();
+        text = message.interactive.list_reply.title;
+        tappedMenuLabel = message.interactive.list_reply.title;
+      } else if (MENU_LINK_REPLIES[tappedId]) {
+        // A website link instead of a bot answer (see MENU_LINK_REPLIES).
+        menuLinkReply = MENU_LINK_REPLIES[tappedId]();
         text = message.interactive.list_reply.title;
         tappedMenuLabel = message.interactive.list_reply.title;
       } else if (tappedId === 'qty_10plus') {
@@ -1828,6 +1836,11 @@ app.post('/webhook', async (req, res) => {
       inboundMessage
     );
 
+    if (menuLinkReply && customer.mode === 'CHATBOT') {
+      await sendAndTrackOutbound(customer, 'CHATBOT', menuLinkReply, inboundMessage._id, true);
+      if (!showBoxTypeMenu) return;
+    }
+
     if (showBoxTypeMenu && customer.mode === 'CHATBOT') {
       await sendBoxTypeMenu(customer);
       return;
@@ -1847,7 +1860,7 @@ app.post('/webhook', async (req, res) => {
       await sendAndTrackOutbound(
         customer,
         'CHATBOT',
-        "🌐 Here's our website: https://transcosydney.com.au/",
+        "🌐 Here's our website: " + SITE_URL + "/",
         inboundMessage._id
       );
       return;
@@ -5540,7 +5553,7 @@ async function sendWhatsAppMessage(
 const WELCOME_MENU_ITEMS = [
   { id: 'menu_calendar', title: '🗓️ Shipment Calendar', phrase: 'What is your shipping schedule?' },
   { id: 'menu_track', title: '📦 Track My Shipment', phrase: 'I want to track my shipment' },
-  { id: 'menu_declaration', title: '📋 Declaration Form', phrase: 'Send me the Declaration Form' },
+  { id: 'menu_book', title: '📝 Book Drop-off/Pickup', phrase: 'How do I book a drop-off?' },
   { id: 'menu_price', title: '💰 Get a Price Quote', phrase: "I'd like to get a price quote" },
   { id: 'menu_sea', title: '🚢 Sea Freight Info', phrase: 'Tell me about Sea Freight' },
   { id: 'menu_air', title: '✈️ Air Freight Info', phrase: 'Tell me about Air Freight' },
@@ -5558,10 +5571,33 @@ const WELCOME_MENU_ITEMS = [
 // not duplicated here in the body text.
 const WELCOME_BODY_TEXT =
   "👋 *Welcome to Transco Cargo Sydney!*\n\n" +
-  "I'm your dedicated Transco Cargo agent, here to make shipping to Sri Lanka.\n\n" +
+  "I'm your Transco Cargo agent — here to help you ship to Sri Lanka 🇱🇰 and India 🇮🇳.\n\n" +
   "💬 Happy to chat in English, සිංහල, or தமிழ் — just write in whichever you're comfortable with.\n\n" +
-  "🎉 *Current Promotion:* Send 2 boxes and get the 3rd one FREE! (Sea Freight only)\n\n" +
+  "🎉 *Current Promotion:* Every 3rd Tea Chest is FREE! (Sea Freight, Tea Chests only)\n\n" +
   "*How can I help you today?*";
+
+// The new website (My Transco, booking, drop-off form).
+const SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
+
+// WhatsApp menu taps → the right page on the website (typed questions
+// still get normal bot answers). "Talk to Our Team" and the price-quote
+// box menu keep working in the chat as before.
+const MENU_LINK_REPLIES = {
+  menu_calendar: () => "🗓️ Our shipping calendar — cutoff and arrival dates — is here:\n🇱🇰 Sri Lanka: " + SITE_URL + "/sri-lanka.html\n🇮🇳 India: " + SITE_URL + "/india.html",
+  menu_track: () => "📦 Track your boxes in *My Transco* — your BL number and status are there: " + SITE_URL + "/account.html\n\nOr just type your 6-digit BL number here and I'll look it up.",
+  menu_sea: () => "🚢 Everything about Sea Freight — prices, boxes and dates:\n🇱🇰 " + SITE_URL + "/sri-lanka.html\n🇮🇳 " + SITE_URL + "/india.html\n📦 Box sizes & prices: " + SITE_URL + "/box-info.html",
+  menu_air: () => "✈️ Air Freight details are on our website: " + SITE_URL + "/sri-lanka.html\n\nOr tell me the weight of your box and I'll give you a quote right here.",
+  menu_price: () => "💰 All our box prices are here: " + SITE_URL + "/box-info.html\n\nOr pick a box type below and I'll work out your price right here 👇"
+};
+// Personal My Transco link — the WhatsApp message proves the number is
+// theirs, so the link signs them straight in (or opens sign-up with the
+// number already confirmed). Sent with the welcome menu.
+function personalLinkText(customer, link) {
+  const first = hasRealName(customer) ? String(customer.name).split(' ')[0] : '';
+  return customer.passwordHash
+    ? "👋 " + (first ? "Welcome back, " + first + "! " : "Welcome back! ") + "Open *My Transco* — you'll be signed in automatically:\n" + link + "\n\nBook, track your boxes and see your documents there. (This link works for 24 hours.)"
+    : "📝 Create your free *My Transco* account — your number is already confirmed, just add your email and a password:\n" + link + "\n\nThen you can book online, track your boxes and save your receivers. (This link works for 24 hours.)";
+}
 
 // Generic native WhatsApp tappable list — shared by the welcome menu
 // and the box-type menu below, rather than duplicating the WhatsApp
@@ -5659,6 +5695,16 @@ async function sendWelcomeMenu(customer) {
   );
 
   await broadcastMessageCreated(customer, outgoing);
+
+  // Then their personal My Transco link (signed straight in, or sign-up
+  // with the number confirmed). Never blocks the menu if it fails.
+  try {
+    const fresh = (await customers().findOne({ _id: customer._id })) || customer;
+    const { link } = await customerTools.createInviteLink(fresh, 'whatsapp');
+    await sendAndTrackOutbound(fresh, 'CHATBOT', personalLinkText(fresh, link), null, true);
+  } catch (err) {
+    console.error('Personal My Transco link failed:', err.message);
+  }
 }
 
 // Shown instead of routing through Flowise when "Get a Price Quote" is

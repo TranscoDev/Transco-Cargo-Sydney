@@ -129,6 +129,11 @@
   .cat-chip { font: inherit; font-size: 15px; font-weight: 600; color: var(--navy, #182233); background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 10px 15px; cursor: pointer; min-height: 44px; }
   .cat-chip[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: #fff; }
   .item-grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 52px; }
+  .pw-toggle { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: 0; border-radius: 10px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #6b7280; cursor: pointer; padding: 0; }
+  .pw-toggle:hover, .pw-toggle:focus-visible { color: #0c7d6b; }
+  .pw-toggle svg { width: 22px; height: 22px; }
   .acct-box { background: #fff; border: 2px solid var(--teal); border-radius: var(--radius); padding: 16px; }
   .linkish { background: none; border: 0; padding: 0; color: #0c7d6b; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   .check { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; font-size: 15px; }
@@ -200,6 +205,10 @@
   // the same way the rest of the site writes them.
   var T = {
     si: {
+      "Show": "පෙන්නන්න",
+      "Hide": "හංගන්න",
+      "Show password": "Password එක පෙන්නන්න",
+      "Hide password": "Password එක හංගන්න",
       "Anything we should know?": "අපි දැනගන්න ඕන දෙයක් තියෙනවද?",
       "Air Freight is priced by weight — our staff weigh your boxes.": "Air Freight මිල බර අනුවයි — අපේ staff ඔබේ box කිරනවා.",
       "every 3rd free": "හැම 3වෙනි එකම නොමිලේ",
@@ -356,6 +365,10 @@
       "Couldn't send. Please check your internet and try again, or ask our staff.": "යවන්න බැරි වුණා. Internet බලලා ආයෙත් උත්සාහ කරන්න, නැත්නම් staff ගෙන් අහන්න."
     },
     ta: {
+      "Show": "காட்டு",
+      "Hide": "மறை",
+      "Show password": "Password ஐக் காட்டு",
+      "Hide password": "Password ஐ மறை",
       "Anything we should know?": "நாங்கள் தெரிந்துகொள்ள வேண்டியது ஏதேனும் உள்ளதா?",
       "Air Freight is priced by weight — our staff weigh your boxes.": "Air Freight எடையின்படி விலையிடப்படும் — எங்கள் staff உங்கள் பெட்டிகளை எடைபோடுவார்கள்.",
       "every 3rd free": "ஒவ்வொரு 3வதும் இலவசம்",
@@ -595,6 +608,9 @@
   // when staff confirm the drop-off at the counter.
   var acctCheck = { mobile: "", hasAccount: null };
   var newAcct = { email: "", password: "", agree: false, skip: false, created: false };
+  // Standard eye / eye-off icons for the show-password button.
+  var EYE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-6.5 0-10-7-10-7a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
   function checkAccount() {
     var m = String(state.sender.mobile || "").trim();
     if (!m || m === acctCheck.mobile) return;
@@ -954,7 +970,8 @@
       '<h2 style="margin:4px 0 4px">' + esc(t("Create your My Transco account")) + "</h2>" +
       '<p class="lead" style="margin:0 0 10px;font-size:14px">' + esc(t("Track these boxes and book faster next time. Your account starts when our staff confirm your drop-off.")) + "</p>" +
       '<div class="field' + (badFields["account.email"] ? " bad" : "") + '"><label for="na-email">' + esc(t("Email")) + '</label><input id="na-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(newAcct.email) + '" /></div>' +
-      '<div class="field' + (badFields["account.password"] ? " bad" : "") + '"><label for="na-pw">' + esc(t("Choose a password")) + '</label><input id="na-pw" type="password" autocomplete="new-password" placeholder="' + esc(t("At least 8 characters")) + '" value="' + esc(newAcct.password) + '" /></div>' +
+      '<div class="field' + (badFields["account.password"] ? " bad" : "") + '"><label for="na-pw">' + esc(t("Choose a password")) + '</label><div class="pw-wrap"><input id="na-pw" type="' + (newAcct.showPw ? "text" : "password") + '" autocomplete="new-password" placeholder="' + esc(t("At least 8 characters")) + '" value="' + esc(newAcct.password) + '" />' +
+        '<button type="button" id="na-pw-toggle" class="pw-toggle" aria-pressed="' + !!newAcct.showPw + '" aria-label="' + esc(newAcct.showPw ? t("Hide password") : t("Show password")) + '">' + (newAcct.showPw ? EYE_OFF_ICON : EYE_ICON) + "</button></div></div>" +
       '<label class="check' + (badFields["account.privacyAccepted"] ? " bad" : "") + '"><input type="checkbox" id="na-agree"' + (newAcct.agree ? " checked" : "") + " /><span>" + esc(t("I agree to the")) + ' <a href="/privacy.html" target="_blank" rel="noopener">' + esc(t("Privacy Policy")) + "</a>.</span></label>" +
       '<p style="text-align:center;margin:12px 0 0"><button type="button" id="na-skip" class="linkish">' + esc(t("Skip — just send the form")) + "</button></p></div>";
   }
@@ -1073,6 +1090,16 @@
     // My Transco account step.
     var naE = document.getElementById("na-email");
     if (naE) naE.oninput = function () { newAcct.email = naE.value; delete badFields["account.email"]; };
+    // Show / hide the password they're typing (keeps what they typed).
+    var naT = document.getElementById("na-pw-toggle");
+    if (naT) naT.onclick = function () {
+      newAcct.showPw = !newAcct.showPw;
+      var inp = document.getElementById("na-pw");
+      if (inp) { inp.type = newAcct.showPw ? "text" : "password"; inp.focus(); }
+      naT.setAttribute("aria-pressed", String(newAcct.showPw));
+      naT.setAttribute("aria-label", newAcct.showPw ? t("Hide password") : t("Show password"));
+      naT.innerHTML = newAcct.showPw ? EYE_OFF_ICON : EYE_ICON;
+    };
     var naP = document.getElementById("na-pw");
     if (naP) naP.oninput = function () { newAcct.password = naP.value; delete badFields["account.password"]; };
     var naA = document.getElementById("na-agree");

@@ -60,15 +60,14 @@ const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
 // real answer follows immediately in the same message.
 const WEB_GREETING_TEXT =
   "👋 *Welcome to Transco Cargo Sydney!*\n\n" +
-  "I'm your dedicated Transco Cargo agent, here to make shipping to Sri Lanka.\n\n" +
+  "I'm your Transco Cargo agent — here to help you ship to Sri Lanka 🇱🇰 and India 🇮🇳.\n\n" +
   "📦 Shipping & Pricing\n" +
   "🔎 Shipment Tracking\n" +
   "🕐 Opening Hours & Bookings\n" +
   "🚚 Shipping Information\n\n" +
   "💬 Happy to chat in English, සිංහල, or தமிழ் — just write in whichever you're comfortable with.\n\n" +
-  "🎉 *Current Promotion:* Send 2 boxes and get the 3rd one FREE! (Sea Freight only)\n\n" +
-  "🌐 Website: https://transcosydney.com.au/\n" +
-  "📋 Declaration Form: https://transcosydney.com.au/declaration-form";
+  "🎉 *Current Promotion:* Every 3rd Tea Chest is FREE! (Sea Freight, Tea Chests only)\n\n" +
+  "📝 Book online (your declaration is included): https://transco-agent-site.transcocargo.workers.dev/account.html#/book";
 
 // One "customer" document per website visitor session. Separate query
 // shape (sessionId, not phoneNumber) so this can never collide with or

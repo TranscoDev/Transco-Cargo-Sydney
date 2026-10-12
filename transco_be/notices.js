@@ -105,6 +105,15 @@ function createNoticeRouters() {
     } catch (err) { next(err); }
   });
 
+  // Closures that block drop-off days (from/to Sydney dates) — the chat
+  // bot reads this to tell customers when we're closed.
+  publicRouter.get('/closures', async (req, res, next) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json({ closures: (await upcomingClosures()).map(c => ({ from: c.from, to: c.to, title: c.title })) });
+    } catch (err) { next(err); }
+  });
+
   const staffRouter = express.Router();
   staffRouter.get('/', async (req, res, next) => {
     try {

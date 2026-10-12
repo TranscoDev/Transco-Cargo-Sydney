@@ -2052,3 +2052,28 @@ test('a long closure: booking dates jump past it (always enough days) and the fo
     await api('DELETE', `/api/notices/${closure.body.notice.id}`, { token: staffToken });
   }
 });
+
+test('WhatsApp: "Hi" gets the menu + a personal My Transco link; menu taps get website links', async () => {
+  const from = '61499000777';
+  const post = (msg) => api('POST', '/webhook', { body: { entry: [{ changes: [{ value: { contacts: [{ profile: { name: 'Wa Tester' } }], messages: [{ from, id: 'wamid.T' + Date.now() + Math.random(), timestamp: String(Math.floor(Date.now() / 1000)), ...msg }] } }] }] } });
+  const sentTo = () => whatsappRequests.filter(r => r.body.to === from);
+  const wait = async (check) => { for (let i = 0; i < 40 && !check(); i++) await new Promise(r => setTimeout(r, 100)); };
+
+  whatsappRequests = [];
+  await post({ type: 'text', text: { body: 'hi' } });
+  await wait(() => sentTo().some(r => JSON.stringify(r.body).includes('#/join/')));
+  const texts = sentTo().map(r => JSON.stringify(r.body));
+  assert.ok(texts.some(t => t.includes('"interactive"')), 'menu sent');
+  const linkMsg = texts.find(t => t.includes('#/join/'));
+  assert.ok(linkMsg, 'personal link sent');
+  assert.match(linkMsg, /Create your free/);
+  const token = /#\/join\/([A-Za-z0-9_-]+)/.exec(linkMsg)[1];
+  const info = await api('GET', `/api/portal/auth/invite/${token}`);
+  assert.equal(info.body.phoneNumber, from);
+  assert.equal(info.body.hasAccount, false);
+
+  whatsappRequests = [];
+  await post({ type: 'interactive', interactive: { type: 'list_reply', list_reply: { id: 'menu_track', title: '📦 Track My Shipment' } } });
+  await wait(() => sentTo().length > 0);
+  assert.ok(sentTo().some(r => JSON.stringify(r.body).includes('/account.html')), 'tracking tap → My Transco link');
+});
