@@ -26,8 +26,9 @@ const channels: { key: Channel; label: string; Icon: typeof MessageCircle }[] = 
 // Absent channel means WhatsApp — every conversation that existed before
 // this field was added stays correctly in the WhatsApp view.
 function matchesChannel(c: ConversationSummary, channel: Channel): boolean {
-  if (channel === "WEBSITE") return c.channel === "website";
-  if (channel === "WHATSAPP") return c.channel !== "website";
+  // A customer row with both channels shows under both tabs.
+  if (channel === "WEBSITE") return c.channel === "website" || !!c.channels?.includes("website");
+  if (channel === "WHATSAPP") return c.channel !== "website" || !!c.channels?.includes("whatsapp");
   return true;
 }
 

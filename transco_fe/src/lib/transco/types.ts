@@ -137,6 +137,8 @@ export interface Message {
   /** Set only for a staff-sent attachment (flyer/video/document) — body
    * is used as the caption when present, empty otherwise. */
   mediaUrl?: string | null | undefined;
+  /** Set when chats from several channels are shown together (one customer's WhatsApp + website chats). */
+  via?: "whatsapp" | "website" | undefined;
   mediaType?: MediaType | null | undefined;
 }
 
@@ -220,6 +222,11 @@ export interface ConversationSummary {
   needsAttention?: boolean | undefined;
   needsAttentionMessage?: NeedsAttentionMessage | undefined;
   linkedAccount?: LinkedAccount | null | undefined;
+  /** One row per customer (merge-conversations.ts): the website chats folded into this row. */
+  mergedIds?: string[] | undefined;
+  /** The channels this customer has chatted on. */
+  channels?: ("whatsapp" | "website")[] | undefined;
+  customerCode?: string | null | undefined;
 }
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";

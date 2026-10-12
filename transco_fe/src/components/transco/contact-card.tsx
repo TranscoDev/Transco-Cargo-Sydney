@@ -17,6 +17,12 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+/** "…678" — enough to tell two customers with the same name apart. */
+function phoneEnding(phone: string | null | undefined) {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  return d.length >= 6 ? `…${d.slice(-3)}` : null;
+}
+
 export function ContactCard({
   conversation,
   selected,
@@ -84,6 +90,16 @@ export function ContactCard({
           </span>
         </span>
 
+        {/* Tells same-name customers apart: customer number · last digits of the phone. */}
+        <span className="block truncate text-xs text-muted-foreground">
+          {[
+            conversation.customerCode,
+            channel === "website" && !conversation.linkedAccount ? "Website visitor" : phoneEnding(conversation.linkedAccount?.phoneNumber ?? conversation.phoneNumber),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+
         <span className="mt-1 flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1">
             {lastMessage && lastMessage.sender !== "CUSTOMER" && (
@@ -110,10 +126,21 @@ export function ContactCard({
 
         <span className="mt-1.5 flex flex-wrap items-center gap-1">
           <ModeTag mode={mode} />
-          {channel === "website" && <ChannelTag />}
+          {conversation.mergedIds?.length ? (
+            // One customer, both channels (see merge-conversations.ts).
+            <>
+              <span className="inline-flex items-center rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success-foreground">💬 WhatsApp</span>
+              <ChannelTag />
+            </>
+          ) : (
+            channel === "website" && <ChannelTag />
+          )}
+          {channel === "website" && !conversation.linkedAccount && (
+            <span className="rounded bg-secondary px-1.5 py-0.5 text-xs text-muted-foreground">not signed in</span>
+          )}
           {/* Signed in to My Transco while chatting on the website — we know
               who this is: their real number and customer code. */}
-          {conversation.linkedAccount && (
+          {conversation.linkedAccount && !conversation.mergedIds?.length && (
             <span
               className="inline-flex items-center gap-1 rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success-foreground"
               title={`Signed in to My Transco · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}

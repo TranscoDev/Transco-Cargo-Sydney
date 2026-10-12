@@ -67,6 +67,12 @@ export function MessageBubble({
           flagged && "ring-2 ring-destructive ring-offset-1 ring-offset-chat-canvas",
         )}
       >
+        {/* Several channels shown together: which one this came from. */}
+        {message.via && (
+          <p className={cn("mb-0.5 text-[10.5px] font-bold uppercase tracking-wider", message.via === "website" ? "text-info-foreground" : "text-success-foreground")}>
+            {message.via === "website" ? "🌐 Website" : "💬 WhatsApp"}
+          </p>
+        )}
         {message.sender === "CHATBOT" && (
           <p className="mb-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Chatbot

@@ -31,9 +31,10 @@ const WHATSAPP_WINDOW_MS = 24 * 60 * 60 * 1000;
  * not just as a failed-send icon after the fact. */
 function whatsappWindowClosedHoursAgo(conversation: Conversation): number | null {
   if (conversation.channel === "website") return null;
+  // Only WhatsApp messages count (a merged view also holds website ones).
   const lastCustomerMessage = [...conversation.messages]
     .reverse()
-    .find((m) => m.sender === "CUSTOMER");
+    .find((m) => m.sender === "CUSTOMER" && m.via !== "website");
   if (!lastCustomerMessage) return null;
   const elapsedMs = Date.now() - new Date(lastCustomerMessage.createdAt).getTime();
   if (elapsedMs < WHATSAPP_WINDOW_MS) return null;
