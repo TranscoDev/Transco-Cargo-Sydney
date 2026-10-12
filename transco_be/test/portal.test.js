@@ -2014,3 +2014,21 @@ test('a confirmed walk-in fills the new My Transco profile: address parts, langu
   const people = await api('GET', '/api/portal/me/people', { token: login.body.token });
   assert.equal(people.body.receivers[0].fullName, 'Walk In Receiver', 'receiver saved for next time');
 });
+
+test('walk-in: a Sri Lankan number typed as 07… finds the +94 account (no duplicate customer)', async () => {
+  const reg = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, email: 'sl.user.0199@example.com', countryCode: '94', phone: '0715550199', name: 'Sri Lanka User', password: 'sl-user-pass-1' } });
+  assert.equal(reg.status, 201, JSON.stringify(reg.body));
+  // Typed the local way, no country code — still "Welcome back".
+  assert.deepEqual((await api('GET', '/api/public/dropoff/account?mobile=' + encodeURIComponent('071 555 0199'))).body, { hasAccount: true });
+  const sender = { ...walkInForm().sender, mobile: '071 555 0199', email: 'sl.user.0199@example.com' };
+  const sent = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender }) });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  const b = await db.collection('bookings').findOne({ bookingCode: sent.body.bookingCode });
+  assert.equal(b.phoneNumber, '94715550199');
+  await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-SL-1', contentValues: [10, 20] } });
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: { $in: ['94715550199', '61715550199'] } }), 1, 'one customer, not two');
+  const after = await db.collection('bookings').findOne({ _id: b._id });
+  assert.equal(String(after.customerId), String((await db.collection('customers').findOne({ phoneNumber: '94715550199' }))._id));
+  // An Australian 04… number is still Australian.
+  assert.deepEqual((await api('GET', '/api/public/dropoff/account?mobile=0477555101')).body, { hasAccount: true });
+});

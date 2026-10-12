@@ -184,6 +184,30 @@ module.exports = function createWalkInRouters({
 }) {
   const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
+  // A walk-in's mobile → the number we store, matched to an existing
+  // customer when the same number was typed another way. Without a
+  // country code, 07… is Sri Lankan and 04… Australian (like the website
+  // sign-in); every other reading is also tried, so "070 113 3676" finds
+  // the +94 70 113 3676 account instead of making a second customer.
+  async function resolveMobile(raw) {
+    const str = String(raw || '').trim();
+    const d = str.replace(/\D/g, '');
+    if (!d) return null;
+    const candidates = [];
+    if (str.startsWith('+') || str.startsWith('00')) {
+      candidates.push(d.replace(/^00/, ''));
+    } else {
+      if (/^0?7\d{8}$/.test(d)) candidates.push('94' + d.replace(/^0/, ''));
+      if (/^0?4\d{8}$/.test(d)) candidates.push('61' + d.replace(/^0/, ''));
+      for (const cc of ['61', '94', '91']) candidates.push(normalizePhoneNumber(str, cc));
+    }
+    const unique = [...new Set(candidates.filter(n => n && n.length >= 10 && n.length <= 12))];
+    if (!unique.length) return null;
+    const found = await customers().find({ phoneNumber: { $in: unique } }, { projection: { phoneNumber: 1, passwordHash: 1 } }).toArray();
+    const best = found.find(c => c.passwordHash) || found[0];
+    return best ? best.phoneNumber : unique[0];
+  }
+
   // Does this mobile already have a My Transco account (a password)?
   async function hasAccount(phoneNumber) {
     if (!phoneNumber) return false;
@@ -210,7 +234,7 @@ module.exports = function createWalkInRouters({
   // The form asks for an account only when the number has none yet.
   publicRouter.get('/dropoff/account', wrap(async (req, res) => {
     if (tooManyFromIp(req)) return res.status(429).json({ error: 'Too many requests.' });
-    const phoneNumber = normalizePhoneNumber(String(req.query.mobile || ''));
+    const phoneNumber = await resolveMobile(req.query.mobile);
     res.json({ hasAccount: await hasAccount(phoneNumber) });
   }));
 
@@ -227,7 +251,7 @@ module.exports = function createWalkInRouters({
     const pad = n => String(n).padStart(2, '0');
     const dateISO = `${sydney.getUTCFullYear()}-${pad(sydney.getUTCMonth() + 1)}-${pad(sydney.getUTCDate())}`;
     const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][sydney.getUTCDay()];
-    const phoneNumber = normalizePhoneNumber(v.sender.mobile) || v.sender.mobile.replace(/\D/g, '');
+    const phoneNumber = (await resolveMobile(v.sender.mobile)) || v.sender.mobile.replace(/\D/g, '');
     // Staff-only hint for the Walk-ins page ("Returning" vs "New") — nothing
     // is linked and nothing about that customer is sent back to the phone.
     const returning = Boolean(await customers().findOne({ phoneNumber }, { projection: { _id: 1 } }));
@@ -395,7 +419,7 @@ module.exports = function createWalkInRouters({
     // An online booking is already linked to its My Transco account (and
     // its sender may be someone else), so only walk-ins are linked here.
     let customer = null;
-    const phoneNumber = isWalkIn ? normalizePhoneNumber(b.sender && b.sender.mobile) : null;
+    const phoneNumber = isWalkIn ? await resolveMobile(b.sender && b.sender.mobile) : null;
     if (phoneNumber) {
       const now = new Date();
       const result = await customers().findOneAndUpdate(
