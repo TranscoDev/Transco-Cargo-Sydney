@@ -197,6 +197,69 @@ function NoticesPage() {
   );
 }
 
+// Where the banner's button can go — plain names, so staff never type addresses.
+const DESTINATIONS: { url: string; name: string; button: string }[] = [
+  { url: "/account.html#/book", name: "New booking", button: "Book now" },
+  { url: "/account.html", name: "My Transco (sign in)", button: "Open My Transco" },
+  { url: "/#chat", name: "Chat with our agent", button: "Chat with us" },
+  { url: "/sri-lanka.html", name: "Shipping to Sri Lanka page", button: "Sri Lanka prices" },
+  { url: "/india.html", name: "Shipping to India page", button: "India prices" },
+  { url: "/box-info.html", name: "Box info & prices", button: "See box prices" },
+  { url: "/dropoff.html", name: "Walk-in drop-off form", button: "Fill the form" },
+  { url: "/contact.html", name: "Contact us page", button: "Contact us" },
+  { url: "tel:0434842023", name: "Call us (0434 842 023)", button: "Call us" },
+];
+
+/** "Button goes to": a list of pages; "Other web address" for anything else. */
+function LinkPicker({ link, onChange }: { link: NoticeInput["link"]; onChange: (link: NoticeInput["link"]) => void }) {
+  const known = link?.url ? DESTINATIONS.find((d) => d.url === link.url) : undefined;
+  const [mode, setMode] = useState<string>(!link?.url ? "none" : known ? known.url : "other");
+  const pick = (value: string) => {
+    setMode(value);
+    if (value === "none") return onChange(null);
+    if (value === "other") return onChange({ label: link?.label ?? "", url: known ? "" : link?.url ?? "" });
+    const d = DESTINATIONS.find((x) => x.url === value)!;
+    // Keep their own button text if they typed one; otherwise suggest one.
+    const typed = link?.label && !DESTINATIONS.some((x) => x.button === link.label) ? link.label : d.button;
+    onChange({ label: typed, url: d.url });
+  };
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="n-dest">Button (optional)</Label>
+        <select
+          id="n-dest"
+          value={mode}
+          onChange={(e) => pick(e.target.value)}
+          className="h-10 rounded-md border border-input bg-card px-2 text-sm text-foreground"
+        >
+          <option value="none">No button</option>
+          {DESTINATIONS.map((d) => (
+            <option key={d.url} value={d.url}>
+              Goes to: {d.name}
+            </option>
+          ))}
+          <option value="other">Goes to: another web address…</option>
+        </select>
+      </div>
+      {mode !== "none" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="n-ll">Button text</Label>
+            <Input id="n-ll" value={link?.label ?? ""} maxLength={40} placeholder="e.g. Book now" onChange={(e) => onChange({ label: e.target.value, url: link?.url ?? "" })} />
+          </div>
+          {mode === "other" && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="n-lu">Web address</Label>
+              <Input id="n-lu" value={link?.url ?? ""} maxLength={300} placeholder="https://…" onChange={(e) => onChange({ label: link?.label ?? "", url: e.target.value })} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NoticeEditor({ id, initial, onClose, onSaved }: { id: string | null; initial: NoticeInput; onClose: () => void; onSaved: () => void }) {
   const [v, setV] = useState<NoticeInput>(initial);
   const [saving, setSaving] = useState(false);
@@ -317,16 +380,7 @@ function NoticeEditor({ id, initial, onClose, onSaved }: { id: string | null; in
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="n-ll">Button text (optional)</Label>
-              <Input id="n-ll" value={v.link?.label ?? ""} maxLength={40} placeholder="e.g. Book now" onChange={(e) => set({ link: { label: e.target.value, url: v.link?.url ?? "" } })} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="n-lu">Button link</Label>
-              <Input id="n-lu" value={v.link?.url ?? ""} maxLength={300} placeholder="/account.html#/book" onChange={(e) => set({ link: { label: v.link?.label ?? "", url: e.target.value } })} />
-            </div>
-          </div>
+          <LinkPicker link={v.link} onChange={(link) => set({ link })} />
 
           {v.kind === "closure" && (
             <div className="flex flex-col gap-2 rounded-lg bg-secondary/50 p-3">
