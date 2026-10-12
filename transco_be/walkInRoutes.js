@@ -277,7 +277,11 @@ module.exports = function createWalkInRouters({
       declarationStatus: 'not_received',
       warehouseStatus: 'not_received',
       channel: 'walk_in',
-      walkIn: { status: 'submitted', submittedAt: now, returning, ...(account ? { wantsAccount: true, accountEmail: account.email } : {}) },
+      walkIn: {
+        status: 'submitted', submittedAt: now, returning,
+        ...(['en', 'si', 'ta'].includes(req.body && req.body.language) ? { language: req.body.language } : {}),
+        ...(account ? { wantsAccount: true, accountEmail: account.email } : {})
+      },
       status: 'pending',
       createdAt: now
     };
@@ -409,10 +413,16 @@ module.exports = function createWalkInRouters({
         { upsert: true, returnDocument: 'after' }
       );
       customer = result;
+      // Their profile gets everything they typed: name, the address split
+      // the same way My Transco stores it, and the language they used.
+      const m = /^(.+?),\s*([^,]+?)\s+(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+(\d{4})$/i.exec(String(b.sender.address || '').trim());
       const fill = {
         name: b.sender.fullName,
-        address: { line1: b.sender.address, suburb: '', state: '', postcode: '' }
+        address: m
+          ? { line1: m[1], suburb: m[2], state: m[3].toUpperCase(), postcode: m[4] }
+          : { line1: b.sender.address, suburb: '', state: '', postcode: '' }
       };
+      if (b.walkIn && b.walkIn.language && !customer.preferredLanguage) fill.preferredLanguage = b.walkIn.language;
       if (!customer.portalJoinedAt) fill.portalJoinedAt = now;
       // The account they made on the form switches on now (staff have
       // seen them at the counter, so the number is proven theirs).

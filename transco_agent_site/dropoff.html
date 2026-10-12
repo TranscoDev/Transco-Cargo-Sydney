@@ -79,7 +79,7 @@
   .field { margin-bottom: 14px; }
   .field label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
   .field label .opt { font-weight: 400; color: var(--muted); }
-  .field input, .field textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
+  .field input, .field textarea, .field select { width: 100%; font: inherit; font-size: 16px; padding: 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
   .field textarea { min-height: 76px; resize: vertical; }
   .field .hint { font-size: 13px; color: var(--muted); margin-top: 4px; }
   .field.bad input, .field.bad textarea { border-color: var(--red); background: #fffafa; }
@@ -112,6 +112,23 @@
 
   .note { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; margin-bottom: 14px; }
   .note.info { background: var(--teal-soft); border-color: #9ad8c9; }
+  .estimate { margin-top: 16px; background: #e8f0fb; border: 1px solid #c9d8f1; color: #1d3b6a; border-radius: var(--radius); padding: 14px; }
+  .est-title { display: block; font-size: 16px; margin-bottom: 6px; }
+  .est-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 2px 0; }
+  .est-total { border-top: 1px solid currentColor; margin-top: 6px; padding-top: 6px; font-weight: 800; font-size: 16px; }
+  .est-small { font-size: 13px; margin-top: 4px; }
+  .addr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .addr-row .field:first-child { grid-column: 1 / -1; }
+  .review { background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 4px 14px; margin-bottom: 18px; }
+  .rev-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .rev-row:first-child { border-top: 0; }
+  .rev-k { font-size: 12.5px; color: var(--muted, #6b7480); font-weight: 600; }
+  .rev-v { font-size: 15px; overflow-wrap: anywhere; }
+  .rev-edit { flex-shrink: 0; background: #fff; border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 12px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .cat-chip { font: inherit; font-size: 15px; font-weight: 600; color: var(--navy, #182233); background: #fff; border: 2px solid var(--line); border-radius: 999px; padding: 10px 15px; cursor: pointer; min-height: 44px; }
+  .cat-chip[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: #fff; }
+  .item-grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .acct-box { background: #fff; border: 2px solid var(--teal); border-radius: var(--radius); padding: 16px; }
   .linkish { background: none; border: 0; padding: 0; color: #0c7d6b; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
   .check { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 2px solid var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; font-size: 15px; }
@@ -183,6 +200,49 @@
   // the same way the rest of the site writes them.
   var T = {
     si: {
+      "Anything we should know?": "අපි දැනගන්න ඕන දෙයක් තියෙනවද?",
+      "Air Freight is priced by weight — our staff weigh your boxes.": "Air Freight මිල බර අනුවයි — අපේ staff ඔබේ box කිරනවා.",
+      "every 3rd free": "හැම 3වෙනි එකම නොමිලේ",
+      "Approximate cost for your boxes": "ඔබේ box වලට ආසන්න මිල",
+      "priced by our team": "අපේ team එක මිල කරනවා",
+      "Approximate": "ආසන්න මිල",
+      "door delivery extra": "door delivery අමතරයි",
+      "This is only an approximate cost for the boxes. Our staff confirm the final price at the counter.": "මේක box වලට විතරක් ආසන්න මිලක්. අවසාන මිල අපේ staff counter එකේදී කියනවා.",
+      "What's inside your boxes?": "ඔබේ box ඇතුළේ මොනවද?",
+      "Street address": "වීදියේ ලිපිනය",
+      "Suburb": "Suburb",
+      "State": "State",
+      "Choose…": "තෝරන්න…",
+      "Postcode": "Postcode",
+      "Check and sign": "බලලා අත්සන් කරන්න",
+      "Edit": "වෙනස් කරන්න",
+      "Service": "සේවාව",
+      "Delivery": "Delivery",
+      "Boxes": "Box",
+      "What's inside": "ඇතුළේ තියෙන දේ",
+      "Notes": "සටහන්",
+      "Sender": "යවන කෙනා",
+      "Receiver": "ලබන කෙනා",
+      "How will the receiver get the boxes?": "ලබන කෙනාට box ලැබෙන්නේ කොහොමද?",
+      "Collect from Wattala warehouse": "වත්තල ගබඩාවෙන් ගන්නවා",
+      "Our staff will measure odd-size items and work out the price.": "අපේ staff සාමාන්‍ය නොවන භාණ්ඩ මැනලා මිල ගණන් කරනවා.",
+      "Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.": "යවන හැම දෙයක්ම තෝරන්න — Customs වලට ඕන. වටිනාකම දාන්න ඕන නෑ; අපේ staff දානවා.",
+      "Food": "ආහාර",
+      "New clothing": "අලුත් ඇඳුම්",
+      "Used clothing": "පාවිච්චි කළ ඇඳුම්",
+      "New toys": "අලුත් සෙල්ලම් බඩු",
+      "Used toys": "පාවිච්චි කළ සෙල්ලම් බඩු",
+      "Medicine": "බෙහෙත්",
+      "Electrical": "විදුලි උපකරණ",
+      "Electronics": "ඉලෙක්ට්‍රොනික උපකරණ",
+      "Others": "වෙනත්",
+      "What is it?": "මොකක්ද?",
+      "e.g. Kitchen utensils": "උදා: කුස්සියේ බඩු",
+      "Value (AUD)": "වටිනාකම (AUD)",
+      "Please tap at least one thing you're sending.": "කරුණාකර යවන එක දෙයක්වත් තෝරන්න.",
+      "Please fill in how many for each one (and what \"Others\" is). A value must be a number.": "හැම එකකටම කීයද කියලා දාන්න (වෙනත් නම් මොකක්ද කියලත්). වටිනාකම අංකයක් වෙන්න ඕන.",
+      "We recommend insurance": "Insurance කරන්න අපි නිර්දේශ කරනවා",
+      "You're sending a TV or electrical / electronic items. These can be damaged in transit, so it's better to use insurance.": "ඔබ TV එකක් හෝ විදුලි / ඉලෙක්ට්‍රොනික බඩු යවනවා. ප්‍රවාහනයේදී මේවාට හානි වෙන්න පුළුවන් නිසා insurance කරන එක හොඳයි.",
       "Welcome back!": "ආයෙත් සාදරයෙන් පිළිගන්නවා!",
       "You already have a My Transco account. This drop-off will appear in it after our staff confirm it.": "ඔබට දැනටමත් My Transco account එකක් තියෙනවා. අපේ staff confirm කළාම මේ drop-off එක ඒකේ පේනවා.",
       "No My Transco account for now.": "දැනට My Transco account එකක් නෑ.",
@@ -296,6 +356,49 @@
       "Couldn't send. Please check your internet and try again, or ask our staff.": "යවන්න බැරි වුණා. Internet බලලා ආයෙත් උත්සාහ කරන්න, නැත්නම් staff ගෙන් අහන්න."
     },
     ta: {
+      "Anything we should know?": "நாங்கள் தெரிந்துகொள்ள வேண்டியது ஏதேனும் உள்ளதா?",
+      "Air Freight is priced by weight — our staff weigh your boxes.": "Air Freight எடையின்படி விலையிடப்படும் — எங்கள் staff உங்கள் பெட்டிகளை எடைபோடுவார்கள்.",
+      "every 3rd free": "ஒவ்வொரு 3வதும் இலவசம்",
+      "Approximate cost for your boxes": "உங்கள் பெட்டிகளுக்கான தோராயமான விலை",
+      "priced by our team": "எங்கள் team விலையிடும்",
+      "Approximate": "தோராயமாக",
+      "door delivery extra": "door delivery கூடுதல்",
+      "This is only an approximate cost for the boxes. Our staff confirm the final price at the counter.": "இது பெட்டிகளுக்கான தோராயமான விலை மட்டுமே. இறுதி விலையை எங்கள் staff counter இல் உறுதிசெய்வார்கள்.",
+      "What's inside your boxes?": "உங்கள் பெட்டிகளில் என்ன இருக்கிறது?",
+      "Street address": "தெரு முகவரி",
+      "Suburb": "Suburb",
+      "State": "State",
+      "Choose…": "தேர்ந்தெடுக்கவும்…",
+      "Postcode": "Postcode",
+      "Check and sign": "சரிபார்த்து கையொப்பமிடுங்கள்",
+      "Edit": "மாற்று",
+      "Service": "சேவை",
+      "Delivery": "Delivery",
+      "Boxes": "பெட்டிகள்",
+      "What's inside": "உள்ளே இருப்பவை",
+      "Notes": "குறிப்புகள்",
+      "Sender": "அனுப்புநர்",
+      "Receiver": "பெறுநர்",
+      "How will the receiver get the boxes?": "பெறுநர் பெட்டிகளை எப்படிப் பெறுவார்?",
+      "Collect from Wattala warehouse": "வத்தளை களஞ்சியத்தில் பெறுதல்",
+      "Our staff will measure odd-size items and work out the price.": "எங்கள் staff வழக்கமற்ற பொருட்களை அளந்து விலையிடுவார்கள்.",
+      "Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.": "அனுப்பும் அனைத்தையும் தேர்ந்தெடுங்கள் — Customs க்கு தேவை. மதிப்பு கட்டாயமில்லை; எங்கள் staff சேர்ப்பார்கள்.",
+      "Food": "உணவு",
+      "New clothing": "புதிய ஆடைகள்",
+      "Used clothing": "பயன்படுத்திய ஆடைகள்",
+      "New toys": "புதிய பொம்மைகள்",
+      "Used toys": "பயன்படுத்திய பொம்மைகள்",
+      "Medicine": "மருந்து",
+      "Electrical": "மின் சாதனங்கள்",
+      "Electronics": "இலத்திரனியல் பொருட்கள்",
+      "Others": "மற்றவை",
+      "What is it?": "அது என்ன?",
+      "e.g. Kitchen utensils": "உதா: சமையலறை பாத்திரங்கள்",
+      "Value (AUD)": "மதிப்பு (AUD)",
+      "Please tap at least one thing you're sending.": "அனுப்பும் ஒன்றையாவது தேர்ந்தெடுங்கள்.",
+      "Please fill in how many for each one (and what \"Others\" is). A value must be a number.": "ஒவ்வொன்றுக்கும் எத்தனை என்று உள்ளிடவும் (மற்றவை என்றால் அது என்ன என்றும்). மதிப்பு எண்ணாக இருக்க வேண்டும்.",
+      "We recommend insurance": "Insurance செய்ய பரிந்துரைக்கிறோம்",
+      "You're sending a TV or electrical / electronic items. These can be damaged in transit, so it's better to use insurance.": "நீங்கள் TV அல்லது மின் / இலத்திரனியல் பொருட்களை அனுப்புகிறீர்கள். போக்குவரத்தில் இவை சேதமடையலாம், எனவே insurance செய்வது நல்லது.",
       "Welcome back!": "மீண்டும் வருக!",
       "You already have a My Transco account. This drop-off will appear in it after our staff confirm it.": "உங்களுக்கு ஏற்கனவே My Transco account உள்ளது. எங்கள் staff உறுதிசெய்த பின் இந்த drop-off அதில் தெரியும்.",
       "No My Transco account for now.": "இப்போதைக்கு My Transco account இல்லை.",
@@ -441,15 +544,21 @@
   };
   var options = FALLBACK_OPTIONS;
 
-  function emptyPerson() { return { fullName: "", idNumber: "", address: "", town: "", mobile: "", homePhone: "", email: "" }; }
+  function emptyPerson() { return { fullName: "", idNumber: "", address: "", town: "", mobile: "", homePhone: "", email: "", street: "", suburb: "", state: "", postcode: "" }; }
   function emptyItem() { return { description: "", condition: "", qty: "1", value: "" }; }
+  // The UPB Gift Cargo Declaration categories (same as the booking form).
+  var CATS = [["food", "Food"], ["new_clothing", "New clothing"], ["used_clothing", "Used clothing"], ["new_toys", "New toys"], ["used_toys", "Used toys"],
+    ["medicine", "Medicine"], ["electrical", "Electrical"], ["electronics", "Electronics"], ["others", "Others"]];
+  function catRow(key) { return state.contents.filter(function (c) { return c.category === key; })[0]; }
+  // TV / electrical / electronics: insurance recommended (pre-ticked).
+  function needsInsurance() { return (state.boxes.tv || 0) > 0 || !!catRow("electrical") || !!catRow("electronics"); }
   function fresh() {
     return {
       country: "", service: "", boxes: {}, deliveryType: "",
       // One screen-size band per TV, one { l, w, h } (cm) per odd-size item.
       tvSizes: [], oddDims: [],
       sender: emptyPerson(), receiver: emptyPerson(),
-      contents: [emptyItem()],
+      contents: [],
       insurance: null, declarationAccepted: false, signedName: "",
       dg: emptyDg()
     };
@@ -499,7 +608,7 @@
   var signature = { drawn: false, canvas: null };
   var last = store(LAST_KEY);
 
-  var STEPS = ["where", "boxes", "sender", "receiver", "contents", "finish"];
+  var STEPS = ["where", "boxes", "sender", "receiver", "finish"];
 
   function country() {
     for (var i = 0; i < options.countries.length; i++) if (options.countries[i].key === state.country) return options.countries[i];
@@ -534,7 +643,7 @@
 
     var html = '<p class="step-label">' + esc(t("Step {n} of {m}", { n: step + 1, m: STEPS.length })) + "</p>";
     html += errorText ? '<p class="error" role="alert">' + esc(errorText) + "</p>" : "";
-    html += ({ where: renderWhere, boxes: renderBoxes, sender: renderSender, receiver: renderReceiver, contents: renderContents, finish: renderFinish })[STEPS[step]]();
+    html += ({ where: renderWhere, boxes: renderBoxes, sender: renderSender, receiver: renderReceiver, finish: renderFinish })[STEPS[step]]();
     main.innerHTML = html;
     bind();
   }
@@ -555,6 +664,11 @@
       html += "<h2>" + esc(t("How is it going?")) + '</h2><div class="choices two">' + c.services.map(function (s) {
         return choice('data-service="' + s.key + '"', state.service === s.key, s.key === "air" ? "✈️" : "🚢", t(s.label));
       }).join("") + "</div>";
+      // Door delivery or collection — on the first step, the same as the online booking form.
+      html += "<h2>" + esc(t("How will the receiver get the boxes?")) + '</h2><div class="choices">' +
+        choice('data-delivery="door"', state.deliveryType === "door", "🚚", t("Door delivery"), t("Delivered to the receiver's address (extra charge).")) +
+        choice('data-delivery="collect"', state.deliveryType === "collect", "🏭", state.country === "sri_lanka" ? t("Collect from Wattala warehouse") : t("Pickup from our warehouse"), t("The receiver collects the boxes.")) +
+        "</div>";
     }
     return html;
   }
@@ -567,13 +681,41 @@
       return '<div class="box-row' + (n ? " has" : "") + '"><span class="name">' + esc(it.label) + "</span>" +
         '<span class="stepper"><button type="button" data-box="' + it.key + '" data-d="-1" aria-label="Fewer ' + esc(it.label) + '">−</button>' +
         "<output>" + n + '</output><button type="button" data-box="' + it.key + '" data-d="1" aria-label="More ' + esc(it.label) + '">+</button></span></div>' +
-        (n && it.key === "tv" ? renderTvSizes(n) : "") + (n && it.key === "other" ? renderOddDims(n) : "");
+        (n && it.key === "tv" ? renderTvSizes(n) : "") + (n && it.key === "other" ? '<div class="box-detail"><p class="hint">' + esc(t("Our staff will measure odd-size items and work out the price.")) + "</p></div>" : "");
     }).join("");
-    html += "<h2>" + esc(t("At the destination")) + '</h2><div class="choices">' +
-      choice('data-delivery="collect"', state.deliveryType === "collect", "🏭", t("Pickup from our warehouse"), t("The receiver collects the boxes.")) +
-      choice('data-delivery="door"', state.deliveryType === "door", "🚚", t("Door delivery"), t("Delivered to the receiver's address (extra charge).")) +
-      "</div>";
+    html += renderEstimate();
+    html += '<div class="field" style="margin-top:16px"><label for="notes">' + esc(t("Anything we should know?")) + ' <span class="opt">(' + esc(t("optional")) + ')</span></label><textarea id="notes" maxlength="300">' + esc(state.notes || "") + "</textarea></div>";
+    html += renderContents();
     return html;
+  }
+
+  // Rough cost of the boxes alone — the same rates and breakdown as the
+  // online booking form. Air Freight goes by weight (no estimate).
+  var BOX_PRICE = { tea_chest: 75, gift_box: 45, wine_box: 30, quarter_cbm: 150 };
+  var INDIA_PRICE = { general: [400, 600, 800], tea_chest: [600, 900, 1200], quarter_cbm: [600, 900, 1200] };
+  function renderEstimate() {
+    var c = country(), q = state.boxes;
+    if (!c || !Object.keys(q).length) return "";
+    if (state.service !== "sea") return '<div class="note info" style="margin-top:14px">✈️ ' + esc(t("Air Freight is priced by weight — our staff weigh your boxes.")) + "</div>";
+    var lines = [], total = 0, unknown = false;
+    function label(k) { var it = c.itemTypes.filter(function (x) { return x.key === k; })[0]; return it ? t(it.label) : k; }
+    function line(l, amount) { lines.push([l, amount]); if (amount === null) unknown = true; else total += amount; }
+    if (state.country === "india") {
+      Object.keys(INDIA_PRICE).forEach(function (k) { var n = q[k] || 0, p = INDIA_PRICE[k]; if (n) line(n + " × " + label(k), n <= 3 ? p[n - 1] : p[2] + (n - 3) * (p[2] - p[1])); });
+    } else {
+      if (q.tea_chest) { var tea = 0; for (var i = 1; i <= q.tea_chest; i++) tea += i % 3 === 0 ? 0 : 75; line(q.tea_chest + " × " + label("tea_chest") + (q.tea_chest >= 3 ? " (" + t("every 3rd free") + ")" : ""), tea); }
+      ["gift_box", "wine_box", "quarter_cbm"].forEach(function (k) { if (q[k]) line(q[k] + " × " + label(k), q[k] * BOX_PRICE[k]); });
+      for (var j = 0; j < (q.tv || 0); j++) {
+        var band = TV_SIZES.filter(function (x) { return x.key === state.tvSizes[j]; })[0];
+        line(label("tv") + (band && band.label ? " " + band.label : ""), band && band.price ? band.price : null);
+      }
+    }
+    if (q.other) line(q.other + " × " + label("other"), null);
+    return '<div class="estimate"><b class="est-title">💰 ' + esc(t("Approximate cost for your boxes")) + "</b>" +
+      lines.map(function (l) { return '<div class="est-row"><span>' + esc(l[0]) + "</span><span>" + (l[1] === null ? esc(t("priced by our team")) : "$" + l[1]) + "</span></div>"; }).join("") +
+      '<div class="est-row est-total"><span>' + esc(t("Approximate")) + "</span><span>$" + total + (unknown ? " +" : "") + "</span></div>" +
+      '<div class="est-small">+ ' + esc(t("door delivery extra")) + "</div>" +
+      '<div class="est-small">' + esc(t("This is only an approximate cost for the boxes. Our staff confirm the final price at the counter.")) + "</div></div>";
   }
 
   // TV screen-size bands and their Sea Freight prices (the bot's TV price
@@ -667,11 +809,27 @@
     }
     html += field("sender", "fullName", "Full name (as on passport / NIC)", { ac: "name" });
     html += field("sender", "idNumber", "Passport or NIC number", { caps: true, optional: state.country !== "sri_lanka" });
-    html += field("sender", "address", "Address", { multiline: true, ac: "street-address" });
+    // Australian address, the same fields as the online booking form.
+    if (!state.sender.street && !state.sender.suburb && state.sender.address) splitAddress(state.sender);
+    html += field("sender", "street", "Street address", { ac: "address-line1" });
+    html += '<div class="addr-row">' + field("sender", "suburb", "Suburb", { ac: "address-level2" }) +
+      '<div class="field' + (badFields["sender.state"] ? " bad" : "") + '"><label for="sender-state">' + esc(t("State")) + '</label><select id="sender-state" data-state="1">' +
+      '<option value="">' + esc(t("Choose…")) + "</option>" + ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"].map(function (x) { return '<option' + (state.sender.state === x ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
+      field("sender", "postcode", "Postcode", { mode: "numeric", ac: "postal-code" }) + "</div>";
     html += field("sender", "mobile", "Mobile", { type: "tel", mode: "tel", ac: "tel" });
     html += field("sender", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
     html += field("sender", "email", "Email", { type: "email", mode: "email", ac: "email" });
     return html;
+  }
+
+  // "18 Sorrell St, Parramatta NSW 2150" ⇄ street / suburb / state / postcode.
+  var AU_ADDRESS_RE = /^(.+?),\s*([^,]+?)\s+(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+(\d{4})$/i;
+  function splitAddress(p) {
+    var m = AU_ADDRESS_RE.exec(String(p.address || "").trim());
+    if (m) { p.street = m[1]; p.suburb = m[2]; p.state = m[3].toUpperCase(); p.postcode = m[4]; } else p.street = String(p.address || "").trim();
+  }
+  function joinAddress(p) {
+    return [String(p.street || "").trim(), [String(p.suburb || "").trim(), p.state || "", String(p.postcode || "").trim()].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   }
 
   function savedReceivers() {
@@ -701,18 +859,23 @@
   }
 
   function renderContents() {
-    var html = "<h1>" + esc(t("What's inside?")) + '</h1><p class="lead">' + esc(t("List everything in your boxes — Customs needs it.")) + "</p>";
-    html += state.contents.map(function (c, i) {
-      var bad = badFields["contents." + i];
-      return '<div class="item' + (bad ? " bad" : "") + '"><div class="item-top"><span>' + esc(t("Item {n}", { n: i + 1 })) + "</span>" +
-        (state.contents.length > 1 ? '<button type="button" data-remove="' + i + '">' + esc(t("Remove")) + "</button>" : "") + "</div>" +
-        '<input data-item="' + i + '" data-k="description" value="' + esc(c.description) + '" placeholder="' + esc(t("e.g. Chocolate")) + '" aria-label="' + esc(t("Item {n}", { n: i + 1 })) + '" />' +
-        '<div class="item-grid"><div class="seg" role="group" aria-label="' + esc(t("New")) + " / " + esc(t("Used")) + '"><button type="button" data-item="' + i + '" data-cond="new" aria-pressed="' + (c.condition === "new") + '">' + esc(t("New")) + "</button>" +
-        '<button type="button" data-item="' + i + '" data-cond="used" aria-pressed="' + (c.condition === "used") + '">' + esc(t("Used")) + "</button></div>" +
-        '<div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(c.qty) + '" inputmode="numeric" /></div></div></div>';
-    }).join("");
+    // Older drafts (free-text items) start again with the categories.
+    state.contents = state.contents.filter(function (c) { return c.category; });
+    var html = '<h2 style="margin-top:22px">' + esc(t("What's inside your boxes?")) + '</h2><p class="lead" style="margin-top:-4px">' + esc(t("Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.")) + "</p>";
+    html += '<div class="cat-chips" role="group">' + CATS.map(function (c) {
+      var on = !!catRow(c[0]);
+      return '<button type="button" class="cat-chip" data-cat="' + c[0] + '" aria-pressed="' + on + '">' + esc(t(c[1])) + "</button>";
+    }).join("") + "</div>";
+    CATS.forEach(function (c) {
+      var row = catRow(c[0]);
+      if (!row) return;
+      var i = state.contents.indexOf(row), bad = badFields["contents." + i];
+      html += '<div class="item' + (bad ? " bad" : "") + '"><div class="item-top"><span>✓ ' + esc(t(c[1])) + "</span></div>" +
+        (c[0] === "others" ? '<label for="d' + i + '">' + esc(t("What is it?")) + '</label><input id="d' + i + '" data-item="' + i + '" data-k="description" value="' + esc(row.description) + '" placeholder="' + esc(t("e.g. Kitchen utensils")) + '" style="margin-bottom:10px" />' : "") +
+        '<div class="item-grid two"><div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(row.qty) + '" inputmode="numeric" /></div>' +
+        '<div><label for="v' + i + '">' + esc(t("Value (AUD)")) + ' <span class="opt">(' + esc(t("optional")) + ')</span></label><input id="v' + i + '" data-item="' + i + '" data-k="value" value="' + esc(row.value) + '" inputmode="decimal" /></div></div></div>';
+    });
     html += '<div class="note" id="clothes-note" style="margin-top:6px;border-color:#f0d9a8;background:#fff9ec"' + (showClothesWarning() ? "" : " hidden") + ">" + esc(t(CLOTHES_WARNING)) + "</div>";
-    html += '<button type="button" class="add" id="add-item">' + esc(t("+ Add another item")) + "</button>";
     return html;
   }
 
@@ -721,10 +884,7 @@
   var CLOTHES_WARNING = "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.";
   var CLOTHES_WORDS = ["cloth", "garment", "shirt", "dress", "frock", "saree", "sari", "jeans", "trouser", "pants", "skirt", "blouse", "jacket", "ඇඳුම", "ஆடை", "உடை"];
   function showClothesWarning() {
-    return state.country === "sri_lanka" && state.contents.some(function (c) {
-      var s = String(c.description || "").toLowerCase();
-      return CLOTHES_WORDS.some(function (w) { return s.indexOf(w) !== -1; });
-    });
+    return state.country === "sri_lanka" && (!!catRow("new_clothing") || !!catRow("used_clothing"));
   }
 
   function renderDg() {
@@ -759,8 +919,12 @@
   }
 
   function renderFinish() {
-    var html = "<h1>" + esc(t("Almost done")) + "</h1>";
+    var html = "<h1>" + esc(t("Check and sign")) + "</h1>" + renderReview();
     if (state.service === "air") html += renderDg() + '<div style="height:10px"></div>';
+    if (needsInsurance() && state.insurance === null) { state.insurance = true; state.insAuto = true; }
+    if (!needsInsurance() && state.insAuto) { state.insurance = null; state.insAuto = false; }
+    if (needsInsurance()) html += '<div class="note" style="margin:0 0 12px;background:#fff4d6;border:2px solid #e0a100;color:#5a3b00"><b style="display:block;font-size:16px">⚠️ ' + esc(t("We recommend insurance")) + "</b>" +
+      esc(t("You're sending a TV or electrical / electronic items. These can be damaged in transit, so it's better to use insurance.")) + "</div>";
     html += "<h2>" + esc(t("Do you want your goods insured?")) + '</h2><div class="choices two">' +
       choice('data-ins="yes"', state.insurance === true, "", t("Yes")) + choice('data-ins="no"', state.insurance === false, "", t("No")) + "</div>";
     if (state.insurance === true) html += '<div class="note info" style="margin-top:10px">🛡️ ' + esc(t("For insurance, please contact Supun on 03 9357 7228 for more details.")) + "</div>";
@@ -793,6 +957,29 @@
       '<div class="field' + (badFields["account.password"] ? " bad" : "") + '"><label for="na-pw">' + esc(t("Choose a password")) + '</label><input id="na-pw" type="password" autocomplete="new-password" placeholder="' + esc(t("At least 8 characters")) + '" value="' + esc(newAcct.password) + '" /></div>' +
       '<label class="check' + (badFields["account.privacyAccepted"] ? " bad" : "") + '"><input type="checkbox" id="na-agree"' + (newAcct.agree ? " checked" : "") + " /><span>" + esc(t("I agree to the")) + ' <a href="/privacy.html" target="_blank" rel="noopener">' + esc(t("Privacy Policy")) + "</a>.</span></label>" +
       '<p style="text-align:center;margin:12px 0 0"><button type="button" id="na-skip" class="linkish">' + esc(t("Skip — just send the form")) + "</button></p></div>";
+  }
+
+  // Everything they entered, with Edit to go back — like the booking form's review.
+  function renderReview() {
+    var c = country();
+    var svc = c ? (c.services.filter(function (x) { return x.key === state.service; })[0] || {}).label : "";
+    var boxes = c ? c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) { return state.boxes[it.key] + " × " + t(it.label); }).join(", ") : "";
+    var inside = state.contents.map(function (x) {
+      var cat = CATS.filter(function (k) { return k[0] === x.category; })[0];
+      return x.qty + " × " + (x.category === "others" ? x.description : t(cat ? cat[1] : x.category)) + (String(x.value || "").trim() !== "" ? " ($" + Number(x.value) + ")" : "");
+    }).join(", ");
+    var delivery = state.deliveryType === "door" ? t("Door delivery") : state.country === "sri_lanka" ? t("Collect from Wattala warehouse") : t("Pickup from our warehouse");
+    function row(k, v, toStep) {
+      return '<div class="rev-row"><div><div class="rev-k">' + esc(t(k)) + '</div><div class="rev-v">' + esc(v || "—") + '</div></div><button type="button" class="rev-edit" data-goto="' + toStep + '">' + esc(t("Edit")) + "</button></div>";
+    }
+    return '<div class="review">' +
+      row("Service", t(svc || "") + " · " + (c ? t(c.label) : ""), 0) +
+      row("Delivery", delivery, 0) +
+      row("Boxes", boxes, 1) +
+      row("What's inside", inside, 1) +
+      (String(state.notes || "").trim() ? row("Notes", state.notes, 1) : "") +
+      row("Sender", state.sender.fullName, 2) +
+      row("Receiver", state.receiver.fullName + (state.receiver.town ? ", " + state.receiver.town : ""), 3) + "</div>";
   }
 
   function renderDone() {
@@ -876,6 +1063,13 @@
         if (r) { state.receiver = Object.assign(emptyPerson(), pick(r)); badFields = {}; saveDraft(); render(); }
       };
     });
+    var notes = document.getElementById("notes");
+    if (notes) notes.oninput = function () { state.notes = notes.value; saveDraft(); };
+    var st = main.querySelector("[data-state]");
+    if (st) st.onchange = function () { state.sender.state = st.value; delete badFields["sender.state"]; saveDraft(); };
+    main.querySelectorAll("[data-goto]").forEach(function (b) {
+      b.onclick = function () { step = Number(b.getAttribute("data-goto")); errorText = ""; badFields = {}; render(); window.scrollTo(0, 0); };
+    });
     // My Transco account step.
     var naE = document.getElementById("na-email");
     if (naE) naE.oninput = function () { newAcct.email = naE.value; delete badFields["account.email"]; };
@@ -922,6 +1116,14 @@
     main.querySelectorAll("[data-remove]").forEach(function (b) {
       b.onclick = function () { state.contents.splice(Number(b.getAttribute("data-remove")), 1); badFields = {}; saveDraft(); render(); };
     });
+    main.querySelectorAll("[data-cat]").forEach(function (b) {
+      b.onclick = function () {
+        var key = b.getAttribute("data-cat"), row = catRow(key);
+        if (row) state.contents.splice(state.contents.indexOf(row), 1);
+        else state.contents.push({ category: key, description: "", condition: "", qty: "1", value: "" });
+        badFields = {}; errorText = ""; saveDraft(); render();
+      };
+    });
     var add = document.getElementById("add-item");
     if (add) add.onclick = function () {
       state.contents.push(emptyItem()); saveDraft(); render();
@@ -929,7 +1131,7 @@
       if (inputs.length) inputs[inputs.length - 1].focus();
     };
     main.querySelectorAll("[data-ins]").forEach(function (b) {
-      b.onclick = function () { state.insurance = b.getAttribute("data-ins") === "yes"; errorText = ""; saveDraft(); render(); };
+      b.onclick = function () { state.insurance = b.getAttribute("data-ins") === "yes"; state.insAuto = false; errorText = ""; saveDraft(); render(); };
     });
     main.querySelectorAll("[data-dgno]").forEach(function (box) {
       box.onchange = function () { state.dg.no[Number(box.getAttribute("data-dgno"))] = box.checked; saveDraft(); render(); };
@@ -1120,7 +1322,12 @@
     if (String(p.fullName).trim().length < 2) bad[group + ".fullName"] = 1;
     if (idRequired && !/^[A-Za-z0-9]{5,20}$/.test(String(p.idNumber).replace(/\s/g, ""))) bad[group + ".idNumber"] = 1;
     if (!idRequired && p.idNumber && !/^[A-Za-z0-9]{5,20}$/.test(String(p.idNumber).replace(/\s/g, ""))) bad[group + ".idNumber"] = 1;
-    if (String(p.address).trim().length < 5) bad[group + ".address"] = 1;
+    if (group === "sender") {
+      if (String(p.street || "").trim().length < 3) bad["sender.street"] = 1;
+      if (String(p.suburb || "").trim().length < 2) bad["sender.suburb"] = 1;
+      if (!p.state) bad["sender.state"] = 1;
+      if (!/^\d{4}$/.test(String(p.postcode || "").trim())) bad["sender.postcode"] = 1;
+    } else if (String(p.address).trim().length < 5) bad[group + ".address"] = 1;
     if (withTown && String(p.town).trim().length < 2) bad[group + ".town"] = 1;
     if (!phoneOk(p.mobile)) bad[group + ".mobile"] = 1;
     if (p.homePhone && !phoneOk(p.homePhone)) bad[group + ".homePhone"] = 1;
@@ -1136,7 +1343,6 @@
     return c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) {
       var qty = state.boxes[it.key], item = { type: it.key, qty: qty };
       if (it.key === "tv") item.sizes = state.tvSizes.slice(0, qty);
-      if (it.key === "other") item.dims = state.oddDims.slice(0, qty).map(function (d) { return { l: Number(d.l), w: Number(d.w), h: Number(d.h) }; });
       return item;
     });
   }
@@ -1146,6 +1352,7 @@
     if (stepName === "where") {
       if (!country()) return t("Please choose where you are sending to.");
       if (!state.service) return t("Please choose Sea or Air freight.");
+      if (!state.deliveryType) return t("Please choose pickup or door delivery.");
     }
     if (stepName === "boxes") {
       if (!Object.keys(state.boxes).length) return t("Please add at least one box.");
@@ -1153,12 +1360,6 @@
         if (!validTvSize(state.tvSizes[ti])) badFields["tv." + ti] = 1;
       }
       if (Object.keys(badFields).length) return t("Please choose each TV's screen size.");
-      for (var oi = 0; oi < (state.boxes.other || 0); oi++) {
-        var d = state.oddDims[oi] || {};
-        if (!validDim(d.l) || !validDim(d.w) || !validDim(d.h)) badFields["odd." + oi] = 1;
-      }
-      if (Object.keys(badFields).length) return t("Please enter the length, width and height of each odd-size item in cm (1–500).");
-      if (!state.deliveryType) return t("Please choose pickup or door delivery.");
     }
     if (stepName === "sender" || stepName === "receiver") {
       badFields = stepName === "sender" ? checkPerson("sender", false, state.country === "sri_lanka") : checkPerson("receiver", true, true);
@@ -1167,12 +1368,14 @@
       if (keys.length === 1 && /\.mobile$/.test(keys[0])) return t("Please check the mobile number.");
       if (keys.length) return t("Please fill in the boxes marked in red.");
     }
-    if (stepName === "contents") {
+    if (stepName === "boxes" && !Object.keys(badFields).length && state.deliveryType) {
+      if (!state.contents.length) return t("Please tap at least one thing you're sending.");
       state.contents.forEach(function (c, i) {
-        var q = Number(c.qty);
-        if (String(c.description).trim().length < 2 || !c.condition || !(Number.isInteger(q) && q >= 1 && q <= 999)) badFields["contents." + i] = 1;
+        var q = Number(c.qty), v = String(c.value || "").trim();
+        if ((c.category === "others" && String(c.description).trim().length < 2) || !(Number.isInteger(q) && q >= 1 && q <= 999) ||
+            (v !== "" && !(isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100000))) badFields["contents." + i] = 1;
       });
-      if (Object.keys(badFields).length) return t("Please describe each item, its number and value.");
+      if (Object.keys(badFields).length) return t("Please fill in how many for each one (and what \"Others\" is). A value must be a number.");
     }
     if (stepName === "finish") {
       if (state.service === "air") {
@@ -1198,11 +1401,11 @@
   function stepForField(f) {
     if (!f) return step;
     if (f === "country" || f === "service") return 0;
-    if (f === "items" || f === "deliveryType") return 1;
+    if (f === "deliveryType") return 0;
+    if (f === "items" || f === "contents" || f === "notes") return 1;
     if (f.indexOf("sender.") === 0) return 2;
     if (f.indexOf("receiver.") === 0) return 3;
-    if (f === "contents") return 4;
-    return 5;
+    return 4;
   }
 
   function submit() {
@@ -1212,9 +1415,20 @@
       service: state.service,
       items: itemsPayload(),
       deliveryType: state.deliveryType,
-      sender: state.sender,
+      sender: (function () {
+        var p = Object.assign({}, state.sender, { address: joinAddress(state.sender) });
+        delete p.street; delete p.suburb; delete p.state; delete p.postcode;
+        return p;
+      })(),
+      notes: String(state.notes || "").trim(),
+      language: lang,
       receiver: state.receiver,
-      contents: state.contents.map(function (x) { return { description: x.description, condition: x.condition, qty: Number(x.qty) }; }),
+      contents: state.contents.map(function (x) {
+        var out = { category: x.category, qty: Number(x.qty) };
+        if (x.category === "others") out.description = String(x.description).trim();
+        if (String(x.value || "").trim() !== "") out.value = Number(x.value);
+        return out;
+      }),
       insurance: state.insurance,
       declarationAccepted: state.declarationAccepted,
       signedName: state.signedName,

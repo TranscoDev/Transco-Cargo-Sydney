@@ -1332,7 +1332,7 @@ test('walk-in finalise: staff only; links/creates the customer by phone and reco
   assert.ok(customer.portalJoinedAt, 'a My Transco account was created');
   assert.match(customer.customerCode, /^CUS-\d{6}$/);
   assert.equal(customer.email, 'newwalkin@example.com');
-  assert.equal(customer.address.line1, 'Unit 3, 18 Sorrell Street, Parramatta NSW 2150');
+  assert.deepEqual(customer.address, { line1: 'Unit 3, 18 Sorrell Street', suburb: 'Parramatta', state: 'NSW', postcode: '2150' });
   assert.equal(pii.open(customer.senderDetails.idNumber), 'N10388128');
   const accounts = await api('GET', '/api/my-transco/customers', { token: staffToken });
   assert.ok(JSON.stringify(accounts.body).includes(String(customer._id)));
@@ -1996,4 +1996,21 @@ test('walk-in form can create a My Transco account — switched on when staff co
   const signedIn = await api('POST', '/api/portal/auth/invite', { body: { token: inv2.body.link.split('#/join/')[1] } });
   assert.equal(signedIn.status, 200);
   assert.ok(signedIn.body.token);
+});
+
+test('a confirmed walk-in fills the new My Transco profile: address parts, language, sender + receiver saved', async () => {
+  const sender = { ...walkInForm().sender, mobile: '0477 555 303', email: 'profile.fill@example.com', address: '18 Sorrell St, Parramatta NSW 2150' };
+  const sent = await api('POST', '/api/public/dropoff', { body: walkInForm({ sender, notes: 'Fragile', language: 'si', account: { email: 'profile.fill@example.com', password: 'profile-pass-1', privacyAccepted: true } }) });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  const b = await db.collection('bookings').findOne({ bookingCode: sent.body.bookingCode });
+  assert.equal(b.customerNotes, 'Fragile');
+  await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-PROFILE-1', contentValues: [10, 20] } });
+  const login = await api('POST', '/api/portal/auth/login', { body: { email: 'profile.fill@example.com', password: 'profile-pass-1' } });
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  const p = login.body.profile;
+  assert.deepEqual(p.address, { line1: '18 Sorrell St', suburb: 'Parramatta', state: 'NSW', postcode: '2150' });
+  assert.equal(p.preferredLanguage, 'si');
+  assert.equal(p.idNumber, pii.mask('N10388128'), 'their passport is on the profile (masked)');
+  const people = await api('GET', '/api/portal/me/people', { token: login.body.token });
+  assert.equal(people.body.receivers[0].fullName, 'Walk In Receiver', 'receiver saved for next time');
 });
