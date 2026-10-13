@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCustomerProfile, setPortalPassword } from "@/lib/transco/api";
+import { canSee } from "@/lib/transco/auth";
 import { notify, friendlyError } from "@/lib/transco/notify";
 import { bookingStatus, SENDER_LABEL, shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
@@ -65,7 +66,10 @@ function CustomerProfilePage() {
     load();
   }, [load]);
 
-  const crumbs = [{ label: "Customers", to: "/console/customers" }, { label: profile?.customerName ?? "Customer" }];
+  // A view-only login (e.g. the warehouse) has no Customers list to go back to.
+  const crumbs = canSee("customers")
+    ? [{ label: "Customers", to: "/console/customers" }, { label: profile?.customerName ?? "Customer" }]
+    : [{ label: profile?.customerName ?? "Customer" }];
 
   return (
     <PageShell>
@@ -84,6 +88,8 @@ function CustomerProfilePage() {
 function Profile({ profile: p }: { profile: CustomerProfile }) {
   const navigate = useNavigate();
   const { selectConversation } = useConversations();
+  // View only (e.g. the warehouse): no chat, online account or password tools.
+  const viewOnly = !canSee("customers");
   const setOpenBooking = (bookingId: string) => void navigate({ to: "/console/bookings/$bookingId", params: { bookingId } });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -108,7 +114,7 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
         action: "Check declaration",
         onClick: () => setOpenBooking(firstDeclaration.id),
       }
-    : p.needsAttention
+    : p.needsAttention && !viewOnly
       ? { text: "The bot flagged this conversation for staff.", action: "Open conversation", onClick: openChat }
       : null;
 
@@ -149,12 +155,12 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {p.messages.length > 0 && (
+          {!viewOnly && p.messages.length > 0 && (
             <Button type="button" onClick={openChat}>
               <MessageCircle className="mr-2 h-4 w-4" /> Open conversation
             </Button>
           )}
-          {p.hasOnlineAccount && (
+          {!viewOnly && p.hasOnlineAccount && (
             <Button asChild variant="outline">
               <Link to="/console/my-transco/$customerId" params={{ customerId: p.id }}>
                 Online account
@@ -248,7 +254,7 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
         </section>
 
         {/* Conversation */}
-        <section>
+        {!viewOnly && (<section>
           <SectionHeading
             action={
               p.messages.length > 0 ? (
@@ -276,7 +282,7 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
               <EmptyState compact icon={MessageCircle} title="No messages yet" />
             )}
           </div>
-        </section>
+        </section>)}
 
         {/* Notes */}
         <section>
@@ -313,7 +319,7 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
         </details>
       )}
 
-      {p.channel !== "website" && <PortalPasswordCard customerId={p.id} />}
+      {!viewOnly && p.channel !== "website" && <PortalPasswordCard customerId={p.id} />}
 
     </>
   );

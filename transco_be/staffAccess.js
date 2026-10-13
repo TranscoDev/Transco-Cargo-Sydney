@@ -27,11 +27,15 @@ const PAGES = {
   'my-transco': { label: 'Online Accounts', api: ['/my-transco'] },
   settings: { label: 'Settings (staff list)', api: ['/settings', '/staff'] },
   'bot-controls': { label: 'Bot settings', api: ['/settings'] },
-  notices: { label: 'Website notices', api: ['/notices'] }
+  notices: { label: 'Website notices', api: ['/notices'] },
+  // View-only customer profile (no list, chat, promotions or imports) —
+  // allowed by PROFILE_ONLY below, since the path has the customer id in it.
+  'customer-profile': { label: 'Customer profiles (view only)', api: [] }
 };
 const PAGE_KEYS = Object.keys(PAGES);
 const ROLES = ['admin', 'warehouse', 'custom'];
-const WAREHOUSE_PAGES = ['bookings', 'walk-ins', 'shipments'];
+const WAREHOUSE_PAGES = ['bookings', 'walk-ins', 'shipments', 'customer-profile'];
+const PROFILE_ONLY = /^\/customers\/[^/]+\/profile$/;
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'admin@transco.lk')
   .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
@@ -58,8 +62,9 @@ function owningPages(path) {
   return owners;
 }
 
-function canUse(pages, path) {
+function canUse(pages, path, method = 'GET') {
   if (pages === null) return true;
+  if (method === 'GET' && PROFILE_ONLY.test(path) && pages.includes('customer-profile')) return true;
   const owners = owningPages(path);
   return owners.length === 0 || owners.some(o => pages.includes(o));
 }
@@ -91,7 +96,7 @@ function createAccessMiddleware({ users, ObjectId }) {
     try {
       const pages = await pagesFor(req.user.sub);
       req.staffPages = pages;
-      if (canUse(pages, req.path)) return next();
+      if (canUse(pages, req.path, req.method)) return next();
       return res.status(403).json({ error: "Your account doesn't have access to this page. Ask the admin if you need it.", reason: 'no_page_access' });
     } catch (err) {
       return next(err);
