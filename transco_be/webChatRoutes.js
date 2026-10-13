@@ -67,7 +67,7 @@ const WEB_GREETING_TEXT =
   "🚚 Shipping Information\n\n" +
   "💬 Happy to chat in English, සිංහල, or தமிழ் — just write in whichever you're comfortable with.\n\n" +
   "🎉 *Current Promotion:* Every 3rd Tea Chest is FREE! (Sea Freight, Tea Chests only)\n\n" +
-  "📝 Book online (your declaration is included): https://transco-agent-site.transcocargo.workers.dev/account.html#/book";
+  "📝 Book online (your declaration is included): " + (process.env.PORTAL_SITE_URL || "https://my.transcosydney.com.au").replace(/\/$/, "") + "/account.html#/book";
 
 // One "customer" document per website visitor session. Separate query
 // shape (sessionId, not phoneNumber) so this can never collide with or

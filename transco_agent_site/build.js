@@ -70,5 +70,15 @@ export default {
 
 const outFile = previewOrigin ? 'worker-preview.js' : 'worker.js';
 fs.writeFileSync(path.join(__dirname, outFile), worker);
+
+// The same worker as a Cloudflare Pages project (pages-dist/_worker.js),
+// so my.transcosydney.com.au can point at it with a plain CNAME while the
+// domain's DNS stays at Hostinger. Deploy with
+// `npx wrangler pages deploy pages-dist --project-name transco-site --branch main`.
+if (!previewOrigin) {
+  const pagesDir = path.join(__dirname, 'pages-dist');
+  fs.mkdirSync(pagesDir, { recursive: true });
+  fs.writeFileSync(path.join(pagesDir, '_worker.js'), worker);
+}
 console.log(`${outFile} written, length:`, worker.length, '— routes:', Object.keys(pages).concat(Object.keys(scripts)).join(', '),
   previewOrigin ? `— API: ${previewOrigin}` : '');

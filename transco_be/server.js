@@ -5577,7 +5577,7 @@ const WELCOME_BODY_TEXT =
   "*How can I help you today?*";
 
 // The new website (My Transco, booking, drop-off form).
-const SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
+const SITE_URL = (process.env.PORTAL_SITE_URL || 'https://my.transcosydney.com.au').replace(/\/$/, '');
 
 // WhatsApp menu taps → the right page on the website (typed questions
 // still get normal bot answers). "Talk to Our Team" and the price-quote

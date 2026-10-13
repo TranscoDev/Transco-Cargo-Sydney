@@ -36,7 +36,7 @@ const COUNTRIES: { key: ScheduleCountry; label: string; page: string }[] = [
   { key: "sri_lanka", label: "🇱🇰 Sri Lanka", page: "/sri-lanka.html" },
   { key: "india", label: "🇮🇳 India", page: "/india.html" },
 ];
-const WEBSITE = "https://transco-agent-site.transcocargo.workers.dev";
+const WEBSITE = "https://my.transcosydney.com.au";
 
 /**
  * Staff keep the shipping calendar up to date here: each cutoff date (the

@@ -16,7 +16,7 @@
     ta: { book: "இப்போது book செய்யுங்கள்", track: "என் shipment ஐப் பார்க்க", profile: "என் profile", account: "My Transco திறக்க", dropoff: "Drop-off form திறக்க", boxes: "Boxes மற்றும் விலைகள்", privacy: "Privacy policy படிக்க", contact: "எங்களைத் தொடர்புகொள்ள", whatsapp: "WhatsApp திறக்க", open: "திறக்க" }
   };
   var ICONS = { book: "📝", track: "📦", profile: "👤", account: "👤", dropoff: "📝", boxes: "📦", privacy: "🔒", contact: "📞", whatsapp: "💬", open: "🔗" };
-  var SITE_HOSTS = /(^|\.)transco-agent-site\.transcocargo\.workers\.dev$|(^|\.)transcocargo\.com\.au$|^localhost$/;
+  var SITE_HOSTS = /^(my\.|www\.)?transcosydney\.com\.au$|^transco-site\.pages\.dev$|(^|\.)transco-agent-site\.transcocargo\.workers\.dev$|^localhost$/;
 
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

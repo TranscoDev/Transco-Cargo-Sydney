@@ -1474,7 +1474,7 @@ function createCustomerTools({
   // "Invite to My Transco" button and by WhatsApp ("Hi" → their link) —
   // the WhatsApp message itself proves the number is theirs.
   const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
-  const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
+  const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://my.transcosydney.com.au').replace(/\/$/, '');
   async function createInviteLink(customer, createdBy = null) {
     const crypto = require('crypto');
     const token = crypto.randomBytes(24).toString('base64url');

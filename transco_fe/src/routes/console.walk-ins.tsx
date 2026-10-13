@@ -13,7 +13,7 @@ export const Route = createFileRoute("/console/walk-ins")({
   component: WalkInsPage,
 });
 
-const FORM_URL = "https://transco-agent-site.transcocargo.workers.dev/dropoff.html";
+const FORM_URL = "https://my.transcosydney.com.au/dropoff.html";
 
 type View = "confirm" | "today" | "all";
 

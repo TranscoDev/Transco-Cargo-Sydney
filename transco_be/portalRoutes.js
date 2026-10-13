@@ -20,7 +20,7 @@ const { customers, customerOtps } = require('./db');
 // "Forgot password" links: single use, 30 minutes. Only a hash of the
 // token is stored, so a database leak can't be used to reset passwords.
 const RESET_TTL_MS = 30 * 60 * 1000;
-const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://transco-agent-site.transcocargo.workers.dev').replace(/\/$/, '');
+const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://my.transcosydney.com.au').replace(/\/$/, '');
 const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { OTP_TTL_MS, OTP_MAX_ATTEMPTS } = require('./customerAuth');

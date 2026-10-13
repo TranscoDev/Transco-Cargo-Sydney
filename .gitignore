@@ -83,6 +83,7 @@ Thumbs.db
 # with `node build.js` before `npx wrangler deploy`.
 /transco_agent_site/worker.js
 /transco_agent_site/worker-preview.js
+/transco_agent_site/pages-dist
 /transco_agent_site/.wrangler
 
 # PDFs are never committed (the original paper forms in
