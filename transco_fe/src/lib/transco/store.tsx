@@ -747,6 +747,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   // new message naturally sorts to the top with no separate "reorder" step.
   useEffect(() => {
     const disconnect = connectConsoleSocket((event) => {
+      // Staff tasks keep their own list (tasks.ts); just tell it to re-read.
+      if (event.type === "task.changed") window.dispatchEvent(new Event("transco:tasks-changed"));
       switch (event.type) {
         case "message.created": {
           const { message, customer } = event.payload as MessageCreatedPayload;

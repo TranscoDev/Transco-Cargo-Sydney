@@ -7,6 +7,7 @@ import { ChannelTag } from "./channel-tag";
 import { MessageStatusIcon } from "./message-status";
 import { UnreadBadge } from "./unread-badge";
 import { formatPhone } from "@/lib/transco/phone";
+import { WarehouseTag } from "./ask-warehouse";
 
 function initials(name: string) {
   return name
@@ -126,6 +127,7 @@ export function ContactCard({
 
         <span className="mt-1.5 flex flex-wrap items-center gap-1">
           <ModeTag mode={mode} />
+          <WarehouseTag conversation={conversation} />
           {conversation.mergedIds?.length ? (
             // One customer, both channels (see merge-conversations.ts).
             <>

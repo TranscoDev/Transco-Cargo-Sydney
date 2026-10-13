@@ -9,6 +9,7 @@ import type { Conversation, ConversationMode, Message } from "@/lib/transco/type
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 import { ModeSwitch } from "./mode-switch";
+import { AskWarehouseButton, WarehouseStrip } from "./ask-warehouse";
 import { formatPhone } from "@/lib/transco/phone";
 
 function groupByDay(messages: Message[]) {
@@ -127,7 +128,10 @@ export function ChatPanel({
             </p>
           </div>
         </div>
-        <ModeSwitch mode={conversation.mode} onChange={onModeChange} />
+        <div className="flex shrink-0 items-center gap-2">
+          <AskWarehouseButton conversation={conversation} />
+          <ModeSwitch mode={conversation.mode} onChange={onModeChange} />
+        </div>
       </header>
 
       {conversation.needsAttention && (
@@ -167,6 +171,16 @@ export function ChatPanel({
           </p>
         </div>
       )}
+
+      <WarehouseStrip
+        conversation={conversation}
+        onUseInReply={(text) => {
+          // Replying needs the chat in staff mode; the text then lands in
+          // the message box to check before sending.
+          if (!isHuman) onModeChange("HUMAN");
+          window.setTimeout(() => window.dispatchEvent(new CustomEvent("transco:compose-insert", { detail: text })), 0);
+        }}
+      />
 
       <MessageComposer
         mode={conversation.mode}

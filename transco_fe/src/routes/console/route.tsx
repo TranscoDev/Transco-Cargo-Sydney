@@ -49,16 +49,11 @@ function ConsoleRouteComponent() {
     }
   }, [navigate]);
 
-  // A login limited to some pages lands on its first page instead of the
-  // dashboard, and sees a short note on any page it doesn't have.
+  // Every login lands on the dashboard (a login limited to some pages
+  // sees only its tasks there), and sees a short note on any page it
+  // doesn't have.
   const page = pageForPath(pathname);
   const firstPage = getCurrentUser()?.pages?.[0];
-  useEffect(() => {
-    if (!agentName || !firstPage) return;
-    if (pathname === "/console" || pathname === "/console/" || (page === "dashboard" && !canSee("dashboard"))) {
-      void navigate({ to: "/console/" + firstPage, replace: true });
-    }
-  }, [agentName, firstPage, page, pathname, navigate]);
 
   if (!agentName) return null;
 

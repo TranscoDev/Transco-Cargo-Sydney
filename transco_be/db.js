@@ -170,6 +170,12 @@ function customerOtps() {
   return getDb().collection('customerOtps');
 }
 
+// Staff tasks (taskRoutes.js) — to-dos staff give themselves, a colleague
+// or the warehouse team. Separate from every other collection.
+function staffTasks() {
+  return getDb().collection('staffTasks');
+}
+
 async function nextSequence(name) {
   const doc = await counters().findOneAndUpdate(
     { _id: name },
@@ -199,5 +205,6 @@ module.exports = {
   payments,
   campaigns,
   segments,
-  shippingSchedule
+  shippingSchedule,
+  staffTasks
 };

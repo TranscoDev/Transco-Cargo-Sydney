@@ -8,6 +8,7 @@ import {
   Clock3,
   Globe,
   LayoutDashboard,
+  ListTodo,
   LogOut,
   Megaphone,
   MapPin,
@@ -21,6 +22,7 @@ import {
   QrCode,
   Receipt,
   Settings as SettingsIcon,
+  ShieldCheck,
   Ship,
   Sparkles,
   Sun,
@@ -39,6 +41,7 @@ import { canSee, getCurrentUser, pageForPath } from "@/lib/transco/auth";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
 import type { PauseState } from "@/lib/transco/api";
 import { useConversations } from "@/lib/transco/store";
+import { isMine, useTasks } from "@/lib/transco/tasks";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -59,8 +62,10 @@ export interface NavLeaf {
   label: string;
   to: string;
   icon: LucideIcon;
-  /** Shows a live count: waiting conversations, or walk-ins to confirm. */
-  badge?: "conversations" | "walkIns";
+  /** Shows a live count: waiting conversations, walk-ins to confirm, or my open tasks. */
+  badge?: "conversations" | "walkIns" | "tasks";
+  /** Only for the admin (checked again by the backend). */
+  adminOnly?: boolean;
 }
 export interface NavGroup {
   label: string;
@@ -74,6 +79,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Workspace",
     items: [
       { label: "Dashboard", to: "/console/dashboard", icon: LayoutDashboard },
+      { label: "Tasks", to: "/console/tasks", icon: ListTodo, badge: "tasks" },
       { label: "Conversations", to: "/console/conversations", icon: MessageCircle, badge: "conversations" },
       { label: "Customers", to: "/console/customers", icon: Users },
       { label: "Bookings", to: "/console/bookings", icon: CalendarClock },
@@ -106,6 +112,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Admin",
     items: [
       { label: "Settings", to: "/console/settings", icon: SettingsIcon },
+      { label: "All tasks", to: "/console/all-tasks", icon: ShieldCheck, adminOnly: true },
       { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
       { label: "Website notices", to: "/console/notices", icon: Megaphone },
     ],
@@ -155,14 +162,25 @@ export function useWalkInsToConfirm() {
   return bookings.filter((b) => b.channel === "walk_in" && b.walkInStatus !== "finalised" && b.status !== "cancelled").length;
 }
 
+/** My open tasks (plus unclaimed team tasks for the warehouse), for the menu badge. */
+function useMyTaskCount() {
+  const { tasks, me } = useTasks();
+  if (!me) return { tasks: 0, isAdmin: false };
+  const count = tasks.filter(
+    (t) => t.status !== "done" && (isMine(t, me.id) || (me.isWarehouse && t.assignTo === "team" && !t.claimedById)),
+  ).length;
+  return { tasks: count, isAdmin: me.isAdmin };
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const waiting = useWaitingConversations();
   const walkIns = useWalkInsToConfirm();
+  const { tasks: myTasks, isAdmin } = useMyTaskCount();
   // Only the pages this login may open (Settings → Staff → page access);
   // limited logins don't see the "Coming later" group either.
   const limited = !!getCurrentUser()?.pages;
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canSee(pageForPath(i.to))) }))
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canSee(pageForPath(i.to)) && (!i.adminOnly || isAdmin)) }))
     .filter((g) => g.items.length && !(limited && g.later));
   const laterGroup = groups.find((g) => g.later);
   const [laterOpen, setLaterOpen] = useState(
@@ -218,7 +236,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             <ul className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const active = isActive(pathname, item.to);
-                const count = item.badge === "conversations" ? waiting : item.badge === "walkIns" ? walkIns : 0;
+                const count = item.badge === "conversations" ? waiting : item.badge === "walkIns" ? walkIns : item.badge === "tasks" ? myTasks : 0;
                 return (
                   <li key={item.to}>
                     <Link

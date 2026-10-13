@@ -2688,7 +2688,8 @@ app.get('/api/customers/:customerId/profile', async (req, res) => {
         // For the profile header: "Online account ✓" badge.
         hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
         linkedAccount: await linkedAccountFor(customer),
-        messages: customerMessages,
+        // A view-only login (e.g. the warehouse) gets the profile without the chat.
+        messages: staffAccess.canUse(req.staffPages ?? null, '/customers') ? customerMessages : [],
         shipments: customerShipments,
         liveShipments: liveShipmentsWithBatch,
         bookings: bookingsWithResolvedDate,
@@ -6400,6 +6401,9 @@ app.use('/api/my-transco', createStaffPortalRouter({ tools: customerTools }));
 const scheduleRouters = require('./scheduleRoutes')({ getSydneyNow });
 app.use('/api/public', scheduleRouters.publicRouter);
 app.use('/api/schedule', scheduleRouters.staffRouter);
+
+// Staff tasks (taskRoutes.js): every staff login, whatever its page access.
+app.use('/api/tasks', require('./taskRoutes')({ broadcast, isStaffAdmin }));
 // Both chat channels answer schedule questions from those same dates.
 const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
 

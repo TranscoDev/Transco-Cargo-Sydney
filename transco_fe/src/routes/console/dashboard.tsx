@@ -14,12 +14,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { useWalkInsToConfirm } from "@/components/transco/console-layout";
+import { NAV_GROUPS, useWalkInsToConfirm } from "@/components/transco/console-layout";
+import { TodayPanel } from "@/components/transco/task-kit";
 import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type StatusTone } from "@/components/transco/page-kit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { fetchDashboardSummary, type DashboardSummary } from "@/lib/transco/api";
-import { getCurrentUser } from "@/lib/transco/auth";
+import { canSee, getCurrentUser, pageForPath } from "@/lib/transco/auth";
 
 export const Route = createFileRoute("/console/dashboard")({
   component: DashboardPage,
@@ -34,13 +35,16 @@ export const Route = createFileRoute("/console/dashboard")({
 function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [failed, setFailed] = useState(false);
+  const pages = getCurrentUser()?.pages;
+  const fullDashboard = !pages || pages.includes("dashboard");
 
   const load = useCallback(() => {
+    if (!fullDashboard) return;
     setFailed(false);
     fetchDashboardSummary()
       .then(setSummary)
       .catch(() => setFailed(true));
-  }, []);
+  }, [fullDashboard]);
 
   useEffect(() => {
     load();
@@ -51,28 +55,73 @@ function DashboardPage() {
   // account → just the greeting, never an email address.
   const firstName = getCurrentUser()?.name?.trim().split(/\s+/)[0];
 
+  const header = (
+    <header className="mb-8">
+      <p className="text-sm text-muted-foreground">{today}</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+        {greeting()}{firstName ? `, ${firstName}` : ""} 👋
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">Here's what needs your attention today.</p>
+    </header>
+  );
+
+  // A login without the full dashboard (e.g. the warehouse) sees only its
+  // tasks here — no office numbers.
+  if (!fullDashboard) {
+    return (
+      <PageShell width="narrow">
+        {header}
+        <TodayPanel />
+        <MyPageShortcuts />
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
-      <header className="mb-8">
-        <p className="text-sm text-muted-foreground">{today}</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-          {greeting()}{firstName ? `, ${firstName}` : ""} 👋
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Here's what needs your attention today.</p>
-      </header>
-
-      {failed ? (
-        <ErrorState
-          title="Couldn't load today's overview"
-          description="Everything else in Transco Admin still works — use the menu, or try again."
-          onRetry={load}
-        />
-      ) : !summary ? (
-        <DashboardSkeleton />
-      ) : (
-        <DashboardBody s={summary} />
-      )}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <TodayPanel className="lg:sticky lg:top-0 lg:order-2 lg:self-start" />
+        <div className="min-w-0">
+          {header}
+          {failed ? (
+            <ErrorState
+              title="Couldn't load today's overview"
+              description="Everything else in Transco Admin still works — use the menu, or try again."
+              onRetry={load}
+            />
+          ) : !summary ? (
+            <DashboardSkeleton />
+          ) : (
+            <DashboardBody s={summary} />
+          )}
+        </div>
+      </div>
     </PageShell>
+  );
+}
+
+/** Round shortcuts to the other pages this login may open (e.g. the warehouse's). */
+function MyPageShortcuts() {
+  const links = NAV_GROUPS.filter((g) => !g.later)
+    .flatMap((g) => g.items)
+    .filter((i) => !i.adminOnly && i.to !== "/console/dashboard" && canSee(pageForPath(i.to)));
+  if (!links.length) return null;
+  return (
+    <nav aria-label="My pages" className="mt-6">
+      <SectionHeading>My pages</SectionHeading>
+      <div className="flex flex-wrap gap-2">
+        {links.map((l) => (
+          <Link
+            key={l.to}
+            to={l.to}
+            className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-xs transition-colors hover:border-primary/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <l.icon className="h-4 w-4 text-primary" aria-hidden />
+            {l.label}
+          </Link>
+        ))}
+      </div>
+    </nav>
   );
 }
 
@@ -151,7 +200,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
       {/* TODAY */}
       <section>
         <SectionHeading>Today</SectionHeading>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-5">
           {stats
             .filter((st) => st.value !== undefined)
             .map((st) => (
@@ -172,7 +221,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="grid grid-cols-1 gap-10 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {/* YOUR WORK TODAY */}
         <section>
           <SectionHeading>Your work today</SectionHeading>
@@ -241,7 +290,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
       {/* QUICK ACTIONS */}
       <section>
         <SectionHeading>Quick actions</SectionHeading>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-5">
           <QuickAction to="/console/customers" icon={Search} label="Find a customer" />
           <QuickAction to="/console/shipments" icon={Ship} label="Find a shipment" />
           <QuickAction to="/console/conversations" icon={MessageCircle} label="Conversations" />

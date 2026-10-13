@@ -11,6 +11,7 @@ import {
   type Shipment,
 } from "@/lib/transco/types";
 import { formatPhone } from "@/lib/transco/phone";
+import { WarehouseQuestionsList } from "./ask-warehouse";
 
 /** Right-side context panel for the selected conversation — purely
  * additive to the existing chat view (chat-panel.tsx is untouched).
@@ -105,6 +106,10 @@ export function CustomerContextPanel({
             ))}
           </div>
         )}
+      </Section>
+
+      <Section icon={Package} title="Warehouse Questions">
+        <WarehouseQuestionsList conversation={conversation} />
       </Section>
 
       <Section icon={Receipt} title="Outstanding Payments">

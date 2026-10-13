@@ -77,9 +77,12 @@ export function isAuthenticated(): boolean {
 /** Whether this login may open a console page (see staffAccess.js on the backend). */
 export function canSee(page: string | undefined): boolean {
   // Settings (own password, theme) is open to every login; its staff
-  // list checks the "settings" page itself.
-  if (!page || page === "settings") return true;
+  // list checks the "settings" page itself. Tasks, and the dashboard
+  // (which shows only tasks to a login without the full dashboard), are
+  // open to every login too.
+  if (!page || page === "settings" || page === "tasks" || page === "dashboard") return true;
   const pages = getCurrentUser()?.pages;
+  if (page === "customer-profile") return !pages || pages.includes(page) || pages.includes("customers");
   return !pages || pages.includes(page);
 }
 
@@ -89,6 +92,9 @@ export function pageForPath(pathname: string): string | undefined {
   if (!rest) return undefined;
   if (rest.startsWith("ai/bot-controls")) return "bot-controls";
   if (rest.startsWith("inventory/activity")) return "packaging";
+  // One customer's profile: a login without the Customers page may still
+  // have view-only profiles (the warehouse does).
+  if (/^customers\/[^/]+/.test(rest) && !canSee("customers")) return "customer-profile";
   const first = rest.split("/")[0];
   return first || undefined;
 }

@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { Mic, Paperclip, Send, Square, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -62,6 +62,17 @@ export function MessageComposer({
   // itself must block it here rather than let staff believe a message
   // went out when it didn't.
   const canSend = isHuman && value.trim().length > 0 && !disabled;
+
+  // "Use in reply" on a warehouse answer (ask-warehouse.tsx) drops its
+  // text in here to check and edit — never sent automatically.
+  useEffect(() => {
+    const onInsert = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      if (typeof text === "string" && text) setValue((v) => (v.trim() ? `${v.trimEnd()} ${text}` : text));
+    };
+    window.addEventListener("transco:compose-insert", onInsert);
+    return () => window.removeEventListener("transco:compose-insert", onInsert);
+  }, []);
 
   const submit = () => {
     if (!canSend) return;

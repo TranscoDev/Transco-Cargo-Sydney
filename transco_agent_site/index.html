@@ -466,6 +466,7 @@
     cursor: pointer;
     text-align: left;
     color: #fff;
+    text-decoration: none;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
   .quick-item:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.3); transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
@@ -635,7 +636,8 @@
     .agent-side > div:first-child { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
     .agent-side .agent-name { margin: 0; }
     .agent-side .agent-sub { display: none; }
-    .account-link, .whatsapp-cta { margin-top: 0; justify-content: center; text-align: center; min-height: 48px; font-size: 14px; }
+    /* Phones: no My Transco / WhatsApp buttons in the agent panel. */
+    .account-link, .whatsapp-cta { display: none; }
     .lbl-long { display: none; }
     .lbl-short { display: inline; }
 
@@ -789,10 +791,10 @@
         <div class="quick-list">
           <button class="quick-item" onclick="quickStart('I want a price quote', false)">💰 Get a Price Quote</button>
           <button class="quick-item" onclick="quickStart('I want to track my shipment', false)">📦 Track a Shipment</button>
-          <button class="quick-item" onclick="quickStart('What is your shipping schedule?', false)">🗓️ Shipping Calendar</button>
-          <button class="quick-item" onclick="quickStart('How do I book a drop-off?', false)">📝 How to book</button>
-          <button class="quick-item" onclick="startWithCountry('sri_lanka', false)">🇱🇰 Shipping to Sri Lanka</button>
-          <button class="quick-item" onclick="startWithCountry('india', false)">🇮🇳 Shipping to India</button>
+          <a class="quick-item" href="/sri-lanka.html#sched-title">🗓️ Shipping Calendar</a>
+          <a class="quick-item" href="/account.html#/book">📝 How to book</a>
+          <a class="quick-item" href="/sri-lanka.html">🇱🇰 Shipping to Sri Lanka</a>
+          <a class="quick-item" href="/india.html">🇮🇳 Shipping to India</a>
         </div>
 
         <a class="account-link" id="ta-account-link" href="/account.html?next=chat">👤 <span id="ta-account-label" class="lbl-long">Sign in to see your bookings &amp; shipments</span><span id="ta-account-short" class="lbl-short">Sign in</span></a>
@@ -1271,8 +1273,8 @@
          ["📝", "New booking", function () { location.href = "/account.html#/book"; }]]
       : [["💰", "Get a price", function () { window.quickStart("I want a price quote", false); }],
          ["📦", "Track a shipment", function () { window.quickStart("I want to track my shipment", false); }],
-         ["🗓️", "Shipping calendar", function () { window.quickStart("What is your shipping schedule?", false); }],
-         ["📝", "How to book", function () { window.quickStart("How do I book a drop-off?", false); }]];
+         ["🗓️", "Shipping calendar", function () { location.href = "/sri-lanka.html#sched-title"; }],
+         ["📝", "How to book", function () { location.href = "/account.html#/book"; }]];
     wrap.replaceChildren.apply(wrap, items.map(function (it) {
       var b = document.createElement("button");
       b.type = "button";
