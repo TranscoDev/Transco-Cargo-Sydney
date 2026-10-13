@@ -1953,6 +1953,43 @@ test('sign-up needs an email; forgot password link resets it (single use) and si
   assert.equal((await api('GET', '/api/portal/me', { token: reg.body.token })).status, 401, 'old sessions signed out');
 });
 
+test('forgot password with a WhatsApp code; change password with a code instead of the current one', async () => {
+  const reg = await api('POST', '/api/portal/auth/register', { body: { privacyAccepted: true, email: 'wa.reset@example.com', countryCode: '61', phone: '0498123987', name: 'Nimal Perera', password: 'old-pass-1234' } });
+  assert.equal(reg.status, 201, JSON.stringify(reg.body));
+
+  // Forgot: code → reset token (not signed in), then the normal reset screen.
+  await api('POST', '/api/portal/auth/request-code', { body: { countryCode: '61', phone: '0498123987' } });
+  const wrong = await api('POST', '/api/portal/auth/verify-code', { body: { countryCode: '61', phone: '0498123987', code: '000000', purpose: 'reset' } });
+  assert.equal(wrong.status, 400);
+  const v = await api('POST', '/api/portal/auth/verify-code', { body: { countryCode: '61', phone: '0498123987', code: lastCodeSentTo('61498123987'), purpose: 'reset' } });
+  assert.equal(v.status, 200, JSON.stringify(v.body));
+  assert.ok(v.body.resetToken && !v.body.token, 'reset token only, no sign-in');
+  const c = await db.collection('customers').findOne({ phoneNumber: '61498123987' });
+  assert.equal(c.phoneVerified, true, 'the code proved the number');
+  assert.equal(c.passwordHash, undefined, 'an unproven password is removed');
+  assert.equal((await api('GET', '/api/portal/me', { token: reg.body.token })).status, 401, 'old sessions signed out');
+  const ok = await api('POST', '/api/portal/auth/reset-password', { body: { token: v.body.resetToken, password: 'new-pass-5678' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'wa.reset@example.com', password: 'new-pass-5678' } })).status, 200);
+
+  // Unknown number: no account to reset.
+  await api('POST', '/api/portal/auth/request-code', { body: { countryCode: '61', phone: '0498123988' } });
+  const none = await api('POST', '/api/portal/auth/verify-code', { body: { countryCode: '61', phone: '0498123988', code: lastCodeSentTo('61498123988'), purpose: 'reset' } });
+  assert.equal(none.body.reason, 'no_account');
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61498123988' }), 0, 'no record created');
+
+  // Signed in, forgot the current password: a code to their own number.
+  const me = ok.body.token;
+  const noProof = await api('PUT', '/api/portal/me/password', { token: me, body: { newPassword: 'third-pass-999' } });
+  assert.equal(noProof.body.field, 'currentPassword');
+  await api('POST', '/api/portal/auth/request-code', { body: { countryCode: '61', phone: '61498123987' } });
+  const badCode = await api('PUT', '/api/portal/me/password', { token: me, body: { code: '000000', newPassword: 'third-pass-999' } });
+  assert.equal(badCode.body.field, 'code');
+  const changed = await api('PUT', '/api/portal/me/password', { token: me, body: { code: lastCodeSentTo('61498123987'), newPassword: 'third-pass-999' } });
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { countryCode: '61', phone: '0498123987', password: 'third-pass-999' } })).status, 200);
+});
+
 test('walk-in form can create a My Transco account — switched on when staff confirm; staff invite link', async () => {
   const sender = { ...walkInForm().sender, mobile: '0477 555 101', email: 'walkin.acct@example.com' };
   const before = await api('GET', '/api/public/dropoff/account?mobile=' + encodeURIComponent('0477 555 101'));

@@ -160,6 +160,36 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     return normalizePhoneNumber(digits, countryCode);
   }
 
+  // Checks a WhatsApp code for this number. Returns null when it's right
+  // (and spends every outstanding code for the number — single use), or
+  // { status, error } to send back.
+  async function checkOtp(phoneNumber, rawCode) {
+    const code = String(rawCode || '').replace(/\D/g, '');
+    if (!phoneNumber || code.length !== 6) {
+      return { status: 400, error: 'Please enter the 6-digit code we sent you.' };
+    }
+    const otp = await customerOtps().findOne(
+      { phoneNumber, expiresAt: { $gt: new Date() } },
+      { sort: { createdAt: -1 } }
+    );
+    if (!otp) {
+      return { status: 400, error: 'That code has expired. Please ask for a new one.' };
+    }
+    if (otp.attempts >= OTP_MAX_ATTEMPTS) {
+      return { status: 429, error: 'Too many incorrect tries. Please ask for a new code.' };
+    }
+    if (!customerAuth.otpMatches(phoneNumber, code, otp.codeHash)) {
+      await customerOtps().updateOne({ _id: otp._id }, { $inc: { attempts: 1 } });
+      const left = OTP_MAX_ATTEMPTS - otp.attempts - 1;
+      return {
+        status: 400,
+        error: left > 0 ? `That code isn't right. You have ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many incorrect tries. Please ask for a new code.'
+      };
+    }
+    await customerOtps().deleteMany({ phoneNumber });
+    return null;
+  }
+
   // ---------- sign in ----------
 
   router.post('/auth/request-code', wrap(async (req, res) => {
@@ -212,31 +242,32 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     }
 
     const phoneNumber = parsePhone(req.body);
-    const code = String((req.body && req.body.code) || '').replace(/\D/g, '');
-    if (!phoneNumber || code.length !== 6) {
-      return res.status(400).json({ error: 'Please enter the 6-digit code we sent you.' });
-    }
+    const otpError = await checkOtp(phoneNumber, req.body && req.body.code);
+    if (otpError) return res.status(otpError.status).json({ error: otpError.error });
 
-    const otp = await customerOtps().findOne(
-      { phoneNumber, expiresAt: { $gt: new Date() } },
-      { sort: { createdAt: -1 } }
-    );
-    if (!otp) {
-      return res.status(400).json({ error: 'That code has expired. Please ask for a new one.' });
+    // "Forgot password? Use a WhatsApp code": the code proves the phone,
+    // so instead of signing in, hand back a one-time reset token — the
+    // same kind the emailed link carries — and the site opens the
+    // "choose a new password" screen with it (/auth/reset-password).
+    if (req.body && req.body.purpose === 'reset') {
+      const c = await customers().findOne({ phoneNumber });
+      if (!c) {
+        return res.status(404).json({ error: "We couldn't find an account for that number. Don't have an account? Sign up.", reason: 'no_account' });
+      }
+      const resetToken = crypto.randomBytes(32).toString('base64url');
+      const update = { $set: { passwordReset: { hash: hashToken(resetToken), expiresAt: new Date(Date.now() + RESET_TTL_MS) } } };
+      // Same rule as a normal code sign-in: a password set before the
+      // number was proven may not be theirs — remove it and sign out
+      // its sessions, even if they never finish choosing a new one.
+      if (c.phoneVerified === false) {
+        update.$set.phoneVerified = true;
+        update.$set.phoneVerifiedAt = new Date();
+        update.$unset = { passwordHash: '' };
+        update.$inc = { portalTokenVersion: 1 };
+      }
+      await customers().updateOne({ _id: c._id }, update);
+      return res.json({ resetToken });
     }
-    if (otp.attempts >= OTP_MAX_ATTEMPTS) {
-      return res.status(429).json({ error: 'Too many incorrect tries. Please ask for a new code.' });
-    }
-    if (!customerAuth.otpMatches(phoneNumber, code, otp.codeHash)) {
-      await customerOtps().updateOne({ _id: otp._id }, { $inc: { attempts: 1 } });
-      const left = OTP_MAX_ATTEMPTS - otp.attempts - 1;
-      return res.status(400).json({
-        error: left > 0 ? `That code isn't right. You have ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many incorrect tries. Please ask for a new code.'
-      });
-    }
-
-    // Single use — every outstanding code for this number is spent.
-    await customerOtps().deleteMany({ phoneNumber });
 
     const source = ACQUISITION_SOURCES.includes(req.body && req.body.source) ? req.body.source : 'website';
     const now = new Date();
@@ -564,13 +595,17 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
   router.use(customerAuth.requireCustomer);
 
   // Set a password (e.g. after signing in with a WhatsApp code) or change
-  // it. Changing an existing one needs the current one.
+  // it. Changing an existing one needs the current one — or, if they've
+  // forgotten it, a WhatsApp code sent to their own number.
   router.put('/me/password', wrap(async (req, res) => {
     const body = req.body || {};
     if (!validPassword(body.newPassword)) {
       return res.status(400).json({ error: `Please choose a password with at least ${MIN_PASSWORD_LENGTH} characters.`, field: 'newPassword' });
     }
-    if (req.customer.passwordHash &&
+    if (req.customer.passwordHash && body.code !== undefined) {
+      const otpError = await checkOtp(req.customer.phoneNumber, body.code);
+      if (otpError) return res.status(otpError.status).json({ error: otpError.error, field: 'code' });
+    } else if (req.customer.passwordHash &&
         !(typeof body.currentPassword === 'string' && verifyPassword(body.currentPassword, req.customer.passwordHash))) {
       return res.status(400).json({ error: 'Your current password is not right.', field: 'currentPassword' });
     }
