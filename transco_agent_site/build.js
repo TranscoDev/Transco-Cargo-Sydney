@@ -1,8 +1,9 @@
 // Wraps every *.html file in this folder into a single Cloudflare
-// Worker (worker.js) that routes by URL path — index.html serves at
-// both "/" and "/index.html", every other file serves at its own
-// "/<name>.html". Run `node build.js` after editing any page, then
-// `npx wrangler deploy` from this same folder to push the update live.
+// Worker (pages-dist/_worker.js) that routes by URL path — index.html
+// serves at both "/" and "/index.html", every other file serves at its
+// own "/<name>.html". Run `node build.js` after editing any page, then
+// `npx wrangler pages deploy pages-dist --project-name transco-site --branch main`
+// from this same folder to push the update live (see the end of this file).
 //
 // Private preview build: `PREVIEW_API_ORIGIN=https://... node build.js`
 // writes worker-preview.js instead, with every page pointed at that
@@ -68,17 +69,31 @@ export default {
 };
 `;
 
-const outFile = previewOrigin ? 'worker-preview.js' : 'worker.js';
-fs.writeFileSync(path.join(__dirname, outFile), worker);
-
-// The same worker as a Cloudflare Pages project (pages-dist/_worker.js),
-// so my.transcosydney.com.au can point at it with a plain CNAME while the
-// domain's DNS stays at Hostinger. Deploy with
+// The live site is the Cloudflare Pages project behind
+// https://my.transcosydney.com.au (pages-dist/_worker.js). Deploy with
 // `npx wrangler pages deploy pages-dist --project-name transco-site --branch main`.
-if (!previewOrigin) {
+//
+// worker.js (transco-agent-site.transcocargo.workers.dev, the old test
+// address) only sends visitors on to the same page on the live address,
+// so links already shared keep working. Browsers carry the #/... part
+// of a link (e.g. #/join/<token>) across the redirect themselves.
+// 302, not 301, so browsers don't remember it and it can be undone.
+const LIVE_SITE = 'https://my.transcosydney.com.au';
+const redirectWorker = `export default {
+  fetch(request) {
+    const url = new URL(request.url);
+    return new Response(null, { status: 302, headers: { location: ${JSON.stringify(LIVE_SITE)} + url.pathname + url.search } });
+  }
+};
+`;
+
+if (previewOrigin) {
+  fs.writeFileSync(path.join(__dirname, 'worker-preview.js'), worker);
+} else {
   const pagesDir = path.join(__dirname, 'pages-dist');
   fs.mkdirSync(pagesDir, { recursive: true });
   fs.writeFileSync(path.join(pagesDir, '_worker.js'), worker);
+  fs.writeFileSync(path.join(__dirname, 'worker.js'), redirectWorker);
 }
-console.log(`${outFile} written, length:`, worker.length, '— routes:', Object.keys(pages).concat(Object.keys(scripts)).join(', '),
-  previewOrigin ? `— API: ${previewOrigin}` : '');
+console.log(`${previewOrigin ? 'worker-preview.js' : 'pages-dist/_worker.js (+ redirect worker.js)'} written, length:`, worker.length,
+  '— routes:', Object.keys(pages).concat(Object.keys(scripts)).join(', '), previewOrigin ? `— API: ${previewOrigin}` : '');
