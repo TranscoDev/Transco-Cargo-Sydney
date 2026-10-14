@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, Hand, Lock, MessageSquare, Moon, Plus, Sun, Sunrise, Trash2, UserRound, Users } from "lucide-react";
+import { Check, Hand, Leaf, Lock, MessageSquare, Plus, Trash2, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -216,13 +216,22 @@ export function TaskCard({ task, me, onOpen }: { task: StaffTask; me: TaskMe | n
 // Today panel (dashboard)
 // ---------------------------------------------------------------
 
-/** Sunrise in the morning, sun in the afternoon, moon in the evening. */
-function TimeOfDayIcon() {
-  const h = new Date().getHours();
-  const Icon = h < 12 ? Sunrise : h < 17 ? Sun : Moon;
+/**
+ * The panel's colour says how the day is going: green when there's
+ * nothing to do (relax), calm blue while things are on the list, and the
+ * attention colour only when something is late.
+ */
+type DayTone = "calm" | "busy" | "late";
+const DAY_TONE: Record<DayTone, { panel: string; icon: string }> = {
+  calm: { panel: "from-success-soft/70", icon: "bg-success-soft text-success ring-success/25" },
+  busy: { panel: "from-info-soft/70", icon: "bg-info-soft text-info ring-info/25" },
+  late: { panel: "from-attention-soft/70", icon: "bg-attention-soft text-attention ring-attention/25" },
+};
+
+function TodayIcon({ tone }: { tone: DayTone }) {
   return (
-    <span className="grid h-8 w-8 place-items-center rounded-full bg-warning-soft text-warning ring-1 ring-warning/25" aria-hidden>
-      <Icon className="h-4 w-4" strokeWidth={2.25} />
+    <span className={cn("grid h-8 w-8 place-items-center rounded-full ring-1", DAY_TONE[tone].icon)} aria-hidden>
+      <Leaf className="h-4 w-4" strokeWidth={2.25} />
     </span>
   );
 }
@@ -258,6 +267,7 @@ export function TodayPanel({ className }: { className?: string }) {
   const done = mine.filter((t) => t.status === "done").length;
   const left = mine.length - done;
   const percent = mine.length ? Math.round((done / mine.length) * 100) : 0;
+  const tone: DayTone = mine.some((t) => t.status !== "done" && needsAttention(t)) ? "late" : left > 0 ? "busy" : "calm";
 
   const tick = async (t: StaffTask) => {
     setBusyId(t.id);
@@ -278,13 +288,14 @@ export function TodayPanel({ className }: { className?: string }) {
     <aside
       aria-label="Today's tasks"
       className={cn(
-        "rounded-2xl border bg-gradient-to-b from-warning-soft/70 via-card to-card p-4 shadow-xs",
+        "rounded-2xl border bg-gradient-to-b via-card to-card p-4 shadow-xs transition-colors",
+        DAY_TONE[tone].panel,
         className,
       )}
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
-          <TimeOfDayIcon />
+          <TodayIcon tone={tone} />
           Today
         </h2>
         <span className="text-xs text-muted-foreground">{today}</span>
