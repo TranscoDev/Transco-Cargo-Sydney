@@ -4,7 +4,7 @@ import { ContactsDirectory } from "@/components/transco/contacts-directory";
 import { useConversations } from "@/lib/transco/store";
 
 // Unchanged from the old /console "contacts" tab — same component,
-// same data/handlers, same search/filter/segments/CSV/import
+// same data/handlers, same search/filter/segments/CSV
 // behavior. Only the nav label moved to "Customers" (CRM section) and
 // selecting a conversation now navigates to the /conversations route
 // instead of flipping local tab state.
@@ -24,7 +24,6 @@ function CustomersPage() {
     segments,
     saveSegment,
     deleteSegment,
-    importCustomers,
   } = useConversations();
 
   return (
@@ -41,7 +40,6 @@ function CustomersPage() {
       segments={segments}
       onSaveSegment={saveSegment}
       onDeleteSegment={deleteSegment}
-      onImportCustomers={importCustomers}
     />
   );
 }

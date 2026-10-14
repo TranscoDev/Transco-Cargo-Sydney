@@ -15,7 +15,6 @@ import {
   Search,
   Square,
   SquareUserRound,
-  Upload,
   X,
 } from "lucide-react";
 
@@ -32,7 +31,6 @@ import {
   type CustomerSource,
   type CustomerStatus,
   type EmailCampaignResult,
-  type ImportResult,
   type Segment,
   type SegmentFilter,
 } from "@/lib/transco/types";
@@ -164,7 +162,6 @@ export function ContactsDirectory({
   segments = [],
   onSaveSegment,
   onDeleteSegment,
-  onImportCustomers,
 }: {
   conversations: Conversation[];
   onSelect: (id: string) => void;
@@ -185,7 +182,6 @@ export function ContactsDirectory({
   segments?: Segment[];
   onSaveSegment?: (name: string, filter: SegmentFilter) => Promise<void>;
   onDeleteSegment?: (segmentId: string) => void;
-  onImportCustomers?: (file: File) => Promise<ImportResult>;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ContactSourceFilter>("all");
@@ -196,7 +192,6 @@ export function ContactsDirectory({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
 
   const sorted = useMemo(
     () => [...conversations].sort((a, b) => a.customerName.localeCompare(b.customerName)),
@@ -302,18 +297,6 @@ export function ContactsDirectory({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {onImportCustomers && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setImportOpen(true)}
-                title="For a bulk sheet update — for one customer, use Add customer instead"
-              >
-                <Upload className="mr-1.5 h-4 w-4" />
-                Import Excel
-              </Button>
-            )}
             {onAddContact && (
               <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
                 <Plus className="mr-1.5 h-4 w-4" />
@@ -544,9 +527,6 @@ export function ContactsDirectory({
         />
       )}
 
-      {importOpen && onImportCustomers && (
-        <ImportCustomersModal onClose={() => setImportOpen(false)} onImport={onImportCustomers} />
-      )}
     </div>
   );
 }
@@ -1280,153 +1260,6 @@ function SaveSegmentModal({
             {saving ? "Saving…" : "Save Segment"}
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ImportCustomersModal({
-  onClose,
-  onImport,
-}: {
-  onClose: () => void;
-  onImport: (file: File) => Promise<ImportResult>;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ImportResult | null>(null);
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    setFile(e.target.files?.[0] ?? null);
-  };
-
-  const handleImport = async () => {
-    if (!file) return;
-    setImporting(true);
-    setError(null);
-    try {
-      const res = await onImport(file);
-      setResult(res);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            {result ? "Import Complete" : "Import Excel / CSV"}
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 hover:bg-secondary"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {result ? (
-          <div className="space-y-2 overflow-y-auto px-4 py-4 text-xs">
-            <p>
-              <span className="font-semibold text-foreground">{result.summary.processed}</span> rows
-              processed
-            </p>
-            <p className="text-muted-foreground">
-              {result.summary.matchedExisting} existing customers matched
-            </p>
-            <p className="text-muted-foreground">
-              {result.summary.createdNew} new customers created
-            </p>
-            <p className="text-muted-foreground">
-              {result.summary.shipmentsLinked} shipment records linked
-            </p>
-            <p className="text-muted-foreground">
-              {result.summary.skippedSection} skipped (pre-flagged junk in sheet)
-            </p>
-            {result.summary.needsReview > 0 && (
-              <p className="text-yellow-600 dark:text-yellow-400">
-                {result.summary.needsReview} rows need review
-              </p>
-            )}
-            {result.reviewRows.length > 0 && (
-              <div className="mt-2 rounded-md border border-border/60 px-2.5 py-2">
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Needs review
-                </p>
-                <ul className="space-y-1">
-                  {result.reviewRows.map((r, i) => (
-                    <li key={i} className="text-muted-foreground">
-                      {r.senderName}: "{r.rawPhone}" — {r.reason}
-                    </li>
-                  ))}
-                </ul>
-                {result.reviewRowsTruncated && (
-                  <p className="mt-1 text-muted-foreground">…and more not shown here.</p>
-                )}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-3 px-4 py-4 text-xs">
-              <p className="text-muted-foreground">
-                For a bulk sheet update from management — matches existing customers by phone
-                number, only creates new ones where there's no match. Safe to re-run the same or an
-                updated sheet; nothing gets duplicated.
-              </p>
-              <label className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-input text-muted-foreground hover:bg-secondary/40">
-                <Upload className="h-4 w-4" />
-                {file ? file.name : "Choose a .xlsx, .xls, or .csv file"}
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
-              {error && <p className="text-xs text-attention-foreground">{error}</p>}
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleImport}
-                disabled={!file || importing}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-              >
-                {importing ? "Importing…" : "Import"}
-              </button>
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
