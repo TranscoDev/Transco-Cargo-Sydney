@@ -2428,10 +2428,12 @@ app.put('/api/settings/pause-message', async (req, res) => {
 
 // A customer record as it may leave the server: My Transco sign-in
 // secrets and lockout internals are never sent to any browser, staff
-// included (password hash, session version, failed-attempt counters).
+// included (password hash, session version, failed-attempt counters,
+// and the hashed tokens behind reset / invite / confirm-sign-up links).
 function withoutSignInSecrets(customer) {
   const {
     passwordHash, portalTokenVersion, portalLoginFailures, portalLockedUntil,
+    passwordReset, invite, pendingSignup,
     ...safe
   } = customer;
   return safe;

@@ -20,6 +20,19 @@ const { customers, customerOtps } = require('./db');
 // "Forgot password" links: single use, 30 minutes. Only a hash of the
 // token is stored, so a database leak can't be used to reset passwords.
 const RESET_TTL_MS = 30 * 60 * 1000;
+// "Confirm it's you" emails for a number we already know (sign-up from an
+// imported / WhatsApp customer): single use, 24 hours.
+const SIGNUP_CONFIRM_TTL_MS = 24 * 60 * 60 * 1000;
+// WhatsApp sign-in codes are OFF (Oct 2026): WhatsApp only delivers a
+// business message within 24 hours of the customer's last message, so
+// codes often never arrived. Sign-in is email/mobile + password; a known
+// number proves itself with an email link instead. 'on' brings the code
+// routes back (the test suite uses it to keep covering them).
+const WHATSAPP_LOGIN_CODES = process.env.WHATSAPP_LOGIN_CODES === 'on';
+const CODES_OFF = {
+  error: 'We no longer send sign-in codes on WhatsApp. Please sign in with your email or mobile and password, or tap "Forgot password?" to get an email link. Need help? Call us on 0434 842 023.',
+  reason: 'codes_off'
+};
 const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://my.transcosydney.com.au').replace(/\/$/, '');
 const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 const { normalizePhoneNumber } = require('./normalizePhone');
@@ -193,6 +206,7 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
   // ---------- sign in ----------
 
   router.post('/auth/request-code', wrap(async (req, res) => {
+    if (!WHATSAPP_LOGIN_CODES) return res.status(410).json(CODES_OFF);
     if (ipLimited(clientIp(req))) {
       return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
     }
@@ -237,6 +251,7 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
   }));
 
   router.post('/auth/verify-code', wrap(async (req, res) => {
+    if (!WHATSAPP_LOGIN_CODES) return res.status(410).json(CODES_OFF);
     if (ipLimited(clientIp(req))) {
       return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
     }
@@ -372,14 +387,48 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     if (body.privacyAccepted !== true) {
       return res.status(400).json({ error: 'Please tick that you agree to the Privacy Policy.', field: 'privacyAccepted' });
     }
-    const existing = await customers().findOne({ phoneNumber }, { projection: { passwordHash: 1 } });
+    const existing = await customers().findOne({ phoneNumber }, { projection: { passwordHash: 1, email: 1, name: 1 } });
+    if (existing && existing.passwordHash) {
+      return res.status(409).json({ error: 'This number already has an account. Please sign in instead.', reason: 'has_account' });
+    }
     if (existing) {
-      return res.status(409).json({
-        error: existing.passwordHash
-          ? 'This number already has an account. Please sign in instead.'
-          : "We already have this number on file from WhatsApp or an earlier shipment. To protect your details, please sign in with a WhatsApp code instead — or call us on 0434 842 023 and we'll set up a password for you.",
-        reason: existing.passwordHash ? 'has_account' : 'known_number'
+      // A number we already know (an earlier shipment or WhatsApp). The
+      // account opens only once they prove it's theirs: when the email
+      // they typed is the one we have for this number, we email a confirm
+      // link to it — nothing changes until that link is used.
+      const sameEmail = existing.email && String(existing.email).toLowerCase() === email;
+      if (!sameEmail || await emailTakenByOtherAccount(email, existing._id)) {
+        return res.status(409).json({
+          error: "We already have this number from an earlier shipment or WhatsApp. To protect your details, please use the email you gave us before — we'll send you a link to confirm. Don't have it? Say \"Hi\" to us on WhatsApp for your personal link, or call us on 0434 842 023.",
+          reason: 'known_number'
+        });
+      }
+      const token = crypto.randomBytes(32).toString('base64url');
+      const now = new Date();
+      await customers().updateOne({ _id: existing._id }, {
+        $set: {
+          pendingSignup: {
+            hash: hashToken(token),
+            expiresAt: new Date(now.getTime() + SIGNUP_CONFIRM_TTL_MS),
+            passwordHash: hashPassword(body.password),
+            name,
+            preferredLanguage: LANGUAGES.includes(body.preferredLanguage) ? body.preferredLanguage : 'en',
+            source: ACQUISITION_SOURCES.includes(body.source) ? body.source : 'website',
+            requestedAt: now
+          }
+        }
       });
+      const link = `${PORTAL_SITE_URL}/account.html#/confirm/${token}`;
+      const first = (hasRealName(existing) ? existing.name : name).split(' ')[0].replace(/[<>&"]/g, '');
+      await sendCustomerEmail({
+        to: email,
+        subject: 'Confirm your My Transco account',
+        html: `<p>Hi ${first},</p>` +
+          `<p>Tap the button below to finish opening your My Transco account. You'll be signed in with the password you just chose, and see your earlier shipments with us.</p>` +
+          `<p><a href="${link}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#0c7d6b;color:#fff;font-weight:700;text-decoration:none">Confirm my account</a></p>` +
+          `<p style="color:#6b7480;font-size:13px">The link works for 24 hours and can be used once. If you didn't ask for this, you can ignore this email — nothing will change.<br>Transco Cargo Sydney · 0434 842 023</p>`
+      });
+      return res.status(202).json({ confirmEmailSent: true, email });
     }
     if (email && await emailTakenByOtherAccount(email)) {
       return res.status(409).json({
@@ -467,7 +516,7 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
       customer = await customers().findOne({ phoneNumber });
     }
     if (customer && customer.portalLockedUntil && customer.portalLockedUntil > new Date()) {
-      return res.status(429).json({ error: 'Too many incorrect tries. Please wait 15 minutes, or sign in with a WhatsApp code.' });
+      return res.status(429).json({ error: 'Too many incorrect tries. Please wait 15 minutes, or tap "Forgot password?" to reset it by email.' });
     }
     if (!customer) return res.status(401).json(noAccount);
     if (!customer.passwordHash) return res.status(401).json(noPassword);
@@ -545,6 +594,49 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
         // Sign out every other device.
         $inc: { portalTokenVersion: 1 }
       },
+      { returnDocument: 'after' }
+    );
+    await tools.ensureCustomerCode(updated);
+    res.json({ token: customerAuth.signCustomerToken(updated), profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
+  }));
+
+  // ---------- confirm a known-number sign-up (#/confirm/<token>) ----------
+  //
+  // The emailed link went to the address we already had for this number,
+  // so using it proves the number is theirs: the account opens with the
+  // password they chose, the number counts as verified (their earlier
+  // shipments show), and they're signed in. Single use.
+  router.post('/auth/confirm-signup', wrap(async (req, res) => {
+    if (ipLimited(clientIp(req))) {
+      return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+    }
+    const token = (req.body || {}).token;
+    const hash = typeof token === 'string' && token.length >= 20 ? hashToken(token) : null;
+    const c = hash ? await customers().findOne({ 'pendingSignup.hash': hash }) : null;
+    if (!c || !c.pendingSignup || c.pendingSignup.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'This link has expired or was already used. Please create your account again to get a new one.', reason: 'bad_link' });
+    }
+    if (c.passwordHash) {
+      await customers().updateOne({ _id: c._id }, { $unset: { pendingSignup: '' } });
+      return res.status(409).json({ error: 'This number already has an account. Please sign in instead.', reason: 'has_account' });
+    }
+    const p = c.pendingSignup;
+    const now = new Date();
+    const set = {
+      passwordHash: p.passwordHash,
+      passwordUpdatedAt: now,
+      phoneVerified: true,
+      phoneVerifiedAt: now,
+      lastPortalLoginAt: now,
+      privacyAcceptedAt: now,
+      privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+      preferredLanguage: p.preferredLanguage || 'en'
+    };
+    if (!hasRealName(c) && p.name) set.name = p.name;
+    if (!c.portalJoinedAt) { set.portalJoinedAt = now; set.acquisitionSource = p.source || 'website'; }
+    const updated = await customers().findOneAndUpdate(
+      { _id: c._id },
+      { $set: set, $unset: { pendingSignup: '' }, $addToSet: { sources: 'portal' } },
       { returnDocument: 'after' }
     );
     await tools.ensureCustomerCode(updated);

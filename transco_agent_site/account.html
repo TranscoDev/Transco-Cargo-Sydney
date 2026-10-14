@@ -1,8 +1,10 @@
 <!--
   Transco Cargo Sydney — "My Transco" customer account page.
 
-  A customer's own space around the Transco Agent: sign in with a
-  WhatsApp code (no password), then see bookings, shipments (with their
+  A customer's own space around the Transco Agent: sign in with an
+  email or mobile and password (WhatsApp sign-in codes are switched off
+  since Oct 2026; the code screens below only come back if the backend
+  turns WHATSAPP_LOGIN_CODES on), then see bookings, shipments (with their
   own BL), declaration status and profile — and make a booking. The
   Agent chat itself stays on the homepage (/#agent); this page links
   back to it rather than duplicating it.
@@ -529,17 +531,18 @@
       emailSignInHelpNoPw: "Add a password below to also sign in with this email.",
       signInBtn: "Sign in", signInPwSub: "Sign in to book, track your boxes and see your documents.", password: "Password", passwordMissing: "Please enter your password.",
       showPassword: "Show", hidePassword: "Hide",
-      forgotPassword: "Forgot your password? Sign in with a WhatsApp code below, or call us on 0434 842 023 and we'll reset it.",
+      sayHiWhatsApp: "Say Hi on WhatsApp", confirmSentTitle: "Check your email", confirmSent: "We sent a link to {email}. Tap it to open your account — it works for 24 hours.", confirmingAccount: "Opening your account…", confirmFailedTitle: "That link didn't work", pwForgotCurrentEmail: "Forgot it? Sign out, then tap \"Forgot password?\" to get a reset link by email.",
+      forgotPassword: "Forgot your password? Tap \"Forgot password?\" to get a reset link by email, or call us on 0434 842 023.",
       newHere: "New to My Transco?", createAccount: "Create an account", useWhatsAppCode: "Sign in with a WhatsApp code", usePassword: "Sign in with a password instead",
       registerTitle: "Create your account", registerSub: "It takes less than a minute. You can book straight away.", choosePassword: "Choose a password",
       passwordHelp: "At least 8 characters.", passwordShort: "Please choose a password with at least 8 characters.", creatingAccount: "Creating your account…",
       haveAccount: "Already have an account?", hasAccount: "This number already has an account. Please sign in instead.",
-      knownNumber: "We already have this number from WhatsApp or an earlier shipment. To keep your details safe, please sign in with a WhatsApp code — or call us and we'll set up a password for you.",
+      knownNumber: "We already have this number from an earlier shipment or WhatsApp. To keep your details safe, please use the email you gave us before — we'll email you a link to confirm. Don't have it? Say \"Hi\" to us on WhatsApp for your personal link, or call us.",
       codeSignInTitle: "Sign in with a WhatsApp code",
       waTip: "Not getting the code? Send us any message on WhatsApp first, then ask for a code again — it will arrive straight away.", waTipLink: "Message Transco on WhatsApp",
       verifyTitle: "Verify your number", verifySub: "We'll send a 6-digit code to WhatsApp on {phone}. This connects your earlier bookings and shipments with us.",
-      verifyInviteTitle: "Shipped with us before?", verifyInviteBody: "Verify your number with a WhatsApp code to see your earlier bookings and shipments here.", verifyInviteBtn: "Verify my number",
-      passwordTitle: "Password", passwordHelpAdd: "Add a password so you can sign in without a WhatsApp code.", passwordHelpChange: "Change the password you use to sign in.",
+      verifyInviteTitle: "Shipped with us before?", verifyInviteBody: "Your earlier bookings and shipments will show here once our team confirms your number. Say \"Hi\" to us on WhatsApp or call 0434 842 023.", verifyInviteBtn: "Verify my number",
+      passwordTitle: "Password", passwordHelpAdd: "Add a password so you can sign in with your email or mobile.", passwordHelpChange: "Change the password you use to sign in.",
       currentPassword: "Current password", newPassword: "New password", addPassword: "Add password", changePassword: "Change password", passwordSaved: "Your password has been saved.",
       signInTitle: "Sign in to My Transco", signInSub: "Use your mobile number — we'll send a 6-digit code to your WhatsApp. No password needed.",
       country: "Country", phone: "Mobile number", phonePlaceholder: "04XX XXX XXX", sendCode: "Send code",
@@ -621,7 +624,7 @@
       email: "Email (optional)", street: "Street address", suburb: "Suburb", state: "State", postcode: "Postcode", chooseState: "Choose…",
       language: "Language", contactPref: "How should we contact you?", viaWhatsapp: "WhatsApp", viaPhone: "Phone call", viaEmail: "Email",
       save: "Save changes", saved: "Your details have been saved.", memberSince: "Member since {d}",
-      signOut: "Sign out", signOutAll: "Sign out on all devices", signOutAllTitle: "Sign out everywhere?", signOutAllBody: "You'll need a new WhatsApp code to sign in again on any phone or computer.", signOutAllYes: "Sign out everywhere",
+      signOut: "Sign out", signOutAll: "Sign out on all devices", signOutAllTitle: "Sign out everywhere?", signOutAllBody: "You'll need your password to sign in again on any phone or computer.", signOutAllYes: "Sign out everywhere",
       // labels by key
       st: {
         pending: "Waiting for your drop-off", confirmed: "Confirmed — waiting for your drop-off", warehouse_received: "Boxes received at our warehouse", cancelled: "Cancelled",
@@ -666,17 +669,18 @@
       emailSignInHelpNoPw: "මේ email එකෙනුත් sign in වෙන්න, පහළින් password එකක් එකතු කරන්න.",
       signInBtn: "Sign in", signInPwSub: "Booking කරන්න, ඔබේ box track කරන්න සහ documents බලන්න sign in වෙන්න.", password: "Password", passwordMissing: "කරුණාකරලා ඔයාගේ password එක දාන්න.",
       showPassword: "පෙන්නන්න", hidePassword: "හංගන්න",
-      forgotPassword: "Password එක අමතක වුණාද? පහළින් WhatsApp code එකකින් sign in වෙන්න, නැත්නම් 0434 842 023 අමතන්න — අපි reset කරලා දෙන්නම්.",
+      sayHiWhatsApp: "WhatsApp එකෙන් Hi කියන්න", confirmSentTitle: "ඔබේ email එක බලන්න", confirmSent: "{email} ට link එකක් එව්වා. Account එක open කරන්න ඒක ඔබන්න — පැය 24ක් වැඩ කරනවා.", confirmingAccount: "ඔබේ account එක open කරනවා…", confirmFailedTitle: "ඒ link එක වැඩ කළේ නෑ", pwForgotCurrentEmail: "අමතකද? Sign out වෙලා \"Forgot password?\" ඔබලා email එකට reset link එකක් ගන්න.",
+      forgotPassword: "Password එක අමතක වුණාද? \"Forgot password?\" ඔබලා email එකට reset link එකක් ගන්න, නැත්නම් 0434 842 023 අමතන්න.",
       newHere: "My Transco වලට අලුත්ද?", createAccount: "Account එකක් හදන්න", useWhatsAppCode: "WhatsApp code එකකින් sign in වෙන්න", usePassword: "Password එකකින් sign in වෙන්න",
       registerTitle: "ඔයාගේ account එක හදන්න", registerSub: "විනාඩියකටත් අඩුයි. ඉක්මනින්ම book කරන්න පුළුවන්.", choosePassword: "Password එකක් තෝරන්න",
       passwordHelp: "අඩුම තරමේ අකුරු 8ක්.", passwordShort: "කරුණාකරලා අකුරු 8කට වඩා තියෙන password එකක් තෝරන්න.", creatingAccount: "ඔයාගේ account එක හදනවා…",
       haveAccount: "දැනටමත් account එකක් තියෙනවද?", hasAccount: "මේ number එකට දැනටමත් account එකක් තියෙනවා. කරුණාකරලා sign in වෙන්න.",
-      knownNumber: "මේ number එක WhatsApp එකෙන් හෝ කලින් shipment එකකින් අප ළඟ තියෙනවා. ඔයාගේ විස්තර ආරක්ෂා කරන්න, WhatsApp code එකකින් sign in වෙන්න — නැත්නම් අපිට call කරන්න, අපි password එකක් හදලා දෙන්නම්.",
+      knownNumber: "මේ number එක කලින් shipment එකකින් හෝ WhatsApp එකෙන් අප ළඟ තියෙනවා. ඔයාගේ විස්තර ආරක්ෂා කරන්න, කලින් අපිට දුන්න email එක දාන්න — තහවුරු කරන්න link එකක් email කරනවා. ඒක නැත්නම් WhatsApp එකෙන් \"Hi\" කියලා ඔයාගේ personal link එක ගන්න, නැත්නම් අපිට call කරන්න.",
       codeSignInTitle: "WhatsApp code එකකින් sign in වෙන්න",
       waTip: "Code එක එන්නේ නැද්ද? මුලින්ම අපිට WhatsApp එකෙන් ඕනම message එකක් එවලා, ආයෙත් code එක ඉල්ලන්න — ඉක්මනින්ම එයි.", waTipLink: "Transco ට WhatsApp message එකක් එවන්න",
       verifyTitle: "ඔයාගේ number එක verify කරන්න", verifySub: "{phone} WhatsApp එකට ඉලක්කම් 6ක code එකක් එවනවා. එතකොට ඔයාගේ කලින් bookings සහ shipments මෙතනට සම්බන්ධ වෙනවා.",
-      verifyInviteTitle: "කලින් අප එක්ක යැව්වද?", verifyInviteBody: "කලින් bookings සහ shipments මෙතන බලන්න, WhatsApp code එකකින් ඔයාගේ number එක verify කරන්න.", verifyInviteBtn: "මගේ number එක verify කරන්න",
-      passwordTitle: "Password", passwordHelpAdd: "WhatsApp code එකක් නැතුව sign in වෙන්න password එකක් එකතු කරන්න.", passwordHelpChange: "Sign in වෙන password එක වෙනස් කරන්න.",
+      verifyInviteTitle: "කලින් අප එක්ක යැව්වද?", verifyInviteBody: "අපේ team එක ඔයාගේ number එක තහවුරු කළාම කලින් bookings සහ shipments මෙතන පෙනෙයි. WhatsApp එකෙන් \"Hi\" කියන්න, නැත්නම් 0434 842 023 අමතන්න.", verifyInviteBtn: "මගේ number එක verify කරන්න",
+      passwordTitle: "Password", passwordHelpAdd: "Email එකෙන් හෝ mobile එකෙන් sign in වෙන්න password එකක් එකතු කරන්න.", passwordHelpChange: "Sign in වෙන password එක වෙනස් කරන්න.",
       currentPassword: "දැනට තියෙන password එක", newPassword: "අලුත් password එක", addPassword: "Password එක එකතු කරන්න", changePassword: "Password එක වෙනස් කරන්න", passwordSaved: "ඔයාගේ password එක save කළා.",
       signInTitle: "My Transco වලට sign in වෙන්න", signInSub: "ඔයාගේ mobile number එක දෙන්න — ඔයාගේ WhatsApp එකට ඉලක්කම් 6ක code එකක් එවනවා. Password ඕන නෑ.",
       country: "රට", phone: "Mobile number", phonePlaceholder: "07X XXX XXXX", sendCode: "Code එක යවන්න",
@@ -752,7 +756,7 @@
       email: "Email (අවශ්‍ය නම්)", street: "වීදියේ ලිපිනය", suburb: "Suburb", state: "State", postcode: "Postcode", chooseState: "තෝරන්න…",
       language: "භාෂාව", contactPref: "අපි ඔයාව සම්බන්ධ කරගන්නේ කොහොමද?", viaWhatsapp: "WhatsApp", viaPhone: "Phone call", viaEmail: "Email",
       save: "වෙනස්කම් save කරන්න", saved: "ඔයාගේ විස්තර save කළා.", memberSince: "{d} සිට සාමාජිකයෙක්",
-      signOut: "Sign out", signOutAll: "හැම device එකකින්ම sign out වෙන්න", signOutAllTitle: "හැම තැනින්ම sign out වෙන්නද?", signOutAllBody: "ඕනම phone එකක හෝ computer එකක ආයෙත් sign in වෙන්න අලුත් WhatsApp code එකක් ඕන වෙයි.", signOutAllYes: "හැම තැනින්ම sign out",
+      signOut: "Sign out", signOutAll: "හැම device එකකින්ම sign out වෙන්න", signOutAllTitle: "හැම තැනින්ම sign out වෙන්නද?", signOutAllBody: "ඕනම phone එකක හෝ computer එකක ආයෙත් sign in වෙන්න ඔයාගේ password එක ඕන වෙයි.", signOutAllYes: "හැම තැනින්ම sign out",
       st: {
         pending: "ඔයාගේ drop-off එක එනකම් ඉන්නවා", confirmed: "Confirm කළා — ඔයාගේ drop-off එක එනකම් ඉන්නවා", warehouse_received: "අපේ warehouse එකට පෙට්ටි ලැබුණා", cancelled: "Cancel කළා",
         booked: "Book කළා", cargo_received: "අපේ Sydney warehouse එකට ලැබුණා", at_warehouse: "අපේ Sydney warehouse එකේ තියෙනවා", loaded: "Container එකට load කළා",
@@ -796,17 +800,18 @@
       emailSignInHelpNoPw: "இந்த email மூலமும் sign in செய்ய, கீழே ஒரு password ஐச் சேருங்கள்.",
       signInBtn: "Sign in", signInPwSub: "Booking செய்ய, உங்கள் பெட்டிகளை track செய்ய, documents பார்க்க sign in செய்யுங்கள்.", password: "Password", passwordMissing: "உங்கள் password ஐ உள்ளிடவும்.",
       showPassword: "காட்டு", hidePassword: "மறை",
-      forgotPassword: "Password மறந்துவிட்டதா? கீழே WhatsApp code மூலம் sign in செய்யுங்கள், அல்லது 0434 842 023 ஐ அழையுங்கள் — நாங்கள் reset செய்து தருவோம்.",
+      sayHiWhatsApp: "WhatsApp இல் Hi அனுப்புங்கள்", confirmSentTitle: "உங்கள் email ஐப் பாருங்கள்", confirmSent: "{email} க்கு ஒரு link அனுப்பினோம். Account ஐத் திறக்க அதை அழுத்துங்கள் — 24 மணி நேரம் வேலை செய்யும்.", confirmingAccount: "உங்கள் account ஐத் திறக்கிறோம்…", confirmFailedTitle: "அந்த link வேலை செய்யவில்லை", pwForgotCurrentEmail: "மறந்துவிட்டதா? Sign out செய்து \"Forgot password?\" ஐ அழுத்தி email மூலம் reset link பெறுங்கள்.",
+      forgotPassword: "Password மறந்துவிட்டதா? \"Forgot password?\" ஐ அழுத்தி email மூலம் reset link பெறுங்கள், அல்லது 0434 842 023 ஐ அழையுங்கள்.",
       newHere: "My Transco க்குப் புதியவரா?", createAccount: "Account ஐ உருவாக்கு", useWhatsAppCode: "WhatsApp code மூலம் sign in செய்", usePassword: "Password மூலம் sign in செய்",
       registerTitle: "உங்கள் account ஐ உருவாக்குங்கள்", registerSub: "ஒரு நிமிடத்துக்கும் குறைவு. உடனே book செய்யலாம்.", choosePassword: "ஒரு password ஐத் தேர்ந்தெடுங்கள்",
       passwordHelp: "குறைந்தது 8 எழுத்துகள்.", passwordShort: "குறைந்தது 8 எழுத்துகள் உள்ள password ஐத் தேர்ந்தெடுக்கவும்.", creatingAccount: "உங்கள் account ஐ உருவாக்குகிறோம்…",
       haveAccount: "ஏற்கனவே account உள்ளதா?", hasAccount: "இந்த number க்கு ஏற்கனவே account உள்ளது. Sign in செய்யவும்.",
-      knownNumber: "இந்த number WhatsApp அல்லது முந்தைய shipment மூலம் எங்களிடம் ஏற்கனவே உள்ளது. உங்கள் விவரங்களைப் பாதுகாக்க, WhatsApp code மூலம் sign in செய்யுங்கள் — அல்லது எங்களை அழையுங்கள், password அமைத்துத் தருவோம்.",
+      knownNumber: "இந்த number முந்தைய shipment அல்லது WhatsApp மூலம் எங்களிடம் ஏற்கனவே உள்ளது. உங்கள் விவரங்களைப் பாதுகாக்க, முன்பு எங்களுக்குக் கொடுத்த email ஐ உள்ளிடுங்கள் — உறுதிப்படுத்த ஒரு link ஐ email செய்வோம். அது இல்லையா? WhatsApp இல் \"Hi\" என்று அனுப்பி உங்கள் personal link ஐப் பெறுங்கள், அல்லது எங்களை அழையுங்கள்.",
       codeSignInTitle: "WhatsApp code மூலம் sign in செய்யுங்கள்",
       waTip: "Code வரவில்லையா? முதலில் எங்களுக்கு WhatsApp இல் ஏதாவது ஒரு message அனுப்பி, மீண்டும் code கேளுங்கள் — உடனே வரும்.", waTipLink: "Transco க்கு WhatsApp message அனுப்பு",
       verifyTitle: "உங்கள் number ஐச் சரிபாருங்கள்", verifySub: "{phone} WhatsApp க்கு 6 இலக்க code அனுப்புவோம். இது உங்கள் முந்தைய bookings மற்றும் shipments ஐ இணைக்கும்.",
-      verifyInviteTitle: "முன்பு எங்களுடன் அனுப்பியுள்ளீர்களா?", verifyInviteBody: "முந்தைய bookings மற்றும் shipments ஐ இங்கே பார்க்க, WhatsApp code மூலம் உங்கள் number ஐச் சரிபாருங்கள்.", verifyInviteBtn: "என் number ஐச் சரிபார்",
-      passwordTitle: "Password", passwordHelpAdd: "WhatsApp code இல்லாமல் sign in செய்ய ஒரு password ஐச் சேருங்கள்.", passwordHelpChange: "Sign in செய்யும் password ஐ மாற்றுங்கள்.",
+      verifyInviteTitle: "முன்பு எங்களுடன் அனுப்பியுள்ளீர்களா?", verifyInviteBody: "எங்கள் team உங்கள் number ஐ உறுதிப்படுத்தியதும் முந்தைய bookings மற்றும் shipments இங்கே தெரியும். WhatsApp இல் \"Hi\" என்று அனுப்புங்கள் அல்லது 0434 842 023 ஐ அழையுங்கள்.", verifyInviteBtn: "என் number ஐச் சரிபார்",
+      passwordTitle: "Password", passwordHelpAdd: "Email அல்லது mobile மூலம் sign in செய்ய ஒரு password ஐச் சேருங்கள்.", passwordHelpChange: "Sign in செய்யும் password ஐ மாற்றுங்கள்.",
       currentPassword: "தற்போதைய password", newPassword: "புதிய password", addPassword: "Password ஐச் சேர்", changePassword: "Password ஐ மாற்று", passwordSaved: "உங்கள் password save செய்யப்பட்டது.",
       signInTitle: "My Transco இல் sign in செய்யுங்கள்", signInSub: "உங்கள் mobile number ஐப் பயன்படுத்துங்கள் — உங்கள் WhatsApp க்கு 6 இலக்க code அனுப்புவோம். Password தேவையில்லை.",
       country: "நாடு", phone: "Mobile number", phonePlaceholder: "04XX XXX XXX", sendCode: "Code அனுப்பு",
@@ -882,7 +887,7 @@
       email: "Email (விருப்பம்)", street: "தெரு முகவரி", suburb: "Suburb", state: "State", postcode: "Postcode", chooseState: "தேர்ந்தெடு…",
       language: "மொழி", contactPref: "உங்களை எப்படித் தொடர்பு கொள்ள வேண்டும்?", viaWhatsapp: "WhatsApp", viaPhone: "Phone call", viaEmail: "Email",
       save: "மாற்றங்களைச் save செய்", saved: "உங்கள் விவரங்கள் save செய்யப்பட்டன.", memberSince: "{d} முதல் உறுப்பினர்",
-      signOut: "Sign out", signOutAll: "எல்லா device களிலும் sign out", signOutAllTitle: "எல்லா இடங்களிலும் sign out செய்யவா?", signOutAllBody: "எந்த phone அல்லது computer இலும் மீண்டும் sign in செய்ய புதிய WhatsApp code தேவைப்படும்.", signOutAllYes: "எல்லா இடங்களிலும் sign out",
+      signOut: "Sign out", signOutAll: "எல்லா device களிலும் sign out", signOutAllTitle: "எல்லா இடங்களிலும் sign out செய்யவா?", signOutAllBody: "எந்த phone அல்லது computer இலும் மீண்டும் sign in செய்ய உங்கள் password தேவைப்படும்.", signOutAllYes: "எல்லா இடங்களிலும் sign out",
       st: {
         pending: "உங்கள் drop-off க்காகக் காத்திருக்கிறோம்", confirmed: "உறுதியானது — உங்கள் drop-off க்காகக் காத்திருக்கிறோம்", warehouse_received: "எங்கள் கிடங்கில் பெட்டிகள் பெறப்பட்டன", cancelled: "Cancel செய்யப்பட்டது",
         booked: "Book செய்யப்பட்டது", cargo_received: "எங்கள் Sydney கிடங்கில் பெறப்பட்டது", at_warehouse: "எங்கள் Sydney கிடங்கில் உள்ளது", loaded: "Container இல் ஏற்றப்பட்டது",
@@ -1590,11 +1595,6 @@
       h("h1", { class: "page-title", text: t("forgotTitle") }),
       h("p", { class: "page-sub", text: t("forgotSub") }),
       form,
-      h("div", { style: "border-top:1px solid var(--line);margin-top:16px;padding-top:14px" },
-        h("button", { class: "btn secondary block", type: "button", onclick: function () {
-          if (pre && pre.phone) { authState.countryCode = pre.countryCode; authState.phone = pre.phone; }
-          switchMode("resetcode");
-        }, text: t("resetByCode") })),
       h("p", { class: "muted small", style: "margin:14px 0 0", text: t("forgotNoEmail") }),
       h("button", { type: "button", class: "link-btn", style: "padding:0;margin-top:10px", onclick: function () { switchMode("password"); }, text: "‹ " + t("backToSignIn") })));
     emailInput.focus();
@@ -1630,6 +1630,21 @@
     pw.input.focus();
   }
 
+
+  // #/confirm/<token> — the "confirm it's you" email after signing up with
+  // a number we already know. Using it opens the account and signs in.
+  function viewConfirm(confirmToken) {
+    renderChrome(null);
+    render(h("div", { class: "auth-wrap stack" }, h("div", { class: "card", style: "text-align:center" }, h("p", { class: "muted", text: t("confirmingAccount") }))));
+    api("POST", "/auth/confirm-signup", { token: confirmToken })
+      .then(function (data) { history.replaceState(null, "", "#/welcome"); session("transco_joined", "1"); onSignedIn(data); })
+      .catch(function (err) {
+        render(h("div", { class: "auth-wrap stack" }, h("div", { class: "card" },
+          h("h1", { class: "page-title", text: t("confirmFailedTitle") }),
+          h("p", { class: "page-sub", text: err.message }),
+          h("a", { class: "btn teal block", href: "#/signin", onclick: function () { switchMode(err.reason === "has_account" ? "password" : "register"); }, text: err.reason === "has_account" ? t("signInBtn") : t("createAccount") }))));
+      });
+  }
 
   // #/join/<token> — a personal link from our staff (or, later, the
   // WhatsApp bot). It proves the phone is theirs: an existing account is
@@ -1761,7 +1776,7 @@
         h("div", null,
           h("div", { text: message }),
           knownNumber ? h("div", { style: "margin-top:10px;display:flex;flex-direction:column;gap:8px" },
-            h("button", { class: "btn small", type: "button", onclick: function () { phone.save(); switchMode("code"); }, text: "💬 " + t("useWhatsAppCode") }),
+            h("a", { class: "btn small", href: WA_LINK, target: "_blank", rel: "noopener", text: "💬 " + t("sayHiWhatsApp") }),
             h("a", { class: "btn secondary small", href: "tel:0434842023", text: "📞 0434 842 023" })) : null)));
     }
 
@@ -1782,7 +1797,18 @@
         password: pw.input.value, preferredLanguage: lang, source: session(SOURCE_KEY) || "website",
         privacyAccepted: true
       })
-        .then(onSignedIn)
+        .then(function (data) {
+          // A number we already know: the account opens from the link we
+          // just emailed to the address on file.
+          if (data && data.confirmEmailSent) {
+            submit.textContent = t("createAccount");
+            errBox.replaceChildren(h("div", { class: "notice ok", style: "margin-top:12px" },
+              h("span", { class: "ico", "aria-hidden": "true", text: "✉️" }),
+              h("div", null, h("div", { style: "font-weight:700", text: t("confirmSentTitle") }), h("div", { text: t("confirmSent", { email: data.email || em }) }))));
+            return;
+          }
+          onSignedIn(data);
+        })
         .catch(function (err) {
           submit.disabled = false; submit.textContent = t("createAccount");
           if (err.status === 409 && err.reason === "has_account") { showError(t("hasAccount")); return; }
@@ -2091,8 +2117,7 @@
         alert ? h("div", { style: "margin-top:16px" }, alert) : null,
         profile.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:16px" },
           h("span", { class: "ico", "aria-hidden": "true", text: "📦" }),
-          h("div", null, h("div", { style: "font-weight:700", text: t("verifyInviteTitle") }), h("div", { text: t("verifyInviteBody") }),
-            h("a", { href: "#/verify", style: "font-weight:700", text: t("verifyInviteBtn") + " →" }))) : null,
+          h("div", null, h("div", { style: "font-weight:700", text: t("verifyInviteTitle") }), h("div", { text: t("verifyInviteBody") }))) : null,
         recent.length ? h("div", { class: "recent-grid", style: "margin-top:22px" }, recent) : null,
         !summary.latestBooking && !summary.latestShipment
           ? h("div", { style: "margin-top:22px" }, emptyState("📦", t("noBookingsTitle"), t("noBookingsBody"), h("a", { class: "btn", href: "#/book", text: t("startBooking") })))
@@ -3429,43 +3454,22 @@
       var pwErr = function (msg) { pwStatus.replaceChildren(h("div", { class: "notice err" }, h("span", { class: "ico", "aria-hidden": "true", text: "⚠" }), h("span", { text: msg }))); };
       var pwBtn = h("button", { class: "btn secondary block", type: "submit", text: p.hasPassword ? t("changePassword") : t("addPassword") });
 
-      // Forgot the current one: a WhatsApp code to their own number
-      // stands in for it.
-      var useCode = false;
-      var pwCodeInput = h("input", { class: "input code-input", id: "pw-code", type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6" });
-      pwCodeInput.addEventListener("input", function () { pwCodeInput.value = pwCodeInput.value.replace(/\D/g, "").slice(0, 6); });
-      var curPwField = curPw ? h("div", { class: "field" }, h("div", { class: "spread" }, h("label", { for: "pw-current", text: t("currentPassword") }), curPw.toggle), curPw.input) : null;
-      var codeField = h("div", { class: "field", hidden: true },
-        h("label", { for: "pw-code", text: t("codeLabel") }), pwCodeInput, h("span", { class: "help", text: t("pwCodeHelp") }));
-      var codeToggle = h("button", { type: "button", class: "link-btn", style: "display:block;padding:0;margin:8px 0 16px;text-align:left", text: t("pwForgotCurrent") });
-      codeToggle.addEventListener("click", function () {
-        pwStatus.replaceChildren();
-        if (useCode) {
-          useCode = false; codeField.hidden = true; curPwField.hidden = false;
-          codeToggle.textContent = t("pwForgotCurrent"); curPw.input.focus();
-          return;
-        }
-        codeToggle.disabled = true;
-        api("POST", "/auth/request-code", splitPhone(p.phoneNumber)).then(function () {
-          useCode = true; curPwField.hidden = true; codeField.hidden = false;
-          codeToggle.textContent = t("useCurrentPw"); pwCodeInput.focus();
-        }).catch(function (err) { pwErr(err.message); })
-          .finally(function () { codeToggle.disabled = false; });
-      });
+      // Forgot the current one? The emailed reset link (sign-in page,
+      // "Forgot password?") sets a new one.
+      var curPwField = curPw ? h("div", { class: "field" }, h("div", { class: "spread" }, h("label", { for: "pw-current", text: t("currentPassword") }), curPw.toggle), curPw.input,
+        h("span", { class: "help", text: t("pwForgotCurrentEmail") })) : null;
 
       var pwForm = h("form", { novalidate: true, onsubmit: function (e) {
         e.preventDefault();
         pwStatus.replaceChildren();
-        if (useCode && pwCodeInput.value.length !== 6) { pwErr(t("codeInvalid")); pwCodeInput.focus(); return; }
         if (newPw.input.value.length < 8) { pwErr(t("passwordShort")); return; }
         pwBtn.disabled = true;
         var body = { newPassword: newPw.input.value };
-        if (useCode) body.code = pwCodeInput.value; else if (curPw) body.currentPassword = curPw.input.value;
+        if (curPw) body.currentPassword = curPw.input.value;
         api("PUT", "/me/password", body)
           .then(function () {
             profile.hasPassword = true;
             newPw.input.value = ""; if (curPw) curPw.input.value = "";
-            if (useCode) { useCode = false; pwCodeInput.value = ""; codeField.hidden = true; curPwField.hidden = false; codeToggle.textContent = t("pwForgotCurrent"); }
             pwStatus.replaceChildren(h("div", { class: "notice ok" }, h("span", { class: "ico", "aria-hidden": "true", text: "✓" }), h("span", { text: t("passwordSaved") })));
           })
           .catch(function (err) { pwStatus.replaceChildren(h("div", { class: "notice err" }, h("span", { class: "ico", "aria-hidden": "true", text: "⚠" }), h("span", { text: err.message }))); })
@@ -3473,7 +3477,7 @@
       } },
         h("h3", { style: "font-size:16px;margin:0 0 6px", text: t("passwordTitle") }),
         h("p", { class: "muted small", style: "margin:0 0 12px", text: p.hasPassword ? t("passwordHelpChange") : t("passwordHelpAdd") }),
-        curPwField, curPw ? codeField : null, curPw ? codeToggle : null,
+        curPwField,
         h("div", { class: "field" }, h("div", { class: "spread" }, h("label", { for: "pw-new", text: t("newPassword") }), newPw.toggle), newPw.input, h("span", { class: "help", text: t("passwordHelp") })),
         h("div", { style: "margin-top:14px" }, pwStatus, pwBtn));
 
@@ -3517,7 +3521,7 @@
             h("div", { class: "muted small", text: [p.customerCode, p.memberSince ? t("memberSince", { d: fmtDate(p.memberSince, { month: "short", year: "numeric" }) }) : null].filter(Boolean).join(" · ") }))),
         p.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:12px" },
           h("span", { class: "ico", "aria-hidden": "true", text: "📦" }),
-          h("div", null, h("div", { text: t("verifyInviteBody") }), h("a", { href: "#/verify", style: "font-weight:700", text: t("verifyInviteBtn") + " →" }))) : null,
+          h("div", null, h("div", { text: t("verifyInviteBody") }))) : null,
         h("div", { class: "card menu", style: "margin-top:12px" },
           fold("details", "👤", t("menuDetails"), p.idNumber ? t("menuDetailsHint") : t("menuIdMissing"), !p.idNumber, function () { return form; }),
           fold("senders", "📤", t("sendersTitle"), nSenders === null ? null : nSenders ? t("menuSendersN", { n: nSenders }) : t("menuSendersNone"), false,
@@ -3691,6 +3695,7 @@
 
     if (section === "reset" && parts[1]) return viewReset(decodeURIComponent(parts[1]));
     if (section === "join" && parts[1]) return viewJoin(decodeURIComponent(parts[1]));
+    if (section === "confirm" && parts[1]) return viewConfirm(decodeURIComponent(parts[1]));
 
     // Just signed in for the first time — finish the one-question
     // welcome (their name) before anything else.
@@ -3720,7 +3725,6 @@
       case "shipments": return parts[1] ? viewShipment(decodeURIComponent(parts[1])) : viewShipments();
       case "documents": return viewDocuments();
       case "profile": return viewProfile(parts[1]);
-      case "verify": return viewVerify();
       case "welcome": return viewWelcome();
       default: return viewHome();
     }

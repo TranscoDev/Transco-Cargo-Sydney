@@ -163,6 +163,9 @@ before(async () => {
       WHATSAPP_TOKEN: 'test-token',
       PHONE_NUMBER_ID: 'test-phone-id',
       WHATSAPP_OTP_TEMPLATE: '',
+      // WhatsApp sign-in codes are off in production; on here so the code
+      // flows keep their coverage.
+      WHATSAPP_LOGIN_CODES: 'on',
       PEBL_TRACKER_BASE_URL: `http://localhost:${STUB_PEBL_PORT}`,
       STAFF_EMAIL: TEST_STAFF_EMAIL,
       STAFF_PASSWORD: TEST_STAFF_PASSWORD,
@@ -1952,6 +1955,47 @@ test('sign-up needs an email; forgot password link resets it (single use) and si
   assert.equal(again.body.reason, 'bad_link', 'single use');
   assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'kamal@example.com', password: 'brand-new-pass-1' } })).status, 200);
   assert.equal((await api('GET', '/api/portal/me', { token: reg.body.token })).status, 401, 'old sessions signed out');
+});
+
+test('a number we already know signs up by confirming the email we have on file (no WhatsApp code)', async () => {
+  // An imported customer: phone + email from an earlier shipment, no account.
+  const imported = await db.collection('customers').insertOne({
+    phoneNumber: '61411222333', name: 'Imported Sender', email: 'imported.sender@example.com',
+    mode: 'CHATBOT', status: 'HISTORICAL', sources: ['historical'], importedAt: new Date()
+  });
+  const base = { privacyAccepted: true, countryCode: '61', phone: '0411 222 333', name: 'Imported Sender', password: 'imported-pass-1' };
+
+  const wrongEmail = await api('POST', '/api/portal/auth/register', { body: { ...base, email: 'someone.else@example.com' } });
+  assert.equal(wrongEmail.status, 409);
+  assert.equal(wrongEmail.body.reason, 'known_number');
+  assert.ok(!/WhatsApp code/i.test(wrongEmail.body.error), 'no longer points to WhatsApp codes');
+
+  const ok = await api('POST', '/api/portal/auth/register', { body: { ...base, email: 'Imported.Sender@example.com' } });
+  assert.equal(ok.status, 202, JSON.stringify(ok.body));
+  assert.equal(ok.body.confirmEmailSent, true);
+  assert.ok(!ok.body.token, 'not signed in until the email link is used');
+  let c = await db.collection('customers').findOne({ _id: imported.insertedId });
+  assert.ok(!c.passwordHash, 'nothing changes before the link is used');
+  assert.equal(c.pendingSignup.hash.length, 64, 'only a hash of the link token is stored');
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { countryCode: '61', phone: '0411222333', password: 'imported-pass-1' } })).body.reason, 'no_password');
+
+  // Staff never see the pending sign-up (it holds a password hash).
+  const profile = await api('GET', `/api/customers/${imported.insertedId}/profile`, { token: staffToken });
+  assert.equal(profile.status, 200);
+  assert.ok(!JSON.stringify(profile.body).includes('pendingSignup'));
+
+  // Use a known token (the real one is only in the email).
+  const token = 'test-confirm-token-abcdefghijklmnopqrstuvwxyz';
+  await db.collection('customers').updateOne({ _id: imported.insertedId }, { $set: { 'pendingSignup.hash': require('crypto').createHash('sha256').update(token).digest('hex') } });
+  const confirmed = await api('POST', '/api/portal/auth/confirm-signup', { body: { token } });
+  assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+  assert.ok(confirmed.body.token, 'signed in');
+  c = await db.collection('customers').findOne({ _id: imported.insertedId });
+  assert.equal(c.phoneVerified, true, 'the email on file proves the number');
+  assert.ok(c.passwordHash && !c.pendingSignup);
+  assert.ok(c.sources.includes('historical') && c.sources.includes('portal'), 'same record — no duplicate');
+  assert.equal((await api('POST', '/api/portal/auth/confirm-signup', { body: { token } })).body.reason, 'bad_link', 'single use');
+  assert.equal((await api('POST', '/api/portal/auth/login', { body: { email: 'imported.sender@example.com', password: 'imported-pass-1' } })).status, 200);
 });
 
 test('forgot password with a WhatsApp code; change password with a code instead of the current one', async () => {
