@@ -14,6 +14,8 @@ const { connectToDatabase, customers, messages, processedWhatsAppMessages, users
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
+const { parseShipmentSheet, runShipmentImport } = require('./shipmentImport');
+const { getDb } = require('./db');
 const { createCustomerAuth } = require('./customerAuth');
 const { createCustomerTools, hasRealName } = require('./customerTools');
 
@@ -5081,6 +5083,14 @@ app.post('/api/imports/customers', importUpload.single('file'), async (req, res)
       shipmentsColl: shipmentHistory()
     });
 
+    // Nothing recognised — most often a Shipment#NN dashboard sheet
+    // uploaded here instead of on the Shipments page.
+    if (summary.processed === 0) {
+      return res.status(400).json({
+        error: 'No customers found in this file. This button reads the customer list (columns "SENDERS NAME" and "SENDERS NUMBER"). For a "Shipment#NN" sheet from the TRANSCO DASHBOARD, use Shipments → Import shipment sheet.'
+      });
+    }
+
     broadcast('customers.imported', { summary });
 
     res.status(200).json({
@@ -5099,6 +5109,44 @@ app.post('/api/imports/customers', importUpload.single('file'), async (req, res)
     res.status(500).json({
       error: 'Failed to import file'
     });
+  }
+});
+
+// ============================================================
+// SHIPMENT SHEET IMPORT ("TRANSCO DASHBOARD 2026 - Shipment#NN")
+// ============================================================
+//
+// Staff upload the shipment's ledger tab (Excel or CSV). commit=false
+// (the default) only previews; commit=true writes the new HBLs. HBLs
+// already in the system are skipped, so it's safe to upload again.
+// See shipmentImport.js.
+app.post('/api/imports/shipment-sheet', importUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Choose the Shipment#NN Excel or CSV file first.' });
+    let parsed;
+    try {
+      parsed = parseShipmentSheet(req.file.buffer, req.file.originalname);
+    } catch (parseErr) {
+      return res.status(400).json({ error: parseErr.message });
+    }
+    if (!parsed.records.length) return res.status(400).json({ error: 'No customers found under the header row of this sheet.' });
+
+    const commit = String(req.body.commit) === 'true';
+    const result = await runShipmentImport(parsed, {
+      db: getDb(),
+      batchNumber: req.body.batchNumber || parsed.batchNumber,
+      label: String(req.body.label || '').trim() || null,
+      commit,
+      importedBy: req.user?.email || null
+    });
+    if (result.committed) {
+      broadcast('shipments.imported', { batchNumber: result.summary.batchNumber, created: result.created });
+      console.log(`Shipment sheet import: Shipment ${result.summary.batchNumber}, ${result.created} HBLs by ${req.user?.email || 'unknown'}`);
+    }
+    res.status(200).json({ ...result, detectedBatchNumber: parsed.batchNumber });
+  } catch (err) {
+    console.error('Error importing shipment sheet:', err.message);
+    res.status(400).json({ error: err.message || 'Failed to import shipment sheet' });
   }
 });
 

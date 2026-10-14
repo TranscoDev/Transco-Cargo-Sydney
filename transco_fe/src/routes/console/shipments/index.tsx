@@ -28,6 +28,7 @@ import { shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
 import { createConsolidation, fetchConsolidations, fetchShipments } from "@/lib/transco/api";
 import { forgetShipmentList } from "@/components/transco/shipment-picker";
+import { ShipmentSheetImportDialog } from "@/components/transco/shipment-sheet-import";
 import { notify } from "@/lib/transco/notify";
 import {
   SHIPMENT_STATUSES,
@@ -123,12 +124,21 @@ function ShipmentsPage() {
             Customer cargo from warehouse intake to delivery. Open a shipment (e.g. Shipment 57) to see every sender and receiver in it, or a BL to update its status.
           </p>
         </div>
-        <NewShipmentDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          nextNumber={(consolidations.reduce((m, c) => Math.max(m, c.batchNumber), 0) || 0) + 1}
-          onCreated={() => loadBatches()}
-        />
+        <div className="flex flex-wrap gap-2">
+          <ShipmentSheetImportDialog
+            onImported={() => {
+              forgetShipmentList();
+              loadBatches();
+              loadShipments();
+            }}
+          />
+          <NewShipmentDialog
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            nextNumber={(consolidations.reduce((m, c) => Math.max(m, c.batchNumber), 0) || 0) + 1}
+            onCreated={() => loadBatches()}
+          />
+        </div>
       </div>
 
       <div className="mb-5 inline-flex items-center gap-1 rounded-lg bg-secondary p-1">

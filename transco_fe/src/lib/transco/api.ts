@@ -1189,6 +1189,66 @@ export async function importCustomersFile(file: File): Promise<ImportResult> {
   return data as ImportResult;
 }
 
+export interface ShipmentSheetRow {
+  sheetRow: number;
+  hbl: string | null;
+  date: string | null;
+  sender: string;
+  senderPhone: string;
+  customer: "new" | "existing";
+  existingCustomerName: string | null;
+  receiver: string;
+  boxes: string;
+  totalBoxes: number;
+  income: number | null;
+  paid: number;
+  state: "new" | "already imported" | "problem";
+  problems: string[];
+}
+
+export interface ShipmentSheetResult {
+  committed: boolean;
+  created?: number;
+  fileName: string;
+  detectedBatchNumber: number | null;
+  summary: {
+    batchNumber: number;
+    shipmentGroup: "new" | "existing";
+    rowsInSheet: number;
+    newHbls: number;
+    alreadyImported: number;
+    problems: number;
+    newCustomers: number;
+    existingCustomers: number;
+    income: number;
+    paid: number;
+  };
+  rows: ShipmentSheetRow[];
+}
+
+/**
+ * Upload a "TRANSCO DASHBOARD - Shipment#NN" sheet. commit=false only
+ * previews; commit=true imports the new HBLs (existing ones are skipped).
+ */
+export async function importShipmentSheet(
+  file: File,
+  opts: { batchNumber?: number | null | undefined; label?: string | undefined; commit: boolean },
+): Promise<ShipmentSheetResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (opts.batchNumber) formData.append("batchNumber", String(opts.batchNumber));
+  if (opts.label) formData.append("label", opts.label);
+  formData.append("commit", String(opts.commit));
+  const res = await fetch(`${API_BASE_URL}/api/imports/shipment-sheet`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? `Could not read the sheet (${res.status})`);
+  return data as ShipmentSheetResult;
+}
+
 export async function deleteSegment(segmentId: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/segments/${segmentId}`, {
     method: "DELETE",
