@@ -878,7 +878,14 @@ async function createCalendarEvent(booking) {
 
       {
         summary: `Drop-off: ${booking.customerName || booking.phoneNumber}`,
-        description: `Phone: ${booking.phoneNumber}\nBooked via WhatsApp chatbot.`,
+        // Google always shows the service account under "Created by" (it
+        // can't be renamed), so the notes say who it's from and where it came in.
+        description: [
+          'Transco Cargo Sydney Warehouse',
+          booking.bookingCode ? `Booking: ${booking.bookingCode}` : null,
+          `Phone: ${booking.phoneNumber}`,
+          ({ portal: 'Booked via website (My Transco).', website: 'Booked via website chat.', walk_in: 'Walk-in at the warehouse.' })[booking.channel] || 'Booked via WhatsApp.'
+        ].filter(Boolean).join('\n'),
 
         start: {
           dateTime: formatCalendarDateTime(startDate),
