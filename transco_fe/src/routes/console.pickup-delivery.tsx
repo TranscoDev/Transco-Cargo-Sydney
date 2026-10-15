@@ -586,7 +586,22 @@ function JobRow({
         )}
       </div>
 
-      {job.status === "pending" && (
+      {/* Pickups are arranged by phone from Sydney; door deliveries happen
+          overseas weeks later, so they only get "Delivered". */}
+      {job.kind === "pickup" && place.phone && job.status === "pending" && (
+        <a
+          href={`tel:${place.phone}`}
+          className="shrink-0 rounded-md border px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+        >
+          Call
+        </a>
+      )}
+      {job.kind === "pickup" && job.status === "pending" && !job.dateSet && (
+        <Button type="button" size="sm" className="shrink-0" onClick={onOpen}>
+          Set day & time
+        </Button>
+      )}
+      {job.status === "pending" && (job.dateSet || job.kind === "delivery") && (
         <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={markDone}>
           <Check className="mr-1.5 h-4 w-4" aria-hidden />
           {job.kind === "pickup" ? "Picked up" : "Delivered"}

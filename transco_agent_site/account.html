@@ -629,7 +629,7 @@
       signOut: "Sign out", signOutAll: "Sign out on all devices", signOutAllTitle: "Sign out everywhere?", signOutAllBody: "You'll need your password to sign in again on any phone or computer.", signOutAllYes: "Sign out everywhere",
       // labels by key
       st: {
-        pending: "Waiting for your drop-off", confirmed: "Confirmed — waiting for your drop-off", warehouse_received: "Boxes received at our warehouse", cancelled: "Cancelled",
+        pending: "Waiting for your drop-off", pickup_waiting: "Pickup requested — we'll call you to set a day", pickup_booked: "Pickup day booked", picked_up: "Picked up — on the way to our warehouse", confirmed: "Confirmed — waiting for your drop-off", warehouse_received: "Boxes received at our warehouse", cancelled: "Cancelled",
         booked: "Booked", cargo_received: "Received at our Sydney warehouse", at_warehouse: "At our Sydney warehouse", loaded: "Loaded into the container",
         in_transit: "On the way", arrived: "Arrived at the destination port", customs: "Clearing customs", ready_for_collection: "Ready for collection", delivered: "Delivered", unknown: "Status not updated yet"
       },
@@ -760,7 +760,7 @@
       save: "වෙනස්කම් save කරන්න", saved: "ඔයාගේ විස්තර save කළා.", memberSince: "{d} සිට සාමාජිකයෙක්",
       signOut: "Sign out", signOutAll: "හැම device එකකින්ම sign out වෙන්න", signOutAllTitle: "හැම තැනින්ම sign out වෙන්නද?", signOutAllBody: "ඕනම phone එකක හෝ computer එකක ආයෙත් sign in වෙන්න ඔයාගේ password එක ඕන වෙයි.", signOutAllYes: "හැම තැනින්ම sign out",
       st: {
-        pending: "ඔයාගේ drop-off එක එනකම් ඉන්නවා", confirmed: "Confirm කළා — ඔයාගේ drop-off එක එනකම් ඉන්නවා", warehouse_received: "අපේ warehouse එකට පෙට්ටි ලැබුණා", cancelled: "Cancel කළා",
+        pending: "ඔයාගේ drop-off එක එනකම් ඉන්නවා", pickup_waiting: "Pickup එක ඉල්ලුවා — දවසක් දාන්න අපි ඔයාට කතා කරනවා", pickup_booked: "Pickup දවස දාලා තියෙනවා", picked_up: "Pickup කළා — අපේ warehouse එකට එනවා", confirmed: "Confirm කළා — ඔයාගේ drop-off එක එනකම් ඉන්නවා", warehouse_received: "අපේ warehouse එකට පෙට්ටි ලැබුණා", cancelled: "Cancel කළා",
         booked: "Book කළා", cargo_received: "අපේ Sydney warehouse එකට ලැබුණා", at_warehouse: "අපේ Sydney warehouse එකේ තියෙනවා", loaded: "Container එකට load කළා",
         in_transit: "ගමන් කරමින්", arrived: "යවන port එකට ආවා", customs: "Customs clear කරමින්", ready_for_collection: "ගන්න ලෑස්තියි", delivered: "Deliver කළා", unknown: "තත්ත්වය තවම update කරලා නෑ"
       },
@@ -891,7 +891,7 @@
       save: "மாற்றங்களைச் save செய்", saved: "உங்கள் விவரங்கள் save செய்யப்பட்டன.", memberSince: "{d} முதல் உறுப்பினர்",
       signOut: "Sign out", signOutAll: "எல்லா device களிலும் sign out", signOutAllTitle: "எல்லா இடங்களிலும் sign out செய்யவா?", signOutAllBody: "எந்த phone அல்லது computer இலும் மீண்டும் sign in செய்ய உங்கள் password தேவைப்படும்.", signOutAllYes: "எல்லா இடங்களிலும் sign out",
       st: {
-        pending: "உங்கள் drop-off க்காகக் காத்திருக்கிறோம்", confirmed: "உறுதியானது — உங்கள் drop-off க்காகக் காத்திருக்கிறோம்", warehouse_received: "எங்கள் கிடங்கில் பெட்டிகள் பெறப்பட்டன", cancelled: "Cancel செய்யப்பட்டது",
+        pending: "உங்கள் drop-off க்காகக் காத்திருக்கிறோம்", pickup_waiting: "Pickup கோரப்பட்டது — நாளை முடிவு செய்ய உங்களை அழைப்போம்", pickup_booked: "Pickup நாள் முடிவானது", picked_up: "Pickup செய்யப்பட்டது — எங்கள் கிடங்குக்கு வருகிறது", confirmed: "உறுதியானது — உங்கள் drop-off க்காகக் காத்திருக்கிறோம்", warehouse_received: "எங்கள் கிடங்கில் பெட்டிகள் பெறப்பட்டன", cancelled: "Cancel செய்யப்பட்டது",
         booked: "Book செய்யப்பட்டது", cargo_received: "எங்கள் Sydney கிடங்கில் பெறப்பட்டது", at_warehouse: "எங்கள் Sydney கிடங்கில் உள்ளது", loaded: "Container இல் ஏற்றப்பட்டது",
         in_transit: "வழியில் உள்ளது", arrived: "சேரும் துறைமுகத்தை அடைந்தது", customs: "Customs clearance நடக்கிறது", ready_for_collection: "பெற்றுக்கொள்ளத் தயார்", delivered: "Deliver செய்யப்பட்டது", unknown: "நிலை இன்னும் update செய்யப்படவில்லை"
       },
@@ -2026,6 +2026,7 @@
       h("div", { class: "title", text: b.code || t("bookingWord") }),
       h("div", { class: "lines" }, bookingLines(b).map(function (l) { return h("div", { text: l }); })),
       b.blNumber ? h("div", { class: "muted small", style: "margin-top:4px", text: t("blRef") + ": " + b.blNumber }) : null,
+      b.blNumber ? null : h("div", { class: "small", style: "margin-top:6px;font-weight:600", text: handoverLine(b) }),
       h("div", { class: "foot" }, statusPill(b.status), h("span", { class: "go", "aria-hidden": "true", text: t("viewBooking") + " →" })));
   }
   function serviceKey(label) {
@@ -2177,7 +2178,7 @@
       row(t("items"), b.items);
       row(t("destination"), [b.destination, b.country].filter(Boolean).join(", "));
       row(t("delivery"), b.delivery);
-      row(t("dropOff"), handoverText(b.handover, b.dropOff && b.dropOff.date, b.dropOff && b.dropOff.time, b.pickupNote));
+      row(t("dropOff"), handoverText(b.handover, b.dropOff && b.dropOff.date, b.dropOff && b.dropOff.time, b.pickupNote, b.pickup));
       row(t("notes"), b.notes);
 
       // Edit (and cancel, inside Edit) while nothing has happened yet.
@@ -2849,7 +2850,14 @@
       ? { handover: "pickup", pickupNote: (draft.pickupNote || "").trim() }
       : { handover: "dropoff", dropOff: { date: draft.date, time: draft.time } };
   }
-  function handoverText(handover, date, time, note) {
+  // One line on the booking card: drop-off or home pickup, and when.
+  function handoverLine(b) {
+    var when = function (date, time) { return [fmtDate(date, { weekday: "short", day: "numeric", month: "short" }), fmtTime(time)].filter(Boolean).join(" · "); };
+    if (b.handover === "pickup") return "🚚 " + t("handPick") + (b.pickup ? " · " + when(b.pickup.date, b.pickup.time) : "");
+    return "📍 " + t("dropOff") + (b.dropOff && b.dropOff.date ? " · " + when(b.dropOff.date, b.dropOff.time) : "");
+  }
+  function handoverText(handover, date, time, note, pickup) {
+    if (handover === "pickup" && pickup) return t("handPick") + " · " + [fmtDate(pickup.date, { weekday: "long", day: "numeric", month: "long" }), fmtTime(pickup.time)].filter(Boolean).join(" · ");
     if (handover === "pickup") return t("handPick") + (note ? " — " + note : "") + " (" + t("pickupCall") + ")";
     return date ? [fmtDate(date, { weekday: "long", day: "numeric", month: "long" }), fmtTime(time)].filter(Boolean).join(" · ") : null;
   }

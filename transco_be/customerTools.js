@@ -552,6 +552,13 @@ function createCustomerTools({
     if (booking.warehouseStatus === 'received' || booking.status === 'completed') {
       return { key: 'warehouse_received', label: 'Boxes received at our warehouse', tone: 'active' };
     }
+    // Home pickup: follows what staff set on the Pickup & Delivery page.
+    if (booking.handover === 'pickup') {
+      const job = booking.pickupJob || {};
+      if (job.status === 'completed') return { key: 'picked_up', label: 'Picked up — on the way to our warehouse', tone: 'active' };
+      if (job.date && job.status !== 'cancelled') return { key: 'pickup_booked', label: 'Pickup day booked', tone: 'pending' };
+      return { key: 'pickup_waiting', label: "Pickup requested — we'll call you to set a day", tone: 'pending' };
+    }
     if (booking.status === 'confirmed') return { key: 'confirmed', label: 'Confirmed — waiting for your drop-off', tone: 'pending' };
     return { key: 'pending', label: 'Waiting for your drop-off', tone: 'pending' };
   }
@@ -574,6 +581,10 @@ function createCustomerTools({
       // 'pickup' = our team collects from the sender (they call to arrange).
       handover: booking.handover === 'pickup' ? 'pickup' : 'dropoff',
       pickupNote: booking.pickupNote || null,
+      // The day/time staff agreed with the customer (staff note stays internal).
+      pickup: booking.handover === 'pickup' && booking.pickupJob && booking.pickupJob.date && booking.pickupJob.status !== 'cancelled'
+        ? { date: booking.pickupJob.date, time: booking.pickupJob.time || null, done: booking.pickupJob.status === 'completed' }
+        : null,
       status: bookingStatus(booking, shipment),
       declaration: {
         status: booking.declarationStatus === 'received' ? 'received' : booking.declarationSubmittedAt ? 'submitted' : 'needed',

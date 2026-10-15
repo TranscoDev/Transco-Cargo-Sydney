@@ -1867,7 +1867,7 @@ test('staff page access: Warehouse sees bookings/walk-ins/shipments only; admin 
     assert.equal(made.status, 201, JSON.stringify(made.body));
     const login = await api('POST', '/api/auth/login', { body: { email: 'wh.test@transco.lk', password: 'warehouse-pass-1' } });
     // Plus the view-only customer profile added on 2026-10-13 (cd3e666).
-    assert.deepEqual(login.body.user.pages, ['bookings', 'walk-ins', 'shipments', 'customer-profile']);
+    assert.deepEqual(login.body.user.pages, ['bookings', 'walk-ins', 'shipments', 'pickup-delivery', 'customer-profile']);
     const wh = login.body.token;
     assert.equal((await api('GET', '/api/bookings', { token: wh })).status, 200);
     assert.equal((await api('GET', '/api/customers', { token: wh })).status, 403);

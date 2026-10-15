@@ -4,7 +4,8 @@
 //
 // Roles:
 //   admin     — everything (also: an email in ADMIN_EMAILS)
-//   warehouse — Bookings (everything in a booking), Walk-ins, Shipments
+//   warehouse — Bookings (everything in a booking), Walk-ins, Shipments,
+//               Pickup & Delivery
 //   custom    — the pages ticked for them
 //   (none)    — staff accounts made before roles existed: everything,
 //               so nobody is locked out until an admin sets a role.
@@ -34,7 +35,7 @@ const PAGES = {
 };
 const PAGE_KEYS = Object.keys(PAGES);
 const ROLES = ['admin', 'warehouse', 'custom'];
-const WAREHOUSE_PAGES = ['bookings', 'walk-ins', 'shipments', 'customer-profile'];
+const WAREHOUSE_PAGES = ['bookings', 'walk-ins', 'shipments', 'pickup-delivery', 'customer-profile'];
 const PROFILE_ONLY = /^\/customers\/[^/]+\/profile$/;
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'admin@transco.lk')
