@@ -410,6 +410,8 @@
 
   .footer-mini { text-align: center; color: var(--muted); font-size: 13px; margin-top: 30px; }
   .footer-mini a { color: var(--navy); font-weight: 600; }
+  .footer-mini a.wa { display: inline-flex; align-items: center; gap: 5px; color: #128C7E; }
+  .footer-mini a.wa::before { content: ""; width: 16px; height: 16px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2325D366'%3E%3Cpath d='M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.3-.5 0-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 2 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.7-.1 1.3z'/%3E%3C/svg%3E") center/contain no-repeat; }
 </style>
 <script src="/phone-format.js"></script>
 <script src="/chat-links.js"></script>
@@ -637,7 +639,7 @@
       services: { sea: "Sea Freight", air: "Air Freight" },
       deliveries: { door: "Door delivery", collect: "Collect from warehouse" },
       itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "Odd-size item" },
-      footer: "Questions? Call <a href=\"tel:0434842023\">0434 842 023</a> or <a href=\"/#agent\">ask Transco Agent</a>."
+      footer: "Questions? <a class=\"wa\" href=\"https://wa.me/61434842023\" target=\"_blank\" rel=\"noopener\">WhatsApp us</a> or <a href=\"/#agent\">ask Transco Agent</a>."
     },
 
     si: {
@@ -768,7 +770,7 @@
       services: { sea: "Sea Freight", air: "Air Freight" },
       deliveries: { door: "Door delivery", collect: "Warehouse එකෙන් ගන්නවා" },
       itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "අසාමාන්‍ය ප්‍රමාණයේ භාණ්ඩයක්" },
-      footer: "ප්‍රශ්න තියෙනවද? <a href=\"tel:0434842023\">0434 842 023</a> අමතන්න, නැත්නම් <a href=\"/#agent\">Transco Agent ගෙන් අහන්න</a>."
+      footer: "ප්‍රශ්න තියෙනවද? <a class=\"wa\" href=\"https://wa.me/61434842023\" target=\"_blank\" rel=\"noopener\">WhatsApp</a> කරන්න, නැත්නම් <a href=\"/#agent\">Transco Agent ගෙන් අහන්න</a>."
     },
 
     ta: {
@@ -899,7 +901,7 @@
       services: { sea: "Sea Freight", air: "Air Freight" },
       deliveries: { door: "Door delivery", collect: "கிடங்கிலிருந்து பெறுதல்" },
       itemTypes: { tea_chest: "Tea Chest", gift_box: "Gift Box", wine_box: "Wine Box", quarter_cbm: "Quarter CBM box", tv: "TV", general: "General cargo box", other: "வழக்கத்துக்கு மாறான அளவுப் பொருள்" },
-      footer: "கேள்விகளா? <a href=\"tel:0434842023\">0434 842 023</a> ஐ அழையுங்கள் அல்லது <a href=\"/#agent\">Transco Agent இடம் கேளுங்கள்</a>."
+      footer: "கேள்விகளா? <a class=\"wa\" href=\"https://wa.me/61434842023\" target=\"_blank\" rel=\"noopener\">WhatsApp</a> செய்யுங்கள் அல்லது <a href=\"/#agent\">Transco Agent இடம் கேளுங்கள்</a>."
     }
   };
 
@@ -2163,8 +2165,7 @@
     if (d.receiver) rows.push(h("dt", { text: t("receiverLbl") }), h("dd", { text: [d.receiver.fullName, d.receiver.town].filter(Boolean).join(", ") }));
     return h("div", { class: "card" }, head,
       d.status === "submitted" ? h("p", { class: "muted small", style: "margin:10px 0 0", text: t("declSubmittedBody") }) : null,
-      rows.length ? h("dl", { class: "kv", style: "margin-top:12px" }, rows) : null,
-      d.status === "submitted" ? h("p", { class: "muted small", style: "margin:12px 0 0", text: t("declChange") }) : null);
+      rows.length ? h("dl", { class: "kv", style: "margin-top:12px" }, rows) : null);
   }
 
   function viewBooking(id) {
