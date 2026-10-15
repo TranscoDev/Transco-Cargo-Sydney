@@ -111,7 +111,11 @@ async function priceQuoteReply({ quote, account, tools, lang }) {
       items.push({ id: `${base}:${q.district}:x`, title: words.otherTown });
       return { reply: words.town, menu: { items } };
     }
-    where = q.town === 'x' ? ` somewhere in ${district} District` : ` in ${towns[q.town]} (${district} District)`;
+    // The zone comes from our list (same tiers as the Flowise prompt), so
+    // the assistant never has to guess it.
+    const zone = q.town === 'x' ? null : SL.zoneOf(towns[q.town]);
+    where = q.town === 'x' ? ` somewhere in ${district} District`
+      : ` in ${towns[q.town]} (${district} District)` + (zone ? ` — delivery zone ${zone} (${SL.ZONE_LABEL[zone]})` : '');
   }
   return {
     flowiseText: `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} ${PQ_OPTIONS.service[q.service].text}, ${PQ_OPTIONS.delivery[q.delivery].text}${where}. Please ask me which boxes I'm sending and give me the price.`
