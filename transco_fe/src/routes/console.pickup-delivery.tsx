@@ -154,8 +154,8 @@ function PickupDeliveryPage() {
 
   const [period, setPeriod] = useState<Period>("this");
   const [custom, setCustom] = useState({ from: thisWeek.from, to: addDays(thisWeek.to, 7) });
-  const [type, setType] = useState<TypeFilter>("all");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [type, setType] = useState<TypeFilter>("pickup");
+  const [status, setStatus] = useState<StatusFilter>("pending");
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const deliveredShipments = useMemo(
@@ -170,17 +170,8 @@ function PickupDeliveryPage() {
   const count = (kind: PickupDeliveryKind, s?: PickupDeliveryStatus) =>
     jobs.filter((j) => j.kind === kind && (s ? j.status === s : j.status !== "cancelled")).length;
   const totals = {
-    pickups: count("pickup"),
-    deliveries: count("delivery"),
     pendingPickups: count("pickup", "pending"),
     pendingDeliveries: count("delivery", "pending"),
-    donePickups: count("pickup", "completed"),
-    doneDeliveries: count("delivery", "completed"),
-  };
-  const showAll = (t: TypeFilter, s: StatusFilter) => {
-    setPeriod("all");
-    setType(t);
-    setStatus(s);
   };
 
   const range =
@@ -228,37 +219,35 @@ function PickupDeliveryPage() {
         description="Home pickups in Sydney and door deliveries to the receiver — taken straight from the bookings."
       />
 
-      {/* Overall totals — each tile shows its bookings below (all dates). */}
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Tile
+      {/* Pickups and door deliveries are different jobs (Sydney vs overseas),
+          so they get their own tab instead of one mixed list. */}
+      <div className="mb-4 grid grid-cols-2 gap-2" role="tablist" aria-label="Job type">
+        <KindTab
           label="Pickups"
-          value={totals.pickups}
-          hint={`${totals.pendingPickups} pending · ${totals.donePickups} done`}
-          onClick={() => showAll("pickup", "all")}
+          pending={totals.pendingPickups}
+          active={type === "pickup"}
+          onClick={() => setType("pickup")}
         />
-        <Tile
+        <KindTab
           label="Door deliveries"
-          value={totals.deliveries}
-          hint={`${totals.pendingDeliveries} pending · ${totals.doneDeliveries} delivered`}
-          onClick={() => showAll("delivery", "all")}
-        />
-        <Tile
-          label="Pending"
-          value={totals.pendingPickups + totals.pendingDeliveries}
-          attention={totals.pendingPickups + totals.pendingDeliveries > 0}
-          hint={`${totals.pendingPickups} pickups · ${totals.pendingDeliveries} deliveries`}
-          onClick={() => showAll("all", "pending")}
-        />
-        <Tile
-          label="Completed"
-          value={totals.donePickups + totals.doneDeliveries}
-          hint={`${totals.donePickups} picked up · ${totals.doneDeliveries} delivered`}
-          onClick={() => showAll("all", "completed")}
+          pending={totals.pendingDeliveries}
+          active={type === "delivery"}
+          onClick={() => setType("delivery")}
         />
       </div>
 
-      <div className="mb-6 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-6 flex flex-col gap-2">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <Segmented
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: "pending", label: "To do" },
+              { value: "completed", label: type === "pickup" ? "Picked up" : "Delivered" },
+              { value: "all", label: "All" },
+            ]}
+          />
           <Segmented
             label="When"
             value={period}
@@ -270,7 +259,8 @@ function PickupDeliveryPage() {
               { value: "all", label: "All dates" },
             ]}
           />
-          {period === "custom" && (
+        </div>
+        {period === "custom" && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Input
                 type="date"
@@ -296,30 +286,6 @@ function PickupDeliveryPage() {
               />
             </div>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Segmented
-            label="Type"
-            value={type}
-            onChange={setType}
-            options={[
-              { value: "all", label: "All" },
-              { value: "pickup", label: "Pickup" },
-              { value: "delivery", label: "Door delivery" },
-            ]}
-          />
-          <Segmented
-            label="Status"
-            value={status}
-            onChange={setStatus}
-            options={[
-              { value: "all", label: "Any status" },
-              { value: "pending", label: "Pending" },
-              { value: "completed", label: "Completed" },
-              { value: "cancelled", label: "Cancelled" },
-            ]}
-          />
-        </div>
         <p className="text-xs text-muted-foreground">
           {period === "all" ? "All dates" : `${shortDay(range.from)} – ${shortDay(range.to)}`}
         </p>
@@ -371,35 +337,37 @@ function PickupDeliveryPage() {
   );
 }
 
-function Tile({
+function KindTab({
   label,
-  value,
-  attention,
-  hint,
+  pending,
+  active,
   onClick,
 }: {
   label: string;
-  value: number;
-  attention?: boolean;
-  hint?: string | undefined;
+  pending: number;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
-      className="rounded-xl border bg-card px-4 py-3 text-left shadow-xs transition-colors hover:border-primary/40"
+      className={cn(
+        "rounded-xl border px-4 py-3 text-left transition-colors",
+        active ? "border-primary bg-primary/5 shadow-xs" : "bg-card hover:border-primary/40",
+      )}
     >
+      <span className="block text-base font-semibold text-foreground">{label}</span>
       <span
         className={cn(
-          "block text-2xl font-semibold tabular-nums",
-          attention ? "text-warning-foreground" : "text-foreground",
+          "block text-sm",
+          pending > 0 ? "text-warning-foreground" : "text-muted-foreground",
         )}
       >
-        {value}
+        {pending > 0 ? `${pending} to do` : "All done"}
       </span>
-      <span className="block text-xs text-muted-foreground">{label}</span>
-      {hint && <span className="mt-0.5 block text-xs text-muted-foreground/80">{hint}</span>}
     </button>
   );
 }
@@ -417,7 +385,7 @@ function Segmented<T extends string>({
 }) {
   return (
     <div
-      className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-secondary p-1"
+      className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-secondary p-1"
       role="radiogroup"
       aria-label={label}
     >
@@ -429,7 +397,7 @@ function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             value === o.value
               ? "bg-card text-foreground shadow-xs"
               : "text-muted-foreground hover:text-foreground",
@@ -528,84 +496,88 @@ function JobRow({
     }
   };
 
+  const when = job.dateSet
+    ? [shortDay(job.date), job.time].filter(Boolean).join(" · ")
+    : dateCaption
+      ? `Booked ${shortDay(job.date)}`
+      : null;
+  const pending = job.status === "pending";
+
   return (
     <li
       onClick={(e) => {
         if (!(e.target as HTMLElement).closest("button, a")) onOpen();
       }}
       className={cn(
-        "flex cursor-pointer items-center gap-4 rounded-xl border bg-card px-4 py-3 shadow-xs transition-colors hover:border-primary/40",
+        "cursor-pointer rounded-xl border bg-card p-4 shadow-xs transition-colors hover:border-primary/40",
         done && "opacity-70",
       )}
     >
-      <div className="w-14 shrink-0 text-center">
-        <p className="text-base font-semibold tabular-nums text-foreground">{job.time ?? "—"}</p>
-        {showDate && (
-          <p className="text-xs text-muted-foreground">
-            {dateCaption && <span className="block">{dateCaption}</span>}
-            {shortDay(job.date)}
-          </p>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={onOpen}
-            className="truncate text-left text-base font-semibold text-foreground hover:underline"
+            className="text-left text-base font-semibold text-foreground hover:underline"
           >
             {b.customerName || formatPhone(b.phoneNumber)}
           </button>
           {b.bookingCode && (
-            <span className="text-sm tabular-nums text-muted-foreground">{b.bookingCode}</span>
-          )}
-          <StatusBadge tone={job.kind === "pickup" ? "info" : "neutral"}>
-            {KIND_LABEL[job.kind]}
-          </StatusBadge>
-          <StatusBadge tone={STATUS_TONE[job.status]}>
-            {statusLabel(job.kind, job.status)}
-          </StatusBadge>
-          {!job.dateSet && job.status === "pending" && (
-            <span className="text-xs text-warning-foreground">· day not set</span>
+            <span className="ml-2 text-sm tabular-nums text-muted-foreground">{b.bookingCode}</span>
           )}
         </div>
-        <p className="mt-0.5 truncate text-sm text-muted-foreground">
-          {[
-            job.kind === "delivery" && b.receiver ? `To ${b.receiver.fullName}` : null,
-            place.address,
-            formatPhone(place.phone),
-          ]
-            .filter(Boolean)
-            .join(" · ") || "No address yet"}
-        </p>
-        {job.kind === "pickup" && b.pickupNote && (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            Customer prefers: {b.pickupNote}
-          </p>
+        {pending ? (
+          when && (
+            <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">
+              {when}
+            </span>
+          )
+        ) : (
+          <StatusBadge tone={STATUS_TONE[job.status]}>{statusLabel(job.kind, job.status)}</StatusBadge>
         )}
       </div>
 
+      <p className="mt-1 text-sm text-muted-foreground">
+        {[
+          job.kind === "delivery" && b.receiver ? `To ${b.receiver.fullName}` : null,
+          place.address,
+          formatPhone(place.phone),
+        ]
+          .filter(Boolean)
+          .join(" · ") || "No address yet"}
+      </p>
+      {job.kind === "pickup" && b.pickupNote && (
+        <p className="mt-1 text-sm text-foreground">Customer prefers: {b.pickupNote}</p>
+      )}
+
       {/* Pickups are arranged by phone from Sydney; door deliveries happen
           overseas weeks later, so they only get "Delivered". */}
-      {job.kind === "pickup" && place.phone && job.status === "pending" && (
-        <a
-          href={`tel:${place.phone}`}
-          className="shrink-0 rounded-md border px-2.5 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-        >
-          Call
-        </a>
-      )}
-      {job.kind === "pickup" && job.status === "pending" && !job.dateSet && (
-        <Button type="button" size="sm" className="shrink-0" onClick={onOpen}>
-          Set day & time
-        </Button>
-      )}
-      {job.status === "pending" && (job.dateSet || job.kind === "delivery") && (
-        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={markDone}>
-          <Check className="mr-1.5 h-4 w-4" aria-hidden />
-          {job.kind === "pickup" ? "Picked up" : "Delivered"}
-        </Button>
+      {pending && (
+        <div className="mt-3 flex gap-2 sm:justify-end">
+          {job.kind === "pickup" && place.phone && (
+            <Button asChild variant="outline" className="h-10 flex-1 sm:flex-none">
+              <a href={`tel:${place.phone}`}>
+                <Phone className="mr-1.5 h-4 w-4" aria-hidden />
+                Call
+              </a>
+            </Button>
+          )}
+          {job.kind === "pickup" && !job.dateSet ? (
+            <Button type="button" className="h-10 flex-1 sm:flex-none" onClick={onOpen}>
+              Set day & time
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 flex-1 sm:flex-none"
+              onClick={markDone}
+            >
+              <Check className="mr-1.5 h-4 w-4" aria-hidden />
+              {job.kind === "pickup" ? "Picked up" : "Delivered"}
+            </Button>
+          )}
+        </div>
       )}
     </li>
   );
