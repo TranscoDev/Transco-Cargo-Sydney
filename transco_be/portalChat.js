@@ -56,7 +56,7 @@ const T = {
     what: { my_bl: 'shipment reference (BL)', track: 'shipments', my_shipments: 'shipments', my_bookings: 'bookings', declaration: 'declaration status', my_documents: 'documents', my_profile: 'profile', new_booking: 'booking' },
     signIn: 'Sign in',
     noShipments: "I can't see any shipments on your account yet.\n\nYour shipment reference (BL) is assigned once our Sydney warehouse receives and checks your boxes — it will appear here automatically after that.\n\nIf you already have a BL number, just type it and I'll look it up.",
-    noShipmentsButBookings: "Your boxes haven't been assigned a shipment reference (BL) yet — that happens once our Sydney warehouse receives and checks them. Here's where your latest booking is up to:",
+    noShipmentsButBookings: "Your boxes haven't been assigned a shipment reference (BL) yet — that happens once our Sydney warehouse receives and checks them. Here's where your bookings are up to:",
     pickShipment: 'You have {n} shipments with us. Which one would you like to track?',
     trackThis: 'Track this',
     trackingHeader: '📦 *Shipment reference (BL): {bl}*',
@@ -97,7 +97,7 @@ const T = {
     what: { my_bl: 'shipment reference (BL)', track: 'shipments', my_shipments: 'shipments', my_bookings: 'bookings', declaration: 'declaration status', my_documents: 'documents', my_profile: 'profile', new_booking: 'booking' },
     signIn: 'Sign in',
     noShipments: 'ඔයාගේ account එකේ තවම shipments පේන්නේ නෑ.\n\nඅපේ Sydney warehouse එකට ඔයාගේ පෙට්ටි ලැබිලා check කළාට පස්සේ shipment reference (BL) එක දෙනවා — ඊට පස්සේ ඒක මෙතන automatically පෙන්නයි.\n\nඔයා ළඟ දැනටමත් BL number එකක් තියෙනවා නම්, ඒක type කරන්න, මම බලලා කියන්නම්.',
-    noShipmentsButBookings: 'ඔයාගේ පෙට්ටි වලට තවම shipment reference (BL) එකක් දීලා නෑ — අපේ Sydney warehouse එකට ලැබිලා check කළාට පස්සේ තමයි ඒක දෙන්නේ. ඔයාගේ අලුත්ම booking එක මේ වෙලාවේ තියෙන තැන:',
+    noShipmentsButBookings: 'ඔයාගේ පෙට්ටි වලට තවම shipment reference (BL) එකක් දීලා නෑ — අපේ Sydney warehouse එකට ලැබිලා check කළාට පස්සේ තමයි ඒක දෙන්නේ. ඔයාගේ bookings මේ වෙලාවේ තියෙන තැන:',
     pickShipment: 'ඔයාට අප එක්ක shipments {n}ක් තියෙනවා. මොකක්ද track කරන්න ඕන?',
     trackThis: 'මේක track කරන්න',
     trackingHeader: '📦 *Shipment reference (BL): {bl}*',
@@ -138,7 +138,7 @@ const T = {
     what: { my_bl: 'shipment reference (BL)', track: 'shipments', my_shipments: 'shipments', my_bookings: 'bookings', declaration: 'declaration நிலை', my_documents: 'documents', my_profile: 'profile', new_booking: 'booking' },
     signIn: 'Sign in',
     noShipments: 'உங்கள் account இல் இன்னும் shipments எதுவும் இல்லை.\n\nஎங்கள் Sydney கிடங்கு உங்கள் பெட்டிகளைப் பெற்று சரிபார்த்த பிறகு shipment reference (BL) வழங்கப்படும் — அதன் பிறகு அது இங்கே தானாகவே தோன்றும்.\n\nஏற்கனவே BL number இருந்தால், அதை type செய்யுங்கள், நான் பார்த்துச் சொல்கிறேன்.',
-    noShipmentsButBookings: 'உங்கள் பெட்டிகளுக்கு இன்னும் shipment reference (BL) வழங்கப்படவில்லை — எங்கள் Sydney கிடங்கு அவற்றைப் பெற்று சரிபார்த்த பிறகே அது வழங்கப்படும். உங்கள் சமீபத்திய booking இப்போது இருக்கும் நிலை:',
+    noShipmentsButBookings: 'உங்கள் பெட்டிகளுக்கு இன்னும் shipment reference (BL) வழங்கப்படவில்லை — எங்கள் Sydney கிடங்கு அவற்றைப் பெற்று சரிபார்த்த பிறகே அது வழங்கப்படும். உங்கள் bookings இப்போது இருக்கும் நிலை:',
     pickShipment: 'எங்களிடம் உங்களுக்கு {n} shipments உள்ளன. எதை track செய்ய வேண்டும்?',
     trackThis: 'இதை track செய்',
     trackingHeader: '📦 *Shipment reference (BL): {bl}*',
@@ -263,22 +263,28 @@ async function handleAccountIntent({ intent, shipmentId, account, tools, text })
 
     case 'track':
     case 'my_shipments': {
-      const list = await tools.getCustomerShipments(customerId, { limit: 5 });
+      const [list, bookingsList] = await Promise.all([
+        tools.getCustomerShipments(customerId, { limit: 5 }),
+        tools.getCustomerBookings(customerId, { limit: 20 })
+      ]);
+      // Every booking still waiting for a BL — customers often have several
+      // at once (one per receiver), so show them all, not just the newest.
+      const open = bookingsList.filter(b => b.status.key !== 'cancelled' && !b.blNumber);
+      const openCards = open.slice(0, 10).map(b => bookingCard(b, t));
+      const moreBookings = open.length > 10 ? [{ label: t.viewAll, href: '/account.html#/bookings' }] : [];
       if (list.length === 0) {
-        const bookingsList = await tools.getCustomerBookings(customerId, { limit: 1 });
-        const open = bookingsList.find(b => b.status.key !== 'cancelled');
-        if (open) {
-          return { reply: t.noShipmentsButBookings, cards: [bookingCard(open, t)] };
+        if (open.length) {
+          return { reply: t.noShipmentsButBookings, cards: openCards, actions: moreBookings };
         }
         return { reply: t.noShipments, actions: [{ label: t.newBooking, href: '/account.html#/book' }] };
       }
-      if (intent === 'track' && list.length === 1) {
+      if (intent === 'track' && list.length === 1 && !open.length) {
         return trackingReply(tools, customerId, list[0].id, t);
       }
       return {
         reply: fmt(t.pickShipment, { n: list.length }),
-        cards: list.slice(0, 3).map(s => shipmentCard(s, t, true)),
-        actions: list.length > 3 ? [{ label: t.viewAll, href: '/account.html#/shipments' }] : []
+        cards: list.slice(0, 3).map(s => shipmentCard(s, t, true)).concat(openCards),
+        actions: (list.length > 3 ? [{ label: t.viewAll, href: '/account.html#/shipments' }] : []).concat(moreBookings)
       };
     }
 
