@@ -20,7 +20,7 @@
 
 const express = require('express');
 const { customers, bookings } = require('./db');
-const { detectAccountIntent, handleAccountIntent, ACTION_INTENTS } = require('./portalChat');
+const { detectAccountIntent, handleAccountIntent, ACTION_INTENTS, parsePriceQuoteTap } = require('./portalChat');
 const { hasRealName } = require('./customerTools');
 
 const HANDOFF_MARKER = '[[HANDOFF]]';
@@ -205,7 +205,13 @@ module.exports = function createWebChatRouter({
       // one of them.
       let resolvedTap = null;
       let accountAction = null;
-      if (action !== undefined) {
+      let priceTap = null;
+      if (typeof menuItemId === 'string' && (menuItemId === 'menu_price' || menuItemId.startsWith('pq:'))) {
+        // Price quote menu (country → sea/air → door/collect), see portalChat.js.
+        priceTap = menuItemId === 'menu_price' ? { quote: null, title: '💰 Get a Price Quote' } : parsePriceQuoteTap(menuItemId);
+        if (!priceTap) return res.status(400).json({ error: 'Unrecognized menuItemId' });
+        accountAction = 'price_quote';
+      } else if (action !== undefined) {
         if (typeof action !== 'string' || !ACTION_INTENTS.includes(action)) {
           return res.status(400).json({ error: 'Unrecognized action' });
         }
@@ -247,7 +253,9 @@ module.exports = function createWebChatRouter({
       // read back later — the tapped item's readable title for a menu
       // tap (e.g. "🎁 Gift Box"), or the typed text otherwise. Mirrors
       // tappedMenuLabel || text on the WhatsApp side.
-      const displayedCustomerText = accountAction
+      const displayedCustomerText = priceTap
+        ? priceTap.title
+        : accountAction
         ? (typeof label === 'string' && label.trim() ? label.trim().slice(0, 80) : accountAction.replace(/_/g, ' '))
         : resolvedTap ? resolvedTap.title : message.trim();
 
@@ -339,7 +347,7 @@ module.exports = function createWebChatRouter({
 
       // Either the tapped item's phrase (e.g. "I'd like a price for a
       // Gift Box"), or the customer's own typed text.
-      const outgoingText = accountAction ? '' : resolvedTap ? resolvedTap.phrase : message.trim();
+      let outgoingText = accountAction ? '' : resolvedTap ? resolvedTap.phrase : message.trim();
 
       // Questions about the customer's OWN bookings/BLs/shipments are
       // answered from the database (portalChat.js), never by the LLM —
@@ -350,10 +358,15 @@ module.exports = function createWebChatRouter({
         const intent = accountAction || detectAccountIntent(outgoingText);
         if (intent) {
           const handled = await handleAccountIntent({
-            intent, shipmentId, account, tools: customerTools, text: outgoingText
+            intent, shipmentId, account, tools: customerTools, text: outgoingText,
+            quote: priceTap ? priceTap.quote : null
           });
           if (handled && handled.passThrough) {
             accountExtras = handled;
+          } else if (handled && handled.flowiseText) {
+            // Price quote menu finished — its full question goes to the assistant.
+            outgoingText = handled.flowiseText;
+            accountAction = null;
           } else if (handled) {
             const accountReply = await saveMessage({
               customerId: customer._id,
@@ -367,7 +380,7 @@ module.exports = function createWebChatRouter({
             return res.json({
               reply: handled.reply,
               media: null,
-              menu: null,
+              menu: handled.menu || null,
               cards: handled.cards || [],
               actions: handled.actions || [],
               handedOff: false

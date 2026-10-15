@@ -28,10 +28,65 @@ const INTENT_PATTERNS = [
   { intent: 'declaration', re: /\b(my|our)\s+declarations?\b|\bdeclaration status\b|\bdid you (get|receive) my declaration\b/i },
   { intent: 'my_documents', re: /\b(my|our)\s+(documents?|docs|invoices?|receipts?)\b/i },
   { intent: 'my_profile', re: /\b(my|our)\s+(profile|account|details)\b/i },
-  { intent: 'new_booking', re: /\b(make|create|new|start)\s+(a\s+)?booking\b|\bbook\s+(a\s+)?(shipment|boxes|drop.?off)\b/i }
+  { intent: 'new_booking', re: /\b(make|create|new|start)\s+(a\s+)?booking\b|\bbook\s+(a\s+)?(shipment|boxes|drop.?off)\b/i },
+  // The "Get a price" buttons — a short fixed menu first, so every quote
+  // starts from the same three facts (typed "how much for 2 tea chests…"
+  // still goes straight to the assistant).
+  { intent: 'price_quote', re: /^\s*(i want a price quote|i'?d like to get a price quote|get a price( quote)?|price quote)\s*$/i }
 ];
 
-const ACTION_INTENTS = ['my_bl', 'track', 'my_shipments', 'my_bookings', 'declaration', 'my_documents', 'my_profile', 'new_booking', 'track_shipment'];
+const ACTION_INTENTS = ['my_bl', 'track', 'my_shipments', 'my_bookings', 'declaration', 'my_documents', 'my_profile', 'new_booking', 'track_shipment', 'price_quote'];
+
+// ---------- price quote menu: country → sea/air → door/collect ----------
+// Each tap is a menu item id "pq:<country>:<service>:<delivery>" carrying
+// the answers so far, so nothing is stored between taps. Once all three
+// are known, one clear sentence goes to the assistant (which does the
+// actual pricing and remembers it for the follow-up questions).
+const PQ_OPTIONS = {
+  country: { sri_lanka: { title: '🇱🇰 Sri Lanka', text: 'Sri Lanka' }, india: { title: '🇮🇳 India', text: 'India' } },
+  service: { sea: { title: '🚢 Sea Freight', text: 'by Sea Freight' }, air: { title: '✈️ Air Freight', text: 'by Air Freight' } },
+  delivery: { door: { title: '🚚 Door delivery', text: 'with door delivery to the receiver' }, collect: { title: '🏢 Collect from warehouse', text: 'and the receiver will collect from your warehouse' } }
+};
+const PQ_QUESTIONS = {
+  en: { country: 'Where are you sending?', service: 'How should it travel?', delivery: 'How will the receiver get the boxes?', known: 'Sending to {c} (from your bookings).' },
+  si: { country: 'ඔයා යවන්නේ කොහෙටද?', service: 'යවන්නේ කොහොමද?', delivery: 'Receiver ට පෙට්ටි ලැබෙන්නේ කොහොමද?', known: '{c} ට යවනවා (ඔයාගේ bookings වලින්).' },
+  ta: { country: 'எங்கே அனுப்புகிறீர்கள்?', service: 'எப்படி அனுப்ப வேண்டும்?', delivery: 'Receiver பெட்டிகளை எப்படிப் பெறுவார்?', known: '{c} க்கு அனுப்புகிறீர்கள் (உங்கள் bookings இலிருந்து).' }
+};
+
+function parsePriceQuoteTap(menuItemId) {
+  const m = /^pq:([a-z_]*):([a-z]*):([a-z]*)$/.exec(menuItemId || '');
+  if (!m) return null;
+  const pick = (key, v) => (v && PQ_OPTIONS[key][v] ? v : null);
+  const quote = { country: pick('country', m[1]), service: pick('service', m[2]), delivery: pick('delivery', m[3]) };
+  const last = quote.delivery ? PQ_OPTIONS.delivery[quote.delivery] : quote.service ? PQ_OPTIONS.service[quote.service] : quote.country ? PQ_OPTIONS.country[quote.country] : null;
+  return { quote, title: last ? last.title : 'Price quote' };
+}
+
+async function priceQuoteReply({ quote, account, tools, lang }) {
+  const q = Object.assign({ country: null, service: null, delivery: null }, quote || {});
+  const words = PQ_QUESTIONS[lang] || PQ_QUESTIONS.en;
+  let known = '';
+  // Don't ask the country again when their bookings already say it.
+  if (!q.country && account && tools) {
+    const [last] = await tools.getCustomerBookings(account._id, { limit: 1 });
+    const key = last && Object.keys(PQ_OPTIONS.country).find(k => PQ_OPTIONS.country[k].text === last.country);
+    if (key) {
+      q.country = key;
+      known = fmt(words.known, { c: PQ_OPTIONS.country[key].title }) + '\n\n';
+    }
+  }
+  const ask = ['country', 'service', 'delivery'].find(k => !q[k]);
+  if (ask) {
+    const items = Object.keys(PQ_OPTIONS[ask]).map(v => {
+      const next = Object.assign({}, q, { [ask]: v });
+      return { id: `pq:${next.country || ''}:${next.service || ''}:${next.delivery || ''}`, title: PQ_OPTIONS[ask][v].title };
+    });
+    return { reply: known + words[ask], menu: { items } };
+  }
+  return {
+    flowiseText: `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} ${PQ_OPTIONS.service[q.service].text}, ${PQ_OPTIONS.delivery[q.delivery].text}. Please ask me which boxes I'm sending and give me the price.`
+  };
+}
 
 function detectAccountIntent(text) {
   if (!text || typeof text !== 'string') return null;
@@ -234,9 +289,12 @@ async function trackingReply(tools, customerId, shipmentId, t) {
 
 // Returns { reply, cards?, actions? } — or null when this message isn't
 // an account question at all (caller falls through to Flowise).
-async function handleAccountIntent({ intent, shipmentId, account, tools, text }) {
+async function handleAccountIntent({ intent, shipmentId, account, tools, text, quote }) {
   const lang = languageFor(account, text);
   const t = T[lang];
+
+  // Works signed in or not (signed in = country taken from their bookings).
+  if (intent === 'price_quote') return priceQuoteReply({ quote, account, tools, lang });
 
   if (!account) {
     if (intent === 'track' || intent === 'new_booking') {
@@ -336,4 +394,4 @@ async function handleAccountIntent({ intent, shipmentId, account, tools, text })
   }
 }
 
-module.exports = { detectAccountIntent, handleAccountIntent, ACTION_INTENTS, languageFor };
+module.exports = { detectAccountIntent, handleAccountIntent, ACTION_INTENTS, languageFor, parsePriceQuoteTap };
