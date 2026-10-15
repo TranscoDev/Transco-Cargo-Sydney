@@ -163,6 +163,7 @@
   [hidden] { display: none !important; }
 </style>
 <script src="/phone-format.js"></script>
+<script src="/sl-cities.js"></script>
 </head>
 <body>
 <header>
@@ -664,6 +665,10 @@
     html += ({ where: renderWhere, boxes: renderBoxes, sender: renderSender, receiver: renderReceiver, finish: renderFinish })[STEPS[step]]();
     main.innerHTML = html;
     bind();
+    // Sri Lanka receiver: District → Town dropdowns, same as the online booking form.
+    if (STEPS[step] === "receiver" && state.country === "sri_lanka" && window.SLCities) {
+      SLCities.attach(document.getElementById("receiver-town"), { district: t("District"), town: t("Town / city"), choose: t("choose"), other: t("Other — type it below") });
+    }
   }
 
   function choice(attrs, pressed, icon, title, sub) {

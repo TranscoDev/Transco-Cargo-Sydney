@@ -37,7 +37,9 @@ const INTENT_PATTERNS = [
 
 const ACTION_INTENTS = ['my_bl', 'track', 'my_shipments', 'my_bookings', 'declaration', 'my_documents', 'my_profile', 'new_booking', 'track_shipment', 'price_quote'];
 
-// ---------- price quote menu: country → sea/air → door/collect ----------
+const SL = require('./slCities');
+
+// ---------- price quote menu: country → sea/air → door/collect (→ district → town for Sri Lanka door delivery) ----------
 // Each tap is a menu item id "pq:<country>:<service>:<delivery>" carrying
 // the answers so far, so nothing is stored between taps. Once all three
 // are known, one clear sentence goes to the assistant (which does the
@@ -48,22 +50,35 @@ const PQ_OPTIONS = {
   delivery: { door: { title: '🚚 Door delivery', text: 'with door delivery to the receiver' }, collect: { title: '🏢 Collect from warehouse', text: 'and the receiver will collect from your warehouse' } }
 };
 const PQ_QUESTIONS = {
-  en: { country: 'Where are you sending?', service: 'How should it travel?', delivery: 'How will the receiver get the boxes?', known: 'Sending to {c} (from your bookings).' },
-  si: { country: 'ඔයා යවන්නේ කොහෙටද?', service: 'යවන්නේ කොහොමද?', delivery: 'Receiver ට පෙට්ටි ලැබෙන්නේ කොහොමද?', known: '{c} ට යවනවා (ඔයාගේ bookings වලින්).' },
-  ta: { country: 'எங்கே அனுப்புகிறீர்கள்?', service: 'எப்படி அனுப்ப வேண்டும்?', delivery: 'Receiver பெட்டிகளை எப்படிப் பெறுவார்?', known: '{c} க்கு அனுப்புகிறீர்கள் (உங்கள் bookings இலிருந்து).' }
+  en: { country: 'Where are you sending?', service: 'How should it travel?', delivery: 'How will the receiver get the boxes?', district: 'Which district is the receiver in?', town: 'Which town?', otherTown: 'Other town', known: 'Sending to {c} (from your bookings).' },
+  si: { country: 'ඔයා යවන්නේ කොහෙටද?', service: 'යවන්නේ කොහොමද?', delivery: 'Receiver ට පෙට්ටි ලැබෙන්නේ කොහොමද?', district: 'Receiver ඉන්නේ මොන දිස්ත්‍රික්කයේද?', town: 'මොන නගරයද?', otherTown: 'වෙනත් නගරයක්', known: '{c} ට යවනවා (ඔයාගේ bookings වලින්).' },
+  ta: { country: 'எங்கே அனுப்புகிறீர்கள்?', service: 'எப்படி அனுப்ப வேண்டும்?', delivery: 'Receiver பெட்டிகளை எப்படிப் பெறுவார்?', district: 'Receiver எந்த மாவட்டத்தில் உள்ளார்?', town: 'எந்த ஊர்?', otherTown: 'வேறு ஊர்', known: '{c} க்கு அனுப்புகிறீர்கள் (உங்கள் bookings இலிருந்து).' }
 };
 
 function parsePriceQuoteTap(menuItemId) {
-  const m = /^pq:([a-z_]*):([a-z]*):([a-z]*)$/.exec(menuItemId || '');
+  // pq:<country>:<service>:<delivery>[:<district #>[:<town # or x = other>]]
+  const m = /^pq:([a-z_]*):([a-z]*):([a-z]*)(?::(\d*)(?::(\d+|x)?)?)?$/.exec(menuItemId || '');
   if (!m) return null;
   const pick = (key, v) => (v && PQ_OPTIONS[key][v] ? v : null);
-  const quote = { country: pick('country', m[1]), service: pick('service', m[2]), delivery: pick('delivery', m[3]) };
-  const last = quote.delivery ? PQ_OPTIONS.delivery[quote.delivery] : quote.service ? PQ_OPTIONS.service[quote.service] : quote.country ? PQ_OPTIONS.country[quote.country] : null;
-  return { quote, title: last ? last.title : 'Price quote' };
+  const quote = { country: pick('country', m[1]), service: pick('service', m[2]), delivery: pick('delivery', m[3]), district: null, town: null };
+  const d = m[4] !== undefined && m[4] !== '' ? SL.DISTRICTS[Number(m[4])] : null;
+  if (d) {
+    quote.district = Number(m[4]);
+    if (m[5] === 'x') quote.town = 'x';
+    else if (m[5] !== undefined && d[1][Number(m[5])]) quote.town = Number(m[5]);
+  }
+  const title = quote.town === 'x' ? 'Other town'
+    : quote.town !== null ? d[1][quote.town]
+    : d ? d[0]
+    : quote.delivery ? PQ_OPTIONS.delivery[quote.delivery].title
+    : quote.service ? PQ_OPTIONS.service[quote.service].title
+    : quote.country ? PQ_OPTIONS.country[quote.country].title
+    : 'Price quote';
+  return { quote, title };
 }
 
 async function priceQuoteReply({ quote, account, tools, lang }) {
-  const q = Object.assign({ country: null, service: null, delivery: null }, quote || {});
+  const q = Object.assign({ country: null, service: null, delivery: null, district: null, town: null }, quote || {});
   const words = PQ_QUESTIONS[lang] || PQ_QUESTIONS.en;
   let known = '';
   // Don't ask the country again when their bookings already say it.
@@ -83,8 +98,23 @@ async function priceQuoteReply({ quote, account, tools, lang }) {
     });
     return { reply: known + words[ask], menu: { items } };
   }
+  // Sri Lanka door delivery is priced by where it goes: district, then town.
+  const base = `pq:${q.country}:${q.service}:${q.delivery}`;
+  let where = '';
+  if (q.country === 'sri_lanka' && q.delivery === 'door') {
+    if (q.district === null) {
+      return { reply: words.district, menu: { items: SL.DISTRICTS.map((d, i) => ({ id: `${base}:${i}`, title: d[0] })) } };
+    }
+    const [district, towns] = SL.DISTRICTS[q.district];
+    if (q.town === null) {
+      const items = towns.map((t, i) => ({ id: `${base}:${q.district}:${i}`, title: t }));
+      items.push({ id: `${base}:${q.district}:x`, title: words.otherTown });
+      return { reply: words.town, menu: { items } };
+    }
+    where = q.town === 'x' ? ` somewhere in ${district} District` : ` in ${towns[q.town]} (${district} District)`;
+  }
   return {
-    flowiseText: `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} ${PQ_OPTIONS.service[q.service].text}, ${PQ_OPTIONS.delivery[q.delivery].text}. Please ask me which boxes I'm sending and give me the price.`
+    flowiseText: `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} ${PQ_OPTIONS.service[q.service].text}, ${PQ_OPTIONS.delivery[q.delivery].text}${where}. Please ask me which boxes I'm sending and give me the price.`
   };
 }
 

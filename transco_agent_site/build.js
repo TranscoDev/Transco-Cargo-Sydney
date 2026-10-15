@@ -33,6 +33,9 @@ const scripts = {};
 for (const file of fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && !NOT_SERVED.includes(f))) {
   scripts['/' + file] = fs.readFileSync(path.join(__dirname, file), 'utf8');
 }
+// Sri Lanka districts → towns: one list, kept in the backend (the chat's
+// price menu uses it too) and served here for the booking forms.
+scripts['/sl-cities.js'] = fs.readFileSync(path.join(__dirname, '..', 'transco_be', 'slCities.js'), 'utf8');
 
 const extraHeaders = previewOrigin ? { 'x-robots-tag': 'noindex, nofollow' } : {};
 
