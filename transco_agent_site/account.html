@@ -2059,7 +2059,7 @@
   // ---------------------------------------------------------------
   function viewHome() {
     loadAndRender(t("loading"), function () {
-      return Promise.all([profile ? Promise.resolve({ profile: profile }) : api("GET", "/me"), api("GET", "/summary")]);
+      return Promise.all([profile ? Promise.resolve({ profile: profile }) : api("GET", "/me"), api("GET", "/summary"), api("GET", "/bookings")]);
     }, function (res) {
       profile = res[0].profile;
       var summary = res[1];
@@ -2107,9 +2107,9 @@
             : null);
       }
 
+      var allBookings = (res[2] && res[2].bookings) || [];
       var recent = [];
       if (summary.latestShipment) recent.push(h("div", null, h("h2", { class: "section-title", style: "margin-top:0", text: t("latestShipment") }), shipmentCard(summary.latestShipment)));
-      if (summary.latestBooking) recent.push(h("div", null, h("h2", { class: "section-title", style: "margin-top:0", text: t("latestBooking") }), bookingCard(summary.latestBooking)));
 
       render(
         h("h1", { class: "hello", text: greeting() + (name ? ", " + name : "") + " 👋" }),
@@ -2117,11 +2117,11 @@
         blCard,
         quick,
         alert ? h("div", { style: "margin-top:16px" }, alert) : null,
-        profile.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:16px" },
-          h("span", { class: "ico", "aria-hidden": "true", text: "📦" }),
-          h("div", null, h("div", { style: "font-weight:700", text: t("verifyInviteTitle") }), h("div", { text: t("verifyInviteBody") }))) : null,
         recent.length ? h("div", { class: "recent-grid", style: "margin-top:22px" }, recent) : null,
-        !summary.latestBooking && !summary.latestShipment
+        allBookings.length ? h("div", { style: "margin-top:22px" },
+          h("h2", { class: "section-title", style: "margin-top:0", text: t("bookingsTitle") }),
+          h("div", { class: "list" }, allBookings.map(bookingCard))) : null,
+        !allBookings.length && !summary.latestShipment
           ? h("div", { style: "margin-top:22px" }, emptyState("📦", t("noBookingsTitle"), t("noBookingsBody"), h("a", { class: "btn", href: "#/book", text: t("startBooking") })))
           : null,
         profile.customerCode ? h("p", { class: "muted small", style: "margin-top:22px;text-align:center" }, t("customerNo") + ": ", h("span", { class: "chip-code", text: profile.customerCode })) : null
@@ -3520,9 +3520,6 @@
           h("div", { style: "min-width:0" },
             h("div", { class: "person-name", style: "font-size:18px", text: p.name || t("profileTitle") }),
             h("div", { class: "muted small", text: [p.customerCode, p.memberSince ? t("memberSince", { d: fmtDate(p.memberSince, { month: "short", year: "numeric" }) }) : null].filter(Boolean).join(" · ") }))),
-        p.phoneVerified === false ? h("div", { class: "notice info", style: "margin-top:12px" },
-          h("span", { class: "ico", "aria-hidden": "true", text: "📦" }),
-          h("div", null, h("div", { text: t("verifyInviteBody") }))) : null,
         h("div", { class: "card menu", style: "margin-top:12px" },
           fold("details", "👤", t("menuDetails"), p.idNumber ? t("menuDetailsHint") : t("menuIdMissing"), !p.idNumber, function () { return form; }),
           fold("senders", "📤", t("sendersTitle"), nSenders === null ? null : nSenders ? t("menuSendersN", { n: nSenders }) : t("menuSendersNone"), false,
