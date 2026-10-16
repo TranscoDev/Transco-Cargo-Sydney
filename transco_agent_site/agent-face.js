@@ -47,7 +47,7 @@
     ".af-dot::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid #22c55e;animation:afPulse 2.4s infinite}" +
     ".af-wave{position:absolute;top:-10px;right:-8px;font-size:20px;opacity:0;transform-origin:70% 80%;animation:afWave 9s 3s infinite;pointer-events:none}" +
     ".af-greet{position:fixed;right:16px;bottom:calc(98px + env(safe-area-inset-bottom));z-index:901;max-width:min(270px,calc(100vw - 32px));background:#fff;color:#182233;" +
-      "border-radius:16px 16px 4px 16px;box-shadow:0 12px 32px rgba(24,34,51,.22);padding:12px 34px 12px 14px;font:15px/1.4 system-ui,sans-serif;cursor:pointer;animation:afIn .45s ease-out both}" +
+      "border-radius:16px 16px 4px 16px;box-shadow:0 12px 32px rgba(24,34,51,.22);padding:12px 34px 12px 14px;font:15px/1.4 system-ui,sans-serif;cursor:pointer;transform-origin:100% 100%;animation:afIn .55s cubic-bezier(.3,1.3,.5,1) both}" +
     ".af-greet small{display:block;margin-top:6px;color:#6b7480;font-size:12px}" +
     ".af-greet button{position:absolute;top:6px;right:6px;width:26px;height:26px;border:0;border-radius:50%;background:transparent;color:#6b7480;font-size:16px;cursor:pointer}" +
     ".af-greet.out{animation:afOut .25s ease-in both}" +
@@ -58,7 +58,8 @@
     "@keyframes afTilt{0%,82%,100%{transform:rotate(0)}86%{transform:rotate(-7deg)}90%{transform:rotate(5deg)}94%{transform:rotate(-3deg)}}" +
     "@keyframes afWave{0%,80%,100%{opacity:0;transform:rotate(0)}83%{opacity:1;transform:rotate(-20deg)}87%{opacity:1;transform:rotate(15deg)}91%{opacity:1;transform:rotate(-15deg)}95%{opacity:0;transform:rotate(0)}}" +
     "@keyframes afPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}" +
-    "@keyframes afIn{0%{opacity:0;transform:translateY(12px) scale(.95)}100%{opacity:1;transform:none}}" +
+    // Grows out of the chat bubble (bottom-right corner) with a little bounce.
+    "@keyframes afIn{0%{opacity:0;transform:translate(14px,40px) scale(.2)}70%{opacity:1;transform:scale(1.04)}100%{opacity:1;transform:none}}" +
     "@keyframes afOut{to{opacity:0;transform:translateY(8px)}}" +
     "@media (prefers-reduced-motion:reduce){.af,.af-eyes circle,.af-head,.af-dot::after,.af-wave,.af-greet{animation:none!important}.af-wave{display:none}}";
 
@@ -66,9 +67,14 @@
     var l = (document.documentElement.lang || "en").slice(0, 2);
     return WORDS[l] ? l : "en";
   }
-  function store(get, value) {
-    try { if (get) return sessionStorage.getItem("af-greeted"); sessionStorage.setItem("af-greeted", "1"); } catch (e) {}
-    return null;
+  // Greeting every time someone opens the website (once per visit — not
+  // again on each page they click to in the same visit).
+  function store(get) {
+    try {
+      if (get) return sessionStorage.getItem("af-greeted") === "1";
+      sessionStorage.setItem("af-greeted", "1");
+    } catch (e) {}
+    return false;
   }
 
   function setup() {
