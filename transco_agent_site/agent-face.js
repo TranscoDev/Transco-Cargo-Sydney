@@ -130,6 +130,43 @@
     }, 4000);
   }
 
+  // Example questions that rotate in the chat's "Type your question" box
+  // (only while it's empty), so customers see what they can ask. Picks
+  // a set for the page; checks every few seconds so chat boxes added
+  // later (e.g. My Transco's chat panel) get them too.
+  var EXAMPLES = {
+    sl: ["I want to send 3 boxes to Kandy", "How much is a Tea Chest to Colombo?", "When is the next shipment to Sri Lanka?", "Can you pick up boxes from my home?"],
+    in: ["How much to send 2 boxes to Chennai?", "When is the next shipment to India?", "Do you deliver to the door in India?"],
+    box: ["Which box fits a 32\" TV?", "How big is a Tea Chest?", "How much is a Quarter CBM box?"],
+    acct: ["Where are my boxes?", "What's my BL number?", "I want to send 3 boxes to Kandy"],
+    home: ["I want to send 3 boxes to Kandy", "When is the next shipment?", "How much is a Tea Chest?", "Where is your warehouse?"],
+    si: ["මට Kandy වලට boxes 3ක් යවන්න ඕන", "Tea Chest එකක් කීයද?", "ඊළඟ shipment එක කවදද?"],
+    ta: ["Kandy க்கு 3 பெட்டிகள் அனுப்ப வேண்டும்", "ஒரு Tea Chest எவ்வளவு?", "அடுத்த shipment எப்போது?"]
+  };
+  var EG = { en: "e.g. ", si: "උදා: ", ta: "உதா: " };
+  function exampleSet() {
+    var l = lang();
+    if (l !== "en") return EXAMPLES[l];
+    var p = location.pathname;
+    return /sri-lanka/.test(p) ? EXAMPLES.sl : /india/.test(p) ? EXAMPLES.in : /box-info/.test(p) ? EXAMPLES.box
+      : /account/.test(p) ? EXAMPLES.acct : EXAMPLES.home;
+  }
+  var QUESTION_BOX = /Type your question|ප්‍රශ්නය|கேள்வி/;
+  var turn = 0;
+  function rotateExamples() {
+    var set = exampleSet(), prefix = EG[lang()] || EG.en;
+    Array.prototype.forEach.call(document.querySelectorAll("input[type=text], input:not([type]), textarea"), function (el) {
+      if (!el.dataset.afEx) {
+        if (!QUESTION_BOX.test(el.placeholder || "")) return;
+        el.dataset.afEx = "1";
+      }
+      if (!el.value) el.placeholder = prefix + set[turn % set.length];
+    });
+    turn++;
+  }
+
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup);
   else setup();
+  setInterval(rotateExamples, 6000);
+  setTimeout(rotateExamples, 600);
 })();
