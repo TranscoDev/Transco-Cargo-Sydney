@@ -665,6 +665,14 @@
     html += ({ where: renderWhere, boxes: renderBoxes, sender: renderSender, receiver: renderReceiver, finish: renderFinish })[STEPS[step]]();
     main.innerHTML = html;
     bind();
+    // Every phone box: country dropdown + number, same as the online booking form.
+    if (window.PhoneField) {
+      var rCode = state.country === "india" ? "91" : "94";
+      [["sender-mobile", "61"], ["sender-homePhone", "61"], ["receiver-mobile", rCode], ["receiver-homePhone", rCode]].forEach(function (x) {
+        var el = document.getElementById(x[0]);
+        if (el) PhoneField.attach(el, { code: x[1] });
+      });
+    }
     // Sri Lanka receiver: District → Town dropdowns, same as the online booking form.
     if (STEPS[step] === "receiver" && state.country === "sri_lanka" && window.SLCities) {
       SLCities.attach(document.getElementById("receiver-town"), { district: t("District"), town: t("Town / city"), choose: t("choose"), other: t("Other — type it below") });
@@ -828,7 +836,6 @@
       html += '<button type="button" class="reuse" id="reuse-sender"><span aria-hidden="true">↺</span><span>' + esc(t("Use my details from last time")) + "<small>" + esc(last.sender.fullName) + "</small></span></button>";
     }
     html += field("sender", "fullName", "Full name (as on passport / NIC)", { ac: "name" });
-    html += field("sender", "idNumber", "Passport or NIC number", { caps: true, optional: state.country !== "sri_lanka" });
     // Australian address, the same fields as the online booking form.
     if (!state.sender.street && !state.sender.suburb && state.sender.address) splitAddress(state.sender);
     html += field("sender", "street", "Street address", { ac: "address-line1" });
@@ -837,8 +844,10 @@
       '<option value="">' + esc(t("Choose…")) + "</option>" + ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"].map(function (x) { return '<option' + (state.sender.state === x ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
       field("sender", "postcode", "Postcode", { mode: "numeric", ac: "postal-code" }) + "</div>";
     html += field("sender", "mobile", "Mobile", { type: "tel", mode: "tel", ac: "tel" });
-    html += field("sender", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
     html += field("sender", "email", "Email", { type: "email", mode: "email", ac: "email" });
+    // Same order as the online booking form.
+    html += field("sender", "idNumber", "Passport or NIC number", { caps: true, optional: state.country !== "sri_lanka" });
+    html += field("sender", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
     return html;
   }
 
@@ -869,12 +878,12 @@
       html += '<button type="button" class="reuse" id="reuse-receiver"><span aria-hidden="true">↺</span><span>' + esc(t("Same receiver as last time")) + "<small>" + esc(last.receiver.fullName + (last.receiver.town ? ", " + last.receiver.town : "")) + "</small></span></button>";
     }
     html += field("receiver", "fullName", "Full name (as on passport / NIC)");
-    html += field("receiver", "idNumber", "Passport or NIC number", { caps: true });
     html += field("receiver", "address", "Address", { multiline: true });
     html += field("receiver", "town", "Town / city");
     html += field("receiver", "mobile", "Mobile", { type: "tel", mode: "tel" });
-    html += field("receiver", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
     html += field("receiver", "email", "Email", { type: "email", mode: "email" });
+    html += field("receiver", "idNumber", "Passport or NIC number", { caps: true });
+    html += field("receiver", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
     return html;
   }
 
@@ -1372,7 +1381,7 @@
       if (!/^\d{4}$/.test(String(p.postcode || "").trim())) bad["sender.postcode"] = 1;
     } else if (String(p.address).trim().length < 5) bad[group + ".address"] = 1;
     if (withTown && String(p.town).trim().length < 2) bad[group + ".town"] = 1;
-    if (!phoneOk(p.mobile)) bad[group + ".mobile"] = 1;
+    if (!phoneOk(p.mobile) || (window.PhoneField && !PhoneField.validMobile(p.mobile))) bad[group + ".mobile"] = 1;
     if (p.homePhone && !phoneOk(p.homePhone)) bad[group + ".homePhone"] = 1;
     if (!EMAIL_RE.test(String(p.email).trim())) bad[group + ".email"] = 1;
     return bad;
