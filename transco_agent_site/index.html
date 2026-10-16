@@ -1254,7 +1254,9 @@
   }
   function updateFab() {
     if (!fab) return;
-    fab.classList.toggle("show", !chatOpen && (isPhone() || !agentInView()));
+    // Hidden while the Agent chat area is on screen (phone or computer) —
+    // the chat is right there, so the bubble would only cover it.
+    fab.classList.toggle("show", !chatOpen && !agentInView());
   }
   window.addEventListener("resize", updateFab);
   setTimeout(updateFab, 0);
