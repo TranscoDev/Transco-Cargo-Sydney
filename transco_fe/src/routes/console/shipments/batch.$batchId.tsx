@@ -19,6 +19,7 @@ import type { ConsolidationDetail } from "@/lib/transco/types";
 import { Breadcrumbs, LoadingRows, PageShell, StatusBadge } from "@/components/transco/page-kit";
 import { forgetShipmentList } from "@/components/transco/shipment-picker";
 import { notify } from "@/lib/transco/notify";
+import { getCurrentUser } from "@/lib/transco/auth";
 import { shipmentStatus } from "@/lib/transco/status";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,8 @@ function BatchDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Warehouse logins don't see shipment income/profit.
+  const showMoney = getCurrentUser()?.role !== "warehouse";
 
   const load = () => {
     setError(null);
@@ -152,6 +155,7 @@ function BatchDetailPage() {
           </div>
 
           <div className="mb-8 grid items-start gap-6 lg:grid-cols-2">
+            {showMoney && (
             <SectionCard icon={Wallet} tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" title="Money">
               <div className="flex flex-col gap-2 text-sm">
                 <Line label="Income" value={AUD.format(batch.financials.grossIncome)} />
@@ -171,6 +175,7 @@ function BatchDetailPage() {
                 )}
               </div>
             </SectionCard>
+            )}
 
             <SectionCard icon={CalendarDays} tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" title="Key dates">
               <div className="flex flex-col gap-2 text-sm">

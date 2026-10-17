@@ -26,7 +26,7 @@ const {
 } = require('./customerTools');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const pii = require('./pii');
-const { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf } = require('./formsPdf');
+const { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf, upbMissing } = require('./formsPdf');
 
 const IP_WINDOW_MS = 15 * 60 * 1000;
 const IP_MAX_SUBMISSIONS = Number(process.env.WALKIN_IP_LIMIT) || 8;
@@ -574,6 +574,8 @@ module.exports = function createWalkInRouters({
   formsRouter.get('/:bookingId/forms.pdf', wrap(async (req, res) => {
     const d = await loadForPrint(req, res);
     if (!d) return;
+    const missing = upbMissing(d);
+    if (missing) return res.status(400).json({ error: missing });
     const pdf = await allFormsPdf(d);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Transco-forms-${refOf(d)}.pdf"`);
@@ -627,6 +629,8 @@ module.exports = function createWalkInRouters({
   formsRouter.get('/:bookingId/forms/:key', wrap(async (req, res) => {
     const d = await loadForPrint(req, res);
     if (!d) return;
+    const missing = req.params.key === 'upb' && upbMissing(d);
+    if (missing) return res.status(400).json({ error: missing });
     const one = await singleFormPdf(d, req.params.key);
     if (!one) return res.status(404).json({ error: 'This booking does not have that form.' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -642,6 +646,8 @@ module.exports = function createWalkInRouters({
     const d = await loadForPrint(req, res);
     if (!d) return;
     if (!d.blNumber) return res.status(400).json({ error: 'Assign the BL number first — the forms are sent once the BL is assigned.' });
+    const missing = upbMissing(d);
+    if (missing) return res.status(400).json({ error: missing });
     const files = await formAttachments(d);
     const name = d.sender ? d.sender.fullName : (d.customer && d.customer.name) || 'Customer';
     const booking = await bookings().findOne({ _id: new ObjectId(d.bookingId) });

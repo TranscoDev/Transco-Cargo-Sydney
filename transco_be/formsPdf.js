@@ -320,15 +320,15 @@ async function addShippingDeclaration(doc, d) {
   one(36, 235.3, 62, caps(d.collectionCentre));
   // BL No is left blank — the office writes it in by hand.
 
-  // Remarks: our form number + pickup/delivery (as the old form did).
-  const remark = [
-    d.bookingCode,
-    d.deliveryKey === 'collect' ? 'Pickup from the destination warehouse' : d.deliveryKey === 'door' ? 'Door delivery' : null
-  ].filter(Boolean).join(' - ');
+  // Remarks: pickup/delivery only (no booking number on the paper form).
+  const remark = d.deliveryKey === 'collect' ? 'Pickup from the destination warehouse' : d.deliveryKey === 'door' ? 'Door delivery' : '';
   flow([{ x: 9, y: 253.8, w: 88 }, { x: 9, y: 258.0, w: 88 }], remark, { size: 9 });
 
-  // Declarant: name (two short lines), signature, date.
-  flow([{ x: 104.5, y: 244.9, w: 32 }, { x: 104.5, y: 248.0, w: 32 }], caps(signedName), { size: 8, align: 'center' });
+  // Declarant: name sits on its line, level with the date; a long name
+  // takes two lines ending on that same line. Then signature, date.
+  const declarant = caps(signedName);
+  if (font.widthOfTextAtSize(printable(declarant), 8) * 1.02 <= 32 * MM) one(104.5, 247.6, 32, declarant, { size: 8, align: 'center' });
+  else flow([{ x: 104.5, y: 244.6, w: 32 }, { x: 104.5, y: 247.6, w: 32 }], declarant, { size: 8, align: 'center' });
   if (d.signature && d.signature.image) await drawSignature(doc, page, d.signature.image, { x: 141, y: 241.6, w: 31, h: 7.8 });
   one(178, 247.6, 20, dmy(signedDate), { size: 9, align: 'center' });
 
@@ -362,6 +362,16 @@ const UPB_ROW_H = (239.1 - 106.7) / UPB_ROWS;
 // The printed form numbers its rows ...9, 11, 10, 12... — so item 10 goes
 // on the row printed "10." and item 11 on the row printed "11.".
 const UPB_ROW_FOR_ITEM = n => (n === 10 ? 10 : n === 11 ? 9 : n - 1);
+
+/** Customs won't take a UPB form with a blank Quantity or Value, so it
+ * isn't made until every listed item has both (null = OK). An empty list
+ * is fine — the office fills that form by hand. */
+function upbMissing(d) {
+  if (!formsFor(d).some(f => f.key === 'upb')) return null;
+  const bad = (d.contents || []).find(c => !(Number.isInteger(c.qty) && c.qty > 0) || typeof c.value !== 'number');
+  if (!bad) return null;
+  return `Fill in the quantity and value of every item first ("${bad.description}" is missing one) — the UPB form can't go with empty fields. Add them in the Confirm section.`;
+}
 
 async function addUpbGiftDeclaration(doc, d) {
   const contents = d.contents || [];
@@ -631,4 +641,4 @@ async function formAttachments(d) {
   return out;
 }
 
-module.exports = { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf };
+module.exports = { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf, upbMissing };

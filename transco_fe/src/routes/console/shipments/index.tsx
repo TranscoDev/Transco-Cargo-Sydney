@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/components/transco/page-kit";
 import { shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
+import { getCurrentUser } from "@/lib/transco/auth";
 import { createConsolidation, fetchConsolidations, fetchShipments } from "@/lib/transco/api";
 import { forgetShipmentList } from "@/components/transco/shipment-picker";
 import { ShipmentSheetImportDialog } from "@/components/transco/shipment-sheet-import";
@@ -201,6 +202,8 @@ function BatchListView({
   error: string | null;
   unassignedCount: number;
 }) {
+  // Warehouse logins don't see shipment income/profit.
+  const showMoney = getCurrentUser()?.role !== "warehouse";
   if (error) return <ErrorState title="Couldn't load shipments" onRetry={() => window.location.reload()} />;
   if (loading) return <LoadingRows rows={5} />;
   if (consolidations.length === 0) {
@@ -241,8 +244,8 @@ function BatchListView({
               <th className="px-4 py-3 font-medium">PE Number</th>
               <th className="px-4 py-3 font-medium">HBL Range</th>
               <th className="px-4 py-3 font-medium">Imported</th>
-              <th className="px-4 py-3 font-medium">Gross Income</th>
-              <th className="px-4 py-3 font-medium">Gross Profit</th>
+              {showMoney && <th className="px-4 py-3 font-medium">Gross Income</th>}
+              {showMoney && <th className="px-4 py-3 font-medium">Gross Profit</th>}
               <th className="px-4 py-3 font-medium">PEBL ETA</th>
             </tr>
           </thead>
@@ -269,10 +272,12 @@ function BatchListView({
                     <span className="ml-1.5 text-xs text-muted-foreground">imported so far</span>
                   )}
                 </td>
-                <td className="px-4 py-3 tabular-nums">{AUD.format(c.financials.grossIncome)}</td>
-                <td className="px-4 py-3 tabular-nums text-success-foreground">
-                  {AUD.format(c.financials.grossProfit)}
-                </td>
+                {showMoney && <td className="px-4 py-3 tabular-nums">{AUD.format(c.financials.grossIncome)}</td>}
+                {showMoney && (
+                  <td className="px-4 py-3 tabular-nums text-success-foreground">
+                    {AUD.format(c.financials.grossProfit)}
+                  </td>
+                )}
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {c.dates.peblEta || "—"}
                 </td>
