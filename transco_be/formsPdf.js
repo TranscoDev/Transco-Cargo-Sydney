@@ -318,7 +318,7 @@ async function addShippingDeclaration(doc, d) {
     box(84.8, 100.2, o.total);
   }
   one(36, 235.3, 62, caps(d.collectionCentre));
-  one(19, 241.1, 79, caps(d.blNumber));
+  // BL No is left blank — the office writes it in by hand.
 
   // Remarks: our form number + pickup/delivery (as the old form did).
   const remark = [
@@ -332,8 +332,8 @@ async function addShippingDeclaration(doc, d) {
   if (d.signature && d.signature.image) await drawSignature(doc, page, d.signature.image, { x: 141, y: 241.6, w: 31, h: 7.8 });
   one(178, 247.6, 20, dmy(signedDate), { size: 9, align: 'center' });
 
-  // Bottom receipt slip: BL No / Date.
-  one(117, 283.4, 24, caps(d.blNumber), { size: 9 });
+  // Bottom receipt slip: only the Date — BL No, Received AUD and
+  // Package/s are filled in by hand at the office.
   one(117, 290.9, 24, dmy(signedDate || d.createdAt), { size: 9 });
 }
 
