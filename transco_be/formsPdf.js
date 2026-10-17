@@ -203,7 +203,7 @@ async function drawSignature(doc, page, image, box) {
 // bigger gap at the bottom. The other forms are original PDFs with their
 // own margins, so they stay full size.
 const PRINT_SCALE = 0.92;
-const PRINT_TOP_MM = 6;
+const PRINT_TOP_MM = 5;
 const edgeToEdgePages = new WeakSet();
 async function save(doc) {
   for (const page of doc.getPages()) {
@@ -224,18 +224,26 @@ async function shippingDeclarationPdf(d) {
   return await save(doc);
 }
 
-// The scanned form stops mid-way through the footer's second address line.
-// Blank the half-cut line and draw the rest of the footer below the scan,
-// in the space print-scaling leaves at the bottom (y > 297 mm is fine there).
-function finishDeclarationFooter(page, font) {
+// The scanned form stops mid-way through the footer, and its head-office
+// line is out of date. Keep the scan's logo, BL No and Date, blank the rest,
+// and draw the footer as on the current paper form — below the scan, in the
+// space print-scaling leaves at the bottom (y > 297 mm is fine there).
+function finishDeclarationFooter(page, font, regular) {
   const y = mm => PAGE_H - mm * MM;
   const LINE = rgb(0.2, 0.2, 0.2);
-  const BOTTOM = 300.5;
+  const BOTTOM = 305;
   const white = rgb(1, 1, 1);
-  page.drawRectangle({ x: 7 * MM, y: y(297), width: 92.6 * MM, height: 2.9 * MM, color: white });
+  const text = (t, x, top, size, f = regular) => page.drawText(t, { x: x * MM, y: y(top) - size * 0.35, size, font: f, color: LINE });
+  page.drawRectangle({ x: 7 * MM, y: y(297), width: 92.6 * MM, height: 6.6 * MM, color: white });
   page.drawRectangle({ x: 101 * MM, y: y(297), width: 99 * MM, height: 2.9 * MM, color: white });
-  page.drawText('45 Adrian Road, Campbellfield VIC 3061', { x: 21 * MM, y: y(296.6), size: 8.5, font, color: LINE });
-  for (const x of [6.2, 100.2, 200.7]) page.drawLine({ start: { x: x * MM, y: y(296) }, end: { x: x * MM, y: y(BOTTOM) }, thickness: 1, color: LINE });
+  text('Transco Head Office : 45 Adrian Road, Campbellfield VIC 3061', 9, 292.3, 7.5);
+  text('Tel : 61 3 9357 7228   Fax: 61 3 9357 7229', 9, 295.4, 7.5);
+  text('1300 - 1 - TRANSCO', 9, 298.5, 7.5);
+  text('info@transcocargo.com.au     www.transcocargo.com.au', 9, 301.9, 8, font);
+  text('Received AUD ____________ for ________ Package/s', 104, 297.4, 9);
+  page.drawLine({ start: { x: 100.2 * MM, y: y(300) }, end: { x: 200.7 * MM, y: y(300) }, thickness: 0.6, color: LINE });
+  text('Please Quote given Ref. No when enquiring about your shipment', 102, 302.5, 7.3, font);
+  for (const x of [6.2, 100.2, 200.7]) page.drawLine({ start: { x: x * MM, y: y(290) }, end: { x: x * MM, y: y(BOTTOM) }, thickness: 1, color: LINE });
   page.drawLine({ start: { x: 6.2 * MM, y: y(BOTTOM) }, end: { x: 200.7 * MM, y: y(BOTTOM) }, thickness: 1, color: LINE });
 }
 
@@ -245,7 +253,7 @@ async function addShippingDeclaration(doc, d) {
   page.drawImage(bg, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
   edgeToEdgePages.add(page);
   const font = await doc.embedFont(StandardFonts.HelveticaBold);
-  finishDeclarationFooter(page, font);
+  finishDeclarationFooter(page, font, await doc.embedFont(StandardFonts.Helvetica));
   const { flow, one, tick } = createWriter(page, font);
 
   const sender = d.sender;
