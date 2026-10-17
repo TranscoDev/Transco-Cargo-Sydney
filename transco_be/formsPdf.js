@@ -197,20 +197,55 @@ async function drawSignature(doc, page, image, box) {
   }
 }
 
+// The declaration scan runs right to the paper edge, but office printers
+// can't print the edges — and lose the most at the bottom, so the footer
+// got cut off. That page is shrunk and sits near the top, leaving the
+// bigger gap at the bottom. The other forms are original PDFs with their
+// own margins, so they stay full size.
+const PRINT_SCALE = 0.92;
+const PRINT_TOP_MM = 6;
+const edgeToEdgePages = new WeakSet();
+async function save(doc) {
+  for (const page of doc.getPages()) {
+    if (!edgeToEdgePages.has(page)) continue;
+    const { width, height } = page.getSize();
+    page.scaleContent(PRINT_SCALE, PRINT_SCALE);
+    page.translateContent((width * (1 - PRINT_SCALE)) / 2, height * (1 - PRINT_SCALE) - PRINT_TOP_MM * MM);
+  }
+  return Buffer.from(await doc.save());
+}
+
 /** One booking's Shipping Declaration as PDF bytes. `d` = getDeclarationForPrint(). */
 async function shippingDeclarationPdf(d) {
   const doc = await PDFDocument.create();
   doc.setTitle(`Shipping declaration ${d.blNumber ? `BL ${d.blNumber}` : d.bookingCode || ''}`.trim());
   doc.setAuthor('Transco Cargo Sydney');
   await addShippingDeclaration(doc, d);
-  return Buffer.from(await doc.save());
+  return await save(doc);
+}
+
+// The scanned form stops mid-way through the footer's second address line.
+// Blank the half-cut line and draw the rest of the footer below the scan,
+// in the space print-scaling leaves at the bottom (y > 297 mm is fine there).
+function finishDeclarationFooter(page, font) {
+  const y = mm => PAGE_H - mm * MM;
+  const LINE = rgb(0.2, 0.2, 0.2);
+  const BOTTOM = 300.5;
+  const white = rgb(1, 1, 1);
+  page.drawRectangle({ x: 7 * MM, y: y(297), width: 92.6 * MM, height: 2.9 * MM, color: white });
+  page.drawRectangle({ x: 101 * MM, y: y(297), width: 99 * MM, height: 2.9 * MM, color: white });
+  page.drawText('45 Adrian Road, Campbellfield VIC 3061', { x: 21 * MM, y: y(296.6), size: 8.5, font, color: LINE });
+  for (const x of [6.2, 100.2, 200.7]) page.drawLine({ start: { x: x * MM, y: y(296) }, end: { x: x * MM, y: y(BOTTOM) }, thickness: 1, color: LINE });
+  page.drawLine({ start: { x: 6.2 * MM, y: y(BOTTOM) }, end: { x: 200.7 * MM, y: y(BOTTOM) }, thickness: 1, color: LINE });
 }
 
 async function addShippingDeclaration(doc, d) {
   const page = doc.addPage([PAGE_W, PAGE_H]);
   const bg = await doc.embedJpg(declarationBackground());
   page.drawImage(bg, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+  edgeToEdgePages.add(page);
   const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  finishDeclarationFooter(page, font);
   const { flow, one, tick } = createWriter(page, font);
 
   const sender = d.sender;
@@ -561,7 +596,7 @@ async function allFormsPdf(d) {
   doc.setTitle(`Transco forms ${refOf(d)}`);
   doc.setAuthor('Transco Cargo Sydney');
   for (const f of formsFor(d)) await f.add(doc, d);
-  return Buffer.from(await doc.save());
+  return await save(doc);
 }
 
 /** One of the booking's forms on its own (key from formsFor), or null. */
@@ -572,7 +607,7 @@ async function singleFormPdf(d, key) {
   doc.setTitle(`${f.title} ${refOf(d)}`);
   doc.setAuthor('Transco Cargo Sydney');
   await f.add(doc, d);
-  return { filename: `${f.title.replace(/[^A-Za-z0-9]+/g, '-')}-${refOf(d)}.pdf`, content: Buffer.from(await doc.save()) };
+  return { filename: `${f.title.replace(/[^A-Za-z0-9]+/g, '-')}-${refOf(d)}.pdf`, content: await save(doc) };
 }
 
 /** Each form as its own PDF — what "Send email" attaches. */
@@ -583,7 +618,7 @@ async function formAttachments(d) {
     doc.setTitle(`${f.title} ${refOf(d)}`);
     doc.setAuthor('Transco Cargo Sydney');
     await f.add(doc, d);
-    out.push({ filename: `${f.title.replace(/[^A-Za-z0-9]+/g, '-')}-${refOf(d)}.pdf`, content: Buffer.from(await doc.save()) });
+    out.push({ filename: `${f.title.replace(/[^A-Za-z0-9]+/g, '-')}-${refOf(d)}.pdf`, content: await save(doc) });
   }
   return out;
 }
