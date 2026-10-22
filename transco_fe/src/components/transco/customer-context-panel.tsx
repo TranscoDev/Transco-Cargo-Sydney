@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { CalendarClock, Mail, Package, Phone, Receipt, Ship, SquareUserRound } from "lucide-react";
+import { CalendarClock, Mail, Package, Phone, Ship, SquareUserRound, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -23,10 +23,12 @@ export function CustomerContextPanel({
   conversation,
   bookings,
   shipments,
+  onClose,
 }: {
   conversation: Conversation;
   bookings: Booking[];
   shipments: Shipment[];
+  onClose: () => void;
 }) {
   // A signed-in website chat belongs to the customer's real account.
   const owners = new Set([conversation.id, conversation.linkedAccount?.id].filter(Boolean));
@@ -36,8 +38,23 @@ export function CustomerContextPanel({
     .filter((s) => owners.has(s.customerId) && s.status !== "delivered")
     .slice(0, 3);
 
+  // Slide-out "Contact info" drawer (like WhatsApp) — opened by clicking the
+  // name in the chat header, so the chat gets the full width by default.
   return (
-    <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-nav-tint p-4 xl:block">
+    <>
+    <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} aria-hidden />
+    <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-sm overflow-y-auto border-l border-border bg-nav-tint p-4 shadow-xl">
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contact info</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close contact info"
+          className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-secondary"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
       <div className="mb-4">
         <p className="text-sm font-semibold text-foreground">{conversation.customerName}</p>
         <div className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
@@ -112,10 +129,6 @@ export function CustomerContextPanel({
         <WarehouseQuestionsList conversation={conversation} />
       </Section>
 
-      <Section icon={Receipt} title="Outstanding Payments">
-        <EmptyLine text="Available in Phase 5." />
-      </Section>
-
       <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-4">
         <Link
           to="/console/customers/$customerId"
@@ -134,6 +147,7 @@ export function CustomerContextPanel({
         </Link>
       </div>
     </aside>
+    </>
   );
 }
 

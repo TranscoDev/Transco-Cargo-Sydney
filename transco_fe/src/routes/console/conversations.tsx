@@ -49,9 +49,12 @@ function ConversationsPage() {
   const [view, setView] = useState<View>("all");
   // Which chat a staff reply goes to: the WhatsApp one, or a website chat.
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  // Contact info drawer (replaces the old always-on right sidebar).
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const select = (id: string | null) => {
     setView("all");
+    setInfoOpen(false);
     setReplyTo(null);
     selectConversation(id);
     rows.find((r) => r.id === id)?.mergedIds?.forEach((m) => markAsRead(m));
@@ -133,10 +136,18 @@ function ConversationsPage() {
                   onSendAttachment={(file, caption) => sendAttachment(target.id, file, caption)}
                   onModeChange={(mode) => setMode(target.id, mode)}
                   onBack={() => select(null)}
+                  onShowInfo={() => setInfoOpen(true)}
                 />
               </div>
             </div>
-            <CustomerContextPanel conversation={selectedConversation!} bookings={bookings} shipments={shipments} />
+            {infoOpen && (
+              <CustomerContextPanel
+                conversation={selectedConversation!}
+                bookings={bookings}
+                shipments={shipments}
+                onClose={() => setInfoOpen(false)}
+              />
+            )}
           </>
         ) : (
           <div className="grid h-full place-items-center bg-chat-canvas px-6">

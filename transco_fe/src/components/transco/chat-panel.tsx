@@ -49,6 +49,7 @@ export function ChatPanel({
   onSendAttachment,
   onModeChange,
   onBack,
+  onShowInfo,
 }: {
   conversation: Conversation;
   sending: boolean;
@@ -56,6 +57,8 @@ export function ChatPanel({
   onSendAttachment?: ((file: File, caption?: string) => Promise<void>) | undefined;
   onModeChange: (mode: ConversationMode) => void;
   onBack?: () => void;
+  /** Opens the slide-out contact info drawer. */
+  onShowInfo?: () => void;
 }) {
   const isHuman = conversation.mode === "HUMAN";
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -98,14 +101,20 @@ export function ChatPanel({
           )}
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold text-foreground">
-              <Link
-                to="/console/customers/$customerId"
-                params={{ customerId: profileId }}
-                title="Open customer profile"
-                className="hover:underline"
-              >
-                {conversation.customerName}
-              </Link>
+              {onShowInfo ? (
+                <button type="button" onClick={onShowInfo} title="Contact info" className="hover:underline">
+                  {conversation.customerName}
+                </button>
+              ) : (
+                <Link
+                  to="/console/customers/$customerId"
+                  params={{ customerId: profileId }}
+                  title="Open customer profile"
+                  className="hover:underline"
+                >
+                  {conversation.customerName}
+                </Link>
+              )}
             </h1>
             <p className="flex items-center gap-3 truncate text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
