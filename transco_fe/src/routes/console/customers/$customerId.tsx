@@ -32,6 +32,12 @@ import { canSee } from "@/lib/transco/auth";
 import { notify, friendlyError } from "@/lib/transco/notify";
 import { bookingStatus, SENDER_LABEL, shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
+import { NewTaskButton, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
+
+function ProfileTasksLine({ customerId }: { customerId: string }) {
+  const tasks = useOpenTasksAbout({ customerIds: [customerId] });
+  return <OpenTasksLine tasks={tasks} className="mt-2" />;
+}
 import type { Booking, CustomerProfile, Shipment } from "@/lib/transco/types";
 import { formatPhone, telHref } from "@/lib/transco/phone";
 
@@ -152,9 +158,20 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
                 </a>
               )}
             </div>
+            <ProfileTasksLine customerId={p.id} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <NewTaskButton
+            label="Task"
+            variant="outline"
+            defaultAssignTo="person"
+            about={{
+              customerId: p.id,
+              customerName: p.customerName,
+              context: [p.customerCode, formatPhone(p.phoneNumber), p.email].filter(Boolean).join(" · "),
+            }}
+          />
           {!viewOnly && p.messages.length > 0 && (
             <Button type="button" onClick={openChat}>
               <MessageCircle className="mr-2 h-4 w-4" /> Open conversation

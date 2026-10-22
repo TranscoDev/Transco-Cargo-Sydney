@@ -38,14 +38,22 @@ function questionOf(task: StaffTask) {
   return task.customerName && task.title.startsWith(prefix) ? task.title.slice(prefix.length) : task.title;
 }
 
-/** Warehouse questions about this customer, newest first. */
+/** "warehouse", "the team", "Malshani" or "you" — who a task is waiting on. */
+function waitingOn(t: StaffTask) {
+  if (t.assignTo === "me") return "you";
+  if (t.assignTo === "person") return firstName(t.assigneeName);
+  return t.team === "all" ? "the team" : "warehouse";
+}
+
+/** Open tasks about this customer, newest first. */
 export function useWarehouseQuestions(chat: ChatLike): StaffTask[] {
   const { tasks } = useTasks();
   const key = customerIds(chat).join(",");
   return useMemo(() => {
     const ids = new Set(key.split(","));
     return tasks
-      .filter((t) => t.assignTo === "team" && t.customerId && ids.has(t.customerId))
+      // Any task about this customer (made with "+ Task" in the chat, a booking or the profile).
+      .filter((t) => t.customerId && ids.has(t.customerId))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [tasks, key]);
 }
@@ -222,14 +230,14 @@ export function WarehouseStrip({ conversation, onUseInReply }: { conversation: C
       <div className="min-w-0 flex-1">
         {waiting ? (
           <p className="text-sm text-warning-foreground">
-            <span className="font-semibold">Waiting on warehouse</span> · “{questionOf(t)}” · {waitedFor(t.createdAt)}
+            <span className="font-semibold">Waiting on {waitingOn(t)}</span> · “{questionOf(t)}” · {waitedFor(t.createdAt)}
             {t.claimedByName ? ` · ${firstName(t.claimedByName)} is on it` : ""}
           </p>
         ) : answer ? (
           <>
             <p className="text-xs text-success-foreground/80">“{questionOf(t)}”</p>
             <p className="whitespace-pre-wrap break-words text-sm text-success-foreground">
-              <span className="font-semibold">Warehouse ({firstName(answer.byName)}):</span> {answer.text}
+              <span className="font-semibold">{firstName(answer.byName)}:</span> {answer.text}
             </p>
           </>
         ) : (
@@ -265,7 +273,7 @@ export function WarehouseStrip({ conversation, onUseInReply }: { conversation: C
 export function WarehouseQuestionsList({ conversation }: { conversation: Conversation }) {
   const questions = useWarehouseQuestions(conversation).slice(0, 5);
   const [open, setOpen] = useState<StaffTask | null>(null);
-  if (!questions.length) return <p className="text-xs text-muted-foreground">None yet. Use “Ask Warehouse” above the chat.</p>;
+  if (!questions.length) return <p className="text-xs text-muted-foreground">None yet. Use “+ Task” above the chat.</p>;
   return (
     <div className="flex flex-col gap-1.5">
       {questions.map((t) => {
@@ -297,7 +305,7 @@ export function WarehouseTag({ conversation }: { conversation: ConversationSumma
         answered ? "bg-success-soft text-success-foreground" : "bg-warning-soft text-warning-foreground",
       )}
     >
-      📦 {answered ? "Answered" : "Warehouse"}
+      📋 {answered ? "Answered" : "Task"}
     </span>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import { API_BASE_URL } from "./config";
 import { getAuthToken } from "./auth";
+import type { Booking } from "./types";
 
 /**
  * Staff tasks (transco_be/taskRoutes.js). One shared copy of "the tasks I
@@ -42,6 +43,7 @@ export interface StaffTask {
   customerId: string | null;
   customerName: string | null;
   bookingId: string | null;
+  context?: string | null;
   comments: TaskComment[];
   createdAt: string;
   updatedAt: string;
@@ -68,6 +70,40 @@ export interface NewTaskInput {
   customerId?: string | undefined;
   customerName?: string | undefined;
   bookingId?: string | undefined;
+  /** Customer/booking details line, when made from a chat, booking or profile. */
+  context?: string | undefined;
+  /** Team tasks: "warehouse" (default) or "all" (anyone can claim). */
+  team?: "warehouse" | "all" | undefined;
+}
+
+/** A booking as task details: who, which booking, when, what. */
+export function bookingTaskAbout(b: Booking): TaskAbout {
+  const when = [b.resolvedDate ? new Date(`${b.resolvedDate}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" }) : null, b.requestedTime]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    customerId: b.customerId || null,
+    customerName: b.customerName || b.phoneNumber || "Booking",
+    bookingId: b.id,
+    context: [
+      b.bookingCode,
+      b.phoneNumber,
+      when ? `${b.handover === "pickup" ? "Pickup" : "Drop-off"} ${when}` : null,
+      b.boxSummary,
+      b.destination,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  };
+}
+
+/** What a task made from a chat, booking or customer profile is about. */
+export interface TaskAbout {
+  customerId?: string | null | undefined;
+  customerName?: string | null | undefined;
+  bookingId?: string | null | undefined;
+  /** One line: CUS code · phone · booking details. */
+  context?: string | undefined;
 }
 
 export interface TaskPerson {
@@ -287,7 +323,10 @@ export function fmtDue(task: StaffTask, now = new Date()): string | null {
 export function forWhom(task: StaffTask, meId?: string): string {
   if (task.assignTo === "me") return "My to-do";
   if (task.assignTo === "person") return task.assigneeId === meId ? "For me" : `For ${task.assigneeName ?? "a colleague"}`;
-  return task.claimedByName ? `Warehouse · ${task.claimedById === meId ? "you" : task.claimedByName}` : "Warehouse team · not claimed";
+  const team = task.team === "all" ? "Everyone" : "Warehouse";
+  return task.claimedByName
+    ? `${team} · ${task.claimedById === meId ? "you" : task.claimedByName}`
+    : `${team === "Everyone" ? "Everyone" : "Warehouse team"} · not claimed`;
 }
 
 /** Tasks this person should do (personal, given to them, or team tasks they claimed). */

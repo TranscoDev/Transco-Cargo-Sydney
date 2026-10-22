@@ -125,7 +125,7 @@ export function CustomerContextPanel({
         )}
       </Section>
 
-      <Section icon={Package} title="Warehouse Questions">
+      <Section icon={Package} title="Tasks">
         <WarehouseQuestionsList conversation={conversation} />
       </Section>
 

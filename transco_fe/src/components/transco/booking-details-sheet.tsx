@@ -27,6 +27,9 @@ import { ShipmentPicker } from "@/components/transco/shipment-picker";
 import { MoveShipmentControl } from "@/components/transco/move-shipment";
 import { Breadcrumbs, PageShell, StatusBadge } from "@/components/transco/page-kit";
 import { formatPhone } from "@/lib/transco/phone";
+import { useConversations } from "@/lib/transco/store";
+import { bookingTaskAbout } from "@/lib/transco/tasks";
+import { NewTaskButton, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
 
 /**
  * Everything staff need about one booking in one place — customer,
@@ -156,6 +159,8 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
   const d = data && data.bookingId === bookingId ? data : null;
   const confirm = d?.confirm ?? null;
   const name = d ? d.customer.name ?? d.sender?.fullName ?? "No name" : "";
+  const listed = useConversations().bookings.find((b) => b.id === bookingId);
+  const bookingTasks = useOpenTasksAbout({ bookingId });
 
   return (
     <PageShell width="full" className="max-w-350">
@@ -179,8 +184,10 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
                 ))}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">{d ? [name, d.itemsText, [d.destination, d.country].filter(Boolean).join(", ")].filter(Boolean).join(" · ") : "Loading…"}</p>
+            <OpenTasksLine tasks={bookingTasks} className="mt-2" />
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {listed && <NewTaskButton label="Task" variant="outline" defaultAssignTo="person" about={bookingTaskAbout(listed)} />}
             <Button type="button" variant="outline" onClick={() => setEditing(true)} disabled={!d}>
               <PenLine className="mr-2 h-4 w-4" /> Change details
             </Button>

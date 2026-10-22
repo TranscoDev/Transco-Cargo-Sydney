@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, Hand, Leaf, Lock, MessageSquare, Plus, Trash2, UserRound, Users } from "lucide-react";
+import { Check, Hand, Leaf, ListTodo, Lock, MessageSquare, Plus, Trash2, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
   useTasks,
   waitedFor,
   type StaffTask,
+  type TaskAbout,
   type TaskAction,
   type TaskAssignTo,
   type TaskMe,
@@ -179,6 +180,21 @@ export function TaskCard({ task, me, onOpen }: { task: StaffTask; me: TaskMe | n
         </span>
       </button>
       <DeleteIcon task={task} me={me} className="absolute right-1.5 top-1.5" />
+      {/* Who it's about (made from a chat, booking or profile) — opens the booking or customer. */}
+      {task.customerName && (
+        <Link
+          to={task.bookingId ? "/console/bookings/$bookingId" : "/console/customers/$customerId"}
+          params={task.bookingId ? { bookingId: task.bookingId } : { customerId: task.customerId ?? "" }}
+          disabled={!task.bookingId && (!task.customerId || !canSee("customer-profile"))}
+          className="flex items-start gap-2 rounded-lg bg-secondary/70 px-2.5 py-1.5 text-xs hover:bg-secondary"
+        >
+          <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-foreground">{task.customerName}</span>
+            {task.context && <span className="line-clamp-2 block text-muted-foreground">{task.context}</span>}
+          </span>
+        </Link>
+      )}
       <TaskChips task={task} />
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span className="min-w-0">
@@ -458,15 +474,19 @@ export function NewTaskDialog({
   open,
   onClose,
   defaultAssignTo = "team",
+  about,
 }: {
   open: boolean;
   onClose: () => void;
   defaultAssignTo?: TaskAssignTo | undefined;
+  /** Made from a chat, booking or customer profile — attached to the task. */
+  about?: TaskAbout | undefined;
 }) {
   const { me } = useTasks();
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [assignTo, setAssignTo] = useState<TaskAssignTo>(defaultAssignTo);
+  const [everyone, setEveryone] = useState(false);
   const [personId, setPersonId] = useState("");
   const [people, setPeople] = useState<TaskPerson[] | null>(null);
   const [due, setDue] = useState<DueChoice>("none");
@@ -480,6 +500,7 @@ export function NewTaskDialog({
     setTitle("");
     setNote("");
     setAssignTo(defaultAssignTo);
+    setEveryone(false);
     setPersonId("");
     setDue("none");
     setPickDate("");
@@ -517,8 +538,13 @@ export function NewTaskDialog({
         note: note.trim() || undefined,
         assignTo,
         personId: assignTo === "person" ? personId : undefined,
+        team: assignTo === "team" ? (everyone ? "all" : "warehouse") : undefined,
         dueDate,
         dueTime: dueDate && time ? time : null,
+        customerId: about?.customerId ?? undefined,
+        customerName: about?.customerName ?? undefined,
+        bookingId: about?.bookingId ?? undefined,
+        context: about?.context,
       });
       toast.success(assignTo === "me" ? "Added to your list" : "Task sent ✓");
       onClose();
@@ -537,6 +563,16 @@ export function NewTaskDialog({
           <DialogDescription>Only the first box is needed. Everything else is optional.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
+          {about?.customerName && (
+            <div className="flex items-start gap-2.5 rounded-lg border bg-secondary/60 px-3 py-2">
+              <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <div className="min-w-0 text-sm">
+                <p className="font-semibold text-foreground">{about.customerName}</p>
+                {about.context && <p className="text-xs text-muted-foreground">{about.context}</p>}
+                <p className="mt-0.5 text-xs text-muted-foreground">Attached to the task automatically.</p>
+              </div>
+            </div>
+          )}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="task-title" className="text-sm font-semibold text-foreground">
               What needs doing?
@@ -550,15 +586,22 @@ export function NewTaskDialog({
               <Choice on={assignTo === "me"} onClick={() => setAssignTo("me")}>
                 <Lock className="h-3.5 w-3.5" aria-hidden /> Me only
               </Choice>
-              <Choice on={assignTo === "team"} onClick={() => setAssignTo("team")}>
+              <Choice on={assignTo === "team" && !everyone} onClick={() => { setAssignTo("team"); setEveryone(false); }}>
                 <Users className="h-3.5 w-3.5" aria-hidden /> Warehouse team
+              </Choice>
+              <Choice on={assignTo === "team" && everyone} onClick={() => { setAssignTo("team"); setEveryone(true); }}>
+                <Users className="h-3.5 w-3.5" aria-hidden /> Everyone
               </Choice>
               <Choice on={assignTo === "person"} onClick={() => setAssignTo("person")}>
                 <UserRound className="h-3.5 w-3.5" aria-hidden /> A person
               </Choice>
             </div>
             {assignTo === "me" && <p className="text-xs text-muted-foreground">Private — only you will see it.</p>}
-            {assignTo === "team" && <p className="text-xs text-muted-foreground">Anyone in the warehouse can claim it. Once claimed, it's theirs.</p>}
+            {assignTo === "team" && (
+              <p className="text-xs text-muted-foreground">
+                {everyone ? "Any staff member can claim it." : "Anyone in the warehouse can claim it."} Once claimed, it's theirs.
+              </p>
+            )}
             {assignTo === "person" && (
               <>
                 <label htmlFor="task-person" className="sr-only">
@@ -700,6 +743,12 @@ export function TaskDetailsDialog({ task: initial, onClose }: { task: StaffTask 
 
         {task.note && <p className="whitespace-pre-wrap rounded-lg bg-secondary px-3 py-2 text-sm text-foreground">{task.note}</p>}
 
+        {task.context && <p className="text-sm text-muted-foreground">{task.context}</p>}
+        {task.bookingId && (
+          <Link to="/console/bookings/$bookingId" params={{ bookingId: task.bookingId }} className="text-sm font-medium text-primary hover:underline">
+            Open the booking →
+          </Link>
+        )}
         {task.customerId && !canSee("customer-profile") && task.customerName && (
           <p className="text-sm text-muted-foreground">Customer: {task.customerName}</p>
         )}
@@ -815,14 +864,88 @@ export function TaskDetailsDialog({ task: initial, onClose }: { task: StaffTask 
   );
 }
 
-export function NewTaskButton({ className, defaultAssignTo }: { className?: string; defaultAssignTo?: TaskAssignTo | undefined }) {
+export function NewTaskButton({
+  className,
+  defaultAssignTo,
+  about,
+  label = "New task",
+  variant,
+}: {
+  className?: string;
+  defaultAssignTo?: TaskAssignTo | undefined;
+  about?: TaskAbout | undefined;
+  label?: string;
+  variant?: "default" | "outline";
+}) {
+  const { me } = useTasks();
   const [open, setOpen] = useState(false);
+  // Tasks not reachable → no button, nothing else affected.
+  if (about && !me) return null;
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)} className={className}>
-        <Plus className="mr-1 h-4 w-4" aria-hidden /> New task
+      <Button type="button" variant={variant} onClick={() => setOpen(true)} className={className}>
+        <Plus className="mr-1 h-4 w-4" aria-hidden /> {label}
       </Button>
-      <NewTaskDialog open={open} onClose={() => setOpen(false)} defaultAssignTo={defaultAssignTo} />
+      <NewTaskDialog open={open} onClose={() => setOpen(false)} defaultAssignTo={defaultAssignTo} about={about} />
+    </>
+  );
+}
+
+/** Small quiet ＋ on a list row (e.g. every booking) — opens the task form. */
+export function AddTaskIcon({ about, className }: { about: TaskAbout; className?: string }) {
+  const { me } = useTasks();
+  const [open, setOpen] = useState(false);
+  if (!me) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Add a task for this"
+        aria-label="Add a task"
+        className={cn(
+          "grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+          className,
+        )}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+      <NewTaskDialog open={open} onClose={() => setOpen(false)} defaultAssignTo="person" about={about} />
+    </>
+  );
+}
+
+/** Open tasks about these customers / this booking, for "1 open task — …" lines. */
+export function useOpenTasksAbout({ customerIds = [], bookingId }: { customerIds?: string[]; bookingId?: string | null | undefined }) {
+  const { tasks } = useTasks();
+  const key = customerIds.join(",");
+  return useMemo(() => {
+    const ids = new Set(key ? key.split(",") : []);
+    return tasks.filter(
+      (t) => t.status !== "done" && ((bookingId && t.bookingId === bookingId) || (!bookingId && t.customerId && ids.has(t.customerId))),
+    );
+  }, [tasks, key, bookingId]);
+}
+
+/** "1 open task — Malshani: Call about pickup" — click to open it. */
+export function OpenTasksLine({ tasks, className }: { tasks: StaffTask[]; className?: string }) {
+  const { me } = useTasks();
+  const [open, setOpen] = useState<StaffTask | null>(null);
+  if (!tasks.length) return null;
+  const first = tasks[0]!;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(first)}
+        className={cn("inline-flex max-w-full items-center gap-1.5 truncate rounded-md bg-warning-soft px-2 py-1 text-xs font-medium text-warning-foreground hover:bg-warning/20", className)}
+      >
+        <ListTodo className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span className="truncate">
+          {tasks.length === 1 ? "1 open task" : `${tasks.length} open tasks`} — {forWhom(first, me?.id).replace(/^For /, "")}: {first.title}
+        </span>
+      </button>
+      <TaskDetailsDialog task={open} onClose={() => setOpen(null)} />
     </>
   );
 }

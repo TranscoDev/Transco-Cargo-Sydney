@@ -40,6 +40,14 @@ import { EmptyState, StatusBadge } from "@/components/transco/page-kit";
 import { bookingStatus } from "@/lib/transco/status";
 import { friendlyError, notify } from "@/lib/transco/notify";
 import { formatPhone, phoneMatches } from "@/lib/transco/phone";
+import { bookingTaskAbout } from "@/lib/transco/tasks";
+import { AddTaskIcon, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
+
+/** "1 open task — Malshani: …" under a booking, so nobody adds it twice. */
+function BookingTasksLine({ bookingId }: { bookingId: string }) {
+  const tasks = useOpenTasksAbout({ bookingId });
+  return <OpenTasksLine tasks={tasks} className="mt-1" />;
+}
 import {
   AlertDialog,
   AlertDialogAction,
@@ -462,6 +470,7 @@ function BookingCard({
             {booking.channel === "walk_in" && !walkInToFinalise && <span className="text-xs text-muted-foreground">· walk-in</span>}
           </div>
           {details && <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground md:truncate">{details}</p>}
+          <BookingTasksLine bookingId={booking.id} />
         </div>
 
         <div className="order-2 ml-auto flex shrink-0 items-center gap-1 md:order-3 md:ml-0">
@@ -478,6 +487,7 @@ function BookingCard({
               </Link>
             </Button>
           )}
+          <AddTaskIcon about={bookingTaskAbout(booking)} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

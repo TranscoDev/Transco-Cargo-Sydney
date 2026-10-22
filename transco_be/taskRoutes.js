@@ -64,6 +64,7 @@ function shape(doc) {
     customerId: doc.customerId || null,
     customerName: doc.customerName || null,
     bookingId: doc.bookingId || null,
+    context: doc.context || null,
     comments: (doc.comments || []).map(c => ({ id: c.id, byId: c.byId, byName: c.byName, text: c.text, at: c.at })),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -187,7 +188,8 @@ module.exports = function createTaskRouter({ broadcast, isStaffAdmin, canDeleteC
       title,
       note: text(body.note, 500) || null,
       assignTo,
-      team: assignTo === 'team' ? 'warehouse' : null,
+      // A team task is for the warehouse, or for everyone ('all').
+      team: assignTo === 'team' ? (body.team === 'all' ? 'all' : 'warehouse') : null,
       assigneeId,
       assigneeName,
       createdById: user.id,
@@ -199,6 +201,9 @@ module.exports = function createTaskRouter({ broadcast, isStaffAdmin, canDeleteC
       customerId: text(body.customerId, 64) || null,
       customerName: text(body.customerName, 120) || null,
       bookingId: text(body.bookingId, 64) || null,
+      // Customer/booking details when made from a chat, booking or profile
+      // (e.g. "CUS-000005 · 0412 345 678 · Pickup 12 Nov · 3 boxes").
+      context: text(body.context, 300) || null,
       comments: [],
       createdAt: now,
       updatedAt: now

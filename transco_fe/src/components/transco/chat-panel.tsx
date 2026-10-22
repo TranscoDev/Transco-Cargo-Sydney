@@ -9,7 +9,8 @@ import type { Conversation, ConversationMode, Message } from "@/lib/transco/type
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 import { ModeSwitch } from "./mode-switch";
-import { AskWarehouseButton, WarehouseStrip } from "./ask-warehouse";
+import { WarehouseStrip } from "./ask-warehouse";
+import { NewTaskButton } from "./task-kit";
 import { formatPhone } from "@/lib/transco/phone";
 
 function groupByDay(messages: Message[]) {
@@ -138,7 +139,19 @@ export function ChatPanel({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <AskWarehouseButton conversation={conversation} />
+          <NewTaskButton
+            label="Task"
+            variant="outline"
+            defaultAssignTo="team"
+            className="h-9 px-2.5"
+            about={{
+              customerId: profileId,
+              customerName: conversation.customerName,
+              context: [conversation.linkedAccount?.customerCode ?? conversation.customerCode, formatPhone(conversation.phoneNumber), "from chat"]
+                .filter(Boolean)
+                .join(" · "),
+            }}
+          />
           <ModeSwitch mode={conversation.mode} onChange={onModeChange} />
         </div>
       </header>
