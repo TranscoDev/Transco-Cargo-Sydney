@@ -7,6 +7,8 @@ import {
   ChevronDown,
   Heart,
   HeartOff,
+  Link2,
+  Unlink,
   MailOpen,
   Mail,
   Pin,
@@ -28,6 +30,8 @@ export function ChatMenu({
   onChange,
   onMarkRead,
   canDelete,
+  onLink,
+  onUnlink,
 }: {
   conversation: ConversationSummary;
   open: boolean;
@@ -35,6 +39,10 @@ export function ChatMenu({
   onChange: (flags: InboxFlags) => void;
   onMarkRead: () => void;
   canDelete: boolean;
+  /** Website visitor not linked yet → "Link to customer…". */
+  onLink?: (() => void) | undefined;
+  /** Linked by staff → "Unlink customer". */
+  onUnlink?: (() => void) | undefined;
 }) {
   const inbox = conversation.inbox ?? {};
   const unread = conversation.unreadCount > 0 || !!inbox.markedUnread;
@@ -78,6 +86,21 @@ export function ChatMenu({
             {inbox.archived ? "Unarchive chat" : "Archive chat"}
           </Item>
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          {onLink && (
+            <Item icon={Link2} onSelect={onLink}>
+              Link to customer…
+            </Item>
+          )}
+          {onUnlink && (
+            <Item
+              icon={Unlink}
+              onSelect={() => {
+                if (window.confirm(`Unlink this chat from ${conversation.customerName}?`)) onUnlink();
+              }}
+            >
+              Unlink customer
+            </Item>
+          )}
           <Item icon={UserCog} onSelect={() => onChange({ isStaff: !inbox.isStaff })}>
             {inbox.isStaff ? "Not a staff member" : "Mark as staff (Internal)"}
           </Item>

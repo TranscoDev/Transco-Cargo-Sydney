@@ -84,6 +84,7 @@ export interface BackendCustomer {
   /** Website chats: the My Transco account the visitor was signed in to. */
   linkedAccount?: LinkedAccount | null;
   inbox?: InboxFlags;
+  customerCode?: string | null;
 }
 
 /**
@@ -353,6 +354,7 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     phoneNumber: contactNumber(c),
     linkedAccount: c.linkedAccount ?? null,
     inbox: c.inbox,
+    customerCode: c.customerCode ?? null,
     mode: c.mode,
     channel: c.channel,
     messages: c.messages.map(mapMessage),
@@ -1001,6 +1003,21 @@ export async function setInboxFlags(customerId: string, flags: InboxFlags): Prom
   if (!res.ok) {
     throw new Error(`Failed to update chat (${res.status})`);
   }
+}
+
+/** Link a website chat to a customer (null = unlink). Staff-side only. */
+export async function linkChatToCustomer(
+  chatId: string,
+  customerId: string | null,
+): Promise<{ name: string; linkedAccount: LinkedAccount | null }> {
+  const res = await fetch(`${API_BASE_URL}/api/customers/${chatId}/link`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ customerId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Failed to link chat (${res.status})`);
+  return data;
 }
 
 export interface PauseState {

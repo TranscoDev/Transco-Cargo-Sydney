@@ -5,7 +5,7 @@ import { EmptyState } from "./page-kit";
 import { cn } from "@/lib/utils";
 import type { ConversationSummary, InboxFlags } from "@/lib/transco/types";
 
-import { ContactCard } from "./contact-card";
+import { ContactCard, type LinkActions } from "./contact-card";
 
 type StatusFilter = "ALL" | "UNREAD" | "HUMAN" | "ATTENTION" | "FAVOURITES" | "INTERNAL";
 type Channel = "ALL" | "WHATSAPP" | "WEBSITE";
@@ -51,7 +51,9 @@ export function ContactList({
   onInbox,
   onMarkRead,
   canDelete,
+  linkActionsFor,
 }: {
+  linkActionsFor: (row: ConversationSummary) => LinkActions;
   conversations: ConversationSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -229,6 +231,7 @@ export function ContactList({
               onInbox={(flags) => onInbox(c.id, flags)}
               onMarkRead={() => onMarkRead(c.id)}
               canDelete={canDelete}
+              linkActions={linkActionsFor(c)}
             />
           ))
         )}

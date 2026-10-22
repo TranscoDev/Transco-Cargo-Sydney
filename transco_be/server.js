@@ -1574,13 +1574,16 @@ async function markNeedsAttention(customer, triggerMessage) {
 // A website chat has no real phone number of its own. When the visitor was
 // signed in to My Transco, this is who they really are — shown in the
 // console's Conversations instead of the anonymous session.
-function linkedAccountSummary(account) {
+// byStaff: linked by staff in Conversations (not a sign-in) — staff-side
+// only; the bot never treats the visitor as signed in because of it.
+function linkedAccountSummary(account, byStaff = false) {
   if (!account) return null;
   return {
     id: String(account._id),
     name: account.name || null,
     phoneNumber: account.phoneNumber || null,
-    customerCode: account.customerCode || null
+    customerCode: account.customerCode || null,
+    byStaff
   };
 }
 
@@ -1590,7 +1593,7 @@ async function linkedAccountFor(customer) {
     { _id: customer.linkedCustomerId },
     { projection: { name: 1, phoneNumber: 1, customerCode: 1 } }
   );
-  return linkedAccountSummary(account);
+  return linkedAccountSummary(account, customer.linkedBy === 'staff');
 }
 
 async function broadcastMessageCreated(customer, message) {
@@ -2588,7 +2591,7 @@ app.get('/api/customers', async (req, res) => {
         hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
 
         linkedAccount: customer.linkedCustomerId
-          ? linkedAccountSummary(customerById.get(String(customer.linkedCustomerId)))
+          ? linkedAccountSummary(customerById.get(String(customer.linkedCustomerId)), customer.linkedBy === 'staff')
           : null,
 
         messages:
@@ -4412,6 +4415,10 @@ app.patch('/api/customers/:customerId/inbox', async (req, res) => {
     for (const key of INBOX_FLAGS) {
       if (typeof body[key] === 'boolean') $set[`inbox.${key}`] = body[key];
     }
+    // "Not them" on a link suggestion: the customer id not to suggest again.
+    if (body.dismissedLink === null || (typeof body.dismissedLink === 'string' && ObjectId.isValid(body.dismissedLink))) {
+      $set['inbox.dismissedLink'] = body.dismissedLink;
+    }
     if (Object.keys($set).length === 0) return res.status(400).json({ error: 'Nothing to change' });
     if ('inbox.deleted' in $set && !(await canDeleteChats(req))) {
       return res.status(403).json({ error: 'Only the admin can delete chats.' });
@@ -4431,6 +4438,48 @@ app.patch('/api/customers/:customerId/inbox', async (req, res) => {
   } catch (err) {
     console.error('Error updating chat inbox flags:', err.message);
     res.status(500).json({ error: 'Failed to update chat' });
+  }
+});
+
+// Staff link a not-signed-in website chat to an existing customer (or
+// unlink with customerId: null). Staff-side only: the chat shows the
+// customer's name and joins their row; the visitor gets no account access.
+app.patch('/api/customers/:customerId/link', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const target = req.body?.customerId ?? null;
+    if (!ObjectId.isValid(customerId) || (target !== null && !ObjectId.isValid(target))) {
+      return res.status(400).json({ error: 'Invalid customer id' });
+    }
+    const chat = await customers().findOne({ _id: new ObjectId(customerId) });
+    if (!chat) return res.status(404).json({ error: 'Chat not found' });
+    if (chat.channel !== 'website') return res.status(400).json({ error: 'Only website chats can be linked.' });
+    if (chat.linkedCustomerId && chat.linkedBy !== 'staff') {
+      return res.status(409).json({ error: 'This visitor signed in — the chat is already theirs.' });
+    }
+
+    let update;
+    if (target === null) {
+      update = { $set: { name: chat.nameBeforeLink || chat.name }, $unset: { linkedCustomerId: '', linkedBy: '', nameBeforeLink: '' } };
+    } else {
+      const account = await customers().findOne({ _id: new ObjectId(target) });
+      if (!account || account.channel === 'website') return res.status(404).json({ error: 'Customer not found' });
+      update = {
+        $set: {
+          linkedCustomerId: account._id,
+          linkedBy: 'staff',
+          name: account.name || chat.name,
+          nameBeforeLink: chat.nameBeforeLink || chat.name
+        }
+      };
+    }
+    const updated = await customers().findOneAndUpdate({ _id: chat._id }, update, { returnDocument: 'after' });
+    const linkedAccount = await linkedAccountFor(updated);
+    broadcast('customer.link_changed', { customerId: updated._id, name: updated.name, linkedAccount });
+    res.status(200).json({ name: updated.name, linkedAccount });
+  } catch (err) {
+    console.error('Error linking chat:', err.message);
+    res.status(500).json({ error: 'Failed to link chat' });
   }
 });
 

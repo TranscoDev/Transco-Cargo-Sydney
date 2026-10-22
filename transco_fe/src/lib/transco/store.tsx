@@ -32,6 +32,7 @@ import {
   sendHumanMessage,
   setCustomerMode,
   setInboxFlags,
+  linkChatToCustomer,
   setPauseState as setPauseStateRequest,
   updateBooking as updateBookingRequest,
   updatePickupDelivery as updatePickupDeliveryRequest,
@@ -111,6 +112,8 @@ interface ConversationsApi {
   setMode: (conversationId: string, mode: ConversationMode) => void;
   /** Pin / archive / mute / mark unread / staff / delete a chat. */
   setInbox: (conversationId: string, flags: InboxFlags) => void;
+  /** Link a website chat to a customer (null = unlink). Resolves true on success. */
+  linkChat: (chatId: string, customerId: string | null) => Promise<boolean>;
   markAsRead: (conversationId: string) => void;
   /** Simulates an inbound WhatsApp event; stands in for a socket push. */
   receiveCustomerMessage: (conversationId: string, body: string) => void;
@@ -702,6 +705,21 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
     [patch],
   );
 
+  const linkChat = useCallback(
+    async (chatId: string, customerId: string | null) => {
+      try {
+        const { name, linkedAccount } = await linkChatToCustomer(chatId, customerId);
+        patch(chatId, (c) => ({ ...c, customerName: name || c.customerName, linkedAccount }));
+        notify.success(customerId ? `Linked to ${name}` : "Chat unlinked");
+        return true;
+      } catch (err) {
+        notify.error(customerId ? "Couldn't link this chat" : "Couldn't unlink this chat", (err as Error).message);
+        return false;
+      }
+    },
+    [patch],
+  );
+
   const setMode = useCallback(
     (conversationId: string, mode: ConversationMode) => {
       // Optimistic local update; conversationId doubles as the backend
@@ -856,6 +874,18 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         case "customer.inbox_changed": {
           const { customerId, inbox } = event.payload as { customerId: string; inbox: InboxFlags };
           setConversations((prev) => prev.map((c) => (c.id === customerId ? { ...c, inbox } : c)));
+          return;
+        }
+
+        case "customer.link_changed": {
+          const { customerId, name, linkedAccount } = event.payload as {
+            customerId: string;
+            name: string;
+            linkedAccount: Conversation["linkedAccount"];
+          };
+          setConversations((prev) =>
+            prev.map((c) => (c.id === customerId ? { ...c, customerName: name || c.customerName, linkedAccount } : c)),
+          );
           return;
         }
 
@@ -1041,6 +1071,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sendAttachment,
       setMode,
       setInbox,
+      linkChat,
       markAsRead,
       receiveCustomerMessage,
       updateMessageStatus,
@@ -1089,6 +1120,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sending,
       setMode,
       setInbox,
+      linkChat,
       summaries,
       updatePauseState,
       updateContact,

@@ -186,6 +186,8 @@ export interface Conversation {
    * to — who they really are (their phoneNumber shown is this account's). */
   linkedAccount?: LinkedAccount | null | undefined;
   inbox?: InboxFlags | undefined;
+  /** CUS-000123 — for the link-to-customer search. */
+  customerCode?: string | null | undefined;
 }
 
 /** WhatsApp-style chat list flags, shared by all staff (customer.inbox). */
@@ -199,6 +201,8 @@ export interface InboxFlags {
   isStaff?: boolean;
   /** Hidden from the list; the messages are kept. */
   deleted?: boolean;
+  /** "Not them" on a link suggestion — that customer id isn't suggested again. */
+  dismissedLink?: string | null;
 }
 
 export interface LinkedAccount {
@@ -206,6 +210,8 @@ export interface LinkedAccount {
   name: string | null;
   phoneNumber: string | null;
   customerCode: string | null;
+  /** Linked by staff in Conversations, not a My Transco sign-in. */
+  byStaff?: boolean;
 }
 
 /** GET /api/customers/:id/profile — the CRM detail view. A superset of

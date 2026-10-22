@@ -123,7 +123,7 @@ export function ChatPanel({
               </span>
               {conversation.linkedAccount && (
                 <span className="rounded bg-success-soft px-1.5 font-medium text-success-foreground">
-                  ✓ Signed in{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
+                  {conversation.linkedAccount.byStaff ? "🔗 Linked" : "✓ Signed in"}{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
                 </span>
               )}
               <Link

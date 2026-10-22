@@ -9,7 +9,9 @@ import { EmptyState } from "@/components/transco/page-kit";
 import { mergeSummaries, mergedMessages } from "@/lib/transco/merge-conversations";
 import { useConversations } from "@/lib/transco/store";
 import { useTasks } from "@/lib/transco/tasks";
-import type { Conversation } from "@/lib/transco/types";
+import type { Conversation, ConversationSummary } from "@/lib/transco/types";
+import type { LinkActions } from "@/components/transco/contact-card";
+import { LinkCustomerDialog, LinkSuggestion, linkCandidates, suggestCustomer } from "@/components/transco/link-customer";
 import { cn } from "@/lib/utils";
 
 // Same filters, chatbot/staff switching and live updates as before. One
@@ -34,6 +36,7 @@ function ConversationsPage() {
     sendAttachment,
     setMode,
     setInbox,
+    linkChat,
     sending,
     websitePaused,
     whatsappPaused,
@@ -61,6 +64,30 @@ function ConversationsPage() {
     setReplyTo(null);
     selectConversation(id);
     rows.find((r) => r.id === id)?.mergedIds?.forEach((m) => markAsRead(m));
+  };
+
+  // Linking a website chat to an existing customer (staff-side only).
+  const candidates = useMemo(() => linkCandidates(conversations), [conversations]);
+  const suggestion = selectedConversation ? suggestCustomer(selectedConversation, candidates) : null;
+  const [linkFor, setLinkFor] = useState<string | null>(null);
+  const link = async (chatId: string, customer: Conversation) => {
+    if (!(await linkChat(chatId, customer.id))) return;
+    setLinkFor(null);
+    // The chat now sits inside the customer's row — open that row.
+    if (chatId === selectedId) select(customer.id);
+  };
+  const linkActionsFor = (row: ConversationSummary): LinkActions => {
+    if (row.channel === "website" && !row.linkedAccount) return { onLink: () => setLinkFor(row.id) };
+    const staffLinked = [row.id, ...(row.mergedIds ?? [])].filter(
+      (id) => conversations.find((c) => c.id === id)?.linkedAccount?.byStaff,
+    );
+    if (!staffLinked.length) return {};
+    return {
+      onUnlink: () => {
+        staffLinked.forEach((id) => void linkChat(id, null));
+        if (row.id === selectedId) select(null);
+      },
+    };
   };
 
   const merged = web.length > 0 && selectedConversation;
@@ -102,6 +129,14 @@ function ConversationsPage() {
             rows.find((r) => r.id === id)?.mergedIds?.forEach((m) => markAsRead(m));
           }}
           canDelete={!!me?.canDeleteChats}
+          linkActionsFor={linkActionsFor}
+        />
+        <LinkCustomerDialog
+          open={!!linkFor}
+          onOpenChange={(o) => !o && setLinkFor(null)}
+          visitorName={conversations.find((c) => c.id === linkFor)?.customerName ?? "this visitor"}
+          candidates={candidates}
+          onPick={(customer) => linkFor && void link(linkFor, customer)}
         />
       </aside>
 
@@ -109,6 +144,14 @@ function ConversationsPage() {
         {shown && target ? (
           <>
             <div className="flex min-w-0 flex-1 flex-col">
+              {suggestion && selectedConversation && (
+                <LinkSuggestion
+                  customer={suggestion}
+                  onLink={() => void link(selectedConversation.id, suggestion)}
+                  onDismiss={() => setInbox(selectedConversation.id, { dismissedLink: suggestion.id })}
+                  onSearch={() => setLinkFor(selectedConversation.id)}
+                />
+              )}
               {merged && (
                 <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-panel px-3 py-2 md:px-4">
                   {(["all", "whatsapp", "website"] as View[]).map((v) => (

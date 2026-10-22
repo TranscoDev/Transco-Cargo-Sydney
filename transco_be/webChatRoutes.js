@@ -242,6 +242,7 @@ module.exports = function createWebChatRouter({
       if (account) {
         const link = {};
         if (String(customer.linkedCustomerId || '') !== String(account._id)) link.linkedCustomerId = account._id;
+        if (customer.linkedBy !== 'signin') link.linkedBy = 'signin'; // a real sign-in replaces a staff link
         if (hasRealName(account) && customer.name !== account.name) link.name = account.name;
         if (Object.keys(link).length) {
           await customers().updateOne({ _id: customer._id }, { $set: link });

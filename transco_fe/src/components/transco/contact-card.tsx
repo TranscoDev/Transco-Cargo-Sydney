@@ -6,6 +6,11 @@ import { formatRelativeTime } from "@/lib/transco/time";
 import type { ConversationSummary, InboxFlags } from "@/lib/transco/types";
 
 import { ChatMenu } from "./chat-menu";
+
+export interface LinkActions {
+  onLink?: (() => void) | undefined;
+  onUnlink?: (() => void) | undefined;
+}
 import { ModeTag } from "./mode-tag";
 import { ChannelTag } from "./channel-tag";
 import { MessageStatusIcon } from "./message-status";
@@ -35,6 +40,7 @@ export function ContactCard({
   onInbox,
   onMarkRead,
   canDelete,
+  linkActions,
 }: {
   conversation: ConversationSummary;
   selected: boolean;
@@ -42,6 +48,7 @@ export function ContactCard({
   onInbox: (flags: InboxFlags) => void;
   onMarkRead: () => void;
   canDelete: boolean;
+  linkActions: LinkActions;
 }) {
   const { lastMessage, mode, channel, unreadCount, needsAttention, needsAttentionMessage } = conversation;
   const inbox = conversation.inbox ?? {};
@@ -171,9 +178,10 @@ export function ContactCard({
           {conversation.linkedAccount && !conversation.mergedIds?.length && (
             <span
               className="inline-flex items-center gap-1 rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success-foreground"
-              title={`Signed in to My Transco · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}
+              title={`${conversation.linkedAccount.byStaff ? "Linked by staff" : "Signed in to My Transco"} · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}
             >
-              ✓ Signed in{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
+              {conversation.linkedAccount.byStaff ? "🔗 Linked" : "✓ Signed in"}
+              {conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
             </span>
           )}
         </span>
@@ -187,6 +195,8 @@ export function ContactCard({
         onChange={onInbox}
         onMarkRead={onMarkRead}
         canDelete={canDelete}
+        onLink={linkActions.onLink}
+        onUnlink={linkActions.onUnlink}
       />
     </div>
     </div>
