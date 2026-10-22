@@ -31,6 +31,7 @@ import {
   sendAttachment as sendAttachmentRequest,
   sendHumanMessage,
   setCustomerMode,
+  setInboxFlags,
   setPauseState as setPauseStateRequest,
   updateBooking as updateBookingRequest,
   updatePickupDelivery as updatePickupDeliveryRequest,
@@ -62,6 +63,7 @@ import type {
   ConversationMode,
   ConversationSummary,
   CustomerStatus,
+  InboxFlags,
   EmailCampaignResult,
   ImportResult,
   Message,
@@ -107,6 +109,8 @@ interface ConversationsApi {
    * mode or there's no live backend. See sendAttachment in api.ts. */
   sendAttachment: (conversationId: string, file: File, caption?: string) => Promise<void>;
   setMode: (conversationId: string, mode: ConversationMode) => void;
+  /** Pin / archive / mute / mark unread / staff / delete a chat. */
+  setInbox: (conversationId: string, flags: InboxFlags) => void;
   markAsRead: (conversationId: string) => void;
   /** Simulates an inbound WhatsApp event; stands in for a socket push. */
   receiveCustomerMessage: (conversationId: string, body: string) => void;
@@ -195,6 +199,7 @@ function toSummary(c: Conversation): ConversationSummary {
     needsAttention: c.needsAttention === true,
     needsAttentionMessage: c.needsAttentionMessage,
     linkedAccount: c.linkedAccount ?? null,
+    inbox: c.inbox,
   };
 }
 
@@ -576,6 +581,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
     (conversationId: string) => {
       patch(conversationId, (c) => ({
         ...c,
+        inbox: c.inbox?.markedUnread ? { ...c.inbox, markedUnread: false } : c.inbox,
         messages: c.messages.map((m) =>
           m.sender === "CUSTOMER" && m.read === false ? { ...m, read: true } : m,
         ),
@@ -677,6 +683,23 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       );
     },
     [appendMessage],
+  );
+
+  const setInbox = useCallback(
+    (conversationId: string, flags: InboxFlags) => {
+      let previous: InboxFlags | undefined;
+      patch(conversationId, (c) => {
+        previous = c.inbox;
+        return { ...c, inbox: { ...c.inbox, ...flags } };
+      });
+      setInboxFlags(conversationId, flags).catch((err) => {
+        console.error("Failed to update chat:", err);
+        if (!isLiveRef.current) return;
+        patch(conversationId, (c) => ({ ...c, inbox: previous }));
+        notify.error("Couldn't update this chat", "Nothing changed — please try again.");
+      });
+    },
+    [patch],
   );
 
   const setMode = useCallback(
@@ -783,6 +806,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
               customerName: customer.name || conversation.customerName,
               phoneNumber: contactNumber({ ...customer, channel: customer.channel ?? conversation.channel }),
               linkedAccount: customer.linkedAccount ?? conversation.linkedAccount ?? null,
+              // A new message may bring an archived/deleted chat back.
+              inbox: customer.inbox ?? conversation.inbox,
               mode: customer.mode,
               messages: [...conversation.messages, mapped],
             };
@@ -825,6 +850,12 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
               c.id === customerId ? { ...c, email: customer.email, notes: customer.notes } : c,
             ),
           );
+          return;
+        }
+
+        case "customer.inbox_changed": {
+          const { customerId, inbox } = event.payload as { customerId: string; inbox: InboxFlags };
+          setConversations((prev) => prev.map((c) => (c.id === customerId ? { ...c, inbox } : c)));
           return;
         }
 
@@ -1009,6 +1040,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sendMessage,
       sendAttachment,
       setMode,
+      setInbox,
       markAsRead,
       receiveCustomerMessage,
       updateMessageStatus,
@@ -1056,6 +1088,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       sendAttachment,
       sending,
       setMode,
+      setInbox,
       summaries,
       updatePauseState,
       updateContact,

@@ -1,21 +1,31 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
+import { Archive, ArrowLeft, CheckCircle2, Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
 import { EmptyState } from "./page-kit";
 
 import { cn } from "@/lib/utils";
-import type { ConversationSummary } from "@/lib/transco/types";
+import type { ConversationSummary, InboxFlags } from "@/lib/transco/types";
 
 import { ContactCard } from "./contact-card";
 
-type StatusFilter = "ALL" | "UNREAD" | "HUMAN" | "ATTENTION";
+type StatusFilter = "ALL" | "UNREAD" | "HUMAN" | "ATTENTION" | "FAVOURITES" | "INTERNAL";
 type Channel = "ALL" | "WHATSAPP" | "WEBSITE";
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "UNREAD", label: "Unread" },
-  { key: "HUMAN", label: "Staff" },
   { key: "ATTENTION", label: "Needs staff" },
+  { key: "HUMAN", label: "Taken over" },
+  { key: "FAVOURITES", label: "Favourites" },
+  { key: "INTERNAL", label: "Internal" },
 ];
+
+const isUnread = (c: ConversationSummary) => c.unreadCount > 0 || !!c.inbox?.markedUnread;
+
+// Pinned chats first (like WhatsApp), then newest activity.
+function byPinThenRecent(a: ConversationSummary, b: ConversationSummary) {
+  const pin = Number(!!b.inbox?.pinned) - Number(!!a.inbox?.pinned);
+  return pin || Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt);
+}
 
 const channels: { key: Channel; label: string; Icon: typeof MessageCircle }[] = [
   { key: "ALL", label: "All", Icon: MessageCircle },
@@ -38,10 +48,16 @@ export function ContactList({
   onSelect,
   websitePaused,
   whatsappPaused,
+  onInbox,
+  onMarkRead,
+  canDelete,
 }: {
   conversations: ConversationSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onInbox: (id: string, flags: InboxFlags) => void;
+  onMarkRead: (id: string) => void;
+  canDelete: boolean;
   /** Shows a paused indicator directly on the Website tab, independent of
    * whatsappPaused — so staff can see at a glance which channel (if any)
    * is currently paused without opening the Bot Controls dropdown. */
@@ -51,32 +67,48 @@ export function ContactList({
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState<Channel>("ALL");
   const [status, setStatus] = useState<StatusFilter>("ALL");
+  const [showArchived, setShowArchived] = useState(false);
 
   // Scoped to the selected channel — Unread/Human/Attention counts and
   // filtering apply within "Website" or "WhatsApp" independently, not
   // across both at once, whenever a specific channel is picked.
+  // Deleted chats never show; our own staff only show under Internal.
   const inChannel = useMemo(
-    () => conversations.filter((c) => matchesChannel(c, channel)),
+    () => conversations.filter((c) => !c.inbox?.deleted && matchesChannel(c, channel)),
     [conversations, channel],
   );
+  const customerChats = useMemo(() => inChannel.filter((c) => !c.inbox?.isStaff), [inChannel]);
+  const archived = useMemo(() => customerChats.filter((c) => c.inbox?.archived), [customerChats]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return inChannel.filter((c) => {
-      if (status === "UNREAD" && c.unreadCount === 0) return false;
-      if (status === "HUMAN" && c.mode !== "HUMAN") return false;
-      if (status === "ATTENTION" && !c.needsAttention) return false;
-      if (!q) return true;
-      return (
-        c.customerName.toLowerCase().includes(q) ||
-        c.phoneNumber.replace(/\s/g, "").includes(q.replace(/\s/g, ""))
-      );
-    });
-  }, [inChannel, status, query]);
+    const base =
+      status === "INTERNAL"
+        ? inChannel.filter((c) => c.inbox?.isStaff)
+        : showArchived
+          ? archived
+          : customerChats.filter((c) => !c.inbox?.archived);
+    return base
+      .filter((c) => {
+        if (status === "UNREAD" && !isUnread(c)) return false;
+        if (status === "HUMAN" && c.mode !== "HUMAN") return false;
+        if (status === "ATTENTION" && !c.needsAttention) return false;
+        if (status === "FAVOURITES" && !c.inbox?.favourite) return false;
+        if (!q) return true;
+        return (
+          c.customerName.toLowerCase().includes(q) ||
+          c.phoneNumber.replace(/\s/g, "").includes(q.replace(/\s/g, ""))
+        );
+      })
+      .sort(byPinThenRecent);
+  }, [inChannel, customerChats, archived, showArchived, status, query]);
 
-  const unreadTotal = inChannel.reduce((n, c) => n + c.unreadCount, 0);
-  const humanTotal = inChannel.filter((c) => c.mode === "HUMAN").length;
-  const attentionTotal = inChannel.filter((c) => c.needsAttention).length;
+  // Muted and staff chats don't add to the unread count.
+  const counted = customerChats.filter((c) => !c.inbox?.muted && !c.inbox?.archived);
+  const unreadTotal = counted.filter(isUnread).length;
+  const humanTotal = counted.filter((c) => c.mode === "HUMAN").length;
+  const attentionTotal = counted.filter((c) => c.needsAttention).length;
+  const archivedUnread = archived.filter(isUnread).length;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
@@ -84,7 +116,7 @@ export function ContactList({
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
           <h1 className="truncate text-base font-semibold text-foreground">Conversations</h1>
           <p className="shrink-0 text-xs text-muted-foreground">
-            {unreadTotal} unread · {humanTotal} staff
+            {unreadTotal} unread · {humanTotal} taken over
             {attentionTotal > 0 && (
               <span className="font-medium text-attention-foreground"> · {attentionTotal} need staff</span>
             )}
@@ -137,14 +169,17 @@ export function ContactList({
           />
         </div>
 
-        <div className="mt-2 flex gap-1">
+        <div className="mt-2 flex flex-wrap gap-1">
           {statusFilters.map((f) => (
             <button
               key={f.key}
               type="button"
-              onClick={() => setStatus(f.key)}
+              onClick={() => {
+                setStatus(f.key);
+                setShowArchived(false);
+              }}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                 status === f.key
                   ? f.key === "ATTENTION"
                     ? "bg-attention-soft text-attention-foreground ring-1 ring-attention/40"
@@ -161,6 +196,22 @@ export function ContactList({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* WhatsApp-style "Archived" row at the top of the list. */}
+        {status !== "INTERNAL" && (showArchived || archived.length > 0) && (
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className="flex w-full items-center gap-3 border-b border-border px-4 py-2.5 text-left text-sm hover:bg-secondary/70"
+          >
+            {showArchived ? <ArrowLeft className="h-4 w-4 text-primary" /> : <Archive className="h-4 w-4 text-primary" />}
+            <span className="flex-1 font-medium text-foreground">{showArchived ? "Back to chats" : "Archived"}</span>
+            {!showArchived && (
+              <span className={cn("text-xs", archivedUnread > 0 ? "font-semibold text-primary" : "text-muted-foreground")}>
+                {archivedUnread > 0 ? `${archivedUnread} unread` : archived.length}
+              </span>
+            )}
+          </button>
+        )}
         {visible.length === 0 ? (
           <EmptyState
             compact
@@ -175,6 +226,9 @@ export function ContactList({
               conversation={c}
               selected={c.id === selectedId}
               onSelect={onSelect}
+              onInbox={(flags) => onInbox(c.id, flags)}
+              onMarkRead={() => onMarkRead(c.id)}
+              canDelete={canDelete}
             />
           ))
         )}

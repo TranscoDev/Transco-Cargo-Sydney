@@ -21,6 +21,7 @@ import type {
   CustomerStatus,
   EmailCampaignResult,
   ImportResult,
+  InboxFlags,
   LinkedAccount,
   MediaType,
   Message,
@@ -82,6 +83,7 @@ export interface BackendCustomer {
   outstandingBalance?: number | null;
   /** Website chats: the My Transco account the visitor was signed in to. */
   linkedAccount?: LinkedAccount | null;
+  inbox?: InboxFlags;
 }
 
 /**
@@ -350,6 +352,7 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     customerName: c.name,
     phoneNumber: contactNumber(c),
     linkedAccount: c.linkedAccount ?? null,
+    inbox: c.inbox,
     mode: c.mode,
     channel: c.channel,
     messages: c.messages.map(mapMessage),
@@ -985,6 +988,18 @@ export async function setCustomerMode(customerId: string, mode: ConversationMode
   });
   if (!res.ok) {
     throw new Error(`Failed to update mode (${res.status})`);
+  }
+}
+
+/** Pin / archive / mute / mark unread / staff / delete — one or more flags. */
+export async function setInboxFlags(customerId: string, flags: InboxFlags): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/inbox`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(flags),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update chat (${res.status})`);
   }
 }
 

@@ -54,6 +54,8 @@ export interface TaskMe {
   name: string;
   isAdmin: boolean;
   isWarehouse: boolean;
+  /** Admin + named staff (CHAT_DELETE_EMAILS) may delete chats. */
+  canDeleteChats?: boolean;
 }
 
 export interface NewTaskInput {

@@ -185,6 +185,20 @@ export interface Conversation {
   /** Website chats only: the My Transco account the visitor was signed in
    * to — who they really are (their phoneNumber shown is this account's). */
   linkedAccount?: LinkedAccount | null | undefined;
+  inbox?: InboxFlags | undefined;
+}
+
+/** WhatsApp-style chat list flags, shared by all staff (customer.inbox). */
+export interface InboxFlags {
+  pinned?: boolean;
+  archived?: boolean;
+  favourite?: boolean;
+  muted?: boolean;
+  markedUnread?: boolean;
+  /** One of our own staff — shown under Internal, not All. */
+  isStaff?: boolean;
+  /** Hidden from the list; the messages are kept. */
+  deleted?: boolean;
 }
 
 export interface LinkedAccount {
@@ -227,6 +241,7 @@ export interface ConversationSummary {
   /** The channels this customer has chatted on. */
   channels?: ("whatsapp" | "website")[] | undefined;
   customerCode?: string | null | undefined;
+  inbox?: InboxFlags | undefined;
 }
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";

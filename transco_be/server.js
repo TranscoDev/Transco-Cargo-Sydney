@@ -1594,6 +1594,14 @@ async function linkedAccountFor(customer) {
 }
 
 async function broadcastMessageCreated(customer, message) {
+  // Like WhatsApp: a new customer message brings an archived (unless
+  // muted) or deleted chat back into the main list.
+  const inbox = customer.inbox;
+  if (message.senderType === 'CUSTOMER' && inbox && (inbox.deleted || (inbox.archived && !inbox.muted))) {
+    customer = { ...customer, inbox: { ...inbox, deleted: false, archived: inbox.muted ? inbox.archived : false } };
+    await customers().updateOne({ _id: customer._id }, { $set: { inbox: customer.inbox } });
+  }
+
   const [unreadCount, linkedAccount] = await Promise.all([
     messages().countDocuments({
       customerId: customer._id,
@@ -2109,6 +2117,17 @@ async function isStaffAdmin(req) {
 }
 
 const ADMIN_ONLY_MESSAGE = 'Only the Transco admin can add or remove staff members.';
+
+// Who may delete (hide) a chat in Conversations: the admin plus the
+// staff emails in CHAT_DELETE_EMAILS (default: Malshani, staff01).
+const CHAT_DELETE_EMAILS = (process.env.CHAT_DELETE_EMAILS || 'staff01@transco.lk')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+async function canDeleteChats(req) {
+  if (!req.user) return false;
+  if (CHAT_DELETE_EMAILS.includes(String(req.user.email || '').toLowerCase())) return true;
+  return isStaffAdmin(req);
+}
 
 app.patch('/api/auth/password', async (req, res) => {
 
@@ -4378,6 +4397,43 @@ app.get('/api/tracking/:blNumber', async (req, res) => {
 // MARK CUSTOMER MESSAGES AS READ
 // ============================================================
 
+// WhatsApp-style chat list flags, shared by every staff member:
+// pin, archive, favourite, mute, mark unread, staff (Internal tab) and
+// deleted (hidden — messages are kept). Stored as customer.inbox.
+const INBOX_FLAGS = ['pinned', 'archived', 'favourite', 'muted', 'markedUnread', 'isStaff', 'deleted'];
+
+app.patch('/api/customers/:customerId/inbox', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    if (!ObjectId.isValid(customerId)) return res.status(400).json({ error: 'Invalid customer id' });
+
+    const body = req.body ?? {};
+    const $set = {};
+    for (const key of INBOX_FLAGS) {
+      if (typeof body[key] === 'boolean') $set[`inbox.${key}`] = body[key];
+    }
+    if (Object.keys($set).length === 0) return res.status(400).json({ error: 'Nothing to change' });
+    if ('inbox.deleted' in $set && !(await canDeleteChats(req))) {
+      return res.status(403).json({ error: 'Only the admin can delete chats.' });
+    }
+    // Deleting or archiving a chat also unpins it, like WhatsApp.
+    if ($set['inbox.deleted'] || $set['inbox.archived']) $set['inbox.pinned'] = false;
+
+    const updated = await customers().findOneAndUpdate(
+      { _id: new ObjectId(customerId) },
+      { $set },
+      { returnDocument: 'after', projection: { inbox: 1 } }
+    );
+    if (!updated) return res.status(404).json({ error: 'Customer not found' });
+
+    broadcast('customer.inbox_changed', { customerId: updated._id, inbox: updated.inbox });
+    res.status(200).json({ inbox: updated.inbox });
+  } catch (err) {
+    console.error('Error updating chat inbox flags:', err.message);
+    res.status(500).json({ error: 'Failed to update chat' });
+  }
+});
+
 app.patch(
   '/api/customers/:customerId/read',
   async (req, res) => {
@@ -4426,6 +4482,13 @@ app.patch(
             _id: 1
           })
           .toArray();
+
+
+      // Opening a chat clears a manual "Mark as unread".
+      if (customer.inbox?.markedUnread) {
+        await customers().updateOne({ _id: custId }, { $set: { 'inbox.markedUnread': false } });
+        broadcast('customer.inbox_changed', { customerId: custId, inbox: { ...customer.inbox, markedUnread: false } });
+      }
 
 
       if (unread.length > 0) {
@@ -6460,7 +6523,7 @@ app.use('/api/public', scheduleRouters.publicRouter);
 app.use('/api/schedule', scheduleRouters.staffRouter);
 
 // Staff tasks (taskRoutes.js): every staff login, whatever its page access.
-app.use('/api/tasks', require('./taskRoutes')({ broadcast, isStaffAdmin }));
+app.use('/api/tasks', require('./taskRoutes')({ broadcast, isStaffAdmin, canDeleteChats }));
 // Both chat channels answer schedule questions from those same dates.
 const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
 

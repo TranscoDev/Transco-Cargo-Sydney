@@ -72,7 +72,7 @@ function shape(doc) {
   };
 }
 
-module.exports = function createTaskRouter({ broadcast, isStaffAdmin }) {
+module.exports = function createTaskRouter({ broadcast, isStaffAdmin, canDeleteChats }) {
   const router = express.Router();
   const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -141,7 +141,7 @@ module.exports = function createTaskRouter({ broadcast, isStaffAdmin }) {
     const record = await personById(user.id);
     res.json({
       tasks: docs.map(shape),
-      me: { id: user.id, name: user.name, isAdmin: await isStaffAdmin(req), isWarehouse: Boolean(record && record.role === 'warehouse') }
+      me: { id: user.id, name: user.name, isAdmin: await isStaffAdmin(req), isWarehouse: Boolean(record && record.role === 'warehouse'), canDeleteChats: await canDeleteChats(req) }
     });
   }));
 

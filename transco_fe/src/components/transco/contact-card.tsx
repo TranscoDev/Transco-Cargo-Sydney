@@ -1,7 +1,11 @@
+import { useState } from "react";
+import { BellOff, Heart, Pin } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/transco/time";
-import type { ConversationSummary } from "@/lib/transco/types";
+import type { ConversationSummary, InboxFlags } from "@/lib/transco/types";
 
+import { ChatMenu } from "./chat-menu";
 import { ModeTag } from "./mode-tag";
 import { ChannelTag } from "./channel-tag";
 import { MessageStatusIcon } from "./message-status";
@@ -28,16 +32,31 @@ export function ContactCard({
   conversation,
   selected,
   onSelect,
+  onInbox,
+  onMarkRead,
+  canDelete,
 }: {
   conversation: ConversationSummary;
   selected: boolean;
   onSelect: (id: string) => void;
+  onInbox: (flags: InboxFlags) => void;
+  onMarkRead: () => void;
+  canDelete: boolean;
 }) {
   const { lastMessage, mode, channel, unreadCount, needsAttention, needsAttentionMessage } = conversation;
+  const inbox = conversation.inbox ?? {};
   const isHuman = mode === "HUMAN";
   const preview = lastMessage?.body ?? "No messages yet";
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+    <div
+      className="group relative"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenuOpen(true);
+      }}
+    >
     <button
       type="button"
       onClick={() => onSelect(conversation.id)}
@@ -83,10 +102,13 @@ export function ContactCard({
           </span>
           <span
             className={cn(
-              "shrink-0 text-xs tabular-nums",
+              "flex shrink-0 items-center gap-1 text-xs tabular-nums",
               unreadCount > 0 ? "font-medium text-primary" : "text-muted-foreground",
             )}
           >
+            {inbox.favourite && <Heart className="h-3 w-3 fill-current text-attention" aria-label="Favourite" />}
+            {inbox.muted && <BellOff className="h-3 w-3 text-muted-foreground" aria-label="Muted" />}
+            {inbox.pinned && <Pin className="h-3 w-3 text-muted-foreground" aria-label="Pinned" />}
             {formatRelativeTime(conversation.lastActivityAt)}
           </span>
         </span>
@@ -115,7 +137,11 @@ export function ContactCard({
               {preview}
             </span>
           </span>
-          <UnreadBadge count={unreadCount} />
+          {unreadCount > 0 ? (
+            <UnreadBadge count={unreadCount} />
+          ) : (
+            inbox.markedUnread && <span className="h-3 w-3 shrink-0 rounded-full bg-primary" aria-label="Marked unread" />
+          )}
         </span>
 
         {needsAttention && (
@@ -153,5 +179,16 @@ export function ContactCard({
         </span>
       </span>
     </button>
+    <div className="absolute bottom-2.5 right-3">
+      <ChatMenu
+        conversation={conversation}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        onChange={onInbox}
+        onMarkRead={onMarkRead}
+        canDelete={canDelete}
+      />
+    </div>
+    </div>
   );
 }

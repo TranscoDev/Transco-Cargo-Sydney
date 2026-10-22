@@ -8,6 +8,7 @@ import { CustomerContextPanel } from "@/components/transco/customer-context-pane
 import { EmptyState } from "@/components/transco/page-kit";
 import { mergeSummaries, mergedMessages } from "@/lib/transco/merge-conversations";
 import { useConversations } from "@/lib/transco/store";
+import { useTasks } from "@/lib/transco/tasks";
 import type { Conversation } from "@/lib/transco/types";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +33,14 @@ function ConversationsPage() {
     sendMessage,
     sendAttachment,
     setMode,
+    setInbox,
     sending,
     websitePaused,
     whatsappPaused,
     bookings,
     shipments,
   } = useConversations();
+  const { me } = useTasks();
 
   const rows = useMemo(() => mergeSummaries(summaries), [summaries]);
   const selectedRow = rows.find((r) => r.id === selectedId) ?? null;
@@ -89,6 +92,16 @@ function ConversationsPage() {
           onSelect={select}
           websitePaused={websitePaused}
           whatsappPaused={whatsappPaused}
+          onInbox={(id, flags) => {
+            setInbox(id, flags);
+            // Like WhatsApp: marking the open chat unread (or deleting it) closes it.
+            if (id === selectedId && (flags.markedUnread || flags.deleted)) select(null);
+          }}
+          onMarkRead={(id) => {
+            markAsRead(id);
+            rows.find((r) => r.id === id)?.mergedIds?.forEach((m) => markAsRead(m));
+          }}
+          canDelete={!!me?.canDeleteChats}
         />
       </aside>
 
