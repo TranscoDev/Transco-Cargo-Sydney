@@ -13,6 +13,7 @@ import type {
   ConsolidationDates,
   ConsolidationFinancials,
   ConsolidationTotals,
+  LiveBoxCounts,
   Conversation,
   ConversationChannel,
   ConversationMode,
@@ -680,6 +681,7 @@ interface BackendConsolidation {
   financialsNote?: string | null;
   dates: ConsolidationDates;
   importedShipmentCount: number;
+  liveBoxes?: LiveBoxCounts;
   createdAt: string;
   updatedAt: string;
 }
@@ -697,18 +699,32 @@ function mapConsolidation(c: BackendConsolidation): Consolidation {
     financialsNote: c.financialsNote,
     dates: c.dates,
     importedShipmentCount: c.importedShipmentCount,
+    liveBoxes: c.liveBoxes,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };
 }
 
 export async function fetchConsolidations(): Promise<Consolidation[]> {
+  return (await fetchShipmentBoard()).consolidations;
+}
+
+/** Shipments with live box counts, plus BLs waiting for a shipment. */
+export async function fetchShipmentBoard(): Promise<{ consolidations: Consolidation[]; waiting: LiveBoxCounts | null }> {
   const res = await fetch(`${API_BASE_URL}/api/consolidations`, { headers: authHeaders() });
   if (!res.ok) {
     throw new Error(`Failed to load shipment batches (${res.status})`);
   }
-  const data = (await res.json()) as { consolidations: BackendConsolidation[] };
-  return data.consolidations.map(mapConsolidation);
+  const data = (await res.json()) as { consolidations: BackendConsolidation[]; waiting?: LiveBoxCounts };
+  return { consolidations: data.consolidations.map(mapConsolidation), waiting: data.waiting ?? null };
+}
+
+/** The next free BL number, suggested at drop-off (null if none yet). */
+export async function fetchNextBl(): Promise<string | null> {
+  const res = await fetch(`${API_BASE_URL}/api/next-bl`, { headers: authHeaders() });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { nextBl?: string | null };
+  return data.nextBl ?? null;
 }
 
 /** Move a BL to another shipment (container), or out of one (null). The same record moves — never a copy. */

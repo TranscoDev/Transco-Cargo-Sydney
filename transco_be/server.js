@@ -3873,6 +3873,90 @@ app.patch('/api/shipments/:shipmentId', async (req, res) => {
 
 
 // ============================================================
+// LIVE BOX COUNTS per shipment (the sheet's TC/GB/OB/WB/CBM columns)
+// ============================================================
+//
+// Counted from the BLs actually in each shipment, so a shipment fills up
+// as BLs are added to it. Imported BLs carry their box counts; a BL given
+// at drop-off is counted from its booking's items. OB = Odd Box: TVs and
+// any other/odd-size item go there, as in the shipment sheet.
+const BOOKING_ITEM_TO_COLUMN = { tea_chest: 'tc', gift_box: 'gb', wine_box: 'wb', quarter_cbm: 'quarterCbm' };
+const BOX_COLUMNS = ['tc', 'gb', 'ob', 'wb', 'quarterCbm', 'halfCbm', 'oneCbm'];
+
+function emptyBoxCounts() {
+  return { bls: 0, tc: 0, gb: 0, ob: 0, wb: 0, quarterCbm: 0, halfCbm: 0, oneCbm: 0, total: 0 };
+}
+
+function addShipmentBoxes(counts, shipment, booking) {
+  counts.bls += 1;
+  if (shipment.boxes && typeof shipment.boxes === 'object') {
+    let sum = 0;
+    for (const col of BOX_COLUMNS) {
+      const n = Number(shipment.boxes[col]) || 0;
+      counts[col] += n;
+      sum += n;
+    }
+    counts.total += Number(shipment.totalBoxes) || sum;
+    return;
+  }
+  const items = booking && Array.isArray(booking.items) ? booking.items : [];
+  if (items.length) {
+    for (const item of items) {
+      const n = Number(item.qty) || 0;
+      counts[BOOKING_ITEM_TO_COLUMN[item.type] || 'ob'] += n;
+      counts.total += n;
+    }
+    return;
+  }
+  counts.total += Number(shipment.boxCount ?? booking?.boxCount) || 0;
+}
+
+async function liveBoxCounts() {
+  const list = await shipments().find(
+    { hblNumber: { $nin: [null, ''] } },
+    { projection: { consolidationId: 1, bookingId: 1, boxes: 1, totalBoxes: 1, boxCount: 1, status: 1 } }
+  ).toArray();
+  const bookingIds = list.map(s => s.bookingId).filter(Boolean);
+  const bookingList = bookingIds.length
+    ? await bookings().find({ _id: { $in: bookingIds } }, { projection: { items: 1, boxCount: 1 } }).toArray()
+    : [];
+  const bookingById = new Map(bookingList.map(b => [String(b._id), b]));
+
+  const byConsolidation = new Map();
+  const waiting = emptyBoxCounts();
+  for (const s of list) {
+    const booking = s.bookingId ? bookingById.get(String(s.bookingId)) : null;
+    if (s.consolidationId) {
+      const key = String(s.consolidationId);
+      if (!byConsolidation.has(key)) byConsolidation.set(key, emptyBoxCounts());
+      addShipmentBoxes(byConsolidation.get(key), s, booking);
+    } else if (s.bookingId && s.status !== 'delivered') {
+      // Given a BL at drop-off, still in the warehouse waiting for a shipment.
+      addShipmentBoxes(waiting, s, booking);
+    }
+  }
+  return { byConsolidation, waiting };
+}
+
+// The next free BL number (highest numeric BL + 1) — suggested to the
+// warehouse at drop-off; they can change it. (Not under /api/shipments/,
+// which /api/shipments/:shipmentId would catch first.)
+app.get('/api/next-bl', async (req, res) => {
+  try {
+    const [top] = await shipments().aggregate([
+      { $match: { hblNumber: { $regex: '^[0-9]{4,}$' } } },
+      { $project: { n: { $toLong: '$hblNumber' } } },
+      { $sort: { n: -1 } },
+      { $limit: 1 }
+    ]).toArray();
+    res.status(200).json({ nextBl: top ? String(Number(top.n) + 1) : null });
+  } catch (err) {
+    console.error('Error finding next BL:', err.message);
+    res.status(500).json({ error: 'Failed to find the next BL' });
+  }
+});
+
+// ============================================================
 // CONSOLIDATIONS (shipment batches — "Batch 57", "Batch 58", ...)
 // ============================================================
 //
@@ -3893,13 +3977,18 @@ app.get('/api/consolidations', async (req, res) => {
     ]).toArray();
     const countById = new Map(counts.map(c => [String(c._id), c.count]));
 
+    const { byConsolidation, waiting } = await liveBoxCounts();
+
     const result = allConsolidations.map(c => ({
       ...c,
-      importedShipmentCount: countById.get(String(c._id)) ?? 0
+      importedShipmentCount: countById.get(String(c._id)) ?? 0,
+      liveBoxes: byConsolidation.get(String(c._id)) || emptyBoxCounts()
     }));
 
     res.status(200).json({
-      consolidations: result
+      consolidations: result,
+      // BLs given at drop-off that aren't in a shipment yet.
+      waiting
     });
 
   } catch (err) {

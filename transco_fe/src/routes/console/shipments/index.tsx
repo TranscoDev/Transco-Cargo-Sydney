@@ -27,7 +27,7 @@ import { EmptyState, ErrorState, LoadingRows, StatusBadge } from "@/components/t
 import { shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
 import { getCurrentUser } from "@/lib/transco/auth";
-import { createConsolidation, fetchConsolidations, fetchShipments } from "@/lib/transco/api";
+import { createConsolidation, fetchShipmentBoard, fetchShipments } from "@/lib/transco/api";
 import { forgetShipmentList } from "@/components/transco/shipment-picker";
 import { ShipmentSheetImportDialog } from "@/components/transco/shipment-sheet-import";
 import { notify } from "@/lib/transco/notify";
@@ -35,6 +35,7 @@ import {
   SHIPMENT_STATUSES,
   SHIPMENT_STATUS_LABELS,
   type Consolidation,
+  type LiveBoxCounts,
   type Shipment,
   type ShipmentStatus,
 } from "@/lib/transco/types";
@@ -49,10 +50,56 @@ const AUD = new Intl.NumberFormat("en-AU", {
   maximumFractionDigits: 0,
 });
 
+// The shipment sheet's columns. OB = Odd Box (TVs and other odd sizes).
+const BOX_COLS: { key: keyof LiveBoxCounts; label: string; title: string }[] = [
+  { key: "bls", label: "BLs", title: "BLs in this shipment" },
+  { key: "tc", label: "TC", title: "Tea Chest" },
+  { key: "gb", label: "GB", title: "Gift Box" },
+  { key: "ob", label: "OB", title: "Odd Box (TVs, other sizes)" },
+  { key: "wb", label: "WB", title: "Wine Box" },
+  { key: "quarterCbm", label: "¼ CBM", title: "Quarter CBM box" },
+  { key: "halfCbm", label: "½ CBM", title: "Half CBM box" },
+  { key: "oneCbm", label: "1 CBM", title: "1 CBM box" },
+  { key: "total", label: "Total boxes", title: "Total boxes" },
+];
+
+function BoxCells({ counts }: { counts: LiveBoxCounts | undefined }) {
+  return (
+    <>
+      {BOX_COLS.map((col) => {
+        const n = counts?.[col.key] ?? 0;
+        return (
+          <td
+            key={col.key}
+            className={cn(
+              "px-2 py-3 text-right tabular-nums",
+              col.key === "total" ? "font-semibold text-foreground" : n ? "text-foreground" : "text-muted-foreground/60",
+            )}
+          >
+            {n}
+          </td>
+        );
+      })}
+    </>
+  );
+}
+
+function sumCounts(list: (LiveBoxCounts | undefined)[]): LiveBoxCounts {
+  const sum: LiveBoxCounts = { bls: 0, tc: 0, gb: 0, ob: 0, wb: 0, quarterCbm: 0, halfCbm: 0, oneCbm: 0, total: 0 };
+  for (const c of list) if (c) for (const k of Object.keys(sum) as (keyof LiveBoxCounts)[]) sum[k] += c[k] ?? 0;
+  return sum;
+}
+
+/** "—" until there's a figure (new shipments; expenses are calculated later). */
+const money = (n: number | null | undefined) => (n ? AUD.format(n) : "—");
+
 function ShipmentsPage() {
   const [view, setView] = useState<"batches" | "all">("batches");
 
   const [consolidations, setConsolidations] = useState<Consolidation[]>([]);
+  const [waiting, setWaiting] = useState<LiveBoxCounts | null>(null);
+  // "All BLs" showing only the BLs waiting for a shipment.
+  const [waitingOnly, setWaitingOnly] = useState(false);
   const [batchesLoading, setBatchesLoading] = useState(true);
   const [batchesError, setBatchesError] = useState<string | null>(null);
 
@@ -65,9 +112,10 @@ function ShipmentsPage() {
 
   const loadBatches = () => {
     setBatchesLoading(true);
-    fetchConsolidations()
+    fetchShipmentBoard()
       .then((data) => {
-        setConsolidations(data);
+        setConsolidations(data.consolidations);
+        setWaiting(data.waiting);
         setBatchesError(null);
       })
       .catch((err) =>
@@ -100,6 +148,7 @@ function ShipmentsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return shipments.filter((s) => {
+      if (waitingOnly && !(s.bookingId && s.hblNumber && !s.consolidationId && s.status !== "delivered")) return false;
       if (statusFilter !== "all" && s.status !== statusFilter) return false;
       if (!q) return true;
       return (
@@ -110,7 +159,7 @@ function ShipmentsPage() {
         (s.blNumber ?? "").toLowerCase().includes(q)
       );
     });
-  }, [shipments, query, statusFilter]);
+  }, [shipments, query, statusFilter, waitingOnly]);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-background">
@@ -156,7 +205,10 @@ function ShipmentsPage() {
         </button>
         <button
           type="button"
-          onClick={() => setView("all")}
+          onClick={() => {
+            setView("all");
+            setWaitingOnly(false);
+          }}
           aria-pressed={view === "all"}
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -173,9 +225,16 @@ function ShipmentsPage() {
           loading={batchesLoading}
           error={batchesError}
           unassignedCount={unassignedCount}
+          waiting={waiting}
+          onOpenWaiting={() => {
+            setWaitingOnly(true);
+            setView("all");
+          }}
         />
       ) : (
         <AllShipmentsView
+          waitingOnly={waitingOnly}
+          onClearWaiting={() => setWaitingOnly(false)}
           shipments={filtered}
           totalCount={shipments.length}
           loading={loading}
@@ -196,11 +255,15 @@ function BatchListView({
   loading,
   error,
   unassignedCount,
+  waiting,
+  onOpenWaiting,
 }: {
   consolidations: Consolidation[];
   loading: boolean;
   error: string | null;
   unassignedCount: number;
+  waiting: LiveBoxCounts | null;
+  onOpenWaiting: () => void;
 }) {
   // Warehouse logins don't see shipment income/profit.
   const showMoney = getCurrentUser()?.role !== "warehouse";
@@ -218,6 +281,16 @@ function BatchListView({
     <>
       {/* Phones: one tappable card per shipment instead of a wide table. */}
       <ul className="flex flex-col gap-2 md:hidden">
+        {waiting && waiting.bls > 0 && (
+          <li>
+            <button type="button" onClick={onOpenWaiting} className="block w-full rounded-xl border border-warning/40 bg-warning-soft p-4 text-left">
+              <span className="text-base font-semibold text-warning-foreground">Not in a shipment yet</span>
+              <p className="mt-1 text-sm tabular-nums text-warning-foreground/90">
+                {waiting.bls} BLs · {waiting.total} boxes · TC {waiting.tc} · GB {waiting.gb} · OB {waiting.ob}
+              </p>
+            </button>
+          </li>
+        )}
         {consolidations.map((c) => (
           <li key={c.id}>
             <Link
@@ -230,29 +303,49 @@ function BatchListView({
                 <span className="text-xs text-muted-foreground">{c.dates.peblEta ? `ETA ${c.dates.peblEta}` : c.label}</span>
               </div>
               <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-                HBL {c.hblRange.from}–{c.hblRange.to} · {c.importedShipmentCount}/{c.totals.hbl} BLs
+                {c.liveBoxes?.bls ?? c.importedShipmentCount} BLs · {c.liveBoxes?.total ?? 0} boxes
+                {c.liveBoxes ? ` · TC ${c.liveBoxes.tc} · GB ${c.liveBoxes.gb} · OB ${c.liveBoxes.ob}` : ""}
               </p>
             </Link>
           </li>
         ))}
       </ul>
       <div className="hidden overflow-auto rounded-xl border bg-card shadow-xs md:block">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1100px] text-left text-sm">
           <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
             <tr>
-              <th className="px-4 py-3 font-medium">Shipment</th>
-              <th className="px-4 py-3 font-medium">PE Number</th>
-              <th className="px-4 py-3 font-medium">HBL Range</th>
-              <th className="px-4 py-3 font-medium">Imported</th>
-              {showMoney && <th className="px-4 py-3 font-medium">Gross Income</th>}
-              {showMoney && <th className="px-4 py-3 font-medium">Gross Profit</th>}
-              <th className="px-4 py-3 font-medium">PEBL ETA</th>
+              <th className="sticky left-0 z-10 bg-secondary px-4 py-3 font-medium">Shipment</th>
+              <th className="px-3 py-3 font-medium">PE No.</th>
+              <th className="px-3 py-3 font-medium">HBL range</th>
+              {BOX_COLS.map((col) => (
+                <th key={col.key} className="px-2 py-3 text-right font-medium" title={col.title}>
+                  {col.label}
+                </th>
+              ))}
+              {showMoney && <th className="px-3 py-3 text-right font-medium">Income</th>}
+              {showMoney && <th className="px-3 py-3 text-right font-medium">Expenses</th>}
+              {showMoney && <th className="px-3 py-3 text-right font-medium">Profit</th>}
+              <th className="px-3 py-3 font-medium">ETA</th>
             </tr>
           </thead>
           <tbody>
+            {/* BLs given at drop-off that aren't in a shipment yet — what's sitting in the warehouse. */}
+            {waiting && waiting.bls > 0 && (
+              <tr className="cursor-pointer border-t border-border bg-warning-soft/60 hover:bg-warning-soft" onClick={onOpenWaiting}>
+                <td className="sticky left-0 z-10 bg-warning-soft px-4 py-3">
+                  <span className="font-medium text-warning-foreground">Not in a shipment yet</span>
+                  <p className="text-xs text-warning-foreground/80">Click to see them</p>
+                </td>
+                <td className="px-3 py-3" />
+                <td className="px-3 py-3" />
+                <BoxCells counts={waiting} />
+                {showMoney && <td colSpan={3} />}
+                <td />
+              </tr>
+            )}
             {consolidations.map((c) => (
-              <tr key={c.id} className="border-t border-border transition-colors hover:bg-accent/30">
-                <td className="px-4 py-3">
+              <tr key={c.id} className="group border-t border-border transition-colors hover:bg-accent/30">
+                <td className="sticky left-0 z-10 bg-card px-4 py-3 group-hover:bg-accent">
                   <Link
                     to="/console/shipments/batch/$batchId"
                     params={{ batchId: c.id }}
@@ -262,28 +355,30 @@ function BatchListView({
                   </Link>
                   <p className="text-xs text-muted-foreground">{c.label}</p>
                 </td>
-                <td className="px-4 py-3">{c.peNumber || "—"}</td>
-                <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                  {c.hblRange.from}–{c.hblRange.to}
+                <td className="px-3 py-3">{c.peNumber || "—"}</td>
+                <td className="px-3 py-3 tabular-nums text-muted-foreground">
+                  {c.hblRange.from ? `${c.hblRange.from}–${c.hblRange.to}` : "—"}
                 </td>
-                <td className="px-4 py-3 tabular-nums">
-                  {c.importedShipmentCount} / {c.totals.hbl}
-                  {c.importedShipmentCount < c.totals.hbl && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">imported so far</span>
-                  )}
-                </td>
-                {showMoney && <td className="px-4 py-3 tabular-nums">{AUD.format(c.financials.grossIncome)}</td>}
-                {showMoney && (
-                  <td className="px-4 py-3 tabular-nums text-success-foreground">
-                    {AUD.format(c.financials.grossProfit)}
-                  </td>
-                )}
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {c.dates.peblEta || "—"}
-                </td>
+                <BoxCells counts={c.liveBoxes} />
+                {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(c.financials.grossIncome)}</td>}
+                {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(c.financials.totalExpenses)}</td>}
+                {showMoney && <td className="px-3 py-3 text-right tabular-nums text-success-foreground">{money(c.financials.grossProfit)}</td>}
+                <td className="px-3 py-3 text-xs text-muted-foreground">{c.dates.peblEta || "—"}</td>
               </tr>
             ))}
           </tbody>
+          <tfoot className="border-t-2 border-border bg-secondary/40 font-semibold">
+            <tr>
+              <td className="sticky left-0 z-10 bg-secondary px-4 py-3">Total</td>
+              <td />
+              <td />
+              <BoxCells counts={sumCounts(consolidations.map((c) => c.liveBoxes))} />
+              {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(consolidations.reduce((n, c) => n + c.financials.grossIncome, 0))}</td>}
+              {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(consolidations.reduce((n, c) => n + c.financials.totalExpenses, 0))}</td>}
+              {showMoney && <td className="px-3 py-3 text-right tabular-nums text-success-foreground">{money(consolidations.reduce((n, c) => n + c.financials.grossProfit, 0))}</td>}
+              <td />
+            </tr>
+          </tfoot>
         </table>
       </div>
 
@@ -298,6 +393,8 @@ function BatchListView({
 }
 
 function AllShipmentsView({
+  waitingOnly,
+  onClearWaiting,
   shipments,
   totalCount,
   loading,
@@ -307,6 +404,8 @@ function AllShipmentsView({
   statusFilter,
   onStatusFilterChange,
 }: {
+  waitingOnly: boolean;
+  onClearWaiting: () => void;
   shipments: Shipment[];
   totalCount: number;
   loading: boolean;
@@ -342,7 +441,19 @@ function AllShipmentsView({
             ))}
           </SelectContent>
         </Select>
+        {waitingOnly && (
+          <button
+            type="button"
+            onClick={onClearWaiting}
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-warning-soft px-3 text-sm font-medium text-warning-foreground hover:bg-warning/20"
+          >
+            Not in a shipment yet ✕
+          </button>
+        )}
       </div>
+      {waitingOnly && (
+        <p className="-mt-3 mb-4 text-xs text-muted-foreground">Open a BL and pick a shipment under “Move to” — any staff member can do it.</p>
+      )}
 
 
 

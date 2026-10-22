@@ -519,8 +519,23 @@ export interface Consolidation {
   financialsNote?: string | null | undefined;
   dates: ConsolidationDates;
   importedShipmentCount: number;
+  /** Boxes in the BLs actually in this shipment now (fills up as BLs are added). */
+  liveBoxes?: LiveBoxCounts | undefined;
   createdAt: string;
   updatedAt: string;
+}
+
+/** The shipment sheet's box columns. OB = Odd Box (TVs, other/odd sizes). */
+export interface LiveBoxCounts {
+  bls: number;
+  tc: number;
+  gb: number;
+  ob: number;
+  wb: number;
+  quarterCbm: number;
+  halfCbm: number;
+  oneCbm: number;
+  total: number;
 }
 
 export interface ConsolidationDetail extends Consolidation {
