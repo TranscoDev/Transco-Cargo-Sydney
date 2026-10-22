@@ -6446,6 +6446,46 @@ const customerTools = createCustomerTools({
   createCalendarEvent
 });
 
+// Conversations: website visitors who sent one message (e.g. "Hi" or a
+// quick-question button) and never replied within an hour are archived,
+// so real enquiries stand out. Only chats never archived/unarchived by
+// staff ('inbox.archived' unset), so an unarchive always sticks. A new
+// message brings them back (broadcastMessageCreated).
+const SILENT_VISITOR_MS = 60 * 60 * 1000;
+
+async function archiveSilentVisitors() {
+  const candidates = await customers().find({
+    channel: 'website',
+    linkedCustomerId: { $exists: false },
+    'inbox.archived': { $exists: false },
+    mode: { $ne: 'HUMAN' },
+    needsAttention: { $ne: true },
+    $or: [{ createdAt: { $lt: new Date(Date.now() - SILENT_VISITOR_MS) } }, { createdAt: { $exists: false } }]
+  }, { projection: { _id: 1 } }).limit(500).toArray();
+  if (!candidates.length) return;
+
+  const ids = candidates.map(c => c._id);
+  const [counts, recent] = await Promise.all([
+    messages().aggregate([
+      { $match: { customerId: { $in: ids }, senderType: 'CUSTOMER' } },
+      { $group: { _id: '$customerId', n: { $sum: 1 } } }
+    ]).toArray(),
+    messages().distinct('customerId', { customerId: { $in: ids }, createdAt: { $gte: new Date(Date.now() - SILENT_VISITOR_MS) } })
+  ]);
+  const talked = new Set(counts.filter(c => c.n > 1).map(c => String(c._id)));
+  const active = new Set(recent.map(String));
+  const silent = ids.filter(id => !talked.has(String(id)) && !active.has(String(id)));
+  if (!silent.length) return;
+
+  await customers().updateMany({ _id: { $in: silent } }, { $set: { 'inbox.archived': true, 'inbox.autoArchived': true } });
+  const docs = await customers().find({ _id: { $in: silent } }, { projection: { inbox: 1 } }).toArray();
+  for (const d of docs) broadcast('customer.inbox_changed', { customerId: d._id, inbox: d.inbox });
+}
+
+setInterval(() => {
+  archiveSilentVisitors().catch(err => console.error('[inbox] auto-archive failed:', err.message));
+}, 10 * 60 * 1000).unref();
+
 // Privacy retention: remove Passport/NIC numbers from records older than
 // ID_RETENTION_YEARS (off until it's set — the period is still to be
 // confirmed). Checked once an hour after start-up, then daily.

@@ -7,12 +7,14 @@ import type { ConversationSummary, InboxFlags } from "@/lib/transco/types";
 
 import { ContactCard, type LinkActions } from "./contact-card";
 
-type StatusFilter = "ALL" | "UNREAD" | "HUMAN" | "ATTENTION" | "FAVOURITES" | "INTERNAL";
+type StatusFilter = "ALL" | "UNREAD" | "CUSTOMERS" | "ENQUIRIES" | "HUMAN" | "ATTENTION" | "FAVOURITES" | "INTERNAL";
 type Channel = "ALL" | "WHATSAPP" | "WEBSITE";
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "UNREAD", label: "Unread" },
+  { key: "CUSTOMERS", label: "Customers" },
+  { key: "ENQUIRIES", label: "New enquiries" },
   { key: "ATTENTION", label: "Needs staff" },
   { key: "HUMAN", label: "Taken over" },
   { key: "FAVOURITES", label: "Favourites" },
@@ -20,6 +22,9 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
 ];
 
 const isUnread = (c: ConversationSummary) => c.unreadCount > 0 || !!c.inbox?.markedUnread;
+
+/** A website visitor we don't know yet (not signed in, not linked by staff). */
+const isEnquiry = (c: ConversationSummary) => c.channel === "website" && !c.linkedAccount && !c.mergedIds?.length;
 
 // Pinned chats first (like WhatsApp), then newest activity.
 function byPinThenRecent(a: ConversationSummary, b: ConversationSummary) {
@@ -93,6 +98,8 @@ export function ContactList({
     return base
       .filter((c) => {
         if (status === "UNREAD" && !isUnread(c)) return false;
+        if (status === "CUSTOMERS" && isEnquiry(c)) return false;
+        if (status === "ENQUIRIES" && !isEnquiry(c)) return false;
         if (status === "HUMAN" && c.mode !== "HUMAN") return false;
         if (status === "ATTENTION" && !c.needsAttention) return false;
         if (status === "FAVOURITES" && !c.inbox?.favourite) return false;
@@ -111,6 +118,7 @@ export function ContactList({
   const humanTotal = counted.filter((c) => c.mode === "HUMAN").length;
   const attentionTotal = counted.filter((c) => c.needsAttention).length;
   const archivedUnread = archived.filter(isUnread).length;
+  const enquiryTotal = counted.filter(isEnquiry).length;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
@@ -192,6 +200,7 @@ export function ContactList({
               )}
             >
               {f.label}
+              {f.key === "ENQUIRIES" && enquiryTotal > 0 && <span className="ml-1 tabular-nums opacity-70">{enquiryTotal}</span>}
             </button>
           ))}
         </div>
