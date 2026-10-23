@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { NAV_GROUPS, useWalkInsToConfirm } from "@/components/transco/console-layout";
+import { NAV_GROUPS, useWaitingConversations, useWalkInsToConfirm } from "@/components/transco/console-layout";
 import { TodayPanel } from "@/components/transco/task-kit";
 import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type StatusTone } from "@/components/transco/page-kit";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -145,7 +145,8 @@ interface WorkItem {
 }
 
 function DashboardBody({ s }: { s: DashboardSummary }) {
-  const waiting = s.conversationsWaiting ?? s.unreadConversations;
+  // Same number as the Conversations badge in the menu: customers asking for staff.
+  const waiting = useWaitingConversations();
   const dropOffs = s.todaysDropOffs ?? [];
   // Same count as the Walk-ins badge in the sidebar, so the two always agree.
   const walkIns = useWalkInsToConfirm();
@@ -162,7 +163,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
     {
       count: waiting,
       label: plural(waiting, "Reply to 1 conversation", `Reply to ${waiting} conversations`),
-      hint: "Customers waiting for an answer, or chats the bot flagged for staff.",
+      hint: "Customers who asked to talk to staff.",
       to: "/console/conversations",
       icon: MessageCircle,
       tone: "info",

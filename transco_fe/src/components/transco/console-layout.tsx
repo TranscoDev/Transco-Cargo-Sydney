@@ -153,7 +153,7 @@ function isActive(pathname: string, to: string) {
 
 /** Customers who asked for staff (the "Needs staff" filter): one per customer,
  * never our own staff's Internal chats, deleted chats or never-chatted profiles. */
-function useWaitingConversations() {
+export function useWaitingConversations() {
   const { summaries } = useConversations();
   return useMemo(
     () => mergeSummaries(summaries).filter((c) => c.needsAttention && c.lastMessage && !c.inbox?.isStaff && !c.inbox?.deleted && !c.inbox?.archived).length,
