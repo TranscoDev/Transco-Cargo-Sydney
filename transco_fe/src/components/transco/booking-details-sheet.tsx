@@ -17,7 +17,7 @@ import {
   type DeclarationPerson,
   type DeclarationPrintData,
 } from "@/lib/transco/declaration-print";
-import { fetchNextBl, finaliseWalkIn } from "@/lib/transco/api";
+import { finaliseWalkIn } from "@/lib/transco/api";
 import { formatDate, saveBookingDetails } from "@/lib/transco/my-transco";
 import { friendlyError, notify } from "@/lib/transco/notify";
 import { BookingDetailsEditor } from "@/components/transco/booking-details-editor";
@@ -381,20 +381,6 @@ function FinaliseSection({
   const isWalkIn = !!data.walkIn;
   const hasBl = !!data.blNumber;
   const [bl, setBl] = useState("");
-  // The next free BL is filled in for the warehouse; they can change it.
-  const [suggestedBl, setSuggestedBl] = useState<string | null>(null);
-  useEffect(() => {
-    if (hasBl) return;
-    let cancelled = false;
-    fetchNextBl().then((next) => {
-      if (cancelled || !next) return;
-      setSuggestedBl(next);
-      setBl((current) => current || next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasBl]);
   const [batch, setBatch] = useState("");
   const [weight, setWeight] = useState(asText(data.weight));
   const [cbm, setCbm] = useState(asText(data.cbm));
@@ -568,14 +554,7 @@ function FinaliseSection({
         <p className="mb-3 text-xs text-muted-foreground">To change the BL or shipment number, use “Weights, price &amp; BL” on the booking.</p>
       ) : (
         <div className="mb-4 grid grid-cols-1 gap-3 @sm:grid-cols-[1fr_11rem]">
-          <Field
-            id="fin-bl"
-            label="BL number"
-            value={bl}
-            onChange={setBl}
-            inputMode="text"
-            hint={suggestedBl && bl === suggestedBl ? "Next free BL, filled in for you — change it if needed." : "Required — the customer's main reference."}
-          />
+          <Field id="fin-bl" label="BL number" value={bl} onChange={setBl} inputMode="text" hint="Required — the customer's main reference." />
           <div className="flex flex-col gap-1">
             <Label htmlFor="fin-batch" className="text-xs">Shipment</Label>
             <ShipmentPicker id="fin-batch" value={batch} onChange={setBatch} className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground" />
