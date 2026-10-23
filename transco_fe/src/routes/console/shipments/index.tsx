@@ -100,12 +100,6 @@ function BoxCells({ counts, cols }: { counts: LiveBoxCounts | undefined; cols: t
   );
 }
 
-function sumCounts(list: (LiveBoxCounts | undefined)[]): LiveBoxCounts {
-  const sum: LiveBoxCounts = { bls: 0, tc: 0, gb: 0, ob: 0, wb: 0, quarterCbm: 0, halfCbm: 0, oneCbm: 0, total: 0 };
-  for (const c of list) if (c) for (const k of Object.keys(sum) as (keyof LiveBoxCounts)[]) sum[k] += c[k] ?? 0;
-  return sum;
-}
-
 /** "—" until there's a figure (new shipments; expenses are calculated later). */
 const money = (n: number | null | undefined) => (n ? AUD.format(n) : "—");
 
@@ -388,18 +382,6 @@ function BatchListView({
               </tr>
             ))}
           </tbody>
-          <tfoot className="border-t border-border bg-secondary font-semibold">
-            <tr>
-              <td className="sticky left-0 z-10 bg-secondary px-4 py-3">Total</td>
-              <td />
-              <td />
-              <BoxCells counts={sumCounts(consolidations.map((c) => c.liveBoxes))} cols={boxCols} />
-              {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(consolidations.reduce((n, c) => n + c.financials.grossIncome, 0))}</td>}
-              {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(consolidations.reduce((n, c) => n + c.financials.totalExpenses, 0))}</td>}
-              {showMoney && <td className="px-3 py-3 text-right tabular-nums text-success-foreground">{money(consolidations.reduce((n, c) => n + c.financials.grossProfit, 0))}</td>}
-              <td />
-            </tr>
-          </tfoot>
         </table>
       </div>
 
