@@ -63,20 +63,36 @@ const BOX_COLS: { key: keyof LiveBoxCounts; label: string; title: string }[] = [
   { key: "total", label: "Total boxes", title: "Total boxes" },
 ];
 
-function BoxCells({ counts }: { counts: LiveBoxCounts | undefined }) {
+// Always shown; WB and the CBM sizes only appear once some shipment has them.
+const ALWAYS_SHOWN: (keyof LiveBoxCounts)[] = ["bls", "tc", "gb", "ob", "total"];
+
+function visibleBoxCols(all: (LiveBoxCounts | null | undefined)[]) {
+  return BOX_COLS.filter((col) => ALWAYS_SHOWN.includes(col.key) || all.some((c) => (c?.[col.key] ?? 0) > 0));
+}
+
+/** Box cells for one row — blank instead of 0; a shipment with no BLs says so once. */
+function BoxCells({ counts, cols }: { counts: LiveBoxCounts | undefined; cols: typeof BOX_COLS }) {
+  if (!counts?.bls) {
+    return (
+      <td colSpan={cols.length} className="border-r-2! border-r-foreground/25! px-2 py-3 text-center text-xs text-muted-foreground">
+        No BLs yet
+      </td>
+    );
+  }
   return (
     <>
-      {BOX_COLS.map((col) => {
-        const n = counts?.[col.key] ?? 0;
+      {cols.map((col, i) => {
+        const n = counts[col.key] ?? 0;
         return (
           <td
             key={col.key}
             className={cn(
               "px-2 py-3 text-right tabular-nums",
-              col.key === "total" ? "font-semibold text-foreground" : n ? "text-foreground" : "text-muted-foreground/60",
+              col.key === "total" ? "font-semibold text-foreground" : "text-foreground",
+              i === cols.length - 1 && "border-r-2! border-r-foreground/25! pr-3",
             )}
           >
-            {n}
+            {n || ""}
           </td>
         );
       })}
@@ -267,6 +283,7 @@ function BatchListView({
 }) {
   // Warehouse logins don't see shipment income/profit.
   const showMoney = getCurrentUser()?.role !== "warehouse";
+  const boxCols = visibleBoxCols([waiting, ...consolidations.map((c) => c.liveBoxes)]);
   if (error) return <ErrorState title="Couldn't load shipments" onRetry={() => window.location.reload()} />;
   if (loading) return <LoadingRows rows={5} />;
   if (consolidations.length === 0) {
@@ -311,14 +328,18 @@ function BatchListView({
         ))}
       </ul>
       <div className="hidden overflow-auto rounded-xl border bg-card shadow-xs md:block">
-        <table className="w-full min-w-[1100px] text-left text-sm">
-          <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
+        <table className="w-full min-w-225 text-left text-sm [&_td]:border-r [&_td]:border-border [&_th]:border-r [&_th]:border-border [&_td:last-child]:border-r-0 [&_th:last-child]:border-r-0">
+          <thead className="border-b bg-secondary text-xs text-muted-foreground">
             <tr>
               <th className="sticky left-0 z-10 bg-secondary px-4 py-3 font-medium">Shipment</th>
               <th className="px-3 py-3 font-medium">PE No.</th>
               <th className="px-3 py-3 font-medium">HBL range</th>
-              {BOX_COLS.map((col) => (
-                <th key={col.key} className="px-2 py-3 text-right font-medium" title={col.title}>
+              {boxCols.map((col, i) => (
+                <th
+                  key={col.key}
+                  className={cn("px-2 py-3 text-right font-medium", i === boxCols.length - 1 && "border-r-2! border-r-foreground/25! pr-3")}
+                  title={col.title}
+                >
                   {col.label}
                 </th>
               ))}
@@ -338,7 +359,7 @@ function BatchListView({
                 </td>
                 <td className="px-3 py-3" />
                 <td className="px-3 py-3" />
-                <BoxCells counts={waiting} />
+                <BoxCells counts={waiting} cols={boxCols} />
                 {showMoney && <td colSpan={3} />}
                 <td />
               </tr>
@@ -359,7 +380,7 @@ function BatchListView({
                 <td className="px-3 py-3 tabular-nums text-muted-foreground">
                   {c.hblRange.from ? `${c.hblRange.from}–${c.hblRange.to}` : "—"}
                 </td>
-                <BoxCells counts={c.liveBoxes} />
+                <BoxCells counts={c.liveBoxes} cols={boxCols} />
                 {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(c.financials.grossIncome)}</td>}
                 {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(c.financials.totalExpenses)}</td>}
                 {showMoney && <td className="px-3 py-3 text-right tabular-nums text-success-foreground">{money(c.financials.grossProfit)}</td>}
@@ -367,12 +388,12 @@ function BatchListView({
               </tr>
             ))}
           </tbody>
-          <tfoot className="border-t-2 border-border bg-secondary/40 font-semibold">
+          <tfoot className="border-t border-border bg-secondary font-semibold">
             <tr>
               <td className="sticky left-0 z-10 bg-secondary px-4 py-3">Total</td>
               <td />
               <td />
-              <BoxCells counts={sumCounts(consolidations.map((c) => c.liveBoxes))} />
+              <BoxCells counts={sumCounts(consolidations.map((c) => c.liveBoxes))} cols={boxCols} />
               {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(consolidations.reduce((n, c) => n + c.financials.grossIncome, 0))}</td>}
               {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(consolidations.reduce((n, c) => n + c.financials.totalExpenses, 0))}</td>}
               {showMoney && <td className="px-3 py-3 text-right tabular-nums text-success-foreground">{money(consolidations.reduce((n, c) => n + c.financials.grossProfit, 0))}</td>}
