@@ -259,11 +259,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                       <span className="flex-1">{item.label}</span>
                       {count > 0 && (
                         <span
-                          className={cn(
-                            "min-w-5 rounded-full px-1.5 text-center text-[11px] font-semibold leading-5",
-                            // Customers asking for staff — same red as the "Needs staff" filter.
-                            item.badge === "conversations" ? "bg-attention text-white" : "bg-primary text-primary-foreground",
-                          )}
+                          className="min-w-5 rounded-full bg-primary px-1.5 text-center text-[11px] font-semibold leading-5 text-primary-foreground"
                           aria-label={item.badge === "conversations" ? `${count} need staff` : `${count} waiting`}
                         >
                           {count}
