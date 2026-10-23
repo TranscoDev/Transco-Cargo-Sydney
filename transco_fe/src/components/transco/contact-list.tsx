@@ -104,7 +104,8 @@ export function ContactList({
   // across both at once, whenever a specific channel is picked.
   // Deleted chats never show; our own staff only show under Internal.
   const inChannel = useMemo(
-    () => conversations.filter((c) => !c.inbox?.deleted && matchesChannel(c, channel)),
+    // Customers who never chatted (e.g. imported) aren't conversations — they live in Customers.
+    () => conversations.filter((c) => c.lastMessage && !c.inbox?.deleted && matchesChannel(c, channel)),
     [conversations, channel],
   );
   const customerChats = useMemo(() => inChannel.filter((c) => !c.inbox?.isStaff), [inChannel]);
