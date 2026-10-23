@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { mergeSummaries } from "@/lib/transco/merge-conversations";
+import { useBookingAttention } from "@/components/transco/bookings-panel";
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { cn } from "@/lib/utils";
@@ -64,7 +65,7 @@ export interface NavLeaf {
   to: string;
   icon: LucideIcon;
   /** Shows a live count: waiting conversations, walk-ins to confirm, or my open tasks. */
-  badge?: "conversations" | "walkIns" | "tasks";
+  badge?: "conversations" | "walkIns" | "tasks" | "bookings";
   /** Only for the admin (checked again by the backend). */
   adminOnly?: boolean;
 }
@@ -83,7 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Tasks", to: "/console/tasks", icon: ListTodo, badge: "tasks" },
       { label: "Conversations", to: "/console/conversations", icon: MessageCircle, badge: "conversations" },
       { label: "Customers", to: "/console/customers", icon: Users },
-      { label: "Bookings", to: "/console/bookings", icon: CalendarClock },
+      { label: "Bookings", to: "/console/bookings", icon: CalendarClock, badge: "bookings" },
       { label: "Shipments", to: "/console/shipments", icon: Ship },
     ],
   },
@@ -181,6 +182,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const waiting = useWaitingConversations();
   const walkIns = useWalkInsToConfirm();
+  // Same number as Bookings → Needs attention.
+  const bookingsAttention = useBookingAttention().total;
   const { tasks: myTasks, isAdmin } = useMyTaskCount();
   // Only the pages this login may open (Settings → Staff → page access);
   // limited logins don't see the "Coming later" group either.
@@ -241,7 +244,12 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             <ul className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const active = isActive(pathname, item.to);
-                const count = item.badge === "conversations" ? waiting : item.badge === "walkIns" ? walkIns : item.badge === "tasks" ? myTasks : 0;
+                const count =
+                  item.badge === "conversations" ? waiting
+                  : item.badge === "walkIns" ? walkIns
+                  : item.badge === "tasks" ? myTasks
+                  : item.badge === "bookings" ? bookingsAttention
+                  : 0;
                 return (
                   <li key={item.to}>
                     <Link
