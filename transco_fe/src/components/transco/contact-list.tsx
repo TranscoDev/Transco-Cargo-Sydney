@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Archive, ArrowLeft, CheckCircle2, Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Archive, ArrowLeft, CheckCircle2, ChevronDown, Search, MessageCircle, Globe, PauseCircle } from "lucide-react";
 import { EmptyState } from "./page-kit";
 
 import { cn } from "@/lib/utils";
@@ -7,19 +8,41 @@ import type { ConversationSummary, InboxFlags } from "@/lib/transco/types";
 
 import { ContactCard, type LinkActions } from "./contact-card";
 
-type StatusFilter = "ALL" | "UNREAD" | "CUSTOMERS" | "ENQUIRIES" | "HUMAN" | "ATTENTION" | "FAVOURITES" | "INTERNAL";
+type StatusFilter = "ALL" | "UNREAD" | "CUSTOMERS" | "ENQUIRIES" | "HUMAN" | "ATTENTION" | "INTERNAL";
 type Channel = "ALL" | "WHATSAPP" | "WEBSITE";
 
-const statusFilters: { key: StatusFilter; label: string }[] = [
+// Shown as chips; the rest sit under the ⌄ chip, like WhatsApp.
+const MAIN_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "UNREAD", label: "Unread" },
-  { key: "CUSTOMERS", label: "Customers" },
   { key: "ENQUIRIES", label: "New enquiries" },
   { key: "ATTENTION", label: "Needs staff" },
-  { key: "HUMAN", label: "Taken over" },
-  { key: "FAVOURITES", label: "Favourites" },
-  { key: "INTERNAL", label: "Internal" },
 ];
+const MORE_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "CUSTOMERS", label: "Customers" },
+  { key: "HUMAN", label: "Taken over" },
+  { key: "INTERNAL", label: "Internal (staff)" },
+];
+
+function Chip({ on, attention, onClick, children }: { on: boolean; attention?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        "h-7 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors",
+        on
+          ? "border-primary/30 bg-primary/15 text-primary"
+          : attention
+            ? "border-attention/40 text-attention-foreground hover:bg-attention-soft"
+            : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 const isUnread = (c: ConversationSummary) => c.unreadCount > 0 || !!c.inbox?.markedUnread;
 
@@ -102,7 +125,6 @@ export function ContactList({
         if (status === "ENQUIRIES" && !isEnquiry(c)) return false;
         if (status === "HUMAN" && c.mode !== "HUMAN") return false;
         if (status === "ATTENTION" && !c.needsAttention) return false;
-        if (status === "FAVOURITES" && !c.inbox?.favourite) return false;
         if (!q) return true;
         return (
           c.customerName.toLowerCase().includes(q) ||
@@ -119,6 +141,11 @@ export function ContactList({
   const attentionTotal = counted.filter((c) => c.needsAttention).length;
   const archivedUnread = archived.filter(isUnread).length;
   const enquiryTotal = counted.filter(isEnquiry).length;
+
+  const pick = (key: StatusFilter) => {
+    setStatus(key);
+    setShowArchived(false);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
@@ -179,30 +206,48 @@ export function ContactList({
           />
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1">
-          {statusFilters.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => {
-                setStatus(f.key);
-                setShowArchived(false);
-              }}
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                status === f.key
-                  ? f.key === "ATTENTION"
-                    ? "bg-attention-soft text-attention-foreground ring-1 ring-attention/40"
-                    : "bg-accent text-accent-foreground"
-                  : f.key === "ATTENTION" && attentionTotal > 0
-                    ? "text-attention-foreground hover:bg-attention-soft"
-                    : "text-muted-foreground hover:bg-secondary",
-              )}
-            >
-              {f.label}
-              {f.key === "ENQUIRIES" && enquiryTotal > 0 && <span className="ml-1 tabular-nums opacity-70">{enquiryTotal}</span>}
-            </button>
-          ))}
+        {/* WhatsApp-style chips: the main filters, the rest under ⌄. */}
+        <div className="-mx-3 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {MAIN_FILTERS.map((f) => {
+            const count = f.key === "UNREAD" ? unreadTotal : f.key === "ENQUIRIES" ? enquiryTotal : f.key === "ATTENTION" ? attentionTotal : 0;
+            return (
+              <Chip key={f.key} on={status === f.key} attention={f.key === "ATTENTION" && count > 0} onClick={() => pick(f.key)}>
+                {f.label}
+                {count > 0 && <span className="ml-1 tabular-nums opacity-75">{count}</span>}
+              </Chip>
+            );
+          })}
+          {/* A filter picked from ⌄ shows as its own chip while it's on. */}
+          {MORE_FILTERS.some((f) => f.key === status) && (
+            <Chip on onClick={() => pick("ALL")}>
+              {MORE_FILTERS.find((f) => f.key === status)?.label} ✕
+            </Chip>
+          )}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                aria-label="More filters"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-44 rounded-lg border border-border bg-panel p-1 text-sm shadow-lg">
+                {MORE_FILTERS.map((f) => (
+                  <DropdownMenu.Item
+                    key={f.key}
+                    onSelect={() => pick(f.key)}
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-md px-2.5 py-2 outline-none data-highlighted:bg-secondary"
+                  >
+                    {f.label}
+                    {status === f.key && <span className="text-primary">✓</span>}
+                  </DropdownMenu.Item>
+                ))}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
       </div>
 
