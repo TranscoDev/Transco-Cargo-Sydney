@@ -100,6 +100,17 @@ function BoxCells({ counts, cols }: { counts: LiveBoxCounts | undefined; cols: t
   );
 }
 
+/** BLs in number order, the newest (highest) first; BLs without a number last. */
+function byBlNewestFirst(a: Shipment, b: Shipment) {
+  const na = Number(a.hblNumber);
+  const nb = Number(b.hblNumber);
+  const okA = !!a.hblNumber && Number.isFinite(na);
+  const okB = !!b.hblNumber && Number.isFinite(nb);
+  if (okA && okB) return nb - na;
+  if (okA !== okB) return okA ? -1 : 1;
+  return (b.hblNumber ?? "").localeCompare(a.hblNumber ?? "");
+}
+
 /** "—" until there's a figure (new shipments; expenses are calculated later). */
 const money = (n: number | null | undefined) => (n ? AUD.format(n) : "—");
 
@@ -169,7 +180,7 @@ function ShipmentsPage() {
         (s.blNumber ?? "").toLowerCase().includes(q)
       );
     });
-  }, [shipments, query, statusFilter, waitingOnly]);
+  }, [shipments, query, statusFilter, waitingOnly]).sort(byBlNewestFirst);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto bg-background">
