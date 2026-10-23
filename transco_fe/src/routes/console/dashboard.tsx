@@ -168,7 +168,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
     {
       count: waiting,
       label: plural(waiting, "Reply to 1 conversation", `Reply to ${waiting} conversations`),
-      hint: "Customers who asked to talk to staff.",
+      hint: "Customers who asked to talk to staff, and chats marked unread.",
       to: "/console/conversations",
       icon: MessageCircle,
       tone: "info",

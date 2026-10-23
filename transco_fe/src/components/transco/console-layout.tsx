@@ -157,7 +157,12 @@ function isActive(pathname: string, to: string) {
 export function useWaitingConversations() {
   const { summaries } = useConversations();
   return useMemo(
-    () => mergeSummaries(summaries).filter((c) => c.needsAttention && c.lastMessage && !c.inbox?.isStaff && !c.inbox?.deleted && !c.inbox?.archived).length,
+    () =>
+      mergeSummaries(summaries).filter(
+        (c) =>
+          // Asked for staff, or a staff member marked it unread to come back to.
+          (c.needsAttention || c.inbox?.markedUnread) && c.lastMessage && !c.inbox?.isStaff && !c.inbox?.deleted && !c.inbox?.archived,
+      ).length,
     [summaries],
   );
 }
