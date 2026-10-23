@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { mergeSummaries } from "@/lib/transco/merge-conversations";
-import { useBookingAttention } from "@/components/transco/bookings-panel";
+import { useTodayBookingCount } from "@/components/transco/bookings-panel";
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { cn } from "@/lib/utils";
@@ -182,8 +182,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const waiting = useWaitingConversations();
   const walkIns = useWalkInsToConfirm();
-  // Same number as Bookings → Needs attention.
-  const bookingsAttention = useBookingAttention().total;
+  // Today's bookings.
+  const bookingsToday = useTodayBookingCount();
   const { tasks: myTasks, isAdmin } = useMyTaskCount();
   // Only the pages this login may open (Settings → Staff → page access);
   // limited logins don't see the "Coming later" group either.
@@ -248,7 +248,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   item.badge === "conversations" ? waiting
                   : item.badge === "walkIns" ? walkIns
                   : item.badge === "tasks" ? myTasks
-                  : item.badge === "bookings" ? bookingsAttention
+                  : item.badge === "bookings" ? bookingsToday
                   : 0;
                 return (
                   <li key={item.to}>

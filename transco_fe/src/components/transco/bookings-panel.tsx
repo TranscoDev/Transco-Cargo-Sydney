@@ -144,6 +144,15 @@ export function bookingAttention(bookings: Booking[], today: string) {
   return { walkIns, checks, bls, total: walkIns.length + checks.length + bls.length };
 }
 
+/** Today's bookings (not cancelled) — the Bookings badge in the menu. */
+export function useTodayBookingCount() {
+  const { bookings } = useConversations();
+  return useMemo(() => {
+    const today = todayKey();
+    return bookings.filter((b) => b.resolvedDate === today && b.status !== "cancelled").length;
+  }, [bookings]);
+}
+
 /** The same groups for the dashboard, from the live bookings list. */
 export function useBookingAttention() {
   const { bookings } = useConversations();
