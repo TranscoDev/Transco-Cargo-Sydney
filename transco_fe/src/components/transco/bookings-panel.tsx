@@ -41,6 +41,7 @@ import { bookingStatus } from "@/lib/transco/status";
 import { friendlyError, notify } from "@/lib/transco/notify";
 import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 import { bookingTaskAbout } from "@/lib/transco/tasks";
+import { useConversations } from "@/lib/transco/store";
 import { AddTaskIcon, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
 
 /** "1 open task — Malshani: …" under a booking, so nobody adds it twice. */
@@ -123,6 +124,32 @@ function needsBl(b: Booking) {
   return (b.warehouseStatus === "received" || b.status === "completed") && !b.shipmentId && b.status !== "cancelled";
 }
 
+/**
+ * The "Needs attention" groups — ONE rule, used by the Bookings page and the
+ * dashboard so their numbers always match:
+ *   walkIns — QR walk-in forms to confirm (check boxes, assign BL)
+ *   checks  — online bookings whose drop-off day has come: check boxes &
+ *             declaration, assign BL (plus older incomplete declarations)
+ *   bls     — boxes received but still no BL
+ */
+export function bookingAttention(bookings: Booking[], today: string) {
+  const walkIns: Booking[] = [];
+  const checks: Booking[] = [];
+  const bls: Booking[] = [];
+  for (const b of bookings) {
+    if (needsFinalise(b)) walkIns.push(b);
+    else if (needsDeclarationCheck(b) || (needsDropOffConfirm(b) && b.resolvedDate <= today)) checks.push(b);
+    else if (needsBl(b)) bls.push(b);
+  }
+  return { walkIns, checks, bls, total: walkIns.length + checks.length + bls.length };
+}
+
+/** The same groups for the dashboard, from the live bookings list. */
+export function useBookingAttention() {
+  const { bookings } = useConversations();
+  return useMemo(() => bookingAttention(bookings, todayKey()), [bookings]);
+}
+
 export function BookingsPanel({
   bookings,
   onDelete,
@@ -149,17 +176,15 @@ export function BookingsPanel({
     if (initialFilter !== "all") setView("attention");
   }, [initialFilter]);
 
+  const attention = useMemo(() => bookingAttention(bookings, today), [bookings, today]);
   const counts = useMemo(() => {
-    let todayN = 0, upcoming = 0, declarations = 0, bls = 0, walkIns = 0;
+    let todayN = 0, upcoming = 0;
     for (const b of bookings) {
       if (b.status !== "cancelled" && b.resolvedDate === today) todayN += 1;
       if (b.status !== "cancelled" && b.resolvedDate > today) upcoming += 1;
-      if (needsDeclarationCheck(b)) declarations += 1;
-      if (needsBl(b)) bls += 1;
-      if (needsFinalise(b)) walkIns += 1;
     }
-    return { today: todayN, upcoming, attention: walkIns + declarations + bls, declarations, bls, walkIns };
-  }, [bookings, today]);
+    return { today: todayN, upcoming, attention: attention.total };
+  }, [bookings, today, attention]);
 
   const byTime = (a: Booking, b: Booking) => a.requestedTime.localeCompare(b.requestedTime);
   const q = query.trim().toLowerCase();
@@ -193,13 +218,14 @@ export function BookingsPanel({
     emptyTitle = "Nothing coming up";
     emptyText = "Future bookings will appear here.";
   } else if (view === "attention") {
+    const oldestFirst = (a: Booking, b: Booking) => a.resolvedDate.localeCompare(b.resolvedDate) || byTime(a, b);
     groups = [
-      { key: "walkins", heading: "Walk-ins to confirm", items: bookings.filter(needsFinalise).sort((a, b) => a.resolvedDate.localeCompare(b.resolvedDate) || byTime(a, b)) },
-      { key: "decl", heading: "Declarations to check", items: bookings.filter(needsDeclarationCheck).sort((a, b) => a.resolvedDate.localeCompare(b.resolvedDate)) },
-      { key: "bls", heading: "BLs to assign", items: bookings.filter(needsBl).sort((a, b) => a.resolvedDate.localeCompare(b.resolvedDate)) },
+      { key: "walkins", heading: "Walk-ins to confirm", items: [...attention.walkIns].sort(oldestFirst) },
+      { key: "decl", heading: "Drop-offs to check — boxes & BL", items: [...attention.checks].sort(oldestFirst) },
+      { key: "bls", heading: "BLs to assign", items: [...attention.bls].sort(oldestFirst) },
     ].filter((g) => g.items.length);
     emptyTitle = "All clear";
-    emptyText = "No walk-ins to confirm, no declarations to check and no BLs to assign.";
+    emptyText = "No walk-ins to confirm, no drop-offs to check and no BLs to assign.";
   } else if (view === "cancelled") {
     // Kept apart from the other tabs; "Restore" brings one back.
     const g = groupByDate(bookings.filter((b) => b.status === "cancelled"));

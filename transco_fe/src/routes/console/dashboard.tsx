@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { NAV_GROUPS, useWaitingConversations, useWalkInsToConfirm } from "@/components/transco/console-layout";
+import { useBookingAttention } from "@/components/transco/bookings-panel";
 import { TodayPanel } from "@/components/transco/task-kit";
 import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type StatusTone } from "@/components/transco/page-kit";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,13 +151,17 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
   const dropOffs = s.todaysDropOffs ?? [];
   // Same count as the Walk-ins badge in the sidebar, so the two always agree.
   const walkIns = useWalkInsToConfirm();
+  // Same groups as Bookings → Needs attention, so the numbers match what you see there.
+  const attention = useBookingAttention();
+  const checks = attention.checks.length;
+  const bls = attention.bls.length;
 
   const stats: { label: string; value: number | undefined; to: string; search?: BookingsSearch; icon: LucideIcon }[] = [
     { label: "Drop-offs today", value: s.todaysBookings, to: "/console/bookings", icon: CalendarClock },
     { label: "Conversations waiting", value: waiting, to: "/console/conversations", icon: MessageCircle },
     { label: "Walk-ins to confirm", value: walkIns, to: "/console/walk-ins", icon: QrCode },
-    { label: "Declarations to check", value: s.declarationsToCheck, to: "/console/bookings", search: { show: "declarations" }, icon: ClipboardCheck },
-    { label: "BLs to assign", value: s.blsToAssign, to: "/console/bookings", search: { show: "bls" }, icon: PackageCheck },
+    { label: "Drop-offs to check", value: checks, to: "/console/bookings", search: { show: "declarations" }, icon: ClipboardCheck },
+    { label: "BLs to assign", value: bls, to: "/console/bookings", search: { show: "bls" }, icon: PackageCheck },
   ];
 
   const work = ([
@@ -171,23 +176,23 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
     {
       count: walkIns,
       label: plural(walkIns, "Confirm 1 walk-in", `Confirm ${walkIns} walk-ins`),
-      hint: "Customers filled the QR form at the counter — check their boxes and confirm.",
+      hint: "Customers filled the QR form at the counter — check their boxes and assign the BL.",
       to: "/console/walk-ins",
       icon: QrCode,
       tone: "pending",
     },
     {
-      count: s.declarationsToCheck ?? 0,
-      label: plural(s.declarationsToCheck ?? 0, "Check 1 declaration", `Check ${s.declarationsToCheck} declarations`),
-      hint: "Filled online by customers — open the booking, check it, mark it Checked.",
+      count: checks,
+      label: plural(checks, "Check 1 drop-off", `Check ${checks} drop-offs`),
+      hint: "Booked online and dropped off — check the boxes and declaration, then assign the BL.",
       to: "/console/bookings",
       search: { show: "declarations" },
       icon: ClipboardCheck,
       tone: "pending",
     },
     {
-      count: s.blsToAssign ?? 0,
-      label: plural(s.blsToAssign ?? 0, "Assign 1 BL", `Assign ${s.blsToAssign} BLs`),
+      count: bls,
+      label: plural(bls, "Assign 1 BL", `Assign ${bls} BLs`),
       hint: "Boxes are in the warehouse — give each booking its shipment reference.",
       to: "/console/bookings",
       search: { show: "bls" },
