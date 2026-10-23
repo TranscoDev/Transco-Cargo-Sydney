@@ -105,7 +105,7 @@ type AssignBl = (bookingId: string, hblNumber: string, batchNumber?: number | nu
 /** Kept for the route's ?show=… link from the dashboard. */
 export type BookingFilter = "all" | "declarations" | "bls";
 
-type View = "today" | "upcoming" | "attention" | "past";
+type View = "today" | "upcoming" | "attention" | "past" | "cancelled";
 
 function needsDeclarationCheck(b: Booking) {
   // A full declaration (filled when booking) is checked in the Confirm panel instead.
@@ -184,7 +184,7 @@ export function BookingsPanel({
     emptyTitle = "No bookings on this day";
     emptyText = "Pick another day, or clear the date.";
   } else if (view === "today") {
-    groups = [{ key: today, heading: dayLabel(today), items: bookings.filter((b) => b.resolvedDate === today).sort(byTime) }];
+    groups = [{ key: today, heading: dayLabel(today), items: bookings.filter((b) => b.resolvedDate === today && b.status !== "cancelled").sort(byTime) }];
     emptyTitle = "No drop-offs today";
     emptyText = counts.upcoming ? `There ${counts.upcoming === 1 ? "is 1 booking" : `are ${counts.upcoming} bookings`} coming up — see Upcoming.` : "New bookings will appear here.";
   } else if (view === "upcoming") {
@@ -200,8 +200,14 @@ export function BookingsPanel({
     ].filter((g) => g.items.length);
     emptyTitle = "All clear";
     emptyText = "No walk-ins to confirm, no declarations to check and no BLs to assign.";
+  } else if (view === "cancelled") {
+    // Kept apart from the other tabs; "Restore" brings one back.
+    const g = groupByDate(bookings.filter((b) => b.status === "cancelled"));
+    groups = [...g.keys()].sort().reverse().map((d) => ({ key: d, heading: dayLabel(d), items: g.get(d)!.sort(byTime) }));
+    emptyTitle = "No cancelled bookings";
+    emptyText = "";
   } else {
-    const g = groupByDate(bookings.filter((b) => b.resolvedDate < today || b.status === "cancelled"));
+    const g = groupByDate(bookings.filter((b) => b.resolvedDate < today && b.status !== "cancelled"));
     groups = [...g.keys()].sort().reverse().map((d) => ({ key: d, heading: dayLabel(d), items: g.get(d)!.sort(byTime) }));
     emptyTitle = "No past bookings";
     emptyText = "";
@@ -213,6 +219,7 @@ export function BookingsPanel({
     { key: "upcoming", label: "Upcoming", count: counts.upcoming },
     { key: "attention", label: "Needs attention", count: counts.attention, attention: counts.attention > 0 },
     { key: "past", label: "Past" },
+    { key: "cancelled", label: "Cancelled" },
   ];
 
   return (
