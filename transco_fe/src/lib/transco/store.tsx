@@ -109,7 +109,8 @@ interface ConversationsApi {
   /** WhatsApp only for now — throws if the conversation isn't in HUMAN
    * mode or there's no live backend. See sendAttachment in api.ts. */
   sendAttachment: (conversationId: string, file: File, caption?: string) => Promise<void>;
-  setMode: (conversationId: string, mode: ConversationMode) => void;
+  /** quiet: no success toast (used for a customer's other chats, so one toast shows). */
+  setMode: (conversationId: string, mode: ConversationMode, quiet?: boolean) => void;
   /** Pin / archive / mute / mark unread / staff / delete a chat. */
   setInbox: (conversationId: string, flags: InboxFlags) => void;
   /** Link a website chat to a customer (null = unlink). Resolves true on success. */
@@ -721,7 +722,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   );
 
   const setMode = useCallback(
-    (conversationId: string, mode: ConversationMode) => {
+    (conversationId: string, mode: ConversationMode, quiet = false) => {
       // Optimistic local update; conversationId doubles as the backend
       // customer._id once a conversation is backed by real data. Errors are
       // logged, not surfaced, so the mock-data demo keeps working standalone.
@@ -732,7 +733,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       });
       setCustomerMode(conversationId, mode)
         .then(() => {
-          if (!isLiveRef.current) return;
+          if (!isLiveRef.current || quiet) return;
           notify.success(
             mode === "HUMAN" ? "You've taken over this chat" : "Handed back to the bot",
             mode === "HUMAN" ? "The bot won't reply here until you hand it back." : "The bot will answer this customer again.",

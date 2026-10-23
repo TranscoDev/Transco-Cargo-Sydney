@@ -190,7 +190,14 @@ function ConversationsPage() {
                   sending={sending}
                   onSend={(body) => sendMessage(target.id, body)}
                   onSendAttachment={(file, caption) => sendAttachment(target.id, file, caption)}
-                  onModeChange={(mode) => setMode(target.id, mode)}
+                  onModeChange={(mode) => {
+                    // Take over / hand back the whole customer: their WhatsApp and website
+                    // chats together, so a "needs staff" flag on either one clears.
+                    setMode(target.id, mode);
+                    [selectedConversation!.id, ...web.map((w) => w.id)]
+                      .filter((id) => id !== target.id)
+                      .forEach((id) => setMode(id, mode, true));
+                  }}
                   onBack={() => select(null)}
                   onShowInfo={() => setInfoOpen(true)}
                 />
