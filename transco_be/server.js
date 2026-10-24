@@ -6835,6 +6835,12 @@ app.use('/api/notices', noticeRouters.staffRouter);
 const agentKnowledgeRouters = require('./agentKnowledge').createAgentKnowledgeRouters();
 app.use('/api/public', agentKnowledgeRouters.publicRouter);
 app.use('/api/agent-knowledge', agentKnowledgeRouters.staffRouter);
+
+// Prices & promotions: /api/public/prices (read by the Flowise tool's
+// calculator) and the console's Prices & Promotions page (admins edit).
+const priceRouters = require('./prices').createPriceRouters();
+app.use('/api/public', priceRouters.publicRouter);
+app.use('/api/prices', priceRouters.staffRouter);
 app.use('/api/forms', walkInRouters.formsRouter);
 
 const createWebChatRouter = require('./webChatRoutes');

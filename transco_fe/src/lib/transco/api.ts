@@ -1133,6 +1133,65 @@ export const fetchAgentKnowledgeHistory = () =>
 export const restoreAgentKnowledge = (id: string) =>
   agentKnowledgeRequest<AgentKnowledge>(`/history/${encodeURIComponent(id)}/restore`, { method: "POST" });
 
+// ---- Prices & promotions (console → Prices & Promotions) ----
+
+export interface PriceItem {
+  key: string;
+  group: string;
+  label: string;
+  default: number;
+  value: number;
+}
+
+export type PromoType = "percent" | "amount" | "special_price" | "free_third";
+
+export interface Promotion {
+  id: string;
+  name: string;
+  enabled: boolean;
+  type: PromoType;
+  value: number;
+  appliesTo: "freight" | "freight_delivery" | "order";
+  items: "tea_chest" | "all_boxes" | "tv" | "any";
+  mode: "sea" | "air" | "any";
+  country: "sri_lanka" | "india" | "any";
+  minBoxes: number;
+  startsOn: string;
+  endsOn: string;
+  message: { en: string; si: string; ta: string };
+  active?: boolean;
+}
+
+export interface PriceSettings {
+  prices: PriceItem[];
+  promotions: Promotion[];
+  updatedAt: string | null;
+  updatedBy: string | null;
+  isAdmin: boolean;
+}
+
+async function pricesRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/api/prices${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init.headers || {}) },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Prices request failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
+
+export const fetchPriceSettings = () => pricesRequest<PriceSettings>("");
+
+export const savePriceSettings = (body: { values: Record<string, number | string>; promotions: Promotion[] }) =>
+  pricesRequest<PriceSettings>("", { method: "PUT", body: JSON.stringify(body) });
+
+export const fetchPriceHistory = () => pricesRequest<{ versions: AgentKnowledgeVersion[] }>("/history").then((r) => r.versions);
+
+export const restorePriceVersion = (id: string) =>
+  pricesRequest<PriceSettings>(`/history/${encodeURIComponent(id)}/restore`, { method: "POST" });
+
 export interface DashboardSummary {
   todaysBookings: number;
   newCustomersToday: number;

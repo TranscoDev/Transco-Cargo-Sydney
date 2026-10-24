@@ -30,6 +30,7 @@ const PAGES = {
   'bot-controls': { label: 'Bot settings', api: ['/settings'] },
   notices: { label: 'Website notices', api: ['/notices'] },
   'agent-knowledge': { label: 'Agent Transco (bot knowledge)', api: ['/agent-knowledge'] },
+  prices: { label: 'Prices & Promotions (view; admins edit)', api: ['/prices'] },
   // View-only customer profile (no list, chat, promotions or imports) —
   // allowed by PROFILE_ONLY below, since the path has the customer id in it.
   'customer-profile': { label: 'Customer profiles (view only)', api: [] }
