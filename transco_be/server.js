@@ -5634,10 +5634,11 @@ async function getFlowiseReply(
       let reply =
         response.data?.text;
 
-      // The agent should turn [[KNOWLEDGE]] reference text into its own
-      // answer; if it passed it through raw, hand the chat to staff instead.
+      // [[KNOWLEDGE]] = reference text from the Agent knowledge page
+      // (request_type=38). The Flowise agent copies tool text exactly, so
+      // the answer is written here from that text — or handed to staff.
       if (typeof reply === 'string' && reply.trimStart().startsWith('[[KNOWLEDGE]]')) {
-        reply = "[[HANDOFF]]👍 Thanks for your question! I've passed it to our team and they'll get back to you shortly.";
+        reply = await answerFromKnowledge(text, reply.trimStart().slice('[[KNOWLEDGE]]'.length));
       }
 
 
@@ -5667,6 +5668,91 @@ async function getFlowiseReply(
 
 
   return null;
+}
+
+
+// A short answer to the customer's question from the Agent knowledge
+// reference text (Groq chat, same key as voice transcription). Only facts
+// in the text; anything else → [[HANDOFF]], so staff answer it.
+const KNOWLEDGE_HANDOFF_TEXT = {
+  en: "👍 Thanks for your question! I've passed it to our team and they'll get back to you shortly.",
+  si: "👍 ඔබේ ප්‍රශ්නයට ස්තූතියි! අපි මේක අපේ team එකට යැව්වා — ඔවුන් ඉක්මනින් ඔබට පිළිතුරු දෙයි.",
+  ta: "👍 உங்கள் கேள்விக்கு நன்றி! இதை எங்கள் team இடம் அனுப்பியுள்ளோம் — அவர்கள் விரைவில் உங்களைத் தொடர்புகொள்வார்கள்."
+};
+const KNOWLEDGE_HANDOFF = '[[HANDOFF]]' + KNOWLEDGE_HANDOFF_TEXT.en;
+// The handoff line in the customer's script (Sinhala / Tamil / English).
+function knowledgeHandoff(question) {
+  const q = String(question || '');
+  const lang = /[඀-෿]/.test(q) ? 'si' : /[஀-௿]/.test(q) ? 'ta' : 'en';
+  return '[[HANDOFF]]' + KNOWLEDGE_HANDOFF_TEXT[lang];
+}
+
+// Gemini (GEMINI_API_KEY) first; Groq if Gemini isn't set up or fails.
+async function answerFromKnowledge(question, reference) {
+  if (!String(question || '').trim()) return knowledgeHandoff(question);
+  const system =
+    'You are Agent Transco, the customer support assistant of Transco Cargo Sydney. ' +
+    'Answer the customer\'s message using ONLY the facts in the REFERENCE below.\n' +
+    'Rules:\n' +
+    '- Reply in the same language and script as the customer (English, Sinhala or Tamil).\n' +
+    '- 1 to 5 short lines, warm and direct. Plain text for WhatsApp: no Markdown, never start a line with "* " (use "- " for a list).\n' +
+    '- Never add a price, fee, date, duty amount, phone number or rule that is not written in the REFERENCE.\n' +
+    '- Answer ONLY when the REFERENCE directly states the answer to what they asked. Do not infer, assume or combine facts to reach a yes/no — if it isn\'t stated, it isn\'t known.\n' +
+    '- Otherwise reply with exactly [[HANDOFF]] and nothing else. Never guess.\n\n' +
+    'REFERENCE:\n' + String(reference || '').slice(0, 12000);
+  const ask = String(question).slice(0, 2000);
+
+  const attempts = [];
+  if (process.env.GEMINI_API_KEY) {
+    attempts.push({
+      name: 'gemini',
+      run: async () => {
+        const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        const r = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: 'user', parts: [{ text: ask }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1500 }
+          },
+          { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY }, timeout: 20000 }
+        );
+        return (r.data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+      }
+    });
+  }
+  if (GROQ_API_KEY) {
+    // The smaller model is tried when the main one hits Groq's rate limit.
+    for (const model of [process.env.GROQ_CHAT_MODEL || 'openai/gpt-oss-120b', 'openai/gpt-oss-20b']) {
+      attempts.push({
+        name: model,
+        run: async () => {
+          const r = await axios.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            {
+              model, temperature: 0.1, max_tokens: 1500, reasoning_effort: 'low', include_reasoning: false,
+              messages: [{ role: 'system', content: system }, { role: 'user', content: ask }]
+            },
+            { headers: { Authorization: `Bearer ${GROQ_API_KEY}` }, timeout: 20000 }
+          );
+          return r.data?.choices?.[0]?.message?.content || '';
+        }
+      });
+    }
+  }
+
+  for (const attempt of attempts) {
+    try {
+      let answer = String(await attempt.run()).trim();
+      if (!answer || answer.includes('[[HANDOFF]]')) return knowledgeHandoff(question);
+      // WhatsApp-safe: no Markdown bullets, no stray markers.
+      answer = answer.replace(/^\s*[*•]\s+/gm, '- ').replace(/\[\[[A-Z_]+[^\]]*\]\]/g, '').trim();
+      return answer || knowledgeHandoff(question);
+    } catch (err) {
+      console.error(`Knowledge answer failed (${attempt.name}):`, err.message);
+    }
+  }
+  return knowledgeHandoff(question);
 }
 
 
