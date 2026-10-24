@@ -31,6 +31,7 @@ import {
   Users,
   Wallet,
   Warehouse,
+  BookOpenText,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -116,6 +117,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Settings", to: "/console/settings", icon: SettingsIcon },
       { label: "All tasks", to: "/console/all-tasks", icon: ShieldCheck, adminOnly: true },
       { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
+      { label: "Agent Transco", to: "/console/ai/agent", icon: BookOpenText },
       { label: "Website notices", to: "/console/notices", icon: Megaphone },
     ],
   },
@@ -129,7 +131,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Payments", to: "/console/finance/payments", icon: Wallet },
       { label: "Expenses", to: "/console/finance/expenses", icon: Wallet },
       { label: "Reports", to: "/console/finance/reports", icon: BarChart3 },
-      { label: "Agent Transco", to: "/console/ai/agent", icon: Bot },
     ],
   },
 ];

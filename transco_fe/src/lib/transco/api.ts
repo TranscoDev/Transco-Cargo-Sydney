@@ -1077,6 +1077,62 @@ export async function savePauseMessage(message: string): Promise<PauseMessage> {
   return (await res.json()) as PauseMessage;
 }
 
+// ---- Agent knowledge (console → Agent Transco) ----
+
+export interface AgentDetail {
+  key: string;
+  group: string;
+  label: string;
+  default: string;
+  value: string;
+  adminOnly?: boolean;
+}
+
+export interface AgentSection {
+  key: string;
+  title: string;
+  default: string;
+  text: string;
+}
+
+export interface AgentKnowledge {
+  details: AgentDetail[];
+  sections: AgentSection[];
+  updatedAt: string | null;
+  updatedBy: string | null;
+  isAdmin: boolean;
+}
+
+export interface AgentKnowledgeVersion {
+  id: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  replacedAt: string;
+}
+
+async function agentKnowledgeRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/api/agent-knowledge${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init.headers || {}) },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Agent knowledge request failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
+
+export const fetchAgentKnowledge = () => agentKnowledgeRequest<AgentKnowledge>("");
+
+export const saveAgentKnowledge = (body: { details: Record<string, string>; sections: Record<string, string> }) =>
+  agentKnowledgeRequest<AgentKnowledge>("", { method: "PUT", body: JSON.stringify(body) });
+
+export const fetchAgentKnowledgeHistory = () =>
+  agentKnowledgeRequest<{ versions: AgentKnowledgeVersion[] }>("/history").then((r) => r.versions);
+
+export const restoreAgentKnowledge = (id: string) =>
+  agentKnowledgeRequest<AgentKnowledge>(`/history/${encodeURIComponent(id)}/restore`, { method: "POST" });
+
 export interface DashboardSummary {
   todaysBookings: number;
   newCustomersToday: number;

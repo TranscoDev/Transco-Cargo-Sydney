@@ -5631,8 +5631,14 @@ async function getFlowiseReply(
         );
 
 
-      const reply =
+      let reply =
         response.data?.text;
+
+      // The agent should turn [[KNOWLEDGE]] reference text into its own
+      // answer; if it passed it through raw, hand the chat to staff instead.
+      if (typeof reply === 'string' && reply.trimStart().startsWith('[[KNOWLEDGE]]')) {
+        reply = "[[HANDOFF]]👍 Thanks for your question! I've passed it to our team and they'll get back to you shortly.";
+      }
 
 
       if (!isBadReply(reply)) {
@@ -6737,6 +6743,12 @@ app.use('/api/walk-ins', walkInRouters.staffRouter);
 const noticeRouters = notices.createNoticeRouters();
 app.use('/api/public', noticeRouters.publicRouter);
 app.use('/api/notices', noticeRouters.staffRouter);
+
+// Agent knowledge: /api/public/agent-knowledge (read by the Flowise tool
+// before every reply) and the console's Agent Transco page.
+const agentKnowledgeRouters = require('./agentKnowledge').createAgentKnowledgeRouters();
+app.use('/api/public', agentKnowledgeRouters.publicRouter);
+app.use('/api/agent-knowledge', agentKnowledgeRouters.staffRouter);
 app.use('/api/forms', walkInRouters.formsRouter);
 
 const createWebChatRouter = require('./webChatRoutes');
