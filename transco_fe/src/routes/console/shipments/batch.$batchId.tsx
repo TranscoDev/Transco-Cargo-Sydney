@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Info, Layers, Package, PenLine, Trash2, User, Wallet } from "lucide-react";
+import { CalendarDays, Download, FileText, Info, Layers, Package, PenLine, Trash2, User, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { deleteConsolidation, fetchConsolidation, updateConsolidation } from "@/lib/transco/api";
+import {
+  deleteConsolidation,
+  downloadLandingSheetPdf,
+  fetchConsolidation,
+  fetchLandingSheet,
+  updateConsolidation,
+  type LandingSheet,
+} from "@/lib/transco/api";
 import type { ConsolidationDetail } from "@/lib/transco/types";
 import { Breadcrumbs, LoadingRows, PageShell, StatusBadge } from "@/components/transco/page-kit";
 import { forgetShipmentList } from "@/components/transco/shipment-picker";
@@ -51,6 +58,7 @@ function BatchDetailPage() {
   const [batch, setBatch] = useState<ConsolidationDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [landingOpen, setLandingOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   // Warehouse logins don't see shipment income/profit.
   const showMoney = getCurrentUser()?.role !== "warehouse";
@@ -127,6 +135,10 @@ function BatchDetailPage() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button type="button" size="sm" className="gap-1.5" onClick={() => setLandingOpen(true)}>
+                <FileText className="h-3.5 w-3.5" />
+                Landing sheet
+              </Button>
               <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setEditOpen(true)}>
                 <PenLine className="h-3.5 w-3.5" />
                 Edit
@@ -278,6 +290,8 @@ function BatchDetailPage() {
             </div>
           )}
 
+          <LandingSheetDialog open={landingOpen} onOpenChange={setLandingOpen} consolidationId={batch.id} batchNumber={batch.batchNumber} />
+
           <EditShipmentDialog
             open={editOpen}
             onOpenChange={setEditOpen}
@@ -290,6 +304,129 @@ function BatchDetailPage() {
         </>
       )}
     </PageShell>
+  );
+}
+
+/** The shipment's landing sheet (per HBL: date, memo, delivery town, boxes, CBM) — preview + PDF to send to the PE operations team. */
+function LandingSheetDialog({
+  open,
+  onOpenChange,
+  consolidationId,
+  batchNumber,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  consolidationId: string;
+  batchNumber: number;
+}) {
+  const [sheet, setSheet] = useState<LandingSheet | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setSheet(null);
+    setError(null);
+    fetchLandingSheet(consolidationId)
+      .then(setSheet)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load the landing sheet"));
+  }, [open, consolidationId]);
+
+  const download = async () => {
+    setDownloading(true);
+    try {
+      await downloadLandingSheetPdf(consolidationId, batchNumber);
+    } catch (err) {
+      notify.error("Couldn't make the PDF", err instanceof Error ? err.message : undefined);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const cell = "border border-border px-2 py-1.5 text-center tabular-nums";
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Landing sheet — Shipment {batchNumber}</DialogTitle>
+          <DialogDescription>
+            Made from the HBLs in this shipment. Blank destination = collect from the Wattala warehouse.
+          </DialogDescription>
+        </DialogHeader>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {!sheet && !error && <LoadingRows rows={4} />}
+        {sheet && sheet.rows.length === 0 && <p className="text-sm text-muted-foreground">No HBLs in this shipment yet.</p>}
+        {sheet && sheet.rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-170 border-collapse text-sm">
+              <thead>
+                <tr className="text-xs font-semibold text-primary">
+                  <th className={cell}>Date</th>
+                  <th className={cell}>Memo</th>
+                  <th className={cell}>HBL#</th>
+                  <th className={cell}>Door Delivery Destination</th>
+                  {sheet.columns.map((c) => (
+                    <th key={c.key} className={cell}>
+                      {c.label}
+                    </th>
+                  ))}
+                  <th className={cell}>Total CBM</th>
+                  <th className={cell}>Total Boxes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sheet.rows.map((r) => (
+                  <tr key={r.shipmentId}>
+                    <td className={cell}>{r.date}</td>
+                    <td className={cn(cell, "text-left")}>{r.memo}</td>
+                    <td className={cell}>{r.hbl}</td>
+                    <td className={cell}>{r.destination}</td>
+                    {sheet.columns.map((c) => (
+                      <td key={c.key} className={cell}>
+                        {r.counts[c.key] || ""}
+                      </td>
+                    ))}
+                    <td className={cn(cell, (r.cbm === null || r.cbmToCheck) && "bg-attention-soft text-attention-foreground")}>
+                      {r.cbm === null ? "?" : r.cbmToCheck ? `${r.cbm}?` : r.cbm}
+                    </td>
+                    <td className={cell}>{r.boxes || ""}</td>
+                  </tr>
+                ))}
+                <tr className="font-semibold">
+                  <td className={cell}>Total</td>
+                  <td className={cell} />
+                  <td className={cell}>{sheet.totals.hbls}</td>
+                  <td className={cell}>{sheet.totals.doorDeliveries}</td>
+                  {sheet.columns.map((c) => (
+                    <td key={c.key} className={cell}>
+                      {sheet.totals.counts[c.key] ?? 0}
+                    </td>
+                  ))}
+                  <td className={cell}>{sheet.totals.cbm}</td>
+                  <td className={cell}>{sheet.totals.boxes}</td>
+                </tr>
+              </tbody>
+            </table>
+            {sheet.totals.cbmToCheck > 0 && (
+              <p className="mt-2 text-xs text-attention-foreground">
+                "?" = CBM to check for {sheet.totals.cbmToCheck} HBL{sheet.totals.cbmToCheck === 1 ? "" : "s"} (an item's size wasn't measured, e.g. a TV).
+              </p>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button type="button" className="gap-1.5" disabled={!sheet || sheet.rows.length === 0 || downloading} onClick={download}>
+            <Download className="h-3.5 w-3.5" />
+            {downloading ? "Making PDF…" : "Download PDF"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1133,6 +1133,51 @@ export const fetchAgentKnowledgeHistory = () =>
 export const restoreAgentKnowledge = (id: string) =>
   agentKnowledgeRequest<AgentKnowledge>(`/history/${encodeURIComponent(id)}/restore`, { method: "POST" });
 
+// ---- Landing sheet (Shipments → Shipment NN) ----
+
+export interface LandingSheet {
+  shipment: { id: string; batchNumber: number; label: string; peNumber: string | null; etd: string | null };
+  columns: { key: string; label: string }[];
+  rows: {
+    shipmentId: string;
+    hbl: string;
+    date: string;
+    memo: string;
+    destination: string;
+    counts: Record<string, number>;
+    cbm: number | null;
+    cbmToCheck: boolean;
+    boxes: number;
+  }[];
+  totals: { hbls: number; doorDeliveries: number; counts: Record<string, number>; cbm: number; cbmToCheck: number; boxes: number };
+}
+
+export async function fetchLandingSheet(consolidationId: string): Promise<LandingSheet> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations/${encodeURIComponent(consolidationId)}/landing-sheet`, { headers: authHeaders() });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to load the landing sheet (${res.status})`);
+  }
+  return ((await res.json()) as { landingSheet: LandingSheet }).landingSheet;
+}
+
+/** Downloads the landing sheet PDF (the file staff send to the PE operations team). */
+export async function downloadLandingSheetPdf(consolidationId: string, batchNumber: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/consolidations/${encodeURIComponent(consolidationId)}/landing-sheet.pdf`, { headers: authHeaders() });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to make the PDF (${res.status})`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Landing-sheet-Shipment-${batchNumber}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 // ---- Prices & promotions (console → Prices & Promotions) ----
 
 export interface PriceItem {

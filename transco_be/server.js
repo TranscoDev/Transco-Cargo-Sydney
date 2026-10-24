@@ -4111,6 +4111,57 @@ app.get('/api/consolidations/:consolidationId', async (req, res) => {
   }
 });
 
+// Landing sheet (landingSheet.js): the shipment's summary per HBL — as data
+// for the console's preview, and as the PDF sent to the PE operations team.
+const { buildLandingSheet, landingSheetPdf } = require('./landingSheet');
+
+async function loadLandingSheet(consolidationId) {
+  if (!ObjectId.isValid(consolidationId)) return null;
+  const consolidation = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
+  if (!consolidation) return null;
+  const list = await shipments().find({ consolidationId: consolidation._id }).toArray();
+  const bookingIds = list.map(s => s.bookingId).filter(Boolean);
+  const bookingList = bookingIds.length
+    ? await bookings().find({ _id: { $in: bookingIds } }, { projection: { items: 1, boxCount: 1, deliveryType: 1, 'receiver.town': 1, requestedDateISO: 1, createdAt: 1 } }).toArray()
+    : [];
+  const invoiceList = await getDb().collection('invoices').find(
+    { shipmentId: { $in: list.map(s => s._id) } },
+    { projection: { shipmentId: 1, lineItems: 1 } }
+  ).toArray();
+  return buildLandingSheet(
+    consolidation,
+    list,
+    new Map(bookingList.map(b => [String(b._id), b])),
+    new Map(invoiceList.map(i => [String(i.shipmentId), i]))
+  );
+}
+
+app.get('/api/consolidations/:consolidationId/landing-sheet', async (req, res) => {
+  try {
+    const sheet = await loadLandingSheet(req.params.consolidationId);
+    if (!sheet) return res.status(404).json({ error: 'Shipment not found' });
+    res.status(200).json({ landingSheet: sheet });
+  } catch (err) {
+    console.error('Error building landing sheet:', err.message);
+    res.status(500).json({ error: 'Failed to build the landing sheet' });
+  }
+});
+
+app.get('/api/consolidations/:consolidationId/landing-sheet.pdf', async (req, res) => {
+  try {
+    const sheet = await loadLandingSheet(req.params.consolidationId);
+    if (!sheet) return res.status(404).json({ error: 'Shipment not found' });
+    const pdf = await landingSheetPdf(sheet);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Landing-sheet-Shipment-${sheet.shipment.batchNumber}.pdf"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(pdf);
+  } catch (err) {
+    console.error('Error making landing sheet PDF:', err.message);
+    res.status(500).json({ error: 'Failed to make the landing sheet PDF' });
+  }
+});
+
 // Staff fix a shipment typed in wrong — number, PE number, dates. Only the
 // fields sent are changed. A new number also moves onto every HBL in it
 // (they keep a copy of the number, see the /move route).
