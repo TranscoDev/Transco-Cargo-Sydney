@@ -419,6 +419,7 @@
 <script src="/phone-format.js"></script>
 <script src="/sl-cities.js"></script>
 <script src="/chat-links.js"></script>
+<script src="/chat-photo.js"></script>
 </head>
 <body>
   <a class="sr-only" href="#main">Skip to content</a>
@@ -1311,6 +1312,10 @@
       agent.input.value = "";
       sendToAgent({ message: text }, text);
     } }, agent.input, agent.sendBtn);
+    // 📎 Photo button (chat-photo.js).
+    if (window.TranscoChatPhoto) TranscoChatPhoto.attach(agent.input, function (image, caption) {
+      sendToAgent({ message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");
+    });
     panel.replaceChildren(
       h("div", { class: "ag-head" },
         h("span", { class: "ag-avatar", "aria-hidden": "true" }, chatIcon()),

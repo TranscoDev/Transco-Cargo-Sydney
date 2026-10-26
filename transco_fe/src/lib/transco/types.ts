@@ -134,9 +134,11 @@ export interface Message {
   /** Plain-English reason a FAILED status happened (e.g. the WhatsApp
    * 24-hour messaging window) — set only when status is FAILED. */
   failureReason?: string | null | undefined;
-  /** Set only for a staff-sent attachment (flyer/video/document) — body
-   * is used as the caption when present, empty otherwise. */
+  /** A staff-sent attachment (flyer/video/document; body is the caption),
+   * or a customer's chat photo ("/api/messages/photo/…", staff-only). */
   mediaUrl?: string | null | undefined;
+  /** The customer's photo was deleted after 90 days. */
+  photoDeleted?: boolean | undefined;
   /** Set when chats from several channels are shown together (one customer's WhatsApp + website chats). */
   via?: "whatsapp" | "website" | undefined;
   mediaType?: MediaType | null | undefined;

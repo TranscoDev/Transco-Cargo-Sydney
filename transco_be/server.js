@@ -19,6 +19,7 @@ const { getDb } = require('./db');
 const { createCustomerAuth } = require('./customerAuth');
 const { createCustomerTools, hasRealName } = require('./customerTools');
 const agentAnswer = require('./agentAnswer');
+const customerPhotos = require('./customerPhotos');
 
 // Memory storage — files are small (a customer sheet, not a video) and
 // this only ever runs the parse-then-discard import flow, never needs to
@@ -1816,8 +1817,9 @@ app.post('/webhook', async (req, res) => {
     }
 
     // Photos: downloaded so the bot can look at them with the caption
-    // (agentAnswer.js). The message is saved as "📷 <caption>" so staff
-    // see it in the conversation.
+    // (agentAnswer.js), and kept privately so staff see the photo in
+    // Conversations (customerPhotos.js).
+    let photoMedia = null;
     if (!text && message.type === 'image' && message.image?.id) {
       try {
         photo = await downloadWhatsAppMedia(message.image.id);
@@ -1826,6 +1828,13 @@ app.post('/webhook', async (req, res) => {
       } catch (err) {
         console.error('Photo download failed:', err.response?.data ?? err.message);
         photo = null;
+      }
+      if (photo) {
+        try {
+          photoMedia = await customerPhotos.save(photo.data, photo.mimeType);
+        } catch (err) {
+          console.error('Photo save failed:', err.message);
+        }
       }
     }
 
@@ -1864,7 +1873,8 @@ app.post('/webhook', async (req, res) => {
       content: isVoiceMessage ? `🎤 ${text}` : (tappedMenuLabel || text),
       isRead: false,
       replyToMessageId: null,
-      whatsappStatus: null
+      whatsappStatus: null,
+      ...(photoMedia || {})
     });
 
 
@@ -6918,6 +6928,10 @@ app.use('/api/agent-knowledge', agentKnowledgeRouters.staffRouter);
 const priceRouters = require('./prices').createPriceRouters();
 app.use('/api/public', priceRouters.publicRouter);
 app.use('/api/prices', priceRouters.staffRouter);
+
+// Customer photos from chat — staff-only, deleted after 90 days.
+app.use('/api/messages', customerPhotos.router());
+customerPhotos.startCleanup();
 app.use('/api/forms', walkInRouters.formsRouter);
 
 const createWebChatRouter = require('./webChatRoutes');

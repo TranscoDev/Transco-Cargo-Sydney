@@ -1,14 +1,66 @@
-import { FileText } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FileText, ImageOff } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getAuthToken } from "@/lib/transco/auth";
+import { API_BASE_URL } from "@/lib/transco/config";
 import { formatMessageTime } from "@/lib/transco/time";
 import { renderWhatsAppText } from "@/lib/transco/whatsapp-format";
 import type { Message } from "@/lib/transco/types";
 
 import { MessageStatusIcon } from "./message-status";
 
+/** A customer's chat photo — staff-only, so it's loaded with the login
+ * token rather than a public link. */
+function PrivatePhoto({ path, alt }: { path: string; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let url: string | null = null;
+    let cancelled = false;
+    const token = getAuthToken();
+    fetch(`${API_BASE_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
+      .then((blob) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [path]);
+
+  if (failed) {
+    return (
+      <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <ImageOff className="h-3.5 w-3.5" /> Photo couldn't be loaded
+      </p>
+    );
+  }
+  if (!src) return <div className="mb-1 h-40 w-full animate-pulse rounded-md bg-black/5 dark:bg-white/5" />;
+  return (
+    <a href={src} target="_blank" rel="noopener noreferrer" className="block">
+      <img src={src} alt={alt} className="mb-1 max-h-64 w-full rounded-md object-cover" />
+    </a>
+  );
+}
+
 function MediaContent({ message }: { message: Message }) {
+  if (message.photoDeleted) {
+    return (
+      <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <ImageOff className="h-3.5 w-3.5" /> Photo deleted after 90 days
+      </p>
+    );
+  }
   if (!message.mediaUrl) return null;
+  if (message.mediaUrl.startsWith("/api/messages/photo/")) {
+    return <PrivatePhoto path={message.mediaUrl} alt={message.body || "Customer photo"} />;
+  }
   switch (message.mediaType) {
     case "image":
       return (

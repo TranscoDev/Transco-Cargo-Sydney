@@ -64,6 +64,7 @@ export interface BackendMessage {
   createdAt: string;
   mediaUrl?: string | null;
   mediaType?: MediaType | null;
+  photoDeleted?: boolean;
 }
 
 export interface BackendCustomer {
@@ -250,6 +251,7 @@ export function mapMessage(m: BackendMessage): Message {
     failureReason: m.failureReason ?? undefined,
     mediaUrl: m.mediaUrl,
     mediaType: m.mediaType,
+    photoDeleted: m.photoDeleted ?? undefined,
   };
 }
 

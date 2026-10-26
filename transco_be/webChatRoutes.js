@@ -19,9 +19,17 @@
 // sync with what the website offers.
 
 const express = require('express');
-const { customers, bookings } = require('./db');
+const { customers, bookings, messages } = require('./db');
 const { detectAccountIntent, handleAccountIntent, ACTION_INTENTS, parsePriceQuoteTap } = require('./portalChat');
 const { hasRealName } = require('./customerTools');
+const agentAnswer = require('./agentAnswer');
+const customerPhotos = require('./customerPhotos');
+
+// Photos from the website chat's 📎 button (shrunk in the browser first).
+const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+const PHOTOS_PER_HOUR = 5;
+const CANT_VIEW_PHOTO_REPLY =
+  "📸 Thanks for the photo — I couldn't look at it just now. Could you tell me what it is and what you'd like to know?";
 
 const HANDOFF_MARKER = '[[HANDOFF]]';
 const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
@@ -181,10 +189,23 @@ module.exports = function createWebChatRouter({
 
   router.post('/', async (req, res) => {
     try {
-      const { sessionId, message, menuItemId, action, shipmentId, label, country } = req.body || {};
+      const { sessionId, message, menuItemId, action, shipmentId, label, country, image } = req.body || {};
 
       if (!sessionId || typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'sessionId is required' });
+      }
+
+      // A photo from the 📎 button: { data: base64, mimeType }, already
+      // shrunk by the widget. Read by the agent answer (agentAnswer.js)
+      // and kept privately for staff (customerPhotos.js).
+      let photo = null;
+      if (image !== undefined && image !== null) {
+        const mimeType = image && typeof image.mimeType === 'string' ? image.mimeType.toLowerCase() : '';
+        const data = image && typeof image.data === 'string' ? Buffer.from(image.data, 'base64') : null;
+        if (!customerPhotos.isPhotoType(mimeType) || !data || !data.length || data.length > PHOTO_MAX_BYTES) {
+          return res.status(400).json({ error: 'Please send a JPG or PNG photo under 3 MB.' });
+        }
+        photo = { data, mimeType };
       }
 
       // Signed-in My Transco customer, if the widget sent a valid
@@ -227,11 +248,29 @@ module.exports = function createWebChatRouter({
         if (!resolvedTap) {
           return res.status(400).json({ error: 'Unrecognized menuItemId' });
         }
-      } else if (!message || typeof message !== 'string' || !message.trim()) {
+      } else if (!photo && (!message || typeof message !== 'string' || !message.trim())) {
         return res.status(400).json({ error: 'message is required' });
       }
+      if (photo && (resolvedTap || accountAction)) {
+        return res.status(400).json({ error: 'Send a photo on its own or with a typed message.' });
+      }
+      const caption = photo && typeof message === 'string' ? message.trim().slice(0, 2000) : '';
 
       const { customer, isNewCustomer } = await findOrCreateWebCustomer(sessionId);
+
+      let photoMedia = null;
+      if (photo) {
+        const recent = await messages().countDocuments({
+          customerId: customer._id,
+          senderType: 'CUSTOMER',
+          mediaType: 'image',
+          createdAt: { $gt: new Date(Date.now() - 60 * 60 * 1000) }
+        });
+        if (recent >= PHOTOS_PER_HOUR) {
+          return res.status(429).json({ error: `You can send up to ${PHOTOS_PER_HOUR} photos an hour — please describe it in words instead.` });
+        }
+        photoMedia = await customerPhotos.save(photo.data, photo.mimeType);
+      }
 
       // Link this browser's chat transcript to the signed-in customer, so
       // staff see who they're talking to. The chat stays on its own
@@ -258,7 +297,9 @@ module.exports = function createWebChatRouter({
         ? priceTap.title
         : accountAction
         ? (typeof label === 'string' && label.trim() ? label.trim().slice(0, 80) : accountAction.replace(/_/g, ' '))
-        : resolvedTap ? resolvedTap.title : message.trim();
+        : resolvedTap ? resolvedTap.title
+        : photo ? (caption ? `📷 ${caption}` : '📷 Photo')
+        : message.trim();
 
       const incoming = await saveMessage({
         customerId: customer._id,
@@ -266,7 +307,8 @@ module.exports = function createWebChatRouter({
         content: displayedCustomerText,
         isRead: false,
         replyToMessageId: null,
-        whatsappStatus: null
+        whatsappStatus: null,
+        ...(photoMedia || {})
       });
 
       await broadcastMessageCreated(customer, incoming);
@@ -348,14 +390,14 @@ module.exports = function createWebChatRouter({
 
       // Either the tapped item's phrase (e.g. "I'd like a price for a
       // Gift Box"), or the customer's own typed text.
-      let outgoingText = accountAction ? '' : resolvedTap ? resolvedTap.phrase : message.trim();
+      let outgoingText = accountAction ? '' : resolvedTap ? resolvedTap.phrase : photo ? caption : message.trim();
 
       // Questions about the customer's OWN bookings/BLs/shipments are
       // answered from the database (portalChat.js), never by the LLM —
       // see that file for why. Not an account question -> null, and the
       // message carries on to Flowise below exactly as before.
       let accountExtras = null;
-      if (customerTools) {
+      if (customerTools && !photo) {
         const intent = accountAction || detectAccountIntent(outgoingText);
         if (intent) {
           const handled = await handleAccountIntent({
@@ -399,7 +441,7 @@ module.exports = function createWebChatRouter({
       // Schedule questions: answered from the shipping calendar (the same
       // dates the website shows), not by the AI. Done before the country
       // context below, so the AI still gets that on the next real question.
-      if (answerScheduleQuestion) {
+      if (answerScheduleQuestion && !photo) {
         const scheduleReply = await answerScheduleQuestion({
           text: outgoingText,
           country: (Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) && country) || customer.webCountry || null
@@ -435,7 +477,10 @@ module.exports = function createWebChatRouter({
         await customers().updateOne({ _id: customer._id }, { $set: { webCountry: pageCountry } });
       }
 
-      const rawReply = await getFlowiseReply(flowiseText, sessionId, customer);
+      // A photo goes straight to the agent answer (Flowise can't see it).
+      const rawReply = photo
+        ? (await agentAnswer.answer({ question: caption, customer, image: photo }) || CANT_VIEW_PHOTO_REPLY)
+        : await getFlowiseReply(flowiseText, sessionId, customer);
 
       if (!rawReply) {
         return res.status(502).json({ error: 'No reply from assistant — please try again.' });
