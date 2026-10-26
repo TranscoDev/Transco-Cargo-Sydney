@@ -201,6 +201,7 @@ HOW TO ANSWER
 - Customs duty/tax: say whether the goods are taxable if the FACTS say so, but NEVER give a duty amount; say Sri Lanka Customs assesses it and our team can advise.
 - If part of the question is not answered by the FACTS: answer the parts you can, then say plainly that our team will confirm that part and get back to them here, and put [[HANDOFF]] on the last line. If nothing at all can be answered, reply with exactly [[HANDOFF]].
 - If the customer is upset, complaining, or asks for a person, reply with a short kind line and [[HANDOFF]] on the last line.
+- Home pickup: say yes, we can organise it, and ask in a numbered list: 1. how many boxes they're planning to send, 2. which suburb they live in, 3. whether it's a house or an apartment. Never quote a pickup fee. When they have answered (check the conversation so far), thank them, say Sajith from our team will contact them to confirm the pickup day and the fee, and put [[HANDOFF]] on the last line.
 - If a photo is attached, say briefly what you see only if it helps (e.g. "the wheels with tyres in your photo"). If you can't tell what it is, ask.
 - Use the conversation so far for context; never repeat what was already said, never greet twice in the same conversation.
 
@@ -218,6 +219,14 @@ Agent: Hi Solanie, thanks for your message! A Tea Chest (max 30kg, 42 x 44 x 63 
 • Door delivery: $125 / $145 / $155 depending on distance from Colombo
 🎉 Send 2 Tea Chests, get the 3rd free (same receiver).
 Where in Sri Lanka is it going? Then I can confirm the exact price.
+
+Customer: Do you come to pick up the tea chest box from home? What are your charges?
+Agent: Hi Solanie, sure, we can organise this for you.
+To get started, could you please let me know:
+1. How many boxes you're planning to send
+2. Which suburb you live in
+3. Whether it's a house or an apartment
+Thank you!
 
 Customer: [photo of 4 alloy wheels with tyres] Can I send these 4 alloy wheels with tyres to Sri Lanka? Freight cost and rough customs tax?
 Agent: Hi Shavinu, thanks for the photo! Yes, we can ship alloy wheels with tyres by sea freight.
@@ -299,7 +308,7 @@ const handoff = question => '[[HANDOFF]]' + HANDOFF_TEXT[languageOf(String(quest
  * Returns the reply ([[HANDOFF]] first when staff must follow up), or
  * null when no answer could be made (caller keeps its old behaviour).
  */
-async function answer({ question, customer = null, image = null }) {
+async function answer({ question, customer = null, image = null, history: givenHistory = null }) {
   const q = String(question || '').trim();
   if (!q && !image) return null;
 
@@ -312,7 +321,8 @@ async function answer({ question, customer = null, image = null }) {
   }
 
   const name = customer && hasRealName(customer) ? String(customer.name).trim().split(/\s+/)[0] : '';
-  const history = await conversationSoFar(customer && customer._id);
+  // `history` can be given directly (tests); normally read from the chat.
+  const history = givenHistory !== null ? givenHistory : await conversationSoFar(customer && customer._id);
   const system = `${RULES}\n\nTODAY (Sydney): ${fmtDate(sydneyToday())}\n\nFACTS:\n${facts}`;
   const ask =
     (name ? `Customer's first name: ${name}\n` : 'Customer\'s name: not known\n') +

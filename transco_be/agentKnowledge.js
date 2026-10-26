@@ -87,7 +87,7 @@ const SECTIONS = [
   },
   {
     key: 'faq', title: 'Other questions & answers',
-    default: ''
+    default: 'Q: I don\'t have a Sri Lankan passport or NIC — I\'m an Australian citizen. What do I put on the declaration?\nA: For the declaration form, please enter your Australian passport number in the passport/NIC field. Please also take the same passport with you when you collect your box in Sri Lanka.'
   }
 ];
 
