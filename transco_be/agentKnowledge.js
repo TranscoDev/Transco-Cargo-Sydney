@@ -224,4 +224,4 @@ function createAgentKnowledgeRouters() {
   return { publicRouter, staffRouter };
 }
 
-module.exports = { createAgentKnowledgeRouters, botShape, validate, DETAILS, SECTIONS, DETAIL_KEYS, SECTION_KEYS };
+module.exports = { createAgentKnowledgeRouters, botShape, current, validate, DETAILS, SECTIONS, DETAIL_KEYS, SECTION_KEYS };

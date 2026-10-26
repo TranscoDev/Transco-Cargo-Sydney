@@ -18,6 +18,7 @@ const { parseShipmentSheet, runShipmentImport } = require('./shipmentImport');
 const { getDb } = require('./db');
 const { createCustomerAuth } = require('./customerAuth');
 const { createCustomerTools, hasRealName } = require('./customerTools');
+const agentAnswer = require('./agentAnswer');
 
 // Memory storage — files are small (a customer sheet, not a video) and
 // this only ever runs the parse-then-discard import flow, never needs to
@@ -1728,6 +1729,8 @@ app.post('/webhook', async (req, res) => {
 
     let text = message.text?.body;
     let isVoiceMessage = false;
+    // A photo the bot can look at (agentAnswer.js) — set below.
+    let photo = null;
 
     // A tap on the welcome menu's list — translate it into a clear,
     // natural-language phrase that flows through the exact same
@@ -1812,15 +1815,29 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    // Images/videos/documents/stickers can't be read by the bot at
-    // all right now — staying silent here reads as the bot ignoring
-    // the customer, which is worse than not supporting it. Say so
-    // plainly and redirect them to describe it in words instead.
+    // Photos: downloaded so the bot can look at them with the caption
+    // (agentAnswer.js). The message is saved as "📷 <caption>" so staff
+    // see it in the conversation.
+    if (!text && message.type === 'image' && message.image?.id) {
+      try {
+        photo = await downloadWhatsAppMedia(message.image.id);
+        const caption = String(message.image.caption || '').trim();
+        text = caption ? `📷 ${caption}` : '📷 Photo';
+      } catch (err) {
+        console.error('Photo download failed:', err.response?.data ?? err.message);
+        photo = null;
+      }
+    }
+
+    // Videos/documents/stickers (and photos that couldn't be read) —
+    // staying silent here reads as the bot ignoring the customer, which
+    // is worse than not supporting it. Say so plainly and redirect them
+    // to describe it in words instead.
     if (!text && ['image', 'video', 'document', 'sticker'].includes(message.type)) {
       await sendAndTrackOutbound(
         customer,
         'CHATBOT',
-        "📸 Thanks for sending that — I can't view photos or files just yet, but if you describe what it is and what you'd like to know, I can help right away!"
+        CANT_VIEW_FILES_REPLY
       );
 
       return;
@@ -1915,7 +1932,7 @@ app.post('/webhook', async (req, res) => {
       // Schedule questions are answered from the shipping calendar staff
       // keep in the console — the same dates the website shows — not by
       // the AI, so the two can never disagree.
-      const scheduleReply = await scheduleAnswerer.answerScheduleQuestion({
+      const scheduleReply = photo ? null : await scheduleAnswerer.answerScheduleQuestion({
         text,
         country: customer.webCountry || null
       });
@@ -1924,10 +1941,14 @@ app.post('/webhook', async (req, res) => {
         return;
       }
 
-      const reply =
-        await getFlowiseReply(
+      // A photo goes straight to the agent answer (Flowise can't see it);
+      // if that can't answer, the old "describe it in words" reply.
+      const reply = photo
+        ? (await agentAnswer.answer({ question: String(message.image.caption || '').trim(), customer, image: photo }) || CANT_VIEW_FILES_REPLY)
+        : await getFlowiseReply(
           text,
-          customer.phoneNumber
+          customer.phoneNumber,
+          customer
         );
 
 
@@ -5607,7 +5628,8 @@ app.delete('/api/segments/:segmentId', async (req, res) => {
 
 async function getFlowiseReply(
   text,
-  chatId
+  chatId,
+  customer = null
 ) {
 
   const isBadReply = reply => {
@@ -5687,8 +5709,12 @@ async function getFlowiseReply(
 
       // [[KNOWLEDGE]] = reference text from the Agent knowledge page
       // (request_type=38). The Flowise agent copies tool text exactly, so
-      // the answer is written here from that text — or handed to staff.
+      // the answer is written here: agent-style from all the console
+      // facts (agentAnswer.js), or — if that can't run — from the
+      // knowledge text alone, or handed to staff.
       if (typeof reply === 'string' && reply.trimStart().startsWith('[[KNOWLEDGE]]')) {
+        const agentReply = await agentAnswer.answer({ question: text, customer });
+        if (agentReply) return agentReply;
         reply = await answerFromKnowledge(text, reply.trimStart().slice('[[KNOWLEDGE]]'.length));
       }
 
@@ -7126,6 +7152,23 @@ function whatsAppMediaTypeFor(mimetype) {
 // The result feeds straight into the normal getFlowiseReply() text
 // flow, so language detection, request routing, everything downstream
 // just works unchanged — Whisper auto-detects the spoken language.
+
+const CANT_VIEW_FILES_REPLY =
+  "📸 Thanks for sending that — I can't view this just yet, but if you describe what it is and what you'd like to know, I can help right away!";
+
+// A customer's photo, for the bot to look at (agentAnswer.js). WhatsApp
+// photos are at most 5MB.
+async function downloadWhatsAppMedia(mediaId) {
+  const mediaInfo = await axios.get(
+    `${WHATSAPP_API_BASE_URL}/${mediaId}`,
+    { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` }, timeout: 15000 }
+  );
+  const file = await axios.get(
+    mediaInfo.data.url,
+    { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` }, responseType: 'arraybuffer', timeout: 20000, maxContentLength: 6 * 1024 * 1024 }
+  );
+  return { data: Buffer.from(file.data), mimeType: mediaInfo.data.mime_type || 'image/jpeg' };
+}
 
 async function transcribeWhatsAppAudio(mediaId) {
 

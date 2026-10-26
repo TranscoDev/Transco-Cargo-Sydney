@@ -435,7 +435,7 @@ module.exports = function createWebChatRouter({
         await customers().updateOne({ _id: customer._id }, { $set: { webCountry: pageCountry } });
       }
 
-      const rawReply = await getFlowiseReply(flowiseText, sessionId);
+      const rawReply = await getFlowiseReply(flowiseText, sessionId, customer);
 
       if (!rawReply) {
         return res.status(502).json({ error: 'No reply from assistant — please try again.' });

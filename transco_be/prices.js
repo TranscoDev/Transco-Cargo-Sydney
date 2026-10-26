@@ -25,7 +25,7 @@ const PRICES = [
   { key: 'tea_chest', group: 'Sea freight — boxes (Wattala pickup)', label: 'Tea Chest', default: 75 },
   { key: 'quarter_cbm', group: 'Sea freight — boxes (Wattala pickup)', label: 'Quarter CBM', default: 150 },
   { key: 'bicycle', group: 'Sea freight — boxes (Wattala pickup)', label: 'Bicycle', default: 280 },
-  { key: 'cbm', group: 'Sea freight — boxes (Wattala pickup)', label: 'Odd-size / custom cargo, per CBM', default: 600 },
+  { key: 'cbm', group: 'Sea freight — boxes (Wattala pickup)', label: 'Odd-size / custom cargo, per CBM', default: 550 },
   { key: 'z1_first', group: 'Door delivery in Sri Lanka (per order)', label: 'Zone 1 (up to 20 km) — first box', default: 50 },
   { key: 'z1_extra', group: 'Door delivery in Sri Lanka (per order)', label: 'Zone 1 — each extra box', default: 25 },
   { key: 'z2_first', group: 'Door delivery in Sri Lanka (per order)', label: 'Zone 2 (21–100 km) — first box', default: 70 },
@@ -237,4 +237,4 @@ function createPriceRouters() {
   return { publicRouter, staffRouter };
 }
 
-module.exports = { createPriceRouters, validate, botShape, isActive, PRICES, PRICE_KEYS, DEFAULT_PROMOTIONS };
+module.exports = { createPriceRouters, validate, botShape, current, isActive, PRICES, PRICE_KEYS, DEFAULT_PROMOTIONS };
