@@ -87,6 +87,9 @@ async function buildFacts() {
   const k = knowledge.botShape(knowDoc);
   const freeThird = promotions.some(p => p.type === 'free_third');
   const lines = [];
+  // Correct amounts the bot may work out but that aren't listed (e.g. a
+  // 26kg air box) — allowed by the reply check.
+  const extraAmounts = [];
 
   lines.push('# SEA FREIGHT TO SRI LANKA (AUD, per box, collect from our Wattala warehouse)');
   for (const b of BOXES) lines.push(`- ${b.name} (${b.dims}, max ${b.kg}kg): ${money(v[b.key])}`);
@@ -118,10 +121,10 @@ async function buildFacts() {
 
   lines.push('', '# AIR FREIGHT TO SRI LANKA (per box, max 30kg per box)');
   lines.push(`- ${money(v.air_per_kg)} per kg + ${money(v.air_doc_fee)} documentation fee per box + ${money(v.air_transport)} Local transport per box.`);
-  lines.push(`- Minimum: any box up to 12kg is charged as 12kg (Gift Box rate); over 12kg up to 23kg is charged as 23kg (Tea Chest rate); over 23kg by the kg.`);
   const airBox = kg => round2(kg * v.air_per_kg + v.air_doc_fee + v.air_transport);
-  lines.push(`- Ready prices per box: Gift Box (12kg minimum) ${money(airBox(AIR_TIERS[0]))}, Tea Chest (23kg minimum) ${money(airBox(AIR_TIERS[1]))}` +
-    Array.from({ length: AIR_MAX_KG - AIR_TIERS[1] }, (_, i) => `, ${AIR_TIERS[1] + i + 1}kg ${money(airBox(AIR_TIERS[1] + i + 1))}`).join(''));
+  lines.push(`- Price per box by weight: 12kg or less = ${money(airBox(AIR_TIERS[0]))} (charged as a Gift Box); over 12kg up to 23kg = ${money(airBox(AIR_TIERS[1]))} (charged as a Tea Chest); over 23kg up to 30kg = ${money(v.air_per_kg)} per kg + the two fees (${money(airBox(AIR_TIERS[1]))} + ${money(v.air_per_kg)} for each kg above 23kg).`);
+  lines.push('- When the customer gives a weight, quote ONLY that box\'s price (work it out with the rule above). When no weight is given, give the 12kg and 23kg prices and the per-kg rule, and ask the weight. Never list a price for every weight.');
+  for (let kg = AIR_TIERS[1] + 1; kg <= AIR_MAX_KG; kg++) extraAmounts.push(airBox(kg));
   lines.push(`- Lithium battery surcharge: ${money(v.air_lithium)}. Documents only: first kg ${money(v.doc_first_kg)}, each extra kg ${money(v.doc_extra_kg)}.`);
   lines.push('- Included: door delivery anywhere in Sri Lanka and Sri Lanka customs clearance handling. Not included: government duty/tax, if it applies (paid by the customer directly).');
   lines.push('- Weekly air courier; usually arrives 10-14 days after the Sydney cut-off, depending on flights.');
@@ -148,15 +151,15 @@ async function buildFacts() {
 
   for (const s of k.sections) lines.push('', `# ${s.title.toUpperCase()}`, s.text);
 
-  return lines.join('\n');
+  return { text: lines.join('\n'), extraAmounts };
 }
 
 // ---------- checking the reply ----------
 
 // Every number written in the facts, plus each listed price times 1–10
 // (e.g. "2 Tea Chests = $150").
-function allowedAmounts(facts) {
-  const set = new Set();
+function allowedAmounts(facts, extra = []) {
+  const set = new Set(extra.map(round2));
   const nums = (facts.match(/\d[\d,]*(?:\.\d+)?/g) || []).map(s => Number(s.replace(/,/g, ''))).filter(n => isFinite(n));
   for (const n of nums) set.add(round2(n));
   const unit = (facts.match(/\$\d[\d,]*(?:\.\d+)?/g) || []).map(s => Number(s.slice(1).replace(/,/g, '')));
@@ -174,8 +177,8 @@ function datesIn(text) {
 }
 
 // Returns null when fine, or what's wrong.
-function checkReply(reply, facts) {
-  const amounts = allowedAmounts(facts);
+function checkReply(reply, facts, extraAmounts = []) {
+  const amounts = allowedAmounts(facts, extraAmounts);
   for (const m of reply.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)/g)) {
     const n = round2(Number(m[1].replace(/,/g, '')));
     if (!amounts.has(n)) return `amount $${m[1]} is not in the facts`;
@@ -226,9 +229,11 @@ For an exact price, could you send me:
 2. Are the wheels used or new?
 
 Customer: I just want the price for air freight. I don't have a passport or NIC, I'm an Australian citizen. How can I proceed?
-Agent: Hi Pearline, thanks for your message! Air freight is priced by weight, not ID:
-• $15 per kg + $60 documentation fee + $10 Local transport per box
-• e.g. Gift Box (12kg minimum) $250, Tea Chest (23kg minimum) $415, door-to-door
+Agent: Hi Pearline, thanks for your message! Air freight is priced by the weight of each box, not ID:
+• Up to 12kg: $250
+• Over 12kg up to 23kg: $415
+• Over 23kg (max 30kg): $15 more for each extra kg
+This includes door delivery anywhere in Sri Lanka. How much will your box weigh?
 About the declaration: our team will confirm what you can use instead of a passport/NIC and get back to you here.
 [[HANDOFF]]`;
 
@@ -298,9 +303,9 @@ async function answer({ question, customer = null, image = null }) {
   const q = String(question || '').trim();
   if (!q && !image) return null;
 
-  let facts;
+  let facts, extraAmounts;
   try {
-    facts = await buildFacts();
+    ({ text: facts, extraAmounts } = await buildFacts());
   } catch (err) {
     console.error('Agent answer: could not build the facts:', err.message);
     return null;
@@ -342,7 +347,7 @@ async function answer({ question, customer = null, image = null }) {
       .trim();
     if (!reply) return handoff(q);
 
-    const problem = checkReply(reply, facts);
+    const problem = checkReply(reply, facts, extraAmounts);
     if (problem) {
       console.warn(`Agent answer held back (${attempt.name}): ${problem}. Reply was: ${reply.slice(0, 300)}`);
       return handoff(q);
