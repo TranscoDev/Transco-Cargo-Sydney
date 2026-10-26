@@ -1,7 +1,10 @@
 // 📎 Photo button for the website chat (every page with the assistant).
-// The photo is shrunk in the browser (longest side 1600px, JPEG) before
-// it is sent, so uploads stay quick on phones; the server reads it with
-// the question (agentAnswer.js) and keeps it privately for staff.
+// Like WhatsApp: picking a photo shows a preview above the message box,
+// the customer can type a message with it, then sends with the page's
+// own send button (or Enter). × removes the photo.
+// The photo is shrunk in the browser (longest side 1600px, JPEG) so
+// uploads stay quick on phones; the server reads it with the question
+// (agentAnswer.js) and keeps it privately for staff.
 //
 // Usage, after the page's chat input exists:
 //   TranscoChatPhoto.attach(inputEl, function (image, caption) { ... })
@@ -18,7 +21,11 @@
     s.textContent =
       ".tc-photo-btn{flex-shrink:0;width:42px;height:42px;border-radius:50%;border:1px solid #d7dbd9;background:#fff;" +
       "cursor:pointer;font-size:18px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}" +
-      ".tc-photo-btn:hover{border-color:#1d3557}.tc-photo-btn:disabled{opacity:.5;cursor:default}";
+      ".tc-photo-btn:hover{border-color:#1d3557}.tc-photo-btn:disabled{opacity:.5;cursor:default}" +
+      ".tc-photo-preview{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid #e3e6e4;background:#f7f8f7;font-size:13px;color:#4a5550}" +
+      ".tc-photo-preview img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #d7dbd9}" +
+      ".tc-photo-preview span{flex:1;min-width:0}" +
+      ".tc-photo-remove{flex-shrink:0;width:30px;height:30px;border-radius:50%;border:none;background:#e3e6e4;color:#333;cursor:pointer;font-size:17px;line-height:1}";
     document.head.appendChild(s);
   }
 
@@ -49,6 +56,12 @@
     input.setAttribute("data-photo", "1");
     addStyle();
 
+    var row = input.parentNode;
+    var sendBtn = row.querySelector("button:not(.tc-photo-btn)");
+    var placeholder = input.placeholder;
+    var pending = null; // base64 of the chosen photo, until sent
+    var preview = null;
+
     var picker = document.createElement("input");
     picker.type = "file";
     picker.accept = "image/*";
@@ -57,10 +70,57 @@
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "tc-photo-btn";
-    btn.title = "Send a photo";
-    btn.setAttribute("aria-label", "Send a photo");
+    btn.title = "Add a photo";
+    btn.setAttribute("aria-label", "Add a photo");
     btn.textContent = "📎";
     btn.addEventListener("click", function () { picker.click(); });
+
+    function clearPhoto() {
+      pending = null;
+      if (preview && preview.parentNode) preview.parentNode.removeChild(preview);
+      preview = null;
+      input.placeholder = placeholder;
+    }
+
+    function showPhoto(data) {
+      clearPhoto();
+      pending = data;
+      preview = document.createElement("div");
+      preview.className = "tc-photo-preview";
+      var img = document.createElement("img");
+      img.src = "data:image/jpeg;base64," + data;
+      img.alt = "Photo to send";
+      var note = document.createElement("span");
+      note.textContent = "Photo ready — add a message if you like, then press send.";
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "tc-photo-remove";
+      remove.setAttribute("aria-label", "Remove photo");
+      remove.textContent = "×";
+      remove.addEventListener("click", function () { clearPhoto(); input.focus(); });
+      preview.appendChild(img);
+      preview.appendChild(note);
+      preview.appendChild(remove);
+      if (row.parentNode) row.parentNode.insertBefore(preview, row);
+      input.placeholder = "Add a message (optional)…";
+      input.focus();
+    }
+
+    // With a photo waiting, the page's send button / Enter send it (with
+    // whatever was typed) instead of the page's normal text send.
+    function sendPhoto(e) {
+      if (!pending) return;
+      if (sendBtn && sendBtn.disabled) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      var data = pending;
+      var caption = (input.value || "").trim();
+      input.value = "";
+      clearPhoto();
+      send({ data: data, mimeType: "image/jpeg" }, caption);
+    }
+    if (sendBtn) sendBtn.addEventListener("click", sendPhoto, true);
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") sendPhoto(e); }, true);
 
     picker.addEventListener("change", function () {
       var file = picker.files && picker.files[0];
@@ -72,16 +132,14 @@
         .then(function (data) { return data.length * 0.75 > MAX_BYTES ? shrink(file, 0.6) : data; })
         .then(function (data) {
           if (data.length * 0.75 > MAX_BYTES) { alert("That photo is too large — please try another one."); return; }
-          var caption = (input.value || "").trim();
-          input.value = "";
-          send({ data: data, mimeType: "image/jpeg" }, caption);
+          showPhoto(data);
         })
         .catch(function () { alert("Sorry, that photo couldn't be read. Please try a JPG or PNG."); })
         .then(function () { btn.disabled = false; });
     });
 
-    input.parentNode.insertBefore(btn, input);
-    input.parentNode.insertBefore(picker, input);
+    row.insertBefore(btn, input);
+    row.insertBefore(picker, input);
   }
 
   window.TranscoChatPhoto = { attach: attach };
