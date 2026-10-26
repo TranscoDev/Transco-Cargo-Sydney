@@ -91,7 +91,7 @@ export function pageForPath(pathname: string): string | undefined {
   const rest = pathname.replace(/^\/console\/?/, "");
   if (!rest) return undefined;
   if (rest.startsWith("ai/bot-controls")) return "bot-controls";
-  if (rest.startsWith("ai/agent")) return "agent-knowledge";
+  if (rest.startsWith("ai/agent") || rest.startsWith("ai/faqs")) return "agent-knowledge";
   if (rest.startsWith("inventory/activity")) return "packaging";
   // One customer's profile: a login without the Customers page may still
   // have view-only profiles (the warehouse does).

@@ -31,6 +31,7 @@ import { Route as ConsoleWalkInsRouteImport } from './routes/console.walk-ins'
 import { Route as ConsoleWarehouseRouteImport } from './routes/console.warehouse'
 import { Route as ConsoleAiAgentRouteImport } from './routes/console.ai.agent'
 import { Route as ConsoleAiBotControlsRouteImport } from './routes/console.ai.bot-controls'
+import { Route as ConsoleAiFaqsRouteImport } from './routes/console.ai.faqs'
 import { Route as ConsoleBookingsIndexRouteImport } from './routes/console/bookings/index'
 import { Route as ConsoleBookingsBookingIdRouteImport } from './routes/console/bookings/$bookingId'
 import { Route as ConsoleCustomersIndexRouteImport } from './routes/console/customers/index'
@@ -158,6 +159,11 @@ const ConsoleAiBotControlsRoute = ConsoleAiBotControlsRouteImport.update({
   path: '/ai/bot-controls',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
+const ConsoleAiFaqsRoute = ConsoleAiFaqsRouteImport.update({
+  id: '/ai/faqs',
+  path: '/ai/faqs',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
 const ConsoleBookingsIndexRoute = ConsoleBookingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -269,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/console/': typeof ConsoleIndexRoute
   '/console/ai/agent': typeof ConsoleAiAgentRoute
   '/console/ai/bot-controls': typeof ConsoleAiBotControlsRoute
+  '/console/ai/faqs': typeof ConsoleAiFaqsRoute
   '/console/bookings/$bookingId': typeof ConsoleBookingsBookingIdRoute
   '/console/customers/$customerId': typeof ConsoleCustomersCustomerIdRoute
   '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
@@ -304,6 +311,7 @@ export interface FileRoutesByTo {
   '/console': typeof ConsoleIndexRoute
   '/console/ai/agent': typeof ConsoleAiAgentRoute
   '/console/ai/bot-controls': typeof ConsoleAiBotControlsRoute
+  '/console/ai/faqs': typeof ConsoleAiFaqsRoute
   '/console/bookings/$bookingId': typeof ConsoleBookingsBookingIdRoute
   '/console/customers/$customerId': typeof ConsoleCustomersCustomerIdRoute
   '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
@@ -345,6 +353,7 @@ export interface FileRoutesById {
   '/console/': typeof ConsoleIndexRoute
   '/console/ai/agent': typeof ConsoleAiAgentRoute
   '/console/ai/bot-controls': typeof ConsoleAiBotControlsRoute
+  '/console/ai/faqs': typeof ConsoleAiFaqsRoute
   '/console/bookings/$bookingId': typeof ConsoleBookingsBookingIdRoute
   '/console/customers/$customerId': typeof ConsoleCustomersCustomerIdRoute
   '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
@@ -387,6 +396,7 @@ export interface FileRouteTypes {
     | '/console/'
     | '/console/ai/agent'
     | '/console/ai/bot-controls'
+    | '/console/ai/faqs'
     | '/console/bookings/$bookingId'
     | '/console/customers/$customerId'
     | '/console/finance/expenses'
@@ -422,6 +432,7 @@ export interface FileRouteTypes {
     | '/console'
     | '/console/ai/agent'
     | '/console/ai/bot-controls'
+    | '/console/ai/faqs'
     | '/console/bookings/$bookingId'
     | '/console/customers/$customerId'
     | '/console/finance/expenses'
@@ -462,6 +473,7 @@ export interface FileRouteTypes {
     | '/console/'
     | '/console/ai/agent'
     | '/console/ai/bot-controls'
+    | '/console/ai/faqs'
     | '/console/bookings/$bookingId'
     | '/console/customers/$customerId'
     | '/console/finance/expenses'
@@ -639,6 +651,13 @@ declare module '@tanstack/react-router' {
       path: '/ai/bot-controls'
       fullPath: '/console/ai/bot-controls'
       preLoaderRoute: typeof ConsoleAiBotControlsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/ai/faqs': {
+      id: '/console/ai/faqs'
+      path: '/ai/faqs'
+      fullPath: '/console/ai/faqs'
+      preLoaderRoute: typeof ConsoleAiFaqsRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/bookings/': {
@@ -840,6 +859,7 @@ interface ConsoleRouteRouteChildren {
   ConsoleIndexRoute: typeof ConsoleIndexRoute
   ConsoleAiAgentRoute: typeof ConsoleAiAgentRoute
   ConsoleAiBotControlsRoute: typeof ConsoleAiBotControlsRoute
+  ConsoleAiFaqsRoute: typeof ConsoleAiFaqsRoute
   ConsoleFinanceExpensesRoute: typeof ConsoleFinanceExpensesRoute
   ConsoleFinanceInvoicesRoute: typeof ConsoleFinanceInvoicesRoute
   ConsoleFinancePaymentsRoute: typeof ConsoleFinancePaymentsRoute
@@ -869,6 +889,7 @@ const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleIndexRoute: ConsoleIndexRoute,
   ConsoleAiAgentRoute: ConsoleAiAgentRoute,
   ConsoleAiBotControlsRoute: ConsoleAiBotControlsRoute,
+  ConsoleAiFaqsRoute: ConsoleAiFaqsRoute,
   ConsoleFinanceExpensesRoute: ConsoleFinanceExpensesRoute,
   ConsoleFinanceInvoicesRoute: ConsoleFinanceInvoicesRoute,
   ConsoleFinancePaymentsRoute: ConsoleFinancePaymentsRoute,

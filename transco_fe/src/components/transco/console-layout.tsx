@@ -33,6 +33,7 @@ import {
   Warehouse,
   BookOpenText,
   BadgePercent,
+  MessagesSquare,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -119,6 +120,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "All tasks", to: "/console/all-tasks", icon: ShieldCheck, adminOnly: true },
       { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
       { label: "Agent Transco", to: "/console/ai/agent", icon: BookOpenText },
+      { label: "Bot Q&A", to: "/console/ai/faqs", icon: MessagesSquare },
       { label: "Prices & Promotions", to: "/console/prices", icon: BadgePercent },
       { label: "Website notices", to: "/console/notices", icon: Megaphone },
     ],

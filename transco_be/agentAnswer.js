@@ -77,14 +77,13 @@ async function nextDates(country) {
 }
 
 async function buildFacts() {
-  const [priceDoc, knowDoc, slDates, inDates] = await Promise.all([
+  const [priceDoc, k, slDates, inDates] = await Promise.all([
     prices.current(),
-    knowledge.current(),
+    knowledge.botKnowledge(),
     nextDates('sri_lanka'),
     nextDates('india')
   ]);
   const { values: v, promotions } = prices.botShape(priceDoc);
-  const k = knowledge.botShape(knowDoc);
   const freeThird = promotions.some(p => p.type === 'free_third');
   const lines = [];
   // Correct amounts the bot may work out but that aren't listed (e.g. a

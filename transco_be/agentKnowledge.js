@@ -96,6 +96,69 @@ const SECTION_KEYS = SECTIONS.map(s => s.key);
 
 const store = () => getDb().collection('agentKnowledge');
 const history = () => getDb().collection('agentKnowledgeHistory');
+// Questions & answers (console → Agent Transco → Questions & answers):
+// one document each, instead of the old "Other questions & answers"
+// text box (section 'faq'), which is moved in here once and then hidden.
+const faqs = () => getDb().collection('agentFaqs');
+const FAQS_MOVED_ID = 'faqsMoved';
+const MAX_Q = 500;
+const MAX_A = 2000;
+
+// "Q: …\nA: …" pairs from the old text box.
+function parseFaqText(text) {
+  const out = [];
+  let cur = null;
+  for (const line of String(text || '').split('\n')) {
+    const q = line.match(/^\s*Q\s*[:.-]\s*(.*)$/i);
+    const a = line.match(/^\s*A\s*[:.-]\s*(.*)$/i);
+    if (q) { cur = { question: q[1].trim(), answer: '' }; out.push(cur); }
+    else if (a && cur) cur.answer = a[1].trim();
+    else if (cur && line.trim()) {
+      if (cur.answer) cur.answer += '\n' + line.trim(); else cur.question += ' ' + line.trim();
+    }
+  }
+  return out.filter(f => f.question && f.answer);
+}
+
+// Moves the old text box's Q&As into the list, once.
+async function ensureFaqsMoved() {
+  if (await store().findOne({ _id: FAQS_MOVED_ID })) return;
+  const old = parseFaqText(sectionText(await current(), SECTIONS.find(s => s.key === 'faq')));
+  if (old.length && !(await faqs().countDocuments({}))) {
+    const now = new Date();
+    await faqs().insertMany(old.map(f => ({ ...f, enabled: true, createdAt: now, updatedAt: now, updatedBy: null })));
+  }
+  await store().updateOne({ _id: FAQS_MOVED_ID }, { $set: { movedAt: new Date() } }, { upsert: true });
+}
+
+async function faqList() {
+  await ensureFaqsMoved();
+  return faqs().find({}).sort({ createdAt: -1 }).toArray();
+}
+
+const faqShape = f => ({
+  id: String(f._id), question: f.question, answer: f.answer, enabled: f.enabled !== false,
+  createdAt: f.createdAt || null, updatedAt: f.updatedAt || null, updatedBy: f.updatedBy || null
+});
+
+function validateFaq(body) {
+  const question = clean(body && body.question, MAX_Q);
+  const answer = clean(body && body.answer, MAX_A);
+  if (!question) return { error: 'Write the question.' };
+  if (!answer) return { error: 'Write the answer.' };
+  return { value: { question, answer, enabled: !(body && body.enabled === false) } };
+}
+
+// What the bot reads: the knowledge, with the Q&A list as the
+// "Other questions & answers" section.
+async function botKnowledge() {
+  const shape = botShape(await current());
+  const list = (await faqList()).filter(f => f.enabled !== false);
+  const title = SECTIONS.find(s => s.key === 'faq').title;
+  shape.sections = shape.sections.filter(s => s.title !== title);
+  if (list.length) shape.sections.push({ title, text: list.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n') });
+  return shape;
+}
 
 function clean(v, max) {
   return typeof v === 'string' ? v.replace(/\r\n/g, '\n').trim().slice(0, max) : '';
@@ -118,7 +181,8 @@ function sectionText(doc, s) {
 function staffShape(doc) {
   return {
     details: DETAILS.map(d => ({ ...d, value: detailValue(doc, d) })),
-    sections: SECTIONS.map(s => ({ key: s.key, title: s.title, default: s.default, text: sectionText(doc, s) })),
+    // The Q&As have their own page now (faqs below).
+    sections: SECTIONS.filter(s => s.key !== 'faq').map(s => ({ key: s.key, title: s.title, default: s.default, text: sectionText(doc, s) })),
     updatedAt: doc.updatedAt || null,
     updatedBy: doc.updatedBy || null
   };
@@ -178,11 +242,51 @@ function createAgentKnowledgeRouters() {
   publicRouter.get('/agent-knowledge', async (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store');
-      res.json(botShape(await current()));
+      res.json(await botKnowledge());
     } catch (err) { next(err); }
   });
 
   const staffRouter = express.Router();
+
+  // ---- Questions & answers ----
+  staffRouter.get('/faqs', async (req, res, next) => {
+    try { res.json({ faqs: (await faqList()).map(faqShape) }); } catch (err) { next(err); }
+  });
+
+  staffRouter.post('/faqs', async (req, res, next) => {
+    try {
+      const v = validateFaq(req.body);
+      if (v.error) return res.status(400).json(v);
+      const now = new Date();
+      const doc = { ...v.value, createdAt: now, updatedAt: now, updatedBy: by(req) };
+      const { insertedId } = await faqs().insertOne(doc);
+      res.json(faqShape({ _id: insertedId, ...doc }));
+    } catch (err) { next(err); }
+  });
+
+  staffRouter.put('/faqs/:id', async (req, res, next) => {
+    try {
+      if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: 'Question not found' });
+      const v = validateFaq(req.body);
+      if (v.error) return res.status(400).json(v);
+      const r = await faqs().findOneAndUpdate(
+        { _id: new ObjectId(req.params.id) },
+        { $set: { ...v.value, updatedAt: new Date(), updatedBy: by(req) } },
+        { returnDocument: 'after' }
+      );
+      const doc = r && r.value !== undefined ? r.value : r;
+      if (!doc) return res.status(404).json({ error: 'Question not found' });
+      res.json(faqShape(doc));
+    } catch (err) { next(err); }
+  });
+
+  staffRouter.delete('/faqs/:id', async (req, res, next) => {
+    try {
+      if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: 'Question not found' });
+      await faqs().deleteOne({ _id: new ObjectId(req.params.id) });
+      res.status(204).send();
+    } catch (err) { next(err); }
+  });
   const isAdmin = req => req.staffPages === null || req.staffPages === undefined;
   const by = req => (req.user && req.user.email) || null;
 
@@ -224,4 +328,4 @@ function createAgentKnowledgeRouters() {
   return { publicRouter, staffRouter };
 }
 
-module.exports = { createAgentKnowledgeRouters, botShape, current, validate, DETAILS, SECTIONS, DETAIL_KEYS, SECTION_KEYS };
+module.exports = { createAgentKnowledgeRouters, botShape, botKnowledge, current, validate, parseFaqText, DETAILS, SECTIONS, DETAIL_KEYS, SECTION_KEYS };

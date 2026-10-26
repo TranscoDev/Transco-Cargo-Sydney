@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { BookOpenText, History, Lock, Phone, RotateCcw } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
@@ -101,6 +101,10 @@ function AgentKnowledgePage() {
         <ul className="list-disc space-y-1 pl-5">
           <li><b>Contact details</b> go into every bot reply (English, Sinhala and Tamil).</li>
           <li><b>Information</b> is used to answer questions the bot has no ready answer for. If the answer isn't here, the chat goes to staff.</li>
+          <li>
+            Single <b>questions &amp; answers</b> (e.g. "I only have an Australian passport") go on{" "}
+            <Link to="/console/ai/faqs" className="underline underline-offset-2">Bot Q&amp;A</Link>.
+          </li>
           <li><b>Prices</b> are worked out by the bot's price calculator, and <b>shipping dates</b> come from the Shipping calendar — not edited here.</li>
         </ul>
       </div>

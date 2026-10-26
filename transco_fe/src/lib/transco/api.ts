@@ -1135,6 +1135,39 @@ export const fetchAgentKnowledgeHistory = () =>
 export const restoreAgentKnowledge = (id: string) =>
   agentKnowledgeRequest<AgentKnowledge>(`/history/${encodeURIComponent(id)}/restore`, { method: "POST" });
 
+// ---- Bot questions & answers (Agent Transco → Questions & answers) ----
+
+export interface AgentFaq {
+  id: string;
+  question: string;
+  answer: string;
+  enabled: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export type AgentFaqInput = Pick<AgentFaq, "question" | "answer" | "enabled">;
+
+export const fetchAgentFaqs = () => agentKnowledgeRequest<{ faqs: AgentFaq[] }>("/faqs").then((r) => r.faqs);
+
+export const createAgentFaq = (body: AgentFaqInput) =>
+  agentKnowledgeRequest<AgentFaq>("/faqs", { method: "POST", body: JSON.stringify(body) });
+
+export const updateAgentFaq = (id: string, body: AgentFaqInput) =>
+  agentKnowledgeRequest<AgentFaq>(`/faqs/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) });
+
+export async function deleteAgentFaq(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/agent-knowledge/faqs/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Delete failed (${res.status})`);
+  }
+}
+
 // ---- Landing sheet (Shipments → Shipment NN) ----
 
 export interface LandingSheet {
