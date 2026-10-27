@@ -216,11 +216,15 @@ function cleanTvSizes(raw, qty) {
   return raw.every(s => Object.prototype.hasOwnProperty.call(TV_SIZE_LABELS, s)) ? raw.slice() : null;
 }
 
+// Odd-size items: L × W × H in cm, plus an optional weight (kg) staff
+// weigh at the counter.
 function cleanDims(raw, qty) {
   if (!Array.isArray(raw) || raw.length !== qty) return null;
-  const dims = raw.map(d => ({ l: Number(d && d.l), w: Number(d && d.w), h: Number(d && d.h) }));
-  const ok = dims.every(d => [d.l, d.w, d.h].every(n => Number.isFinite(n) && n >= DIM_CM.min && n <= DIM_CM.max));
-  return ok ? dims.map(d => ({ l: Math.round(d.l), w: Math.round(d.w), h: Math.round(d.h) })) : null;
+  const hasKg = d => d && d.kg !== undefined && d.kg !== null && d.kg !== '';
+  const dims = raw.map(d => ({ l: Number(d && d.l), w: Number(d && d.w), h: Number(d && d.h), kg: hasKg(d) ? Number(d.kg) : null }));
+  const ok = dims.every(d => [d.l, d.w, d.h].every(n => Number.isFinite(n) && n >= DIM_CM.min && n <= DIM_CM.max) &&
+    (d.kg === null || (Number.isFinite(d.kg) && d.kg > 0 && d.kg <= 1000)));
+  return ok ? dims.map(d => ({ l: Math.round(d.l), w: Math.round(d.w), h: Math.round(d.h), ...(d.kg !== null ? { kg: Math.round(d.kg * 10) / 10 } : {}) })) : null;
 }
 
 // Box list for a country — shared by the customer booking form and staff
