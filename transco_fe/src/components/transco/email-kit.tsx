@@ -461,6 +461,75 @@ export function fmtSentAt(iso: string) {
   return new Date(iso).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
+const snippet = (body: string) => body.replace(/\s+/g, " ").trim().slice(0, 110);
+
+/**
+ * Gmail-style thread: the newest message (and any new replies) open, older
+ * ones one line each — click to open. With more than 4, the middle ones
+ * fold into "N earlier messages".
+ */
+function ThreadList({ items }: { items: ThreadItem[] }) {
+  const last = items.length - 1;
+  const [open, setOpen] = useState<Set<string>>(() => new Set(items.filter((it, i) => i === last || (it.kind === "reply" && !it.read)).map((it) => it.id)));
+  const [showAll, setShowAll] = useState(items.length <= 4);
+  const toggle = (id: string) =>
+    setOpen((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
+  // First, "N earlier", then the last two.
+  const hidden = showAll ? 0 : items.length - 3;
+  const shown = showAll ? items : [items[0]!, ...items.slice(-2)];
+
+  return (
+    <ol className="flex flex-col gap-2">
+      {shown.map((it, i) => {
+        const isOpen = open.has(it.id);
+        const reply = it.kind === "reply";
+        const who = reply ? it.fromName || it.fromAddress : it.sentByName;
+        const when = fmtSentAt(reply ? it.receivedAt : it.sentAt);
+        return (
+          <li key={it.id} className="flex flex-col gap-2">
+            {i === 1 && hidden > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="self-center rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                {hidden} earlier {hidden === 1 ? "message" : "messages"}
+              </button>
+            )}
+            <div className={cn("rounded-lg border", reply ? "mr-6 border-primary/30 bg-primary/5" : "ml-6 bg-secondary/30")}>
+              <button type="button" onClick={() => toggle(it.id)} aria-expanded={isOpen} className="flex w-full items-baseline gap-2 px-3 py-2 text-left">
+                <strong className="shrink-0 text-xs text-foreground">
+                  {reply ? "↩ " : ""}
+                  {who}
+                </strong>
+                {isOpen ? (
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                    {reply ? "replied" : `sent to ${it.to}${it.cc ? ` · cc ${it.cc}` : ""}`}
+                    {!reply && it.aiDrafted ? " · ✨ AI draft" : ""}
+                  </span>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{snippet(it.body)}</span>
+                )}
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {reply && !it.read && <span className="mr-1 font-semibold text-primary">new ·</span>}
+                  {when}
+                </span>
+              </button>
+              {isOpen && <div className="whitespace-pre-wrap px-3 pb-3 text-sm leading-relaxed text-foreground">{it.body}</div>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 /** One email conversation: what we sent and the customer's replies, with Reply. */
 export function EmailView({ email, onClose }: { email: SentEmail | null; onClose: () => void }) {
   const [items, setItems] = useState<ThreadItem[] | null>(null);
@@ -507,33 +576,8 @@ export function EmailView({ email, onClose }: { email: SentEmail | null; onClose
               {!items ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : (
-                <ol className="flex flex-col gap-3">
-                  {(items.length ? items : [{ kind: "sent" as const, ...email }]).map((it) => (
-                    <li
-                      key={it.id}
-                      className={cn(
-                        "rounded-lg border p-3",
-                        it.kind === "reply" ? "mr-6 border-primary/30 bg-primary/5" : "ml-6 bg-secondary/30",
-                      )}
-                    >
-                      <p className="mb-1.5 text-xs text-muted-foreground">
-                        {it.kind === "reply" ? (
-                          <>
-                            <strong className="text-foreground">↩ {it.fromName || it.fromAddress}</strong> replied · {fmtSentAt(it.receivedAt)}
-                            {!it.read && " · new"}
-                          </>
-                        ) : (
-                          <>
-                            <strong className="text-foreground">{it.sentByName}</strong> sent · {fmtSentAt(it.sentAt)} · to {it.to}
-                            {it.cc ? ` · cc ${it.cc}` : ""}
-                            {it.aiDrafted ? " · ✨ AI draft" : ""}
-                          </>
-                        )}
-                      </p>
-                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{it.body}</div>
-                    </li>
-                  ))}
-                </ol>
+                // Re-keyed when a message arrives, so the newest one opens.
+                <ThreadList key={items.length} items={items.length ? items : [{ kind: "sent" as const, ...email }]} />
               )}
 
               <DialogFooter className="gap-2">

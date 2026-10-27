@@ -281,6 +281,7 @@ function EmailsPage() {
                     </button>
                     {e.aiDrafted && <Sparkles className="ml-1 inline h-3.5 w-3.5 text-muted-foreground" aria-label="AI draft" />}
                     <RepliesTag email={e} />
+                    {e.lastReplyAt && <span className="block text-xs font-normal text-muted-foreground">Last reply {fmtSentAt(e.lastReplyAt)}</span>}
                   </td>
                 </tr>
               ))}
