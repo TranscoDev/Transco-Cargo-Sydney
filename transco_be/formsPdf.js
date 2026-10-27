@@ -318,7 +318,15 @@ async function addShippingDeclaration(doc, d) {
     box(84.8, 100.2, o.total);
   }
   one(36, 235.3, 62, caps(d.collectionCentre));
-  // BL No is left blank — the office writes it in by hand.
+  // BL No — the number the office finds a customer by, so larger than the
+  // rest: top-right of the header, the office-use BL No line and the
+  // bottom receipt slip.
+  if (d.blNumber) {
+    const bl = caps(d.blNumber);
+    one(161, 7.2, 43, `BL ${bl}`, { size: 14, align: 'right' });
+    one(29, 241.1, 70, bl, { size: 13 });
+    one(118.5, 283.3, 33, bl, { size: 12 });
+  }
 
   // Remarks: pickup/delivery only (no booking number on the paper form).
   const remark = d.deliveryKey === 'collect' ? 'Pickup from the destination warehouse' : d.deliveryKey === 'door' ? 'Door delivery' : '';
@@ -332,7 +340,7 @@ async function addShippingDeclaration(doc, d) {
   if (d.signature && d.signature.image) await drawSignature(doc, page, d.signature.image, { x: 141, y: 241.6, w: 31, h: 7.8 });
   one(178, 247.6, 20, dmy(signedDate), { size: 9, align: 'center' });
 
-  // Bottom receipt slip: only the Date — BL No, Received AUD and
+  // Bottom receipt slip: BL No (above) and the Date — Received AUD and
   // Package/s are filled in by hand at the office.
   one(117, 290.9, 24, dmy(signedDate || d.createdAt), { size: 9 });
 }
