@@ -12,6 +12,7 @@ import { ModeSwitch } from "./mode-switch";
 import { WarehouseStrip } from "./ask-warehouse";
 import { NewTaskButton } from "./task-kit";
 import { EmailButton } from "./email-kit";
+import { AiHelperButton } from "./ai-helper";
 import { formatPhone } from "@/lib/transco/phone";
 
 function groupByDay(messages: Message[]) {
@@ -220,6 +221,18 @@ export function ChatPanel({
         disabled={sending}
         onSend={onSend}
         onSendAttachment={onSendAttachment}
+        aiSlot={
+          <AiHelperButton
+            customerIds={[...new Set([conversation.id, profileId])]}
+            customerId={profileId}
+            onUse={(text) => {
+              // Replying needs the chat in staff mode; the text then
+              // replaces the message box to check before sending.
+              if (!isHuman) onModeChange("HUMAN");
+              window.setTimeout(() => window.dispatchEvent(new CustomEvent("transco:compose-set", { detail: text })), 0);
+            }}
+          />
+        }
       />
     </section>
   );

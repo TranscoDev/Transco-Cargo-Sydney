@@ -461,6 +461,73 @@ Reply with JSON only, no code fence:
 {"subject": "...", "body": "...", "customer": {"name": "...or null", "phone": "...or null", "email": "...or null"}}
 (customer = the customer's details if you can see them in the chat or screenshot)`;
 
+// ---------- chat helper (Conversations → ✨ AI) ----------
+
+const CHAT_REPLY_RULES = `You help a Transco Cargo Sydney staff member reply to a customer in a WhatsApp / website chat. Transco ships boxes from Sydney to Sri Lanka and India.
+
+Write the NEXT message staff will send in this chat.
+
+RULES
+- Use ONLY the FACTS and BOOKING below for prices, dates, shipment numbers and policies. Never invent a price, date, number or promise.
+- Anything you need but the FACTS don't give, write as [check: what is needed]. Staff fill these in.
+- If a screenshot is attached, read it (a customer's message, a list of boxes, a receipt…) and use it.
+- If the staff note asks for a calculation, work it out from the FACTS and give the result plainly (e.g. "3 Tea Chests x $75 = $225").
+- Same language and script as the customer (English, Sinhala or Tamil) unless the staff note says otherwise. Prices stay as $ numbers.
+- Chat style: friendly, short (usually 2-6 lines), plain text, no Markdown, "• " for lists. Don't greet again if the conversation already started.
+- Never include passport/NIC numbers, card numbers or passwords.
+
+Reply with JSON only, no code fence: {"text": "..."}`;
+
+const CHAT_WORK_RULES = `You are an internal helper for Transco Cargo Sydney staff (a cargo company shipping boxes from Sydney to Sri Lanka and India). This answer is for STAFF ONLY — it is never sent to the customer.
+
+Read the screenshot and/or chat and do what the staff member asks: pull out the details, count boxes or items, total amounts, work out prices with the FACTS, compare, or summarise.
+
+RULES
+- Prices, box sizes and dates come only from the FACTS. If something isn't in the FACTS, say "not in our price list" instead of guessing.
+- Show short working, then the result, e.g.
+  • 3 Tea Chest x $75 = $225
+  • 1 Gift Box x $55 = $55
+  Total: $280
+- If you can't read part of the picture, say which part.
+- Plain text, no Markdown, "• " for lists. Be brief and exact.
+
+Reply with JSON only, no code fence: {"text": "..."}`;
+
+// A pasted screenshot as { mimeType, data } — or { error }.
+function readImage(value) {
+  if (typeof value !== 'string' || !value) return { image: null };
+  const m = value.match(/^data:(image\/(?:png|jpeg|jpg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) return { error: 'That file isn\'t a picture. Use a PNG or JPG screenshot.' };
+  const data = Buffer.from(m[2], 'base64');
+  if (data.length > 6 * 1024 * 1024) return { error: 'That picture is too big (max 6 MB).' };
+  return { image: { mimeType: m[1] === 'image/jpg' ? 'image/jpeg' : m[1], data } };
+}
+
+// The last messages of these chats, oldest first.
+async function chatText(ids, limit = 25) {
+  const valid = (Array.isArray(ids) ? ids : []).filter(id => typeof id === 'string' && ObjectId.isValid(id)).slice(0, 5);
+  if (!valid.length) return '';
+  const list = await messages()
+    .find({ customerId: { $in: valid.map(id => new ObjectId(id)).concat(valid) } }, { projection: { senderType: 1, content: 1 } })
+    .sort({ _id: -1 })
+    .limit(limit)
+    .toArray();
+  return list.reverse()
+    .filter(m => m.content)
+    .map(m => `${m.senderType === 'CUSTOMER' ? 'Customer' : 'Transco'}: ${String(m.content).slice(0, 700)}`)
+    .join('\n');
+}
+
+async function latestBooking(customer) {
+  if (!customer) return null;
+  return bookings()
+    .find({ customerId: { $in: [String(customer._id), customer._id] }, status: { $ne: 'cancelled' } })
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .next()
+    .catch(() => null);
+}
+
 function parseDraft(raw) {
   const m = String(raw || '').match(/\{[\s\S]*\}/);
   if (!m) return null;
@@ -838,5 +905,58 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
     });
   }));
 
-  return { router, oauthRouter };
+  // Conversations → ✨ AI: { customerIds, customerId, image?, note?, mode: 'reply' | 'work' }
+  // reply = the next chat message (goes into the message box to check);
+  // work  = an answer for staff only (counts, totals, prices).
+  const assistRouter = express.Router();
+  assistRouter.post('/', wrap(async (req, res) => {
+    if (!process.env.GEMINI_API_KEY) return res.status(400).json({ error: 'The AI helper isn\'t set up on the server.' });
+    const body = req.body || {};
+    const mode = body.mode === 'work' ? 'work' : 'reply';
+    const note = text(body.note, 500);
+    const { image, error } = readImage(body.image);
+    if (error) return res.status(400).json({ error });
+    const chat = await chatText(body.customerIds, mode === 'work' ? 15 : 25);
+    if (!image && !chat) return res.status(400).json({ error: 'Add a screenshot, or use this on a chat with messages.' });
+    if (mode === 'work' && !image && !note) return res.status(400).json({ error: 'Add a screenshot or say what to work out.' });
+
+    let customer = null;
+    if (typeof body.customerId === 'string' && ObjectId.isValid(body.customerId)) {
+      customer = await customers().findOne({ _id: new ObjectId(body.customerId) }, { projection: { name: 1 } });
+    }
+    const booking = await latestBooking(customer);
+    let facts = '';
+    try {
+      ({ text: facts } = await agent.buildFacts());
+    } catch (err) {
+      console.error('AI helper: facts failed:', err.message);
+    }
+
+    const system = `${mode === 'work' ? CHAT_WORK_RULES : CHAT_REPLY_RULES}\n\nFACTS:\n${facts || '(none available — use [check] for every price and date)'}`;
+    const ask = [
+      customer && customer.name ? `Customer: ${customer.name}` : null,
+      booking ? `BOOKING: ${bookingLine(booking)}` : 'BOOKING: none known',
+      note ? `Staff note: ${note}` : null,
+      chat ? `\nChat so far:\n${chat}` : null,
+      image ? '\nA screenshot/photo from staff is attached.' : null
+    ].filter(Boolean).join('\n');
+
+    let raw;
+    try {
+      raw = await agent.callGemini(system, ask, image);
+    } catch (err) {
+      console.error('AI helper failed:', err.response?.status || '', err.message);
+      return res.status(502).json({ error: 'The AI couldn\'t answer just now. Please try again.' });
+    }
+    const m = String(raw || '').match(/\{[\s\S]*\}/);
+    let out = null;
+    try {
+      out = m ? JSON.parse(m[0]).text : null;
+    } catch { /* fall back to the plain text */ }
+    if (typeof out !== 'string') out = String(raw || '').replace(/^```\w*|```$/g, '').trim();
+    if (!out) return res.status(502).json({ error: 'The AI didn\'t return an answer. Please try again.' });
+    res.json({ mode, text: out.replace(/\*\*(.+?)\*\*/g, '$1').trim().slice(0, 4000) });
+  }));
+
+  return { router, oauthRouter, assistRouter };
 };

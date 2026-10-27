@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Mic, Paperclip, Send, Square, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -35,6 +35,7 @@ export function MessageComposer({
   disabled,
   onSend,
   onSendAttachment,
+  aiSlot,
 }: {
   mode: ConversationMode;
   /** Attachments are WhatsApp-only for now (see sendAttachment in
@@ -44,6 +45,8 @@ export function MessageComposer({
   disabled?: boolean;
   onSend: (body: string) => void;
   onSendAttachment?: ((file: File, caption?: string) => Promise<void>) | undefined;
+  /** The ✨ AI helper button, shown left of the message box. */
+  aiSlot?: ReactNode;
 }) {
   const [value, setValue] = useState("");
   const [sendingFile, setSendingFile] = useState(false);
@@ -61,7 +64,9 @@ export function MessageComposer({
   // rejects a CHATBOT-mode send with no visible error, so the composer
   // itself must block it here rather than let staff believe a message
   // went out when it didn't.
-  const canSend = isHuman && value.trim().length > 0 && !disabled;
+  // An AI suggestion's [check: …] parts must be filled in first.
+  const checksLeft = /\[check[^\]]*\]/i.test(value);
+  const canSend = isHuman && value.trim().length > 0 && !disabled && !checksLeft;
 
   // "Use in reply" on a warehouse answer (ask-warehouse.tsx) drops its
   // text in here to check and edit — never sent automatically.
@@ -70,8 +75,17 @@ export function MessageComposer({
       const text = (e as CustomEvent<string>).detail;
       if (typeof text === "string" && text) setValue((v) => (v.trim() ? `${v.trimEnd()} ${text}` : text));
     };
+    // The ✨ AI helper's reply replaces what's typed.
+    const onSet = (e: Event) => {
+      const text = (e as CustomEvent<string>).detail;
+      if (typeof text === "string" && text) setValue(text);
+    };
     window.addEventListener("transco:compose-insert", onInsert);
-    return () => window.removeEventListener("transco:compose-insert", onInsert);
+    window.addEventListener("transco:compose-set", onSet);
+    return () => {
+      window.removeEventListener("transco:compose-insert", onInsert);
+      window.removeEventListener("transco:compose-set", onSet);
+    };
   }, []);
 
   const submit = () => {
@@ -237,6 +251,7 @@ export function MessageComposer({
               </button>
             </>
           )}
+          {aiSlot}
           <textarea
             rows={1}
             value={value}
@@ -270,8 +285,10 @@ export function MessageComposer({
       )}
       {attachError && <p className="mt-1.5 text-xs text-destructive">⚠️ {attachError}</p>}
       {sendingFile && <p className="mt-1.5 text-xs text-muted-foreground">Sending…</p>}
-      <p className="mt-1.5 text-xs text-muted-foreground">
-        {isHuman
+      <p className={cn("mt-1.5 text-xs", checksLeft ? "font-medium text-attention-foreground" : "text-muted-foreground")}>
+        {checksLeft
+          ? "Fill in each [check: …] before sending."
+          : isHuman
           ? "Enter to send · Shift+Enter for a new line"
           : "This conversation is handled by the chatbot. Switch to Staff to reply."}
       </p>

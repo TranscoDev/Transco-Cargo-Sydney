@@ -6886,6 +6886,9 @@ app.use('/api/tasks', require('./taskRoutes')({ broadcast, isStaffAdmin, canDele
 const emailRouters = require('./emailRoutes')({ isStaffAdmin, broadcast });
 app.use('/api/emails', emailRouters.router);
 app.use('/api/email-oauth', emailRouters.oauthRouter);
+// Conversations → ✨ AI (a reply, or a staff-only calculation) — under
+// /messages so it goes with the Conversations page's access.
+app.use('/api/messages/ai-assist', emailRouters.assistRouter);
 // Both chat channels answer schedule questions from those same dates.
 const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
 

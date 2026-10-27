@@ -173,6 +173,30 @@ export function draftEmail(input: {
   return request("POST", "/draft", input);
 }
 
+/** Conversations → ✨ AI: the next chat message, or a staff-only answer. */
+export async function aiAssist(input: {
+  mode: "reply" | "work";
+  customerIds: string[];
+  customerId?: string | null | undefined;
+  image?: string | null;
+  note?: string;
+}): Promise<{ mode: "reply" | "work"; text: string }> {
+  const token = getAuthToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api/messages/ai-assist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    throw new EmailError("Couldn't reach the server. Check the internet and try again.");
+  }
+  const data = (await res.json().catch(() => ({}))) as { error?: string; mode?: "reply" | "work"; text?: string };
+  if (!res.ok || !data.text) throw new EmailError(data.error || `Something went wrong (${res.status})`);
+  return { mode: data.mode ?? input.mode, text: data.text };
+}
+
 /** Any "[check…]" the AI left for staff to fill in. */
 export const CHECK_RE = /\[check[^\]]*\]/i;
 
