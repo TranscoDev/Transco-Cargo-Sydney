@@ -1035,7 +1035,11 @@ function createCustomerTools({
       const amount = Number(l && l.amount);
       if (!label) return { error: 'Each cost line needs a name.' };
       if (!Number.isFinite(amount) || amount < 0 || amount > 1000000) return { error: `"${label}" needs an amount of 0 or more.` };
-      lines.push({ label, amount: Math.round(amount * 100) / 100 });
+      // Optional: the line's type (box type, door delivery, …) and how many.
+      const kind = l && typeof l.kind === 'string' && /^[a-z0-9_]{1,30}$/.test(l.kind) ? l.kind : null;
+      const qty = Number(l && l.qty);
+      if (l && l.qty !== undefined && l.qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 999)) return { error: `"${label}" needs a quantity of 1-999.` };
+      lines.push({ label, amount: Math.round(amount * 100) / 100, ...(kind ? { kind } : {}), ...(Number.isInteger(qty) && qty >= 1 ? { qty } : {}) });
     }
     const discount = input.discount === null || input.discount === undefined || input.discount === '' ? 0 : Number(input.discount);
     if (!Number.isFinite(discount) || discount < 0) return { error: 'The discount must be 0 or more.' };
