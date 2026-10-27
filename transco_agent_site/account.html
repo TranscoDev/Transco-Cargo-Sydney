@@ -227,6 +227,10 @@
   textarea.input { min-height: 90px; resize: vertical; }
   .input:focus { border-color: var(--navy); outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.25); }
   .input[aria-invalid="true"] { border-color: var(--danger); }
+  /* Amount boxes: a fixed "$" inside, kept while typing. */
+  .money { position: relative; }
+  .money::before { content: "$"; position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; pointer-events: none; }
+  .money .input { padding-left: 26px; }
   .field-error { color: var(--danger); font-size: 14px; font-weight: 600; }
   .phone-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; }
   @media (max-width: 340px) { .phone-row { grid-template-columns: 1fr; } }
@@ -3134,7 +3138,7 @@
         if (!c) return;
         var qty = h("input", { class: "input", id: "qty-" + key, value: c.qty, inputmode: "numeric", maxlength: "3" });
         qty.addEventListener("input", function () { c.qty = qty.value; qty.removeAttribute("aria-invalid"); });
-        var val = h("input", { class: "input", id: "val-" + key, value: c.value, inputmode: "decimal", maxlength: "8", placeholder: "$" });
+        var val = h("input", { class: "input", id: "val-" + key, value: c.value, inputmode: "decimal", maxlength: "8" });
         val.addEventListener("input", function () { c.value = val.value; val.removeAttribute("aria-invalid"); });
         var desc = null;
         if (key === "others") {
@@ -3146,7 +3150,7 @@
           desc ? h("div", { class: "field", style: "margin-bottom:10px" }, h("label", { for: "item-others", text: t("othersWhat") }), desc) : null,
           h("div", { class: "grid-2", style: "align-items:end" },
             h("div", { class: "field" }, h("label", { for: "qty-" + key, text: t("howMany") }), qty),
-            h("div", { class: "field" }, h("label", { for: "val-" + key, text: t("valueAud") }), val))));
+            h("div", { class: "field" }, h("label", { for: "val-" + key, text: t("valueAud") }), h("div", { class: "money" }, val)))));
       });
     }
     var chips = h("div", { class: "cat-chips", role: "group", "aria-label": t("s2inside") }, CONTENT_CATS.map(function (key) {

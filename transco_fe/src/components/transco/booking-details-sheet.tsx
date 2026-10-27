@@ -8,6 +8,7 @@ import { CheckCircle2, Mail, PenLine, Plus, Printer, ShipIcon, UserRound, X } fr
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/transco/money-input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -689,11 +690,9 @@ function FinaliseSection({
                   onChange={(e) => updateRow(i, { qty: e.target.value })}
                   className="h-8 px-1.5 text-center text-xs tabular-nums"
                 />
-                <Input
+                <MoneyInput
                   aria-label={`Item ${i + 1}: value in dollars`}
                   value={r.value}
-                  inputMode="decimal"
-                  placeholder="$"
                   aria-invalid={bad || undefined}
                   onChange={(e) => updateRow(i, { value: e.target.value })}
                   className="h-8 px-1.5 text-right text-xs tabular-nums"
@@ -749,9 +748,10 @@ function FinaliseSection({
       <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Office use · charges ($) <span className="font-normal normal-case tracking-normal">— optional, leave blank if not needed</span></p>
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3">
         {OFFICE_FIELDS.map((f) => (
-          <Field key={f.key} id={`fin-${f.key}`} label={f.key === "discount" ? "Discount (−)" : f.label} value={office[f.key]} onChange={(v) => setOffice((s) => ({ ...s, [f.key]: v }))} />
+          <Field key={f.key} id={`fin-${f.key}`} label={f.key === "discount" ? "Discount (−)" : f.label} value={office[f.key]} onChange={(v) => setOffice((s) => ({ ...s, [f.key]: v }))} money />
         ))}
         <Field
+          money
           id="fin-total"
           label="Total due"
           value={office.total}
@@ -823,6 +823,7 @@ function Field({
   placeholder,
   hint,
   inputMode = "decimal",
+  money = false,
 }: {
   id: string;
   label: string;
@@ -831,11 +832,13 @@ function Field({
   placeholder?: string | undefined;
   hint?: string | undefined;
   inputMode?: "decimal" | "text";
+  money?: boolean;
 }) {
+  const Box = money ? MoneyInput : Input;
   return (
     <div className="flex flex-col gap-1">
       <Label htmlFor={id} className="text-xs">{label}</Label>
-      <Input id={id} value={value} placeholder={placeholder} inputMode={inputMode} onChange={(e) => onChange(e.target.value)} className="h-9 tabular-nums" />
+      <Box id={id} value={value} placeholder={placeholder} inputMode={inputMode} onChange={(e) => onChange(e.target.value)} className="h-9 tabular-nums" />
       {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
     </div>
   );

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/transco/money-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -880,8 +881,8 @@ function BookingEditSheet({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="price">Price ($)</Label>
-              <Input
+              <Label htmlFor="price">Price</Label>
+              <MoneyInput
                 id="price"
                 type="number"
                 min="0"

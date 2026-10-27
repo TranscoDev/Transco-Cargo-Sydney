@@ -91,6 +91,10 @@
   .item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--muted); min-height: 24px; }
   .item-top button { border: 0; background: none; color: var(--red); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 6px; }
   .item input { width: 100%; font: inherit; font-size: 16px; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; }
+  /* Amount boxes: a fixed "$" inside, kept while typing. */
+  .money { position: relative; }
+  .money::before { content: "$"; position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 16px; pointer-events: none; }
+  .money input { padding-left: 24px; }
   /* New/Used, how many and value on one row — keeps a long list short. */
   .item-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 8px; margin-top: 8px; align-items: end; }
   .known { background: #fff; border: 1.5px solid #9ad8c9; border-radius: var(--radius); padding: 14px; margin-bottom: 16px; }
@@ -982,7 +986,7 @@
       html += '<div class="item' + (bad ? " bad" : "") + '"><div class="item-top"><span>✓ ' + esc(t(c[1])) + "</span></div>" +
         (c[0] === "others" ? '<label for="d' + i + '">' + esc(t("What is it?")) + '</label><input id="d' + i + '" data-item="' + i + '" data-k="description" value="' + esc(row.description) + '" placeholder="' + esc(t("e.g. Kitchen utensils")) + '" style="margin-bottom:10px" />' : "") +
         '<div class="item-grid two"><div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(row.qty) + '" inputmode="numeric" /></div>' +
-        '<div><label for="v' + i + '">' + esc(t("Value (AUD)")) + '</label><input id="v' + i + '" data-item="' + i + '" data-k="value" value="' + esc(row.value) + '" inputmode="decimal" /></div></div></div>';
+        '<div><label for="v' + i + '">' + esc(t("Value (AUD)")) + '</label><div class="money"><input id="v' + i + '" data-item="' + i + '" data-k="value" value="' + esc(row.value) + '" inputmode="decimal" /></div></div></div></div>';
     });
     html += '<div class="note" id="clothes-note" style="margin-top:6px;border-color:#f0d9a8;background:#fff9ec"' + (showClothesWarning() ? "" : " hidden") + ">" + esc(t(CLOTHES_WARNING)) + "</div>";
     return html;
