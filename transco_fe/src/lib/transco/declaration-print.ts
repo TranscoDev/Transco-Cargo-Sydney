@@ -60,7 +60,7 @@ export interface DeclarationPrintData {
   serviceKey: string | null;
   deliveryKey: string | null;
   destination: string | null;
-  items: { type: string; label: string; qty: number; sizes?: string[]; dims?: { l: number; w: number; h: number }[] }[];
+  items: { type: string; label: string; qty: number; sizes?: string[]; dims?: { l: number; w: number; h: number; kg?: number }[] }[];
   itemsText: string | null;
   boxCount: number | null;
   dropOff: { date: string | null; time: string | null } | null;

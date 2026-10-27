@@ -1,7 +1,7 @@
 import { CostingCard, oddPrice, tvSizeLabel } from "@/components/transco/costing-card";
 import { InviteCard } from "@/components/transco/invite-card";
 import { HandoverTags } from "@/components/transco/handover-tags";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Mail, PenLine, Plus, Printer, ShipIcon, UserRound, X } from "lucide-react";
 
@@ -348,7 +348,17 @@ function BookingInfo({ d }: { d: DeclarationPrintData }) {
 
 // ---------- walk-in finalise ----------
 
-type Dims = { l: string; w: string; h: string };
+type Dims = { l: string; w: string; h: string; kg: string };
+const EMPTY_DIMS: Dims = { l: "", w: "", h: "", kg: "" };
+// Weight is optional; when given, more than 0 and up to 1000 kg.
+const kgOk = (s: string) => s.trim() === "" || (Number.isFinite(Number(s)) && Number(s) > 0 && Number(s) <= 1000);
+// Standard box sizes (cm) → CBM, for the automatic total (agentAnswer.js BOX_SIZES).
+const BOX_CBM: Record<string, number> = {
+  tea_chest: (42 * 44 * 63) / 1e6,
+  gift_box: (41 * 44 * 32) / 1e6,
+  wine_box: (20 * 23 * 20) / 1e6,
+  quarter_cbm: (83 * 50 * 52) / 1e6,
+};
 const dimOk = (s: string) => s.trim() !== "" && Number.isFinite(Number(s)) && Number(s) >= 1 && Number(s) <= 500;
 const dimsOk = (d: Dims) => dimOk(d.l) && dimOk(d.w) && dimOk(d.h);
 // Box types per destination (backend ITEM_TYPES / ITEM_LABELS).
@@ -411,7 +421,7 @@ function FinaliseSection({
   const [odd, setOdd] = useState<Dims[]>(() =>
     Array.from({ length: oddItem?.qty ?? 0 }, (_, k) => {
       const m = oddItem?.dims?.[k];
-      return m ? { l: String(m.l), w: String(m.w), h: String(m.h) } : { l: "", w: "", h: "" };
+      return m ? { l: String(m.l), w: String(m.w), h: String(m.h), kg: asText(m.kg) } : { ...EMPTY_DIMS };
     }),
   );
   const [badOdd, setBadOdd] = useState(false);
@@ -422,8 +432,32 @@ function FinaliseSection({
   const setBoxQty = (type: string, qty: number) => {
     const n = Math.max(0, Math.min(30, qty));
     setBoxes((b) => ({ ...b, [type]: n }));
-    if (type === "other") setOdd((s) => Array.from({ length: n }, (_, k) => s[k] ?? { l: "", w: "", h: "" }));
+    if (type === "other") setOdd((s) => Array.from({ length: n }, (_, k) => s[k] ?? { ...EMPTY_DIMS }));
   };
+
+  // Sea Freight is charged by size (CBM), Air Freight by weight (kg) — each
+  // filled in automatically from the boxes until staff type their own.
+  const isAir = data.serviceKey === "air";
+  const autoCbm = useMemo(() => {
+    let t = 0;
+    for (const [type, qty] of Object.entries(boxes)) t += (BOX_CBM[type] ?? 0) * qty;
+    for (const d of odd) if (dimsOk(d)) t += (Number(d.l) * Number(d.w) * Number(d.h)) / 1e6;
+    return t > 0 ? String(Math.round(t * 1000) / 1000) : "";
+  }, [boxes, odd]);
+  const autoKg = useMemo(() => {
+    const t = odd.reduce((s, d) => s + (d.kg.trim() && kgOk(d.kg) ? Number(d.kg) : 0), 0);
+    return t > 0 ? String(Math.round(t * 10) / 10) : "";
+  }, [odd]);
+  // Already saved → keep it; otherwise follow the automatic total.
+  const [cbmTyped, setCbmTyped] = useState(typeof data.cbm === "number");
+  const [kgTyped, setKgTyped] = useState(typeof data.weight === "number");
+  useEffect(() => {
+    if (!cbmTyped) setCbm(autoCbm);
+  }, [autoCbm, cbmTyped]);
+  useEffect(() => {
+    if (!kgTyped) setWeight(autoKg);
+  }, [autoKg, kgTyped]);
+  const unsizedBoxes = Object.entries(boxes).some(([type, qty]) => qty > 0 && BOX_CBM[type] === undefined && type !== "other");
   useEffect(() => {
     onBoxesChange?.(boxes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -477,11 +511,21 @@ function FinaliseSection({
       setFormError(`Check the item${bad.size === 1 ? "" : "s"} marked in red — each needs a description, how many, and a value (0 is fine).`);
       return;
     }
-    const oddStarted = odd.some((d) => d.l.trim() || d.w.trim() || d.h.trim());
-    const oddDims = odd.map((d) => ({ l: Math.round(Number(d.l)), w: Math.round(Number(d.w)), h: Math.round(Number(d.h)) }));
+    const oddStarted = odd.some((d) => d.l.trim() || d.w.trim() || d.h.trim() || d.kg.trim());
+    const oddDims = odd.map((d) => ({
+      l: Math.round(Number(d.l)),
+      w: Math.round(Number(d.w)),
+      h: Math.round(Number(d.h)),
+      ...(d.kg.trim() ? { kg: Math.round(Number(d.kg) * 10) / 10 } : {}),
+    }));
     if (oddStarted && !odd.every(dimsOk)) {
       setBadOdd(true);
       setFormError("Enter the length, width and height (1–500 cm) of every odd-size item, or leave them all empty.");
+      return;
+    }
+    if (!odd.every((d) => kgOk(d.kg))) {
+      setBadOdd(true);
+      setFormError("Each odd-size item's weight must be a number of kg (up to 1000), or leave it empty.");
       return;
     }
     setBadOdd(false);
@@ -599,7 +643,7 @@ function FinaliseSection({
                 </div>
                 {type === "other" && qty > 0 && (
                   <div className="mt-1.5 flex flex-col gap-1.5">
-                    <p className="text-xs text-muted-foreground">Measure each item (cm) — $550 per CBM. Saved when you confirm.</p>
+                    <p className="text-xs text-muted-foreground">Measure each item (L × W × H cm) and weigh it (kg) — $550 per CBM. Saved when you confirm.</p>
                     {odd.map((d, k) => {
                       const cbm = dimsOk(d) ? (Number(d.l) * Number(d.w) * Number(d.h)) / 1e6 : null;
                       return (
@@ -617,8 +661,17 @@ function FinaliseSection({
                               className="h-8 w-16 px-1.5 text-center text-xs tabular-nums"
                             />
                           ))}
+                          <Input
+                            aria-label={`Odd-size item ${k + 1} weight kg`}
+                            placeholder="kg"
+                            inputMode="decimal"
+                            value={d.kg}
+                            aria-invalid={(badOdd && !kgOk(d.kg)) || undefined}
+                            onChange={(e) => setOdd((s) => s.map((x, j) => (j === k ? { ...x, kg: e.target.value } : x)))}
+                            className="h-8 w-16 px-1.5 text-center text-xs tabular-nums"
+                          />
                           <span className="text-xs tabular-nums text-muted-foreground">
-                            {cbm !== null ? `${cbm.toFixed(3)} CBM · $${oddPrice(Number(d.l), Number(d.w), Number(d.h))}` : "cm"}
+                            {cbm !== null ? `${cbm.toFixed(3)} CBM · $${oddPrice(Number(d.l), Number(d.w), Number(d.h))}` : "cm · kg"}
                           </span>
                         </div>
                       );
@@ -723,8 +776,30 @@ function FinaliseSection({
       </div>
 
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
-        <Field id="fin-weight" label="Weight (kg)" value={weight} onChange={setWeight} />
-        <Field id="fin-cbm" label="CBM" value={cbm} onChange={setCbm} />
+        {/* Air is charged by weight, Sea by size. Emptying a box brings back the automatic total. */}
+        {isAir ? (
+          <Field
+            id="fin-weight"
+            label="Total weight (kg)"
+            value={weight}
+            onChange={(v) => {
+              setWeight(v);
+              setKgTyped(v.trim() !== "");
+            }}
+            hint={kgTyped ? undefined : autoKg ? "Added up from the weighed items — include every box" : "Weigh the boxes and enter the total"}
+          />
+        ) : (
+          <Field
+            id="fin-cbm"
+            label="Total CBM"
+            value={cbm}
+            onChange={(v) => {
+              setCbm(v);
+              setCbmTyped(v.trim() !== "");
+            }}
+            hint={cbmTyped ? undefined : autoCbm ? `Worked out from the box sizes${unsizedBoxes ? " — TVs not included" : ""}` : undefined}
+          />
+        )}
       </div>
 
       {formError && <p className="mt-3 text-xs font-medium text-attention-foreground">{formError}</p>}

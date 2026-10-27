@@ -219,7 +219,7 @@ export interface BookingEditData {
 }
 
 export interface BookingDetailsUpdate {
-  items?: { type: string; qty: number; sizes?: string[]; dims?: { l: number; w: number; h: number }[] }[];
+  items?: { type: string; qty: number; sizes?: string[]; dims?: { l: number; w: number; h: number; kg?: number }[] }[];
   deliveryType?: string;
   sender?: Omit<DeclarationPerson, "town" | "idNumber">;
   receiver?: DeclarationPerson;
