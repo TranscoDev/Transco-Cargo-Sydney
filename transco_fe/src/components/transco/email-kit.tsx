@@ -485,14 +485,14 @@ function ThreadList({ items }: { items: ThreadItem[] }) {
   const shown = showAll ? items : [items[0]!, ...items.slice(-2)];
 
   return (
-    <ol className="flex flex-col gap-2">
+    <ol className="flex min-w-0 flex-col gap-2">
       {shown.map((it, i) => {
         const isOpen = open.has(it.id);
         const reply = it.kind === "reply";
         const who = reply ? it.fromName || it.fromAddress : it.sentByName;
         const when = fmtSentAt(reply ? it.receivedAt : it.sentAt);
         return (
-          <li key={it.id} className="flex flex-col gap-2">
+          <li key={it.id} className="flex min-w-0 flex-col gap-2">
             {i === 1 && hidden > 0 && (
               <button
                 type="button"
@@ -502,7 +502,7 @@ function ThreadList({ items }: { items: ThreadItem[] }) {
                 {hidden} earlier {hidden === 1 ? "message" : "messages"}
               </button>
             )}
-            <div className={cn("rounded-lg border", reply ? "mr-6 border-primary/30 bg-primary/5" : "ml-6 bg-secondary/30")}>
+            <div className={cn("min-w-0 rounded-lg border", reply ? "mr-6 border-primary/30 bg-primary/5" : "ml-6 bg-secondary/30")}>
               <button type="button" onClick={() => toggle(it.id)} aria-expanded={isOpen} className="flex w-full items-baseline gap-2 px-3 py-2 text-left">
                 <strong className="shrink-0 text-xs text-foreground">
                   {reply ? "↩ " : ""}
@@ -521,7 +521,7 @@ function ThreadList({ items }: { items: ThreadItem[] }) {
                   {when}
                 </span>
               </button>
-              {isOpen && <div className="whitespace-pre-wrap px-3 pb-3 text-sm leading-relaxed text-foreground">{it.body}</div>}
+              {isOpen && <div className="whitespace-pre-wrap wrap-break-word px-3 pb-3 text-sm leading-relaxed text-foreground">{it.body}</div>}
             </div>
           </li>
         );
@@ -553,7 +553,7 @@ export function EmailView({ email, onClose }: { email: SentEmail | null; onClose
   return (
     <>
       <Dialog open={!!email && !replying} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-2xl">
           {email && (
             <>
               <DialogHeader>
