@@ -41,7 +41,10 @@ const { getDb, settings, customers, messages, bookings } = require('./db');
 const pii = require('./pii');
 const agent = require('./agentAnswer');
 
-const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'openid', 'email'];
+// readonly: to pick up customers' replies to emails sent from the CRM
+// (only threads we started are ever stored — see pollGmailReplies).
+const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/gmail.readonly', 'openid', 'email'];
+const REPLY_POLL_MS = 2 * 60 * 1000;
 const BACKEND_URL = (process.env.PUBLIC_BACKEND_URL || process.env.MEDIA_BASE_URL || 'https://transco-backend-production.up.railway.app').replace(/\/+$/, '');
 const CONSOLE_URL = (process.env.CONSOLE_URL || 'https://transco-console.transcocargo.workers.dev').replace(/\/+$/, '');
 const GMAIL_REDIRECT = `${BACKEND_URL}/api/email-oauth/gmail/callback`;
@@ -50,6 +53,7 @@ const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 const CHECK_RE = /\[check[^\]]*\]/i;
 
 const sentEmails = () => getDb().collection('sentEmails');
+const emailReplies = () => getDb().collection('emailReplies');
 // Pasted keys often carry a stray space or line break.
 const env = name => String(process.env[name] || '').trim();
 const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -115,7 +119,7 @@ async function gmailAccessToken() {
 // RFC 2047 for non-ASCII headers (names, subjects in Sinhala/Tamil).
 const encodeHeader = s => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s, 'utf8').toString('base64')}?=`);
 
-function buildMime({ from, to, cc, subject, textBody, htmlBody }) {
+function buildMime({ from, to, cc, subject, textBody, htmlBody, inReplyTo }) {
   const boundary = 'tc_' + crypto.randomBytes(12).toString('hex');
   const b64 = s => Buffer.from(s, 'utf8').toString('base64').replace(/.{76}/g, '$&\r\n');
   return [
@@ -123,6 +127,8 @@ function buildMime({ from, to, cc, subject, textBody, htmlBody }) {
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: ${encodeHeader(subject)}`,
+    // Keeps a reply in the customer's thread in their email app.
+    ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`, `References: ${inReplyTo}`] : []),
     'MIME-Version: 1.0',
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     '',
@@ -147,10 +153,132 @@ async function sendViaGmail(mail) {
   const raw = buildMime({ ...mail, from: `${encodeHeader(SENDER_NAME)} <${account.email}>` });
   const r = await axios.post(
     'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
-    { raw: Buffer.from(raw, 'utf8').toString('base64url') },
+    { raw: Buffer.from(raw, 'utf8').toString('base64url'), ...(mail.threadId ? { threadId: mail.threadId } : {}) },
     { headers: { Authorization: `Bearer ${token}` }, timeout: 20000 }
   );
-  return { fromAddress: account.email, providerId: r.data?.id || null };
+  return { fromAddress: account.email, providerId: r.data?.id || null, threadId: r.data?.threadId || null };
+}
+
+// ---------- Gmail replies ----------
+//
+// Every 2 minutes: the newest inbox messages not sent by us. Only those in
+// a thread the CRM started (sentEmails.threadId) are stored — the rest of
+// the inbox (booking notifications, private mail) is never saved.
+
+const header = (msg, name) => {
+  const h = (msg.payload?.headers || []).find(x => x.name.toLowerCase() === name.toLowerCase());
+  return h ? h.value : '';
+};
+
+function partText(part, mime) {
+  if (!part) return '';
+  if (part.mimeType === mime && part.body?.data) return Buffer.from(part.body.data, 'base64url').toString('utf8');
+  for (const p of part.parts || []) {
+    const t = partText(p, mime);
+    if (t) return t;
+  }
+  return '';
+}
+
+function htmlToText(html) {
+  return html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|tr|h\d)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"');
+}
+
+// The reply without the quoted email underneath ("On Mon, … wrote:").
+function withoutQuote(text) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const cut = lines.findIndex((l, i) =>
+    /^On .+wrote:\s*$/i.test(l.trim()) ||
+    (/^On .+/i.test(l.trim()) && /wrote:\s*$/i.test((lines[i + 1] || '').trim())) ||
+    /^-{2,}\s*Original Message\s*-{2,}/i.test(l.trim()) ||
+    /^From: .+/i.test(l.trim()) && /^(Sent|Date): /i.test((lines[i + 1] || '').trim())
+  );
+  const kept = (cut > 0 ? lines.slice(0, cut) : lines).filter(l => !/^>/.test(l.trim()));
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+const addressOnly = from => {
+  const m = String(from).match(/<([^>]+)>/);
+  return (m ? m[1] : String(from)).trim().toLowerCase();
+};
+const nameOnly = from => {
+  const m = String(from).match(/^\s*"?([^"<]+?)"?\s*</);
+  return m ? m[1].trim() : null;
+};
+
+let polling = false;
+async function pollGmailReplies(broadcast) {
+  if (polling) return;
+  const account = await gmailAccount();
+  if (!account || account.broken || !account.canRead) return;
+  polling = true;
+  try {
+    const token = await gmailAccessToken();
+    const api = (path, params) => axios.get(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, { headers: { Authorization: `Bearer ${token}` }, params, timeout: 20000 });
+
+    // Older sent emails (before read access) — look their thread up once.
+    const missing = await sentEmails().find({ account: 'gmail', providerId: { $ne: null }, threadId: { $exists: false } }).limit(20).toArray();
+    for (const s of missing) {
+      try {
+        const r = await api(`messages/${s.providerId}`, { format: 'minimal' });
+        await sentEmails().updateOne({ _id: s._id }, { $set: { threadId: r.data.threadId || null } });
+      } catch {
+        await sentEmails().updateOne({ _id: s._id }, { $set: { threadId: null } });
+      }
+    }
+
+    const list = await api('messages', { q: '-from:me newer_than:3d', maxResults: 50 });
+    const found = list.data.messages || [];
+    if (!found.length) return;
+    const threadIds = [...new Set(found.map(m => m.threadId))];
+    const ours = await sentEmails().find({ threadId: { $in: threadIds } }).sort({ sentAt: 1 }).toArray();
+    if (!ours.length) return;
+    const firstByThread = new Map();
+    for (const s of ours) if (!firstByThread.has(s.threadId)) firstByThread.set(s.threadId, s);
+    const known = new Set((await emailReplies().find({ gmailId: { $in: found.map(m => m.id) } }, { projection: { gmailId: 1 } }).toArray()).map(r => r.gmailId));
+
+    for (const m of found) {
+      const sent = firstByThread.get(m.threadId);
+      if (!sent || known.has(m.id)) continue;
+      const r = await api(`messages/${m.id}`, { format: 'full' });
+      const msg = r.data;
+      const raw = partText(msg.payload, 'text/plain') || htmlToText(partText(msg.payload, 'text/html')) || msg.snippet || '';
+      const from = header(msg, 'From');
+      const doc = {
+        gmailId: msg.id,
+        threadId: msg.threadId,
+        messageId: header(msg, 'Message-ID') || header(msg, 'Message-Id') || null,
+        sentEmailId: String(sent._id),
+        account: 'gmail',
+        fromAddress: addressOnly(from),
+        fromName: nameOnly(from),
+        subject: header(msg, 'Subject') || sent.subject,
+        body: withoutQuote(raw).slice(0, 20000) || raw.slice(0, 20000),
+        customerId: sent.customerId || null,
+        customerName: sent.customerName || null,
+        bookingId: sent.bookingId || null,
+        receivedAt: new Date(Number(msg.internalDate) || Date.now()),
+        read: false,
+        readByName: null
+      };
+      await emailReplies().updateOne({ gmailId: doc.gmailId }, { $setOnInsert: doc }, { upsert: true });
+      if (broadcast) broadcast('email.reply', { threadId: doc.threadId, customerId: doc.customerId });
+    }
+  } catch (err) {
+    console.error('Gmail reply check failed:', err.response?.status || '', err.response?.data?.error?.message || err.message);
+  } finally {
+    polling = false;
+  }
 }
 
 // ---------- Outlook (Microsoft Graph) ----------
@@ -210,6 +338,8 @@ async function accountStatus(isAdmin) {
       address: gmail ? gmail.email : null,
       connectedBy: gmail ? gmail.connectedBy || null : null,
       connectedAt: gmail ? gmail.connectedAt || null : null,
+      // Connected before read access was asked for → Reconnect to see replies.
+      canRead: Boolean(gmail && gmail.canRead),
       // Admins always; everyone else only while Outlook isn't connected.
       usable: gmailOn && (isAdmin || !outlookOn),
       adminOnly: outlookOn
@@ -245,8 +375,44 @@ function shape(doc) {
     sentById: doc.sentById,
     sentByName: doc.sentByName,
     aiDrafted: Boolean(doc.aiDrafted),
-    sentAt: doc.sentAt
+    sentAt: doc.sentAt,
+    threadId: doc.threadId || null,
+    replies: doc.replies || 0,
+    unreadReplies: doc.unreadReplies || 0,
+    lastReplyAt: doc.lastReplyAt || null
   };
+}
+
+function shapeReply(doc) {
+  return {
+    id: String(doc._id),
+    threadId: doc.threadId,
+    fromAddress: doc.fromAddress,
+    fromName: doc.fromName || null,
+    subject: doc.subject,
+    body: doc.body,
+    customerId: doc.customerId || null,
+    customerName: doc.customerName || null,
+    receivedAt: doc.receivedAt,
+    read: Boolean(doc.read),
+    readByName: doc.readByName || null
+  };
+}
+
+// Adds reply counts to sent emails (one row per thread on the list:
+// the first email we sent in it).
+async function withReplyCounts(list) {
+  const threads = [...new Set(list.map(e => e.threadId).filter(Boolean))];
+  if (!threads.length) return list;
+  const counts = await emailReplies().aggregate([
+    { $match: { threadId: { $in: threads } } },
+    { $group: { _id: '$threadId', n: { $sum: 1 }, unread: { $sum: { $cond: ['$read', 0, 1] } }, last: { $max: '$receivedAt' } } }
+  ]).toArray();
+  const byThread = new Map(counts.map(c => [c._id, c]));
+  return list.map(e => {
+    const c = e.threadId && byThread.get(e.threadId);
+    return c ? { ...e, replies: c.n, unreadReplies: c.unread, lastReplyAt: c.last } : e;
+  });
 }
 
 const lastDigits = p => String(p || '').replace(/\D/g, '').slice(-9);
@@ -313,6 +479,11 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
   const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
   const me = req => ({ id: String(req.user.sub), name: String(req.user.name || req.user.email || 'Staff').trim() });
 
+  const timer = setInterval(() => {
+    pollGmailReplies(broadcast).catch(err => console.error('Gmail reply check failed:', err.message));
+  }, REPLY_POLL_MS);
+  if (timer.unref) timer.unref();
+
   async function allowedAccounts(req) {
     const status = await accountStatus(await isStaffAdmin(req));
     return { status, allowed: ['outlook', 'gmail'].filter(a => status[a].usable) };
@@ -373,7 +544,17 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
       } catch { /* shown as unknown */ }
       await settings().updateOne(
         { _id: 'gmailAccount' },
-        { $set: { email, refreshToken: pii.seal(refreshToken), connectedBy: state.by, connectedById: state.byId, connectedAt: new Date(), broken: false } },
+        {
+          $set: {
+            email,
+            refreshToken: pii.seal(refreshToken),
+            canRead: String(scope || '').includes('gmail.readonly'),
+            connectedBy: state.by,
+            connectedById: state.byId,
+            connectedAt: new Date(),
+            broken: false
+          }
+        },
         { upsert: true }
       );
       gmailToken = null;
@@ -404,8 +585,48 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
       const re = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
       query.$or = [{ subject: re }, { to: re }, { customerName: re }, { body: re }];
     }
-    const list = await sentEmails().find(query).sort({ sentAt: -1 }).limit(300).toArray();
-    res.json({ emails: list.map(shape) });
+    // Replies sent from the CRM show inside their thread, not as rows.
+    query.isReply = { $ne: true };
+    const list = await withReplyCounts((await sentEmails().find(query).sort({ sentAt: -1 }).limit(300).toArray()).map(shape));
+    const latest = e => new Date(e.lastReplyAt && e.lastReplyAt > e.sentAt ? e.lastReplyAt : e.sentAt).getTime();
+    list.sort((a, b) => latest(b) - latest(a));
+    res.json({ emails: list });
+  }));
+
+  // Unread customer replies (the Emails menu badge).
+  router.get('/unread', wrap(async (req, res) => {
+    const isAdmin = await isStaffAdmin(req);
+    const { allowed } = await allowedAccounts(req);
+    if (!isAdmin && !allowed.includes('gmail')) return res.json({ count: 0 });
+    res.json({ count: await emailReplies().countDocuments({ read: false }) });
+  }));
+
+  // One conversation: what we sent + the customer's replies, oldest first.
+  // Opening it marks the replies read (for everyone).
+  router.get('/:id/thread', wrap(async (req, res) => {
+    if (!ObjectId.isValid(req.params.id)) return res.status(404).json({ error: 'Email not found' });
+    const first = await sentEmails().findOne({ _id: new ObjectId(req.params.id) });
+    if (!first) return res.status(404).json({ error: 'Email not found' });
+    const isAdmin = await isStaffAdmin(req);
+    const { allowed } = await allowedAccounts(req);
+    if (!isAdmin && !allowed.includes(first.account)) return res.status(403).json({ error: 'You can\'t open emails from this account.' });
+    const sent = first.threadId ? await sentEmails().find({ threadId: first.threadId }).toArray() : [first];
+    const replies = first.threadId ? await emailReplies().find({ threadId: first.threadId }).toArray() : [];
+    const items = [
+      ...sent.map(s => ({ kind: 'sent', at: s.sentAt, ...shape(s) })),
+      ...replies.map(r => ({ kind: 'reply', at: r.receivedAt, ...shapeReply(r) }))
+    ].sort((a, b) => new Date(a.at) - new Date(b.at));
+    if (replies.some(r => !r.read)) {
+      await emailReplies().updateMany({ threadId: first.threadId, read: false }, { $set: { read: true, readByName: me(req).name, readAt: new Date() } });
+      if (broadcast) broadcast('email.reply', { threadId: first.threadId, customerId: first.customerId || null });
+    }
+    res.json({ email: shape(first), items });
+  }));
+
+  // "Check now" on the Emails page.
+  router.post('/check-replies', wrap(async (req, res) => {
+    await pollGmailReplies(broadcast);
+    res.json({ success: true });
   }));
 
   router.get('/recipients', wrap(async (req, res) => {
@@ -457,7 +678,32 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
       booking = await bookings().findOne({ _id: new ObjectId(body.bookingId) }, { projection: { bookingCode: 1 } });
     }
 
-    const mail = { to: to.value, cc: cc.value || '', subject, textBody: message, htmlBody: toHtml(message) };
+    // Answering a thread: same account, same thread, linked like the first email.
+    let thread = null;
+    if (typeof body.threadOf === 'string' && ObjectId.isValid(body.threadOf)) {
+      thread = await sentEmails().findOne({ _id: new ObjectId(body.threadOf) });
+      if (!thread) return res.status(404).json({ error: 'The original email wasn\'t found.' });
+      if (thread.account !== account) return res.status(400).json({ error: `Reply from ${thread.account === 'gmail' ? 'Gmail' : 'Outlook'}, the same address as the first email.` });
+      if (!customer && thread.customerId && ObjectId.isValid(thread.customerId)) {
+        customer = await customers().findOne({ _id: new ObjectId(thread.customerId) }, { projection: { name: 1 } });
+      }
+      if (!booking && thread.bookingId && ObjectId.isValid(thread.bookingId)) {
+        booking = await bookings().findOne({ _id: new ObjectId(thread.bookingId) }, { projection: { bookingCode: 1 } });
+      }
+    }
+    const lastReply = thread && thread.threadId
+      ? await emailReplies().find({ threadId: thread.threadId, messageId: { $ne: null } }).sort({ receivedAt: -1 }).limit(1).next()
+      : null;
+
+    const mail = {
+      to: to.value,
+      cc: cc.value || '',
+      subject,
+      textBody: message,
+      htmlBody: toHtml(message),
+      threadId: thread ? thread.threadId || undefined : undefined,
+      inReplyTo: lastReply ? lastReply.messageId : undefined
+    };
     let result;
     try {
       result = account === 'gmail' ? await sendViaGmail(mail) : await sendViaOutlook(mail);
@@ -483,7 +729,9 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
       sentById: who.id,
       sentByName: who.name,
       aiDrafted: Boolean(body.aiDrafted),
-      sentAt: new Date()
+      sentAt: new Date(),
+      threadId: result.threadId || (thread ? thread.threadId || null : null),
+      isReply: Boolean(thread)
     };
     const { insertedId } = await sentEmails().insertOne(doc);
     const email = shape({ ...doc, _id: insertedId });
@@ -519,6 +767,20 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
         .filter(m => m.content)
         .map(m => `${m.senderType === 'CUSTOMER' ? 'Customer' : 'Transco'}: ${String(m.content).slice(0, 700)}`)
         .join('\n');
+    }
+    // Answering an email thread: the emails so far are the conversation.
+    if (typeof body.threadOf === 'string' && ObjectId.isValid(body.threadOf)) {
+      const first = await sentEmails().findOne({ _id: new ObjectId(body.threadOf) });
+      if (first && first.threadId) {
+        const sent = await sentEmails().find({ threadId: first.threadId }).toArray();
+        const replies = await emailReplies().find({ threadId: first.threadId }).toArray();
+        chat = [
+          ...sent.map(s => ({ at: s.sentAt, line: `Transco (email): ${String(s.body).slice(0, 1500)}` })),
+          ...replies.map(r => ({ at: r.receivedAt, line: `Customer (email): ${String(r.body).slice(0, 1500)}` }))
+        ].sort((a, b) => new Date(a.at) - new Date(b.at)).slice(-10).map(x => x.line).join('\n\n');
+        if (!body.customerId && first.customerId) body.customerId = first.customerId;
+        if (!body.bookingId && first.bookingId) body.bookingId = first.bookingId;
+      }
     }
     if (!image && !chat) return res.status(400).json({ error: 'Add a screenshot, or open this from a chat with messages.' });
 

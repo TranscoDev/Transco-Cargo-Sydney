@@ -5,9 +5,11 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingRows, PageHeader, PageShell, StatusBadge } from "@/components/transco/page-kit";
-import { ComposeEmailDialog, EmailView, fmtSentAt } from "@/components/transco/email-kit";
+import { ComposeEmailDialog, EmailView, fmtSentAt, RepliesTag } from "@/components/transco/email-kit";
+import { cn } from "@/lib/utils";
 import {
   accountLabel,
+  checkReplies,
   disconnectGmail,
   EmailError,
   fetchEmailAccounts,
@@ -55,8 +57,26 @@ function EmailsPage() {
   useEffect(() => {
     load();
     window.addEventListener("transco:emails-changed", load);
-    return () => window.removeEventListener("transco:emails-changed", load);
+    window.addEventListener("transco:email-replies-read", load);
+    // New replies are picked up every 2 minutes on the server.
+    const t = window.setInterval(load, 60 * 1000);
+    return () => {
+      window.removeEventListener("transco:emails-changed", load);
+      window.removeEventListener("transco:email-replies-read", load);
+      window.clearInterval(t);
+    };
   }, [load]);
+
+  const checkNow = async () => {
+    try {
+      await checkReplies();
+      load();
+      window.dispatchEvent(new Event("transco:email-replies-read"));
+      toast.success("Checked for replies");
+    } catch (err) {
+      toast.error(err instanceof EmailError ? err.message : "Couldn't check right now.");
+    }
+  };
 
   // Back from Google's "Connect Gmail" screen.
   useEffect(() => {
@@ -113,9 +133,16 @@ function EmailsPage() {
         title="Emails"
         description="Every email sent to customers from the console."
         actions={
-          <Button type="button" onClick={() => setComposing(true)}>
-            <Mail className="mr-1 h-4 w-4" aria-hidden /> New email
-          </Button>
+          <div className="flex gap-2">
+            {accounts?.gmail.canRead && (
+              <Button type="button" variant="outline" onClick={() => void checkNow()}>
+                Check for replies
+              </Button>
+            )}
+            <Button type="button" onClick={() => setComposing(true)}>
+              <Mail className="mr-1 h-4 w-4" aria-hidden /> New email
+            </Button>
+          </div>
         }
       />
 
@@ -149,6 +176,12 @@ function EmailsPage() {
                   <StatusBadge tone="pending">Not connected</StatusBadge>
                 )}
                 <span className="text-xs text-muted-foreground">{accounts.gmail.adminOnly ? "Admin only" : "Everyone, until Outlook is connected"}</span>
+                {accounts.gmail.connected &&
+                  (accounts.gmail.canRead ? (
+                    <span className="text-xs text-success-foreground">· Replies shown here</span>
+                  ) : (
+                    <span className="text-xs font-medium text-attention-foreground">· {accounts.isAdmin ? "Press Reconnect to see customer replies" : "Replies not connected yet"}</span>
+                  ))}
                 {accounts.isAdmin && (
                   <span className="ml-auto flex gap-2">
                     {accounts.gmail.configured ? (
@@ -229,7 +262,11 @@ function EmailsPage() {
             </thead>
             <tbody>
               {rows.map((e) => (
-                <tr key={e.id} onClick={() => setOpen(e)} className="cursor-pointer border-b last:border-0 hover:bg-secondary/40">
+                <tr
+                  key={e.id}
+                  onClick={() => setOpen(e)}
+                  className={cn("cursor-pointer border-b last:border-0 hover:bg-secondary/40", e.unreadReplies > 0 && "bg-primary/5 font-semibold")}
+                >
                   <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-muted-foreground">{fmtSentAt(e.sentAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
                     {accountLabel(e.account)} · {e.sentByName.split(/\s+/)[0]}
@@ -243,6 +280,7 @@ function EmailsPage() {
                       {e.subject}
                     </button>
                     {e.aiDrafted && <Sparkles className="ml-1 inline h-3.5 w-3.5 text-muted-foreground" aria-label="AI draft" />}
+                    <RepliesTag email={e} />
                   </td>
                 </tr>
               ))}

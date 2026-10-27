@@ -21,6 +21,39 @@ export interface SentEmail {
   sentByName: string;
   aiDrafted: boolean;
   sentAt: string;
+  threadId: string | null;
+  replies: number;
+  unreadReplies: number;
+  lastReplyAt: string | null;
+}
+
+export interface EmailReply {
+  id: string;
+  threadId: string;
+  fromAddress: string;
+  fromName: string | null;
+  subject: string;
+  body: string;
+  receivedAt: string;
+  read: boolean;
+  readByName: string | null;
+}
+
+export type ThreadItem = ({ kind: "sent" } & SentEmail) | ({ kind: "reply" } & EmailReply);
+
+export function fetchThread(id: string): Promise<{ email: SentEmail; items: ThreadItem[] }> {
+  return request<{ email: SentEmail; items: ThreadItem[] }>("GET", `/${id}/thread`).then((d) => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("transco:email-replies-read"));
+    return d;
+  });
+}
+
+export function fetchUnreadReplies(): Promise<{ count: number }> {
+  return request("GET", "/unread");
+}
+
+export function checkReplies(): Promise<{ success: true }> {
+  return request("POST", "/check-replies", {});
 }
 
 export interface EmailAccounts {
@@ -36,6 +69,7 @@ export interface EmailAccounts {
     connectedAt: string | null;
     usable: boolean;
     adminOnly: boolean;
+    canRead: boolean;
   };
 }
 
@@ -118,6 +152,8 @@ export interface SendEmailInput {
   customerName?: string | null | undefined;
   bookingId?: string | null | undefined;
   aiDrafted?: boolean;
+  /** Answering this sent email's thread. */
+  threadOf?: string | undefined;
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<SentEmail> {
@@ -132,6 +168,7 @@ export function draftEmail(input: {
   bookingId?: string | null | undefined;
   image?: string | null;
   note?: string;
+  threadOf?: string | undefined;
 }): Promise<EmailDraft> {
   return request("POST", "/draft", input);
 }

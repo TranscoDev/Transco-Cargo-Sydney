@@ -40,6 +40,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { mergeSummaries } from "@/lib/transco/merge-conversations";
 import { useTodayBookingCount } from "@/components/transco/bookings-panel";
+import { useUnreadEmailReplies } from "@/components/transco/email-kit";
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { cn } from "@/lib/utils";
@@ -69,7 +70,7 @@ export interface NavLeaf {
   to: string;
   icon: LucideIcon;
   /** Shows a live count: waiting conversations, walk-ins to confirm, or my open tasks. */
-  badge?: "conversations" | "walkIns" | "tasks" | "bookings";
+  badge?: "conversations" | "walkIns" | "tasks" | "bookings" | "emails";
   /** Only for the admin (checked again by the backend). */
   adminOnly?: boolean;
 }
@@ -88,7 +89,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Tasks", to: "/console/tasks", icon: ListTodo, badge: "tasks" },
       { label: "Conversations", to: "/console/conversations", icon: MessageCircle, badge: "conversations" },
       { label: "Customers", to: "/console/customers", icon: Users },
-      { label: "Emails", to: "/console/emails", icon: Mail },
+      { label: "Emails", to: "/console/emails", icon: Mail, badge: "emails" },
       { label: "Bookings", to: "/console/bookings", icon: CalendarClock, badge: "bookings" },
       { label: "Shipments", to: "/console/shipments", icon: Ship },
     ],
@@ -196,6 +197,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const walkIns = useWalkInsToConfirm();
   // Today's bookings.
   const bookingsToday = useTodayBookingCount();
+  // New customer replies to our emails.
+  const emailReplies = useUnreadEmailReplies();
   const { tasks: myTasks, isAdmin } = useMyTaskCount();
   // Only the pages this login may open (Settings → Staff → page access);
   // limited logins don't see the "Coming later" group either.
@@ -261,6 +264,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   : item.badge === "walkIns" ? walkIns
                   : item.badge === "tasks" ? myTasks
                   : item.badge === "bookings" ? bookingsToday
+                  : item.badge === "emails" ? emailReplies
                   : 0;
                 return (
                   <li key={item.to}>

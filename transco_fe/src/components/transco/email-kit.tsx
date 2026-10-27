@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { ImageUp, Mail, Sparkles, UserRound, X } from "lucide-react";
+import { ImageUp, Mail, Reply, Sparkles, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,15 @@ import {
   fetchEmailAccounts,
   fetchEmails,
   fetchRecipients,
+  fetchThread,
+  fetchUnreadReplies,
   fillTemplate,
   sendEmail,
   type EmailAccount,
   type EmailAccounts,
   type EmailRecipient,
   type SentEmail,
+  type ThreadItem,
 } from "@/lib/transco/emails";
 
 const fieldClass =
@@ -55,7 +58,25 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
-export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; onClose: () => void; about?: EmailAbout | undefined }) {
+/** Answering an email thread — same account, same thread. */
+export interface EmailReplyTo {
+  threadOf: string;
+  account: EmailAccount;
+  to: string;
+  subject: string;
+}
+
+export function ComposeEmailDialog({
+  open,
+  onClose,
+  about,
+  reply,
+}: {
+  open: boolean;
+  onClose: () => void;
+  about?: EmailAbout | undefined;
+  reply?: EmailReplyTo | undefined;
+}) {
   const [accounts, setAccounts] = useState<EmailAccounts | null>(null);
   const [account, setAccount] = useState<EmailAccount>("outlook");
   const [to, setTo] = useState("");
@@ -94,10 +115,13 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
     loadAccounts(true)
       .then((a) => {
         setAccounts(a);
-        setAccount(a.outlook.usable ? "outlook" : "gmail");
+        setAccount(reply ? reply.account : a.outlook.usable ? "outlook" : "gmail");
       })
       .catch(() => setAccounts(null));
-    if (about?.customerId) {
+    if (reply) {
+      setTo(reply.to);
+      setSubject(/^re:/i.test(reply.subject) ? reply.subject : `Re: ${reply.subject}`);
+    } else if (about?.customerId) {
       fetchRecipients({ customerId: about.customerId })
         .then(({ recipients }) => {
           const r = recipients[0];
@@ -107,7 +131,8 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
         })
         .catch(() => setNoEmailOnFile(true));
     }
-  }, [open, about?.customerId, about?.customerName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, about?.customerId, about?.customerName, reply?.threadOf]);
 
   // Customer search while typing in "To" (only when not already attached).
   useEffect(() => {
@@ -125,7 +150,7 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
 
   const usable: EmailAccount[] = accounts ? (["outlook", "gmail"] as const).filter((a) => accounts[a].usable) : [];
   const checksLeft = CHECK_RE.test(subject) || CHECK_RE.test(body);
-  const canChat = (about?.chatCustomerIds?.length ?? 0) > 0;
+  const canChat = (about?.chatCustomerIds?.length ?? 0) > 0 || !!reply;
 
   const applyTemplate = (key: string) => {
     const t = EMAIL_TEMPLATES.find((x) => x.key === key);
@@ -148,6 +173,7 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
         bookingId: about?.bookingId ?? null,
         image: fromShot ? shot : null,
         ...(note.trim() ? { note: note.trim() } : {}),
+        threadOf: !fromShot && reply ? reply.threadOf : undefined,
       });
       setSubject(d.subject);
       setBody(d.body);
@@ -197,6 +223,7 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
         customerName: name,
         bookingId: about?.bookingId ?? null,
         aiDrafted,
+        threadOf: reply?.threadOf,
       });
       toast.success("Email sent ✓");
       onClose();
@@ -211,7 +238,7 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl" onPaste={onPaste}>
         <DialogHeader>
-          <DialogTitle>New email</DialogTitle>
+          <DialogTitle>{reply ? "Reply" : "New email"}</DialogTitle>
           <DialogDescription>Nothing is sent until you press Send.</DialogDescription>
         </DialogHeader>
 
@@ -232,7 +259,7 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
               <label htmlFor="em-from" className="text-sm font-semibold text-foreground">
                 From
               </label>
-              <select id="em-from" value={account} onChange={(e) => setAccount(e.target.value as EmailAccount)} className={fieldClass} disabled={!accounts}>
+              <select id="em-from" value={account} onChange={(e) => setAccount(e.target.value as EmailAccount)} className={fieldClass} disabled={!accounts || !!reply}>
                 {!accounts && <option>Loading…</option>}
                 {usable.map((a) => (
                   <option key={a} value={a}>
@@ -325,7 +352,7 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
                 </select>
                 {accounts?.aiDrafts && canChat && (
                   <Button type="button" variant="outline" size="sm" disabled={drafting} onClick={() => void runDraft(false)}>
-                    <Sparkles className="mr-1 h-4 w-4" aria-hidden /> {drafting && !shot ? "Writing…" : "Draft from this chat"}
+                    <Sparkles className="mr-1 h-4 w-4" aria-hidden /> {drafting && !shot ? "Writing…" : reply ? "Draft a reply" : "Draft from this chat"}
                   </Button>
                 )}
                 {accounts?.aiDrafts && (
@@ -434,47 +461,146 @@ export function fmtSentAt(iso: string) {
   return new Date(iso).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
+/** One email conversation: what we sent and the customer's replies, with Reply. */
 export function EmailView({ email, onClose }: { email: SentEmail | null; onClose: () => void }) {
+  const [items, setItems] = useState<ThreadItem[] | null>(null);
+  const [replying, setReplying] = useState(false);
+  const id = email?.id;
+
+  useEffect(() => {
+    if (!id) return;
+    setItems(null);
+    const load = () =>
+      fetchThread(id)
+        .then((d) => setItems(d.items))
+        .catch(() => setItems([]));
+    void load();
+    window.addEventListener("transco:emails-changed", load);
+    return () => window.removeEventListener("transco:emails-changed", load);
+  }, [id]);
+
+  const lastReply = [...(items ?? [])].reverse().find((i) => i.kind === "reply");
+
   return (
-    <Dialog open={!!email} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        {email && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="pr-6 text-left">{email.subject}</DialogTitle>
-              <DialogDescription className="text-left">
-                {fmtSentAt(email.sentAt)} · {accountLabel(email.account)} · sent by {email.sentByName}
-                {email.aiDrafted ? " · AI draft" : ""}
-              </DialogDescription>
-            </DialogHeader>
-            <dl className="grid grid-cols-[4rem_1fr] gap-x-2 gap-y-1 text-sm">
-              <dt className="text-muted-foreground">From</dt>
-              <dd className="break-all">{email.fromAddress}</dd>
-              <dt className="text-muted-foreground">To</dt>
-              <dd className="break-all">{email.to}</dd>
-              {email.cc && (
-                <>
-                  <dt className="text-muted-foreground">Cc</dt>
-                  <dd className="break-all">{email.cc}</dd>
-                </>
+    <>
+      <Dialog open={!!email && !replying} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          {email && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="pr-6 text-left">{email.subject}</DialogTitle>
+                <DialogDescription className="text-left">
+                  {accountLabel(email.account)} · {email.fromAddress}
+                </DialogDescription>
+              </DialogHeader>
+              {(email.customerId || email.bookingCode) && (
+                <div className="flex flex-wrap gap-3 text-sm">
+                  {email.customerId && (
+                    <Link to="/console/customers/$customerId" params={{ customerId: email.customerId }} className="font-medium text-primary hover:underline" onClick={onClose}>
+                      {email.customerName || "Customer"} →
+                    </Link>
+                  )}
+                  {email.bookingCode && <span className="text-muted-foreground">Booking {email.bookingCode}</span>}
+                </div>
               )}
-            </dl>
-            {(email.customerId || email.bookingCode) && (
-              <div className="flex flex-wrap gap-3 text-sm">
-                {email.customerId && (
-                  <Link to="/console/customers/$customerId" params={{ customerId: email.customerId }} className="font-medium text-primary hover:underline" onClick={onClose}>
-                    {email.customerName || "Customer"} →
-                  </Link>
-                )}
-                {email.bookingCode && <span className="text-muted-foreground">Booking {email.bookingCode}</span>}
-              </div>
-            )}
-            <div className="whitespace-pre-wrap rounded-lg border bg-secondary/30 p-3 text-sm leading-relaxed text-foreground">{email.body}</div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+
+              {!items ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <ol className="flex flex-col gap-3">
+                  {(items.length ? items : [{ kind: "sent" as const, ...email }]).map((it) => (
+                    <li
+                      key={it.id}
+                      className={cn(
+                        "rounded-lg border p-3",
+                        it.kind === "reply" ? "mr-6 border-primary/30 bg-primary/5" : "ml-6 bg-secondary/30",
+                      )}
+                    >
+                      <p className="mb-1.5 text-xs text-muted-foreground">
+                        {it.kind === "reply" ? (
+                          <>
+                            <strong className="text-foreground">↩ {it.fromName || it.fromAddress}</strong> replied · {fmtSentAt(it.receivedAt)}
+                            {!it.read && " · new"}
+                          </>
+                        ) : (
+                          <>
+                            <strong className="text-foreground">{it.sentByName}</strong> sent · {fmtSentAt(it.sentAt)} · to {it.to}
+                            {it.cc ? ` · cc ${it.cc}` : ""}
+                            {it.aiDrafted ? " · ✨ AI draft" : ""}
+                          </>
+                        )}
+                      </p>
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{it.body}</div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Close
+                </Button>
+                <Button type="button" onClick={() => setReplying(true)}>
+                  <Reply className="mr-1 h-4 w-4" aria-hidden /> Reply
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      {email && (
+        <ComposeEmailDialog
+          open={replying}
+          onClose={() => setReplying(false)}
+          about={{ customerId: email.customerId, customerName: email.customerName, bookingId: email.bookingId, bookingCode: email.bookingCode }}
+          reply={{
+            threadOf: email.id,
+            account: email.account,
+            to: lastReply && lastReply.kind === "reply" ? lastReply.fromAddress : email.to,
+            subject: email.subject,
+          }}
+        />
+      )}
+    </>
   );
+}
+
+/** "↩ 2 replies" on an email row — bold when some are new. */
+export function RepliesTag({ email }: { email: SentEmail }) {
+  if (!email.replies) return null;
+  return (
+    <span
+      className={cn(
+        "ml-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-xs",
+        email.unreadReplies ? "bg-primary font-semibold text-primary-foreground" : "bg-secondary text-muted-foreground",
+      )}
+    >
+      ↩ {email.replies} {email.replies === 1 ? "reply" : "replies"}
+      {email.unreadReplies ? ` · ${email.unreadReplies} new` : ""}
+    </span>
+  );
+}
+
+/** Unread customer email replies — the Emails menu badge. */
+export function useUnreadEmailReplies() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!canSee("emails")) return;
+    let alive = true;
+    const load = () =>
+      fetchUnreadReplies()
+        .then((d) => alive && setCount(d.count))
+        .catch(() => {});
+    void load();
+    const t = window.setInterval(load, 60 * 1000);
+    window.addEventListener("transco:email-replies-read", load);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+      window.removeEventListener("transco:email-replies-read", load);
+    };
+  }, []);
+  return count;
 }
 
 /** Emails sent to this customer — on the customer profile. */
@@ -491,7 +617,11 @@ export function CustomerEmails({ customerIds }: { customerIds: string[] }) {
         .catch(() => setEmails([]));
     void load();
     window.addEventListener("transco:emails-changed", load);
-    return () => window.removeEventListener("transco:emails-changed", load);
+    window.addEventListener("transco:email-replies-read", load);
+    return () => {
+      window.removeEventListener("transco:emails-changed", load);
+      window.removeEventListener("transco:email-replies-read", load);
+    };
   }, [key]);
 
   if (!canSee("emails") || !key) return null;
@@ -507,7 +637,10 @@ export function CustomerEmails({ customerIds }: { customerIds: string[] }) {
           {emails.slice(0, 10).map((e) => (
             <li key={e.id}>
               <button type="button" onClick={() => setOpen(e)} className="flex w-full flex-col gap-0.5 py-2 text-left hover:bg-secondary/40">
-                <span className="text-sm font-medium text-foreground">✉ {e.subject}</span>
+                <span className="text-sm font-medium text-foreground">
+                  ✉ {e.subject}
+                  <RepliesTag email={e} />
+                </span>
                 <span className="text-xs text-muted-foreground">
                   {fmtSentAt(e.sentAt)} · {accountLabel(e.account)} · {e.sentByName}
                 </span>
