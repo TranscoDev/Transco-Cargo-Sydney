@@ -338,14 +338,14 @@ export function ComposeEmailDialog({ open, onClose, about }: { open: boolean; on
               {accounts?.aiDrafts && (
                 <>
                   {shot && (
-                    <div className="flex items-start gap-3">
-                      <img src={shot} alt="Chat screenshot" className="max-h-40 rounded border object-contain" />
-                      <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2">
+                      <img src={shot} alt="Chat screenshot" className="max-h-48 w-full rounded border bg-card object-contain" />
+                      <div className="flex items-center gap-3">
                         <Button type="button" size="sm" disabled={drafting} onClick={() => void runDraft(true)}>
                           <Sparkles className="mr-1 h-4 w-4" aria-hidden /> {drafting ? "Reading…" : "Write the email"}
                         </Button>
                         <button type="button" onClick={() => setShot(null)} className="text-xs text-muted-foreground hover:text-foreground">
-                          Remove
+                          Remove screenshot
                         </button>
                       </div>
                     </div>
