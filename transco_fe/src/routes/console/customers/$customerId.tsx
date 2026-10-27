@@ -33,6 +33,7 @@ import { notify, friendlyError } from "@/lib/transco/notify";
 import { bookingStatus, SENDER_LABEL, shipmentStatus } from "@/lib/transco/status";
 import { useConversations } from "@/lib/transco/store";
 import { NewTaskButton, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
+import { CustomerEmails, EmailButton } from "@/components/transco/email-kit";
 
 function ProfileTasksLine({ customerId }: { customerId: string }) {
   const tasks = useOpenTasksAbout({ customerIds: [customerId] });
@@ -172,6 +173,7 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
               context: [p.customerCode, formatPhone(p.phoneNumber), p.email].filter(Boolean).join(" · "),
             }}
           />
+          {!viewOnly && <EmailButton about={{ customerId: p.id, customerName: p.customerName, chatCustomerIds: [p.id] }} />}
           {!viewOnly && p.messages.length > 0 && (
             <Button type="button" onClick={openChat}>
               <MessageCircle className="mr-2 h-4 w-4" /> Open conversation
@@ -216,6 +218,12 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
           <p className="mt-4 text-sm text-muted-foreground">Nothing needs doing for this customer right now.</p>
         )}
       </section>
+
+      {!viewOnly && (
+        <div className="mb-8">
+          <CustomerEmails customerIds={[p.id]} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Bookings */}

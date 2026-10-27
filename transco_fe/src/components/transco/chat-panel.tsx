@@ -11,6 +11,7 @@ import { MessageComposer } from "./message-composer";
 import { ModeSwitch } from "./mode-switch";
 import { WarehouseStrip } from "./ask-warehouse";
 import { NewTaskButton } from "./task-kit";
+import { EmailButton } from "./email-kit";
 import { formatPhone } from "@/lib/transco/phone";
 
 function groupByDay(messages: Message[]) {
@@ -150,6 +151,15 @@ export function ChatPanel({
               context: [conversation.linkedAccount?.customerCode ?? conversation.customerCode, formatPhone(conversation.phoneNumber), "from chat"]
                 .filter(Boolean)
                 .join(" · "),
+            }}
+          />
+          <EmailButton
+            label="Email"
+            className="h-9 px-2.5"
+            about={{
+              customerId: profileId,
+              customerName: conversation.customerName,
+              chatCustomerIds: [...new Set([conversation.id, profileId])],
             }}
           />
           <ModeSwitch mode={conversation.mode} onChange={onModeChange} />

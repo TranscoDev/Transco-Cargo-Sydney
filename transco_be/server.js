@@ -201,6 +201,7 @@ const PUBLIC_API_PREFIXES = [
   '/auth/login',   // issues the token — can't require one to get one
   '/web-chat',     // public website chat widget, no staff session
   '/public/',      // read-only website data (e.g. the shipping calendar) — see scheduleRoutes.js
+  '/email-oauth/', // Google sends the browser back after "Connect Gmail" — checks its own signed state (emailRoutes.js)
   '/portal/'       // My Transco — applies its own CUSTOMER auth (portalRoutes.js);
                    // trailing slash so e.g. a future '/portal-x' route isn't public
 ];
@@ -6881,6 +6882,10 @@ app.use('/api/schedule', scheduleRouters.staffRouter);
 
 // Staff tasks (taskRoutes.js): every staff login, whatever its page access.
 app.use('/api/tasks', require('./taskRoutes')({ broadcast, isStaffAdmin, canDeleteChats }));
+// Emails to customers from Gmail / Outlook (emailRoutes.js).
+const emailRouters = require('./emailRoutes')({ isStaffAdmin, broadcast });
+app.use('/api/emails', emailRouters.router);
+app.use('/api/email-oauth', emailRouters.oauthRouter);
 // Both chat channels answer schedule questions from those same dates.
 const scheduleAnswerer = require('./scheduleAnswer')({ getSydneyNow });
 

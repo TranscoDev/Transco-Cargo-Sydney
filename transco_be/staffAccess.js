@@ -25,6 +25,7 @@ const PAGES = {
   tracking: { label: 'Tracking', api: ['/tracking', '/shipments'] },
   packaging: { label: 'Packaging', api: ['/packaging'] },
   leads: { label: 'Leads', api: ['/customers', '/leads'] },
+  emails: { label: 'Emails', api: ['/emails'] },
   'my-transco': { label: 'Online Accounts', api: ['/my-transco'] },
   settings: { label: 'Settings (staff list)', api: ['/settings', '/staff'] },
   'bot-controls': { label: 'Bot settings', api: ['/settings'] },

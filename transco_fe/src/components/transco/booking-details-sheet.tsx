@@ -30,6 +30,7 @@ import { formatPhone } from "@/lib/transco/phone";
 import { useConversations } from "@/lib/transco/store";
 import { bookingTaskAbout } from "@/lib/transco/tasks";
 import { NewTaskButton, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
+import { EmailButton } from "@/components/transco/email-kit";
 
 /**
  * Everything staff need about one booking in one place — customer,
@@ -188,6 +189,17 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {listed && <NewTaskButton label="Task" variant="outline" defaultAssignTo="person" about={bookingTaskAbout(listed)} />}
+            {listed && (
+              <EmailButton
+                about={{
+                  customerId: listed.customerId || null,
+                  customerName: listed.customerName || null,
+                  bookingId: listed.id,
+                  bookingCode: listed.bookingCode || null,
+                  chatCustomerIds: listed.customerId ? [listed.customerId] : [],
+                }}
+              />
+            )}
             <Button type="button" variant="outline" onClick={() => setEditing(true)} disabled={!d}>
               <PenLine className="mr-2 h-4 w-4" /> Change details
             </Button>

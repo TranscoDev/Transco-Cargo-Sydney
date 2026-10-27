@@ -366,4 +366,4 @@ async function answer({ question, customer = null, image = null, history: givenH
   return null;
 }
 
-module.exports = { answer, buildFacts, checkReply };
+module.exports = { answer, buildFacts, checkReply, callGemini };
