@@ -147,7 +147,7 @@ export async function fetchDeclaration(bookingId: string): Promise<DeclarationPr
 }
 
 export interface BookingCosting {
-  lines: { label: string; amount: number }[];
+  lines: { label: string; amount: number; kind?: string; qty?: number }[];
   discount: number;
   total: number;
   updatedAt: string | null;
@@ -155,7 +155,7 @@ export interface BookingCosting {
 }
 
 /** Saves the booking's costing (lines + discount); the server works out the total. */
-export async function saveCosting(bookingId: string, body: { lines: { label: string; amount: number }[]; discount: number }): Promise<BookingCosting> {
+export async function saveCosting(bookingId: string, body: { lines: BookingCosting["lines"]; discount: number }): Promise<BookingCosting> {
   const res = await fetch(`${API_BASE_URL}/api/my-transco/bookings/${bookingId}/costing`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },

@@ -145,6 +145,8 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
   const [error, setError] = useState("");
   const [previewAll, setPreviewAll] = useState(false);
   const [editing, setEditing] = useState(false);
+  // The confirm form's box counts as staff change them → the Costing card.
+  const [liveBoxes, setLiveBoxes] = useState<Record<string, number> | null>(null);
 
   const load = useCallback(() => {
     setError("");
@@ -231,14 +233,14 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
           <div className="flex min-w-0 flex-col gap-5 text-sm">
             {confirm ? (
               // Re-reads after a costing save, which fills the office-use boxes.
-              <FinaliseSection key={`${d.bookingId}-${confirm.status}-${d.costing?.updatedAt ?? ""}`} data={d} onDone={load} />
+              <FinaliseSection key={`${d.bookingId}-${confirm.status}-${d.costing?.updatedAt ?? ""}`} data={d} onDone={load} onBoxesChange={setLiveBoxes} />
             ) : (
               <section className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
                 This booking has no online declaration to confirm (it was made in the chat). Record weights, price and the BL from
                 the booking's ⋯ menu on the Bookings page, and fill the printed forms by hand.
               </section>
             )}
-            <CostingCard key={`${d.bookingId}-${d.costing?.updatedAt ?? "new"}`} data={d} onSaved={load} />
+            <CostingCard key={`${d.bookingId}-${d.costing?.updatedAt ?? "new"}`} data={d} boxes={confirm ? liveBoxes : null} onSaved={load} />
             {d.shipmentId && (
               <MoveShipmentControl
                 key={`${d.shipmentId}-${d.batchNumber ?? "none"}`}
@@ -375,10 +377,13 @@ function FinaliseSection({
   data,
   onDone,
   onAssignBl,
+  onBoxesChange,
 }: {
   data: DeclarationPrintData;
   onDone: () => void;
   onAssignBl?: (() => void) | undefined;
+  /** Box counts as staff change them — the Costing card follows them. */
+  onBoxesChange?: ((boxes: Record<string, number>) => void) | undefined;
 }) {
   const finalised = data.confirm?.status === "finalised";
   const isWalkIn = !!data.walkIn;
@@ -413,6 +418,10 @@ function FinaliseSection({
     setBoxes((b) => ({ ...b, [type]: n }));
     if (type === "other") setOdd((s) => Array.from({ length: n }, (_, k) => s[k] ?? { l: "", w: "", h: "" }));
   };
+  useEffect(() => {
+    onBoxesChange?.(boxes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boxes]);
   const shownBoxes = Object.keys(boxes).filter((t) => (boxes[t] ?? 0) > 0 || data.items.some((i) => i.type === t));
   const boxesChanged = Object.entries(boxes).some(([t, q]) => q !== (data.items.find((i) => i.type === t)?.qty ?? 0));
   const [insurance, setInsurance] = useState<boolean | null>(data.insurance);
