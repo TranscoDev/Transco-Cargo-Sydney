@@ -42,8 +42,7 @@ import { EmailButton } from "@/components/transco/email-kit";
  *
  * Walk-ins (the form a customer filled on their phone at the counter)
  * also show what's inside, their insurance answer and signature, and the
- * Finalise step: staff check the boxes, add weight/CBM/office-use
- * charges, and finalise — which links the customer and emails their copy.
+ * Finalise step: staff check the boxes, add weight/CBM and finalise — which links the customer and emails their copy.
  */
 export function BookingDetailsSheet({
   bookingId,
@@ -347,15 +346,6 @@ function BookingInfo({ d }: { d: DeclarationPrintData }) {
 
 // ---------- walk-in finalise ----------
 
-const OFFICE_FIELDS = [
-  { key: "freight", label: "Freight" },
-  { key: "pickup", label: "Pickup" },
-  { key: "doorToDoor", label: "D to D" },
-  { key: "discount", label: "Discount" },
-] as const;
-
-type OfficeKey = (typeof OFFICE_FIELDS)[number]["key"] | "total";
-
 type Dims = { l: string; w: string; h: string };
 const dimOk = (s: string) => s.trim() !== "" && Number.isFinite(Number(s)) && Number(s) >= 1 && Number(s) <= 500;
 const dimsOk = (d: Dims) => dimOk(d.l) && dimOk(d.w) && dimOk(d.h);
@@ -397,14 +387,6 @@ function FinaliseSection({
   const [batch, setBatch] = useState("");
   const [weight, setWeight] = useState(asText(data.weight));
   const [cbm, setCbm] = useState(asText(data.cbm));
-  const [office, setOffice] = useState<Record<OfficeKey, string>>({
-    freight: asText(data.officeUse?.freight),
-    pickup: asText(data.officeUse?.pickup),
-    doorToDoor: asText(data.officeUse?.doorToDoor),
-    discount: asText(data.officeUse?.discount),
-    total: asText(data.officeUse?.total),
-  });
-  const [centre, setCentre] = useState(data.collectionCentre ?? "");
   // What's inside — staff value every item (the customer never enters
   // values), and can add/remove/change items when the customer does at
   // the counter.
@@ -447,10 +429,6 @@ function FinaliseSection({
     setRows((s) => s.map((r, j) => (j === i ? { ...r, ...patch, ...(plain && r.category !== "others" ? { category: null } : {}) } : r)));
     if (badRows.has(i)) setBadRows((s) => new Set([...s].filter((j) => j !== i)));
   };
-
-  const n = (k: OfficeKey) => asNumber(office[k]);
-  const anyCharge = OFFICE_FIELDS.some((f) => f.key !== "discount" && office[f.key].trim());
-  const autoTotal = anyCharge ? (n("freight") || 0) + (n("pickup") || 0) + (n("doorToDoor") || 0) - (n("discount") || 0) : null;
 
   const submit = async () => {
     setFormError("");
@@ -497,7 +475,7 @@ function FinaliseSection({
       setFormError("Keep at least one box.");
       return;
     }
-    const values = { weight: asNumber(weight), cbm: asNumber(cbm), freight: n("freight"), pickup: n("pickup"), doorToDoor: n("doorToDoor"), discount: n("discount"), total: n("total") };
+    const values = { weight: asNumber(weight), cbm: asNumber(cbm) };
     if (Object.values(values).some((v) => Number.isNaN(v))) {
       setFormError("Numbers only, please (0 or more).");
       return;
@@ -523,8 +501,6 @@ function FinaliseSection({
         ...(insurance !== null ? { insurance } : {}),
         weight: values.weight,
         cbm: values.cbm,
-        officeUse: { freight: values.freight, pickup: values.pickup, doorToDoor: values.doorToDoor, discount: values.discount, total: values.total },
-        collectionCentre: centre.trim() || null,
       });
       notify.success(
         finalised ? "Saved" : `BL ${result.hblNumber ?? ""} assigned — declaration confirmed`,
@@ -743,23 +719,6 @@ function FinaliseSection({
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         <Field id="fin-weight" label="Weight (kg)" value={weight} onChange={setWeight} />
         <Field id="fin-cbm" label="CBM" value={cbm} onChange={setCbm} />
-      </div>
-
-      <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Office use · charges ($) <span className="font-normal normal-case tracking-normal">— optional, leave blank if not needed</span></p>
-      <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-3">
-        {OFFICE_FIELDS.map((f) => (
-          <Field key={f.key} id={`fin-${f.key}`} label={f.key === "discount" ? "Discount (−)" : f.label} value={office[f.key]} onChange={(v) => setOffice((s) => ({ ...s, [f.key]: v }))} money />
-        ))}
-        <Field
-          money
-          id="fin-total"
-          label="Total due"
-          value={office.total}
-          placeholder={autoTotal !== null && !Number.isNaN(autoTotal) ? String(Math.round(autoTotal * 100) / 100) : ""}
-          onChange={(v) => setOffice((s) => ({ ...s, total: v }))}
-          hint={office.total.trim() ? undefined : autoTotal !== null ? "Worked out for you" : undefined}
-        />
-        <Field id="fin-centre" label="Collection centre" value={centre} onChange={setCentre} inputMode="text" />
       </div>
 
       {formError && <p className="mt-3 text-xs font-medium text-attention-foreground">{formError}</p>}
