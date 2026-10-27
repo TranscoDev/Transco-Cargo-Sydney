@@ -363,6 +363,12 @@ const BOX_TYPES: Record<string, string[]> = {
 
 type ItemRow = { category: string | null; description: string; condition: "new" | "used" | ""; qty: string; value: string };
 
+/** "Clothing" + used → "Used clothing"; items without a condition keep their name. */
+function itemName(r: ItemRow) {
+  if (!r.condition) return r.description;
+  return `${r.condition === "new" ? "New" : "Used"} ${r.description.charAt(0).toLowerCase()}${r.description.slice(1)}`;
+}
+
 function asText(n: number | null | undefined) {
   return typeof n === "number" ? String(n) : "";
 }
@@ -650,24 +656,15 @@ function FinaliseSection({
           {rows.map((r, i) => {
             const bad = badRows.has(i);
             return (
-              <li key={i} className={`grid grid-cols-[minmax(0,1fr)_3rem_4.5rem_1.75rem] items-center gap-1.5 px-2 py-1.5 @lg:grid-cols-[minmax(0,1fr)_5.5rem_3.5rem_5rem_1.75rem] ${bad ? "bg-attention-soft/40" : ""}`}>
+              <li key={i} className={`grid grid-cols-[3.5rem_minmax(0,1fr)_1.75rem] items-center gap-1.5 px-2 py-1.5 @lg:grid-cols-[minmax(0,1fr)_3.5rem_5rem_1.75rem] ${bad ? "bg-attention-soft/40" : ""}`}>
+                {/* New/used is part of the name ("Used clothing") — the customer already chose it. */}
                 <Input
                   aria-label={`Item ${i + 1}`}
-                  value={r.description}
+                  value={itemName(r)}
                   placeholder="Item"
-                  onChange={(e) => updateRow(i, { description: e.target.value })}
+                  onChange={(e) => updateRow(i, { description: e.target.value, condition: "" })}
                   className="col-span-full h-8 text-xs @lg:col-span-1"
                 />
-                <select
-                  aria-label={`Item ${i + 1}: new or used`}
-                  value={r.condition}
-                  onChange={(e) => updateRow(i, { condition: e.target.value as ItemRow["condition"] })}
-                  className="h-8 min-w-0 rounded-md border border-input bg-card px-1 text-xs text-foreground"
-                >
-                  <option value="">—</option>
-                  <option value="new">New</option>
-                  <option value="used">Used</option>
-                </select>
                 <Input
                   aria-label={`Item ${i + 1}: how many`}
                   value={r.qty}
@@ -829,7 +826,7 @@ function ContentsSection({ contents }: { contents: DeclarationPrintData["content
           {contents.map((c, i) => (
             <tr key={i} className="border-t">
               <td className="py-1 pr-2 font-medium text-foreground">
-                {c.description} {c.condition ? <span className="font-normal text-muted-foreground">· {c.condition}</span> : null}
+                {itemName({ category: null, description: c.description, condition: c.condition === "new" || c.condition === "used" ? c.condition : "", qty: "", value: "" })}
               </td>
               <td className="py-1 text-center tabular-nums">{c.qty}</td>
               <td className="py-1 text-right tabular-nums">{typeof c.value === "number" ? `${c.value}` : "—"}</td>
