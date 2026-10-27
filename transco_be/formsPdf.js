@@ -360,7 +360,8 @@ function chunks(list, size) {
 
 // ---------- UPB / Gift Cargo Declaration (Sri Lanka Customs) ----------
 // Staff-use form ("TRANSCO USE ONLY"), filled from the customer's details
-// and item list with staff's values. Package No is left blank. More than
+// and item list with staff's values. "Package No" is relabelled "BL No"
+// and carries the BL number. More than
 // 20 items continue on another copy of the form, as the form itself says.
 
 const UPB_FILE = 'upb-gift-declaration-sl.pdf';
@@ -392,6 +393,14 @@ async function addUpbGiftDeclaration(doc, d) {
     const r = d.receiver || {};
     const X = 50;
     const W = 149;
+    // The form's "Package No" becomes "BL No" (same place, same bold
+    // style), with the BL written larger on its dotted line.
+    const H = page.getHeight();
+    page.drawRectangle({ x: 103.3 * MM, y: H - 28.4 * MM, width: 23 * MM, height: 5.9 * MM, color: rgb(1, 1, 1) });
+    const label = 'BL No';
+    const labelSize = 13.5;
+    page.drawText(label, { x: 125.7 * MM - font.widthOfTextAtSize(label, labelSize), y: H - 27.3 * MM, size: labelSize, font, color: rgb(0.1, 0.1, 0.1) });
+    if (d.blNumber) one(126.5, 25.4, 22.5, caps(d.blNumber), { size: 11.5 });
     // Sender, then receiver (name / address / PP-NIC / contact).
     one(X, 39.2, W, caps(s.fullName));
     one(X, 46.2, W, caps(s.address), { size: 9 });
