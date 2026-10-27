@@ -6,6 +6,7 @@ import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/transco/money-input";
 import {
   fetchPriceHistory,
   fetchPriceSettings,
@@ -173,8 +174,7 @@ function PricesPage() {
                     <label key={p.key} className="flex items-center justify-between gap-3 text-sm">
                       <span className="text-foreground">{p.label}</span>
                       <span className="flex items-center gap-1">
-                        <span className="text-muted-foreground">$</span>
-                        <Input
+                        <MoneyInput
                           type="number"
                           inputMode="decimal"
                           min={0}
@@ -254,6 +254,11 @@ function PricesPage() {
   );
 }
 
+/** "$" in the box for prices and dollar discounts, not for a percent. */
+function PromoValueInput({ percent, ...props }: { percent: boolean } & React.ComponentProps<typeof Input>) {
+  return percent ? <Input {...props} /> : <MoneyInput {...props} />;
+}
+
 function PromotionEditor({
   promo: p,
   disabled,
@@ -316,8 +321,8 @@ function PromotionEditor({
           </select>
         </Field>
         {!freeThird && (
-          <Field label={p.type === "percent" ? "Discount (%)" : p.type === "amount" ? "Discount ($)" : "Price per box ($)"}>
-            <Input type="number" min={0} disabled={disabled} value={p.value} className="h-9" onChange={(e) => onChange({ value: Number(e.target.value) })} />
+          <Field label={p.type === "percent" ? "Discount (%)" : p.type === "amount" ? "Discount" : "Price per box"}>
+            <PromoValueInput percent={p.type === "percent"} type="number" min={0} disabled={disabled} value={p.value} className="h-9" onChange={(e) => onChange({ value: Number(e.target.value) })} />
           </Field>
         )}
         {!freeThird && (
