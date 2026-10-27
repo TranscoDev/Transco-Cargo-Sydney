@@ -31,7 +31,7 @@ function Chip({ on, attention, onClick, children }: { on: boolean; attention?: b
       onClick={onClick}
       aria-pressed={on}
       className={cn(
-        "h-7 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors",
+        "h-7 shrink-0 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors",
         on
           ? "border-primary/30 bg-primary/15 text-primary"
           : attention
@@ -208,7 +208,10 @@ export function ContactList({
         </div>
 
         {/* WhatsApp-style chips: the main filters, the rest under ⌄. */}
-        <div className="-mx-3 mt-2.5 flex items-center gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* The chips scroll sideways; ⌄ stays pinned on the right so a
+            count never pushes it out of view. */}
+        <div className="mt-2.5 flex items-center gap-1.5">
+          <div className="-ml-3 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pl-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {MAIN_FILTERS.map((f) => {
             const count = f.key === "UNREAD" ? unreadTotal : f.key === "ENQUIRIES" ? enquiryTotal : f.key === "ATTENTION" ? attentionTotal : 0;
             return (
@@ -224,6 +227,7 @@ export function ContactList({
               {MORE_FILTERS.find((f) => f.key === status)?.label} ✕
             </Chip>
           )}
+          </div>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
