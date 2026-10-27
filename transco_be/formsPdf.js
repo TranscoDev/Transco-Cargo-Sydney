@@ -482,9 +482,11 @@ async function addDeliveryAgreement(doc, d) {
   const o = d.officeUse || {};
   if (typeof o.freight === 'number') one(43, 236.2, 16.5, money(o.freight), { align: 'center', size: 9 });
   if (typeof o.doorToDoor === 'number') one(75, 236.2, 16.5, money(o.doorToDoor), { align: 'center', size: 9 });
-  one(21, 247.3, 27.5, caps(d.blNumber), { size: 9 });
+  // BL — larger, it's the number the office finds a customer by.
+  one(21, 246.9, 27.5, caps(d.blNumber), { size: 12 });
+  // Remarks: the delivery only (no booking number on the paper form).
   flow([{ x: 12, y: 265.0, w: 81 }, { x: 12, y: 270.5, w: 81 }],
-    [d.bookingCode, d.deliveryKey === 'collect' ? 'Pickup from the destination warehouse' : 'Door delivery'].filter(Boolean).join(' - '), { size: 8 });
+    d.deliveryKey === 'collect' ? 'Pickup from the destination warehouse' : 'Door delivery', { size: 9 });
 
   // Shipper: name, signature, date.
   one(104.5, 248.6, 49.5, caps(signedNameOf(d)), { size: 9, align: 'center' });
