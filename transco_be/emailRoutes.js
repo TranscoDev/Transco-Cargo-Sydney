@@ -50,6 +50,8 @@ const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 const CHECK_RE = /\[check[^\]]*\]/i;
 
 const sentEmails = () => getDb().collection('sentEmails');
+// Pasted keys often carry a stray space or line break.
+const env = name => String(process.env[name] || '').trim();
 const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -78,7 +80,7 @@ function readState(state) {
 
 // ---------- Gmail ----------
 
-const gmailConfigured = () => Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET);
+const gmailConfigured = () => Boolean(env('GOOGLE_OAUTH_CLIENT_ID') && env('GOOGLE_OAUTH_CLIENT_SECRET'));
 
 async function gmailAccount() {
   const doc = await settings().findOne({ _id: 'gmailAccount' });
@@ -94,8 +96,8 @@ async function gmailAccessToken() {
   if (!refreshToken) throw new Error('Gmail is not connected. An admin can connect it in Emails → Email accounts.');
   try {
     const r = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
-      client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
-      client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+      client_id: env('GOOGLE_OAUTH_CLIENT_ID'),
+      client_secret: env('GOOGLE_OAUTH_CLIENT_SECRET'),
       refresh_token: refreshToken,
       grant_type: 'refresh_token'
     }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 15000 });
@@ -153,16 +155,16 @@ async function sendViaGmail(mail) {
 
 // ---------- Outlook (Microsoft Graph) ----------
 
-const outlookConfigured = () => Boolean(process.env.OUTLOOK_TENANT_ID && process.env.OUTLOOK_CLIENT_ID && process.env.OUTLOOK_CLIENT_SECRET && process.env.OUTLOOK_MAILBOX);
+const outlookConfigured = () => Boolean(env('OUTLOOK_TENANT_ID') && env('OUTLOOK_CLIENT_ID') && env('OUTLOOK_CLIENT_SECRET') && env('OUTLOOK_MAILBOX'));
 
 let outlookToken = null;
 async function outlookAccessToken() {
   if (outlookToken && outlookToken.exp > Date.now() + 60 * 1000) return outlookToken.token;
   const r = await axios.post(
-    `https://login.microsoftonline.com/${encodeURIComponent(process.env.OUTLOOK_TENANT_ID)}/oauth2/v2.0/token`,
+    `https://login.microsoftonline.com/${encodeURIComponent(env('OUTLOOK_TENANT_ID'))}/oauth2/v2.0/token`,
     new URLSearchParams({
-      client_id: process.env.OUTLOOK_CLIENT_ID,
-      client_secret: process.env.OUTLOOK_CLIENT_SECRET,
+      client_id: env('OUTLOOK_CLIENT_ID'),
+      client_secret: env('OUTLOOK_CLIENT_SECRET'),
       scope: 'https://graph.microsoft.com/.default',
       grant_type: 'client_credentials'
     }).toString(),
@@ -174,7 +176,7 @@ async function outlookAccessToken() {
 
 async function sendViaOutlook({ to, cc, subject, htmlBody }) {
   const token = await outlookAccessToken();
-  const mailbox = process.env.OUTLOOK_MAILBOX;
+  const mailbox = env('OUTLOOK_MAILBOX');
   const list = s => String(s || '').split(',').map(a => a.trim()).filter(Boolean).map(address => ({ emailAddress: { address } }));
   await axios.post(
     `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(mailbox)}/sendMail`,
@@ -197,7 +199,7 @@ async function accountStatus(isAdmin) {
   return {
     outlook: {
       connected: outlookOn,
-      address: process.env.OUTLOOK_MAILBOX || 'sydney@transcocargo.com.au',
+      address: env('OUTLOOK_MAILBOX') || 'sydney@transcocargo.com.au',
       secretExpires: expires,
       usable: outlookOn
     },
@@ -325,7 +327,7 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
     if (!(await isStaffAdmin(req))) return res.status(403).json({ error: 'Only an admin can connect Gmail.' });
     if (!gmailConfigured()) return res.status(400).json({ error: 'Google sign-in isn\'t set up on the server yet (GOOGLE_OAUTH_CLIENT_ID / SECRET).' });
     const params = new URLSearchParams({
-      client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
+      client_id: env('GOOGLE_OAUTH_CLIENT_ID'),
       redirect_uri: GMAIL_REDIRECT,
       response_type: 'code',
       scope: GMAIL_SCOPES.join(' '),
@@ -357,8 +359,8 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
     try {
       const r = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
         code: String(req.query.code),
-        client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
-        client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+        client_id: env('GOOGLE_OAUTH_CLIENT_ID'),
+        client_secret: env('GOOGLE_OAUTH_CLIENT_SECRET'),
         redirect_uri: GMAIL_REDIRECT,
         grant_type: 'authorization_code'
       }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 15000 });
