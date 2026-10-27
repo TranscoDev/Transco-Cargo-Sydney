@@ -4,6 +4,7 @@ import {
   CalendarClock,
   ChevronRight,
   ClipboardCheck,
+  Mail,
   MapPin,
   MessageCircle,
   PackageCheck,
@@ -17,6 +18,7 @@ import {
 import { NAV_GROUPS, useWaitingConversations, useWalkInsToConfirm } from "@/components/transco/console-layout";
 import { useBookingAttention } from "@/components/transco/bookings-panel";
 import { TodayPanel } from "@/components/transco/task-kit";
+import { useUnreadEmailReplies } from "@/components/transco/email-kit";
 import { EmptyState, ErrorState, PageShell, SectionHeading, StatusBadge, type StatusTone } from "@/components/transco/page-kit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -155,6 +157,9 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
   const attention = useBookingAttention();
   const checks = attention.checks.length;
   const bls = attention.bls.length;
+  // Same count as the Emails menu badge.
+  const emailReplies = useUnreadEmailReplies();
+  const showEmails = canSee("emails");
 
   const stats: { label: string; value: number | undefined; to: string; search?: BookingsSearch; icon: LucideIcon }[] = [
     { label: "Drop-offs today", value: s.todaysBookings, to: "/console/bookings", icon: CalendarClock },
@@ -162,6 +167,7 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
     { label: "Walk-ins to confirm", value: walkIns, to: "/console/walk-ins", icon: QrCode },
     { label: "Drop-offs to check", value: checks, to: "/console/bookings", search: { show: "declarations" }, icon: ClipboardCheck },
     { label: "BLs to assign", value: bls, to: "/console/bookings", search: { show: "bls" }, icon: PackageCheck },
+    { label: "Email replies", value: showEmails ? emailReplies : undefined, to: "/console/emails", icon: Mail },
   ];
 
   const work = ([
@@ -198,6 +204,14 @@ function DashboardBody({ s }: { s: DashboardSummary }) {
       search: { show: "bls" },
       icon: PackageCheck,
       tone: "pending",
+    },
+    {
+      count: showEmails ? emailReplies : 0,
+      label: plural(emailReplies, "Read 1 email reply", `Read ${emailReplies} email replies`),
+      hint: "Customers answered an email sent from the console.",
+      to: "/console/emails",
+      icon: Mail,
+      tone: "info",
     },
   ] satisfies WorkItem[]).filter((w) => w.count > 0);
 
