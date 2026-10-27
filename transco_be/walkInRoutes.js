@@ -107,7 +107,7 @@ function validateDropOff(input, { paper = false } = {}) {
 
   if (!DELIVERY_LABELS[body.deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
 
-  const contents = validateContents(body.contents);
+  const contents = validateContents(body.contents, { requireValue: true });
   if (contents.error) return contents;
 
   const signOff = validateSignOff(body);

@@ -296,7 +296,9 @@ const CONTENT_CATEGORIES = {
 // value?, description (others only) }. Older rows / staff edits:
 // { description, condition?, qty, category? }. The value (AUD) is optional
 // here — staff must fill every value before Confirm.
-function validateContents(raw) {
+// requireValue: customer forms (booking, My Transco edit, walk-in) must give
+// every item's value; staff counter edits may leave it for later.
+function validateContents(raw, { requireValue = false } = {}) {
   if (!Array.isArray(raw) || raw.length === 0) return { error: "Please add at least one item you're sending.", field: 'contents' };
   if (raw.length > MAX_CONTENT_ROWS) return { error: `Please list up to ${MAX_CONTENT_ROWS} items. For more, ask our staff.`, field: 'contents' };
   const rows = [];
@@ -310,7 +312,9 @@ function validateContents(raw) {
     const qty = Number(r && r.qty);
     if (!Number.isInteger(qty) || qty < 1 || qty > 999) return { error: `Please enter how many "${description}" (1-999).`, field: 'contents' };
     let value = null;
-    if (r && r.value !== undefined && r.value !== null && r.value !== '') {
+    const hasValue = r && r.value !== undefined && r.value !== null && r.value !== '';
+    if (requireValue && !hasValue) return { error: `Please enter the value of "${description}" in AUD.`, field: 'contents' };
+    if (hasValue) {
       value = Number(r.value);
       if (!Number.isFinite(value) || value < 0 || value > 100000) return { error: `The value of "${description}" must be a number in AUD.`, field: 'contents' };
       value = Math.round(value * 100) / 100;
@@ -647,7 +651,7 @@ function createCustomerTools({
     if (sender.error) return sender;
     const receiver = validatePerson(unmaskId(body.receiver, [booking.receiver]), 'receiver', { withId: true, homePhone: true });
     if (receiver.error) return receiver;
-    const contents = validateContents(body.contents);
+    const contents = validateContents(body.contents, { requireValue: true });
     if (contents.error) return contents;
     const set = {
       sender: pii.sealPerson(sender.value),
@@ -1269,7 +1273,7 @@ function createCustomerTools({
     if (senderCheck.error) return senderCheck;
     const receiverCheck = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true });
     if (receiverCheck.error) return receiverCheck;
-    const contentsCheck = validateContents(body.contents);
+    const contentsCheck = validateContents(body.contents, { requireValue: true });
     if (contentsCheck.error) return contentsCheck;
     const signOff = validateSignOff(body);
     if (signOff.error) return signOff;

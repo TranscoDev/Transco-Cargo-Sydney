@@ -248,7 +248,7 @@
       "How will the receiver get the boxes?": "ලබන කෙනාට box ලැබෙන්නේ කොහොමද?",
       "Collect from Wattala warehouse": "වත්තල ගබඩාවෙන් ගන්නවා",
       "Our staff will measure odd-size items and work out the price.": "අපේ staff සාමාන්‍ය නොවන භාණ්ඩ මැනලා මිල ගණන් කරනවා.",
-      "Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.": "යවන හැම දෙයක්ම තෝරන්න — Customs වලට ඕන. වටිනාකම දාන්න ඕන නෑ; අපේ staff දානවා.",
+      "Tap everything you're sending — Customs needs it. Enter how many and the value of each one.": "යවන හැම දෙයක්ම තෝරන්න — Customs වලට ඕන. හැම එකකම ගණන සහ වටිනාකම දාන්න.",
       "Food": "ආහාර",
       "New clothing": "අලුත් ඇඳුම්",
       "Used clothing": "පාවිච්චි කළ ඇඳුම්",
@@ -262,7 +262,7 @@
       "e.g. Kitchen utensils": "උදා: කුස්සියේ බඩු",
       "Value (AUD)": "වටිනාකම (AUD)",
       "Please tap at least one thing you're sending.": "කරුණාකර යවන එක දෙයක්වත් තෝරන්න.",
-      "Please fill in how many for each one (and what \"Others\" is). A value must be a number.": "හැම එකකටම කීයද කියලා දාන්න (වෙනත් නම් මොකක්ද කියලත්). වටිනාකම අංකයක් වෙන්න ඕන.",
+      "Please fill in how many and the value (AUD) for each one (and what \"Others\" is).": "හැම එකකටම කීයද සහ වටිනාකම (AUD) දාන්න (වෙනත් නම් මොකක්ද කියලත්).",
       "We recommend insurance": "Insurance කරන්න අපි නිර්දේශ කරනවා",
       "You're sending a TV or electrical / electronic items. These can be damaged in transit, so it's better to use insurance.": "ඔබ TV එකක් හෝ විදුලි / ඉලෙක්ට්‍රොනික බඩු යවනවා. ප්‍රවාහනයේදී මේවාට හානි වෙන්න පුළුවන් නිසා insurance කරන එක හොඳයි.",
       "Welcome back!": "ආයෙත් සාදරයෙන් පිළිගන්නවා!",
@@ -409,7 +409,7 @@
       "How will the receiver get the boxes?": "பெறுநர் பெட்டிகளை எப்படிப் பெறுவார்?",
       "Collect from Wattala warehouse": "வத்தளை களஞ்சியத்தில் பெறுதல்",
       "Our staff will measure odd-size items and work out the price.": "எங்கள் staff வழக்கமற்ற பொருட்களை அளந்து விலையிடுவார்கள்.",
-      "Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.": "அனுப்பும் அனைத்தையும் தேர்ந்தெடுங்கள் — Customs க்கு தேவை. மதிப்பு கட்டாயமில்லை; எங்கள் staff சேர்ப்பார்கள்.",
+      "Tap everything you're sending — Customs needs it. Enter how many and the value of each one.": "அனுப்பும் அனைத்தையும் தேர்ந்தெடுங்கள் — Customs க்கு தேவை. ஒவ்வொன்றின் எண்ணிக்கையையும் மதிப்பையும் உள்ளிடுங்கள்.",
       "Food": "உணவு",
       "New clothing": "புதிய ஆடைகள்",
       "Used clothing": "பயன்படுத்திய ஆடைகள்",
@@ -423,7 +423,7 @@
       "e.g. Kitchen utensils": "உதா: சமையலறை பாத்திரங்கள்",
       "Value (AUD)": "மதிப்பு (AUD)",
       "Please tap at least one thing you're sending.": "அனுப்பும் ஒன்றையாவது தேர்ந்தெடுங்கள்.",
-      "Please fill in how many for each one (and what \"Others\" is). A value must be a number.": "ஒவ்வொன்றுக்கும் எத்தனை என்று உள்ளிடவும் (மற்றவை என்றால் அது என்ன என்றும்). மதிப்பு எண்ணாக இருக்க வேண்டும்.",
+      "Please fill in how many and the value (AUD) for each one (and what \"Others\" is).": "ஒவ்வொன்றுக்கும் எத்தனை மற்றும் மதிப்பு (AUD) உள்ளிடவும் (மற்றவை என்றால் அது என்ன என்றும்).",
       "We recommend insurance": "Insurance செய்ய பரிந்துரைக்கிறோம்",
       "You're sending a TV or electrical / electronic items. These can be damaged in transit, so it's better to use insurance.": "நீங்கள் TV அல்லது மின் / இலத்திரனியல் பொருட்களை அனுப்புகிறீர்கள். போக்குவரத்தில் இவை சேதமடையலாம், எனவே insurance செய்வது நல்லது.",
       "Welcome back!": "மீண்டும் வருக!",
@@ -970,7 +970,7 @@
   function renderContents() {
     // Older drafts (free-text items) start again with the categories.
     state.contents = state.contents.filter(function (c) { return c.category; });
-    var html = '<h2 style="margin-top:22px">' + esc(t("What's inside your boxes?")) + '</h2><p class="lead" style="margin-top:-4px">' + esc(t("Tap everything you're sending — Customs needs it. The value is optional; our staff can add it.")) + "</p>";
+    var html = '<h2 style="margin-top:22px">' + esc(t("What's inside your boxes?")) + '</h2><p class="lead" style="margin-top:-4px">' + esc(t("Tap everything you're sending — Customs needs it. Enter how many and the value of each one.")) + "</p>";
     html += '<div class="cat-chips" role="group">' + CATS.map(function (c) {
       var on = !!catRow(c[0]);
       return '<button type="button" class="cat-chip" data-cat="' + c[0] + '" aria-pressed="' + on + '">' + esc(t(c[1])) + "</button>";
@@ -982,7 +982,7 @@
       html += '<div class="item' + (bad ? " bad" : "") + '"><div class="item-top"><span>✓ ' + esc(t(c[1])) + "</span></div>" +
         (c[0] === "others" ? '<label for="d' + i + '">' + esc(t("What is it?")) + '</label><input id="d' + i + '" data-item="' + i + '" data-k="description" value="' + esc(row.description) + '" placeholder="' + esc(t("e.g. Kitchen utensils")) + '" style="margin-bottom:10px" />' : "") +
         '<div class="item-grid two"><div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(row.qty) + '" inputmode="numeric" /></div>' +
-        '<div><label for="v' + i + '">' + esc(t("Value (AUD)")) + ' <span class="opt">(' + esc(t("optional")) + ')</span></label><input id="v' + i + '" data-item="' + i + '" data-k="value" value="' + esc(row.value) + '" inputmode="decimal" /></div></div></div>';
+        '<div><label for="v' + i + '">' + esc(t("Value (AUD)")) + '</label><input id="v' + i + '" data-item="' + i + '" data-k="value" value="' + esc(row.value) + '" inputmode="decimal" /></div></div></div>';
     });
     html += '<div class="note" id="clothes-note" style="margin-top:6px;border-color:#f0d9a8;background:#fff9ec"' + (showClothesWarning() ? "" : " hidden") + ">" + esc(t(CLOTHES_WARNING)) + "</div>";
     return html;
@@ -1516,9 +1516,9 @@
       state.contents.forEach(function (c, i) {
         var q = Number(c.qty), v = String(c.value || "").trim();
         if ((c.category === "others" && String(c.description).trim().length < 2) || !(Number.isInteger(q) && q >= 1 && q <= 999) ||
-            (v !== "" && !(isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100000))) badFields["contents." + i] = 1;
+            !(v !== "" && isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100000)) badFields["contents." + i] = 1;
       });
-      if (Object.keys(badFields).length) return t("Please fill in how many for each one (and what \"Others\" is). A value must be a number.");
+      if (Object.keys(badFields).length) return t("Please fill in how many and the value (AUD) for each one (and what \"Others\" is).");
     }
     if (stepName === "finish") {
       if (state.service === "air") {

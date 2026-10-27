@@ -128,7 +128,7 @@ function decl(town, overrides = {}) {
     sender: { isMe: true, fullName: 'Alpha Sender', address: '1 Test St, Seven Hills NSW 2147', mobile: '+61 400 000 001', email: 'sender@example.com', idNumber: 'N1234567', ...(overrides.sender || {}) },
     receiver: { fullName: 'Rita Receiver', address: '12 Temple Rd', town, mobile: '+94 77 123 4567', email: 'rita@example.com', idNumber: '199012345678', ...(overrides.receiver || {}) },
     // The rest of the declaration, collected with every online booking.
-    contents: [{ description: 'Clothes', condition: 'used', qty: 10 }],
+    contents: [{ description: 'Clothes', condition: 'used', qty: 10, value: 30 }],
     insurance: false,
     declarationAccepted: true,
     signedName: 'Alpha Sender',
@@ -1201,7 +1201,7 @@ function walkInForm(overrides = {}) {
     receiver: { fullName: 'Walk In Receiver', address: '83/B/2/1, Mathgamuwa', town: 'Kadugannawa', mobile: '+94 76 107 2332', email: 'receiver@example.com', idNumber: 'N10388128' },
     items: [{ type: 'tea_chest', qty: 1 }],
     deliveryType: 'collect',
-    contents: [{ description: 'Chocolate', condition: 'new', qty: 5 }, { description: 'Clothes', condition: 'used', qty: 10 }],
+    contents: [{ description: 'Chocolate', condition: 'new', qty: 5, value: 20 }, { description: 'Clothes', condition: 'used', qty: 10, value: 30 }],
     insurance: false,
     declarationAccepted: true,
     signedName: 'Walk In Sender',
@@ -1282,10 +1282,10 @@ test('walk-in finalise: staff only; links/creates the customer by phone and reco
   assert.equal((await db.collection('bookings').findOne({ _id: b._id })).walkIn.status, 'submitted');
   assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400555777' }), 0);
 
-  // Values are a staff field: the customer never sends them, and every
-  // item needs one before confirming.
-  assert.equal(b.contents[0].value, null);
-  const noValues = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-001' } });
+  // The customer gives each item's value; staff still confirm a value
+  // for every item before confirming.
+  assert.equal(b.contents[0].value, 20);
+  const noValues = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-001', contentValues: [] } });
   assert.equal(noValues.status, 400);
   assert.equal(noValues.body.field, 'contentValues');
   const oneValue = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'WALKIN-001', contentValues: [70, ''] } });
@@ -1473,12 +1473,12 @@ test('My Transco bookings collect the full declaration; at drop-off staff only v
 
   const made = await api('POST', '/api/portal/bookings', {
     token: acct.token,
-    body: { ...base, ...decl('Kandy', { sender: { homePhone: '02 9600 0000' }, signOff: { insurance: true, contents: [{ description: 'Tea', condition: 'new', qty: 4 }, { description: 'Shoes', condition: 'used', qty: 2 }] } }) }
+    body: { ...base, ...decl('Kandy', { sender: { homePhone: '02 9600 0000' }, signOff: { insurance: true, contents: [{ description: 'Tea', condition: 'new', qty: 4, value: 10 }, { description: 'Shoes', condition: 'used', qty: 2, value: 40 }] } }) }
   });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const b = await db.collection('bookings').findOne({ _id: new ObjectId(made.body.booking.id) });
   assert.equal(b.contents.length, 2);
-  assert.equal(b.contents[0].value, null, 'the customer never enters values');
+  assert.equal(b.contents[0].value, 10, 'the customer enters each value');
   assert.equal(b.insurance, true);
   assert.equal(pii.open(b.sender.idNumber), 'N1234567');
   if (pii.enabled()) assert.ok(pii.isSealed(b.sender.idNumber) && pii.isSealed(b.receiver.idNumber), 'stored encrypted');
@@ -1487,7 +1487,7 @@ test('My Transco bookings collect the full declaration; at drop-off staff only v
 
   // Staff confirm it at drop-off like a walk-in: values + BL.
   const before = await db.collection('customers').findOne({ _id: b.customerId });
-  const noValues = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'ONLINE-001' } });
+  const noValues = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'ONLINE-001', contentValues: [] } });
   assert.equal(noValues.body.field, 'contentValues');
   const done = await api('POST', `/api/walk-ins/${b._id}/finalise`, { token: staffToken, body: { hblNumber: 'ONLINE-001', contentValues: [40, 30], weight: 22 } });
   assert.equal(done.status, 200, JSON.stringify(done.body));
@@ -1650,7 +1650,7 @@ test('online booking: TVs need their screen size; odd-size items are just a coun
   assert.equal(noSize.status, 400);
   assert.equal(noSize.body.field, 'items');
   // Categories (UPB declaration): value optional; "others" needs a description.
-  const contents = [{ category: 'food', qty: 4 }, { category: 'used_clothing', qty: 10, value: 50 }, { category: 'others', description: 'Kitchen utensils', qty: 1 }];
+  const contents = [{ category: 'food', qty: 4, value: 15 }, { category: 'used_clothing', qty: 10, value: 50 }, { category: 'others', description: 'Kitchen utensils', qty: 1, value: 25 }];
   const noOthersText = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, contents: [{ category: 'others', qty: 1 }], items: [{ type: 'other', qty: 1 }] } });
   assert.equal(noOthersText.body.field, 'contents');
   const countOnly = await api('POST', '/api/portal/bookings', { token: acct.token, body: { ...base, contents, items: [{ type: 'other', qty: 2 }] } });
@@ -1658,7 +1658,7 @@ test('online booking: TVs need their screen size; odd-size items are just a coun
   const co = await db.collection('bookings').findOne({ _id: new ObjectId(countOnly.body.booking.id) });
   assert.deepEqual(co.items, [{ type: 'other', qty: 2 }]);
   assert.deepEqual(co.contents.map(c => [c.category, c.description, c.condition, c.qty, c.value]),
-    [['food', 'Food', null, 4, null], ['used_clothing', 'Clothing', 'used', 10, 50], ['others', 'Kitchen utensils', null, 1, null]]);
+    [['food', 'Food', null, 4, 15], ['used_clothing', 'Clothing', 'used', 10, 50], ['others', 'Kitchen utensils', null, 1, 25]]);
 
   const made = await api('POST', '/api/portal/bookings', {
     token: acct.token,
