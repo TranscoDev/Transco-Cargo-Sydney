@@ -9,6 +9,16 @@ function loadShipments(): Promise<Consolidation[]> {
   if (!cache) cache = fetchConsolidations().catch((err: unknown) => { cache = null; throw err; });
   return cache;
 }
+// The newest shipments are the only ones a box can still go in.
+const SHOWN = 4;
+
+/** " · leaves 12 Nov" — the date may come as "2026-11-12" or a full timestamp. */
+function leaves(etd: string | null | undefined): string {
+  if (!etd) return "";
+  const d = new Date(`${String(etd).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? "" : ` · leaves ${d.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`;
+}
+
 /** Call after creating a shipment so pickers show it straight away. */
 export function forgetShipmentList() {
   cache = null;
@@ -66,12 +76,15 @@ export function ShipmentPicker({
       className={className ?? "h-9 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground"}
     >
       <option value="">{shipments ? "Not in a shipment yet" : "Loading…"}</option>
-      {(shipments ?? []).map((s) => (
-        <option key={s.id} value={String(s.batchNumber)}>
-          Shipment {s.batchNumber}
-          {s.dates.sydneyCalendarEtd ? ` · leaves ${new Date(`${s.dates.sydneyCalendarEtd}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}` : ""}
-        </option>
-      ))}
+      {/* Only the newest few — plus the one already chosen, if it's older. */}
+      {(shipments ?? [])
+        .filter((s, i) => i < SHOWN || String(s.batchNumber) === value)
+        .map((s) => (
+          <option key={s.id} value={String(s.batchNumber)}>
+            Shipment {s.batchNumber}
+            {leaves(s.dates.sydneyCalendarEtd)}
+          </option>
+        ))}
     </select>
   );
 }
