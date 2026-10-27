@@ -423,10 +423,11 @@ async function addUpbGiftDeclaration(doc, d) {
     // Total number of packages + the sender's certification.
     const totalPackages = d.boxCount || (d.items || []).reduce((n, i) => n + i.qty, 0) || null;
     if (totalPackages) one(60, 244.6, 40, String(totalPackages));
-    if (d.signature && d.signature.image) await drawSignature(doc, page, d.signature.image, { x: 18, y: 250.6, w: 52, h: 7 });
-    // Name, PP/NIC — one line just above its dotted line (the box runs to 108 mm).
-    one(17, 268.3, 89, caps([signedNameOf(d), s.idNumber].filter(Boolean).join(', ')), { size: 7.5 });
-    one(17, 279.1, 55, `${dmy(signedDateOf(d))}, SYDNEY`, { size: 7 });
+    // Signature, name + PP/NIC and date each sit just above their own
+    // dotted line, under the label above it (the box runs to 108 mm).
+    if (d.signature && d.signature.image) await drawSignature(doc, page, d.signature.image, { x: 18, y: 254.8, w: 52, h: 5.6 });
+    one(17, 271.2, 89, caps([signedNameOf(d), s.idNumber].filter(Boolean).join(', ')), { size: 8.5 });
+    one(17, 281.6, 55, `${dmy(signedDateOf(d))}, SYDNEY`, { size: 8.5 });
 
     // Certification by the agent — staff's own figures, when entered.
     if (totalPackages) one(139, 259.6, 31, String(totalPackages), { size: 9 });
