@@ -17,6 +17,7 @@
 // office-use charges, marks it received, and emails the customer their
 // copy with their BL number.
 
+const crypto = require('crypto');
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const { customers, bookings, shipments, getDb } = require('./db');
@@ -26,6 +27,7 @@ const {
 } = require('./customerTools');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const pii = require('./pii');
+const agent = require('./agentAnswer');
 const { shippingDeclarationPdf, declarationFileName, allFormsPdf, formAttachments, singleFormPdf, formsFor, refOf, upbMissing } = require('./formsPdf');
 
 const IP_WINDOW_MS = 15 * 60 * 1000;
@@ -88,16 +90,16 @@ function validateContentValues(raw, contents) {
   return { value: values };
 }
 
-function validateDropOff(input) {
+function validateDropOff(input, { paper = false } = {}) {
   const body = input || {};
   const country = body.country;
   if (!COUNTRIES[country]) return { error: 'Please choose where you are sending to.', field: 'country' };
   const serviceType = body.service;
   if (!COUNTRIES[country].services.includes(serviceType)) return { error: 'Please choose Sea or Air freight.', field: 'service' };
 
-  const sender = validatePerson(body.sender, 'sender', { idNumber: country === 'sri_lanka' ? 'required' : 'optional', homePhone: true });
+  const sender = validatePerson(body.sender, 'sender', { idNumber: country === 'sri_lanka' ? 'required' : 'optional', homePhone: true, emailOptional: paper });
   if (sender.error) return sender;
-  const receiver = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true });
+  const receiver = validatePerson(body.receiver, 'receiver', { withId: true, homePhone: true, emailOptional: paper });
   if (receiver.error) return receiver;
 
   const items = validateItems(country, body.items, { requireDetails: true });
@@ -136,6 +138,60 @@ function numberOrNull(v, label) {
   if (!Number.isFinite(n) || n < 0 || n > 1000000) return { error: `${label} must be a number of 0 or more.` };
   return { value: Math.round(n * 1000) / 1000 };
 }
+
+// ---------- paper forms (staff typing a hand-written form) ----------
+//
+// Console → "Type a paper form" gets a signed link (12h) that opens the
+// same drop-off form in staff mode: the walk-in is marked as entered by
+// that staff member from paper, and a photo of the paper form can
+// roughly fill it in (Gemini) for staff to check.
+
+const PAPER_KEY = crypto.createHmac('sha256', process.env.SESSION_SECRET || crypto.randomBytes(32)).update('walkin-paper-v1').digest();
+const PAPER_TTL_MS = 12 * 60 * 60 * 1000;
+
+function paperToken(staff) {
+  const body = Buffer.from(JSON.stringify({ s: staff, e: Date.now() + PAPER_TTL_MS })).toString('base64url');
+  return `${body}.${crypto.createHmac('sha256', PAPER_KEY).update(body).digest('base64url')}`;
+}
+
+// The staff member behind a paper-form link, or null.
+function readPaperToken(token) {
+  if (typeof token !== 'string' || token.length > 600) return null;
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  const want = crypto.createHmac('sha256', PAPER_KEY).update(body).digest('base64url');
+  if (sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, 'base64url').toString());
+    return p.e > Date.now() && p.s ? String(p.s) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readPhoto(value) {
+  if (typeof value !== 'string' || !value) return { error: 'Add a photo of the form.' };
+  const m = value.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) return { error: 'That file isn\'t a picture. Use a photo (JPG or PNG).' };
+  const data = Buffer.from(m[2], 'base64');
+  if (data.length > 6 * 1024 * 1024) return { error: 'That picture is too big (max 6 MB).' };
+  return { image: { mimeType: m[1], data } };
+}
+
+const PAPER_READ_RULES = `You read a photo of a hand-written Transco Sydney shipping declaration (cargo from Australia to Sri Lanka or India) and copy what is written into JSON.
+Return ONLY one JSON object, no other text:
+{
+  "country": "sri_lanka" | "india" | "",
+  "service": "sea" | "air" | "",
+  "deliveryType": "door" | "collect" | "",
+  "boxes": { "<type>": number },   // types: tea_chest, gift_box, wine_box, quarter_cbm, tv, other (odd-size item), general (India general cargo box)
+  "sender": { "fullName": "", "idNumber": "", "street": "", "suburb": "", "state": "", "postcode": "", "mobile": "", "homePhone": "", "email": "" },
+  "receiver": { "fullName": "", "idNumber": "", "address": "", "town": "", "mobile": "", "homePhone": "", "email": "" },
+  "contents": [ { "category": "food" | "new_clothing" | "used_clothing" | "new_toys" | "used_toys" | "medicine" | "electrical" | "electronics" | "others", "qty": number, "value": number | null, "description": "" } ],
+  "insurance": true | false | null,
+  "signedName": ""
+}
+Rules: the sender lives in Australia (state like NSW, VIC). idNumber is the passport or NIC number. Copy numbers and spellings exactly as written; use "" or null when a field is empty or you can't read it — never guess. Put items that fit no category under "others" with a short description. One contents row per category (add up quantities).`;
 
 // ---------- email ----------
 
@@ -238,11 +294,37 @@ module.exports = function createWalkInRouters({
     res.json({ hasAccount: await hasAccount(phoneNumber) });
   }));
 
+  // Staff mode only: a photo of a hand-written form → rough field values
+  // for staff to check (nothing is saved here).
+  publicRouter.post('/dropoff/read-photo', wrap(async (req, res) => {
+    const body = req.body || {};
+    if (!readPaperToken(body.paperToken)) return res.status(401).json({ error: 'This staff link has expired. Open it again from the console.' });
+    if (!process.env.GEMINI_API_KEY) return res.status(400).json({ error: 'Photo reading isn\'t set up on the server.' });
+    const { image, error } = readPhoto(body.image);
+    if (error) return res.status(400).json({ error });
+    let raw;
+    try {
+      raw = await agent.callGemini(PAPER_READ_RULES, 'Copy this declaration form into the JSON.', image);
+    } catch (err) {
+      console.error('Paper form read failed:', err.response?.status || '', err.message);
+      return res.status(502).json({ error: 'Couldn\'t read the photo just now. Please try again or type it in.' });
+    }
+    const m = String(raw || '').match(/\{[\s\S]*\}/);
+    let form = null;
+    try {
+      form = m ? JSON.parse(m[0]) : null;
+    } catch { /* handled below */ }
+    if (!form || typeof form !== 'object') return res.status(502).json({ error: 'Couldn\'t make out the form. Try a clearer, straight-on photo, or type it in.' });
+    res.json({ form });
+  }));
+
   publicRouter.post('/dropoff', wrap(async (req, res) => {
-    if (tooManyFromIp(req)) {
+    // Staff typing a paper form at the counter: no per-IP limit.
+    const paperBy = readPaperToken(req.body && req.body.paperToken);
+    if (!paperBy && tooManyFromIp(req)) {
       return res.status(429).json({ error: 'Too many forms sent from this phone. Please ask our staff for help.' });
     }
-    const checked = validateDropOff(req.body);
+    const checked = validateDropOff(req.body, { paper: Boolean(paperBy) });
     if (checked.error) return res.status(400).json({ error: checked.error, field: checked.field || null });
     const v = checked.value;
 
@@ -258,7 +340,7 @@ module.exports = function createWalkInRouters({
 
     // Optional: create a My Transco account (new numbers only).
     let account = null;
-    const a = req.body && req.body.account;
+    const a = !paperBy && req.body && req.body.account;
     if (a && !(await hasAccount(phoneNumber))) {
       const email = typeof a.email === 'string' ? a.email.trim().toLowerCase() : '';
       if (!EMAIL_RE.test(email) || email.length > 120) return res.status(400).json({ error: "That email address doesn't look right.", field: 'account.email' });
@@ -303,6 +385,7 @@ module.exports = function createWalkInRouters({
       channel: 'walk_in',
       walkIn: {
         status: 'submitted', submittedAt: now, returning,
+        ...(paperBy ? { paper: { enteredBy: paperBy, enteredAt: now } } : {}),
         ...(['en', 'si', 'ta'].includes(req.body && req.body.language) ? { language: req.body.language } : {}),
         ...(account ? { wantsAccount: true, accountEmail: account.email } : {})
       },
@@ -328,6 +411,13 @@ module.exports = function createWalkInRouters({
 
   // ----- staff: finalise at the counter -----
   const staffRouter = express.Router();
+
+  // A 12-hour link that opens the drop-off form in staff (paper form) mode.
+  staffRouter.post('/paper-link', (req, res) => {
+    const u = req.user || {};
+    const staff = cleanText(String(u.name || u.email || 'Staff'), 80);
+    res.json({ token: paperToken(staff) });
+  });
 
   staffRouter.post('/:bookingId/finalise', wrap(async (req, res) => {
     const { bookingId } = req.params;

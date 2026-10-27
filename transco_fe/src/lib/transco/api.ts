@@ -147,7 +147,7 @@ export interface BackendBooking {
   sender?: { address?: string } | null;
   pickupJob?: PickupDeliveryJob | null;
   deliveryJob?: PickupDeliveryJob | null;
-  walkIn?: { status?: "submitted" | "finalised"; returning?: boolean } | null;
+  walkIn?: { status?: "submitted" | "finalised"; returning?: boolean; paper?: { enteredBy?: string } } | null;
   contents?: unknown[] | null;
   staffConfirm?: { status?: string } | null;
   deliveryType?: "door" | "collect" | null;
@@ -196,6 +196,7 @@ export function mapBooking(b: BackendBooking): Booking {
     deliveryJob: b.deliveryJob ?? null,
     walkInStatus: b.walkIn?.status ?? null,
     walkInReturning: b.walkIn?.returning ?? null,
+    walkInPaperBy: b.walkIn?.paper?.enteredBy ?? null,
     declarationComplete: Boolean(b.declarationSubmittedAt && Array.isArray(b.contents) && b.contents.length),
     staffConfirmed: b.walkIn?.status === "finalised" || b.staffConfirm?.status === "finalised",
   };
@@ -237,6 +238,14 @@ export async function finaliseWalkIn(
   const data = (await res.json().catch(() => ({}))) as { error?: string; customerId?: string | null; hblNumber?: string | null; firstTime?: boolean };
   if (!res.ok) throw new Error(data.error || `Could not finalise (${res.status})`);
   return { customerId: data.customerId ?? null, hblNumber: data.hblNumber ?? null, firstTime: Boolean(data.firstTime) };
+}
+
+/** A 12-hour link token that opens the drop-off form in staff (paper form) mode. */
+export async function fetchPaperFormToken(): Promise<string> {
+  const res = await fetch(`${API_BASE_URL}/api/walk-ins/paper-link`, { method: "POST", headers: authHeaders() });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; token?: string };
+  if (!res.ok || !data.token) throw new Error(data.error || `Could not open the form (${res.status})`);
+  return data.token;
 }
 
 export function mapMessage(m: BackendMessage): Message {

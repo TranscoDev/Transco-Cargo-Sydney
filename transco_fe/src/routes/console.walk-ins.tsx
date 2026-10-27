@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Check, ExternalLink, QrCode, Search } from "lucide-react";
+import { Check, ExternalLink, FileText, QrCode, Search } from "lucide-react";
 
 import { EmptyState, PageHeader, PageShell, StatusBadge } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 import { useConversations } from "@/lib/transco/store";
 import type { Booking } from "@/lib/transco/types";
+import { fetchPaperFormToken } from "@/lib/transco/api";
+import { notify } from "@/lib/transco/notify";
 
 export const Route = createFileRoute("/console/walk-ins")({
   component: WalkInsPage,
@@ -16,6 +18,21 @@ export const Route = createFileRoute("/console/walk-ins")({
 const FORM_URL = "https://my.transcosydney.com.au/dropoff.html";
 
 type View = "confirm" | "today" | "all";
+
+/** Hand-written form → the same drop-off form in staff mode (photo fill, "entered from paper"). */
+async function openPaperForm() {
+  // Opened first so the browser doesn't block it as a pop-up.
+  const tab = window.open("about:blank", "_blank");
+  try {
+    const token = await fetchPaperFormToken();
+    const url = `${FORM_URL}#paper=${encodeURIComponent(token)}`;
+    if (tab) tab.location.href = url;
+    else window.location.href = url;
+  } catch (err) {
+    tab?.close();
+    notify.error("Couldn't open the paper form", err instanceof Error ? err.message : undefined);
+  }
+}
 
 function todayKey(): string {
   const now = new Date();
@@ -83,11 +100,16 @@ function WalkInsPage() {
         title="Walk-ins (QR)"
         description="Customers who came without a booking and filled the drop-off form on their phone."
         actions={
-          <Button asChild variant="outline" size="sm">
-            <a href={FORM_URL} target="_blank" rel="noreferrer">
-              Open the form <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
-            </a>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={() => void openPaperForm()}>
+              <FileText className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Type a paper form
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={FORM_URL} target="_blank" rel="noreferrer">
+                Open the form <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+              </a>
+            </Button>
+          </div>
         }
       />
 
@@ -183,6 +205,7 @@ function WalkInRow({ booking: b, bl, onOpen }: { booking: Booking; bl: string | 
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-base font-semibold text-foreground md:truncate">{b.customerName || formatPhone(b.phoneNumber)}</span>
             {b.walkInReturning ? <StatusBadge tone="info">Returning</StatusBadge> : <StatusBadge tone="neutral">New customer</StatusBadge>}
+            {b.walkInPaperBy && <StatusBadge tone="neutral">Paper form · {b.walkInPaperBy}</StatusBadge>}
             {b.status === "cancelled" ? (
               <StatusBadge tone="neutral">Cancelled</StatusBadge>
             ) : pending ? (

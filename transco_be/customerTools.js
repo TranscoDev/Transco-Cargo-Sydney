@@ -159,7 +159,7 @@ function cleanText(value, max) {
 // for their Passport/NIC too, and `homePhone` adds the optional "Home"
 // number from the paper form (both used by the walk-in drop-off form).
 // Returns { error, field } or { value }.
-function validatePerson(raw, who, { withId = false, idNumber = null, homePhone = false } = {}) {
+function validatePerson(raw, who, { withId = false, idNumber = null, homePhone = false, emailOptional = false } = {}) {
   const p = raw || {};
   const fullName = cleanText(p.fullName, 80);
   if (fullName.length < 2) return { error: `Please enter the ${who}'s full name as on their passport or NIC.`, field: `${who}.fullName` };
@@ -171,7 +171,8 @@ function validatePerson(raw, who, { withId = false, idNumber = null, homePhone =
     return { error: `Please enter the ${who}'s mobile number (digits only, with country code if outside Australia).`, field: `${who}.mobile` };
   }
   const email = cleanText(p.email, 120).toLowerCase();
-  if (!EMAIL_RE.test(email)) return { error: `Please enter the ${who}'s email address.`, field: `${who}.email` };
+  // Staff typing a paper form: customers who aren't online may have no email.
+  if (!(emailOptional && !email) && !EMAIL_RE.test(email)) return { error: `Please enter the ${who}'s email address.`, field: `${who}.email` };
   const value = { fullName, address, mobile, email };
   if (withId) {
     const town = cleanText(p.town, 60);

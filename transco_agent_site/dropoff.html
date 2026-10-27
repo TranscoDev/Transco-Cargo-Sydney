@@ -201,6 +201,18 @@
   var LAST_KEY = "transco_dropoff_last";
   var DRAFT_KEY = "transco_dropoff_draft";
 
+  // Staff mode: the console opens this page with #paper=<token> to type in
+  // a hand-written form (kept for this tab only; own draft, nothing remembered).
+  var PAPER = "";
+  try {
+    var ph = /[#&]paper=([^&]+)/.exec(location.hash);
+    if (ph) { PAPER = decodeURIComponent(ph[1]); sessionStorage.setItem("transco_paper", PAPER); history.replaceState(null, "", location.pathname); }
+    else PAPER = sessionStorage.getItem("transco_paper") || "";
+  } catch (e) {}
+  if (PAPER) DRAFT_KEY = "transco_dropoff_paper_draft";
+  var photoMsg = "";
+  var photoBusy = false;
+
   // ---------- text (English / Sinhala / Tamil) ----------
   // Box names, place names and the reference number stay in English,
   // the same way the rest of the site writes them.
@@ -623,7 +635,7 @@
       .then(function (d) { if (d && acctCheck.mobile === m) { acctCheck.hasAccount = !!d.hasAccount; if (STEPS[step] === "finish") render(); } })
       .catch(function () {});
   }
-  function accountStepOn() { return acctCheck.hasAccount === false && !newAcct.skip; }
+  function accountStepOn() { return !PAPER && acctCheck.hasAccount === false && !newAcct.skip; }
   var signature = { drawn: false, canvas: null };
   var last = store(LAST_KEY);
 
@@ -685,9 +697,77 @@
       "<span>" + esc(title) + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></button>";
   }
 
+  // Staff mode: read a photo of the paper form and fill what it can.
+  function paperBox() {
+    return '<div class="note info"><b>Staff: typing a paper form.</b> Take or choose a photo of the form to fill it in roughly, then check every step against the paper.' +
+      '<div style="margin-top:10px"><label class="btn back" style="display:inline-block;min-height:0;padding:10px 14px;font-size:15px;cursor:pointer">' +
+      (photoBusy ? "Reading the photo…" : "📷 Fill from a photo") +
+      '<input id="paper-photo" type="file" accept="image/*" capture="environment" hidden' + (photoBusy ? " disabled" : "") + "></label></div>" +
+      (photoMsg ? '<p style="margin:8px 0 0">' + esc(photoMsg) + "</p>" : "") + "</div>";
+  }
+  // Big phone photos → a ~1800px JPEG, small enough to send.
+  function shrinkPhoto(file, done) {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function () {
+      var scale = Math.min(1, 1800 / Math.max(img.width, img.height));
+      var cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      done(cv.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); done(null); };
+    img.src = url;
+  }
+  function str(v) { return v == null ? "" : String(v).trim(); }
+  function applyPhoto(f) {
+    if (f.country && options.countries.some(function (c) { return c.key === f.country; })) state.country = f.country;
+    var c = country();
+    if (c && c.services.some(function (s) { return s.key === f.service; })) state.service = f.service;
+    if (f.deliveryType === "door" || f.deliveryType === "collect") state.deliveryType = f.deliveryType;
+    if (c && f.boxes && typeof f.boxes === "object") {
+      var boxes = {};
+      c.itemTypes.forEach(function (it) { var n = Math.floor(Number(f.boxes[it.key]) || 0); if (n > 0) boxes[it.key] = Math.min(n, 50); });
+      if (Object.keys(boxes).length) state.boxes = boxes;
+    }
+    ["sender", "receiver"].forEach(function (g) {
+      var p = f[g] || {};
+      Object.keys(state[g]).forEach(function (k) { if (str(p[k])) state[g][k] = str(p[k]); });
+    });
+    if (Array.isArray(f.contents)) {
+      var rows = [];
+      f.contents.forEach(function (x) {
+        if (!x || !CATS.some(function (k) { return k[0] === x.category; }) || rows.some(function (r) { return r.category === x.category; })) return;
+        rows.push({ category: x.category, qty: String(Math.max(1, Math.floor(Number(x.qty) || 1))), value: x.value == null || x.value === "" ? "" : String(x.value), description: str(x.description), condition: "" });
+      });
+      if (rows.length) state.contents = rows;
+    }
+    if (typeof f.insurance === "boolean") state.insurance = f.insurance;
+    if (str(f.signedName)) state.signedName = str(f.signedName);
+  }
+  function readPhoto(file) {
+    photoBusy = true; photoMsg = ""; render();
+    shrinkPhoto(file, function (image) {
+      if (!image) { photoBusy = false; photoMsg = "That file couldn't be opened as a picture."; render(); return; }
+      fetch(API_ORIGIN + "/api/public/dropoff/read-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paperToken: PAPER, image: image }) })
+        .then(function (res) { return res.json().catch(function () { return {}; }).then(function (d) { return { ok: res.ok, data: d }; }); })
+        .then(function (r) {
+          photoBusy = false;
+          if (!r.ok || !r.data.form) { photoMsg = (r.data && r.data.error) || "Couldn't read the photo. Please type it in."; render(); return; }
+          applyPhoto(r.data.form); saveDraft();
+          photoMsg = "✓ Filled from the photo. Check every step against the paper — hand-writing can be misread.";
+          render();
+        })
+        .catch(function () { photoBusy = false; photoMsg = "Couldn't send the photo. Check the internet and try again."; render(); });
+    });
+  }
+
   function renderWhere() {
     var c = country();
-    var html = "<h1>" + esc(t("Where are you sending?")) + '</h1><p class="lead">' + esc(t("Fill this while you wait — our staff will check your boxes with you.")) + "</p>";
+    var html = PAPER
+      ? paperBox() + "<h1>Where is it going?</h1>"
+      : "<h1>" + esc(t("Where are you sending?")) + '</h1><p class="lead">' + esc(t("Fill this while you wait — our staff will check your boxes with you.")) + "</p>";
     html += '<div class="choices two">' + options.countries.map(function (o) {
       return choice('data-country="' + o.key + '"', state.country === o.key, o.key === "india" ? "🇮🇳" : "🇱🇰", t(o.label));
     }).join("") + "</div>";
@@ -844,7 +924,7 @@
       '<option value="">' + esc(t("Choose…")) + "</option>" + ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"].map(function (x) { return '<option' + (state.sender.state === x ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
       field("sender", "postcode", "Postcode", { mode: "numeric", ac: "postal-code" }) + "</div>";
     html += field("sender", "mobile", "Mobile", { type: "tel", mode: "tel", ac: "tel" });
-    html += field("sender", "email", "Email", { type: "email", mode: "email", ac: "email" });
+    html += field("sender", "email", PAPER ? "Email (leave empty if they have none)" : "Email", { type: "email", mode: "email", ac: "email" });
     // Same order as the online booking form.
     html += field("sender", "idNumber", "Passport or NIC number", { caps: true, optional: state.country !== "sri_lanka" });
     html += field("sender", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
@@ -881,7 +961,7 @@
     html += field("receiver", "address", "Address", { multiline: true });
     html += field("receiver", "town", "Town / city");
     html += field("receiver", "mobile", "Mobile", { type: "tel", mode: "tel" });
-    html += field("receiver", "email", "Email", { type: "email", mode: "email" });
+    html += field("receiver", "email", PAPER ? "Email (leave empty if they have none)" : "Email", { type: "email", mode: "email" });
     html += field("receiver", "idNumber", "Passport or NIC number", { caps: true });
     html += field("receiver", "homePhone", "Home phone", { type: "tel", mode: "tel", optional: true });
     return html;
@@ -960,7 +1040,7 @@
     html += '<div style="height:22px"></div>';
     html += '<label class="check' + (badFields.declarationAccepted ? " bad" : "") + '"><input type="checkbox" id="declare"' + (state.declarationAccepted ? " checked" : "") + " /><span>" +
       esc(t("I declare that firearms, dangerous goods, chemicals, any prohibited items or commercial quantity of goods are not in the contents.")) + "</span></label>";
-    html += '<div style="margin-top:18px">' + field("_sign", "signedName", "Type your full name to sign") + "</div>";
+    html += '<div style="margin-top:18px">' + field("_sign", "signedName", PAPER ? "Customer's name as signed on the paper form" : "Type your full name to sign") + "</div>";
     html += '<div class="field"><label>' + esc(t("Signature")) + ' <span class="opt">(' + esc(t("optional")) + ')</span></label><div class="sig-wrap"><canvas id="sig"></canvas><div class="ph" id="sig-ph">' + esc(t("Sign here with your finger")) + "</div></div>" +
       '<div class="sig-actions"><span>' + esc(t("You can also sign the printed form at the counter.")) + '</span><button type="button" id="sig-clear">' + esc(t("Clear")) + "</button></div></div>";
     html += renderAccountStep();
@@ -1015,6 +1095,13 @@
   function renderDone() {
     var c = country();
     var boxes = c ? c.itemTypes.filter(function (it) { return state.boxes[it.key]; }).map(function (it) { return state.boxes[it.key] + " × " + it.label; }).join(", ") : "";
+    if (PAPER) {
+      return '<div class="done"><div class="big" aria-hidden="true">✓</div><h1>Paper form saved</h1>' +
+        '<div class="code">' + esc(result.bookingCode) + "</div>" +
+        '<p class="lead">It\'s in the console under Walk-ins. Open it there to check the boxes, value the items and assign the BL — that adds the customer.</p>' +
+        '<div class="summary"><div><b>Sender</b> ' + esc(state.sender.fullName) + "</div><div><b>Boxes</b> " + esc(boxes) + "</div><div><b>Receiver</b> " + esc(state.receiver.fullName) + "</div></div>" +
+        '<button type="button" class="btn back" id="again" style="width:100%;margin-top:22px">Type another paper form</button></div>';
+    }
     return '<div class="done"><div class="big" aria-hidden="true">✓</div><h1>' + esc(t("Thank you!")) + "</h1>" +
       '<p class="lead" style="font-size:17px;color:var(--ink);font-weight:600">' + esc(t("Please show this screen to our staff.")) + "</p>" +
       '<div class="code">' + esc(result.bookingCode) + "</div>" +
@@ -1027,6 +1114,8 @@
   // ---------- events ----------
 
   function bind() {
+    var photoInput = document.getElementById("paper-photo");
+    if (photoInput) photoInput.onchange = function () { if (photoInput.files && photoInput.files[0]) readPhoto(photoInput.files[0]); };
     main.querySelectorAll("[data-country]").forEach(function (b) {
       b.onclick = function () {
         var key = b.getAttribute("data-country");
@@ -1383,7 +1472,9 @@
     if (withTown && String(p.town).trim().length < 2) bad[group + ".town"] = 1;
     if (!phoneOk(p.mobile) || (window.PhoneField && !PhoneField.validMobile(p.mobile))) bad[group + ".mobile"] = 1;
     if (p.homePhone && !phoneOk(p.homePhone)) bad[group + ".homePhone"] = 1;
-    if (!EMAIL_RE.test(String(p.email).trim())) bad[group + ".email"] = 1;
+    // Staff mode: offline customers may have no email — check it only if given.
+    var em = String(p.email || "").trim();
+    if (!(PAPER && !em) && !EMAIL_RE.test(em)) bad[group + ".email"] = 1;
     return bad;
   }
 
@@ -1486,6 +1577,7 @@
       signedName: state.signedName,
       signatureImage: signaturePng()
     };
+    if (PAPER) body.paperToken = PAPER;
     if (accountStepOn()) body.account = { email: String(newAcct.email).trim(), password: newAcct.password, privacyAccepted: true };
     if (state.service === "air") {
       body.dangerousGoods = {
@@ -1509,8 +1601,10 @@
         result = r.data;
         newAcct.created = !!body.account;
         // Remembered on THIS phone only, for next time.
-        store(LAST_KEY, { country: state.country, sender: state.sender, receiver: state.receiver });
-        last = store(LAST_KEY);
+        if (!PAPER) {
+          store(LAST_KEY, { country: state.country, sender: state.sender, receiver: state.receiver });
+          last = store(LAST_KEY);
+        }
         store(DRAFT_KEY, null);
         render(); window.scrollTo(0, 0);
       })
@@ -1540,7 +1634,7 @@
     .catch(function () {});
 
   // Already signed in to My Transco on this phone → saved details ready.
-  loadSaved(false);
+  if (!PAPER) loadSaved(false);
 
   render();
 })();

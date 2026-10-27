@@ -304,6 +304,8 @@ export interface Booking {
   walkInStatus?: "submitted" | "finalised" | null | undefined;
   /** Walk-ins only: the phone number was already a customer when the form came in. */
   walkInReturning?: boolean | null | undefined;
+  /** Typed in by this staff member from a hand-written form. */
+  walkInPaperBy?: string | null | undefined;
   /** The full declaration (incl. what's inside) was filled online or on the QR form. */
   declarationComplete?: boolean | undefined;
   /** Staff checked the boxes, valued the items and assigned the BL. */
