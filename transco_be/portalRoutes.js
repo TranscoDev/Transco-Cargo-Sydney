@@ -15,7 +15,7 @@
 
 const crypto = require('crypto');
 const express = require('express');
-const { customers, customerOtps } = require('./db');
+const { customers, customerOtps, bookings, shipments } = require('./db');
 
 // "Forgot password" links: single use, 30 minutes. Only a hash of the
 // token is stored, so a database leak can't be used to reset passwords.
@@ -155,6 +155,22 @@ async function emailTakenByOtherAccount(email, excludeId) {
   };
   if (excludeId) q._id = { $ne: excludeId };
   return Boolean(await customers().findOne(q, { projection: { _id: 1 } }));
+}
+
+// A known number with nothing personal on it yet — no email, address,
+// sender details, bookings or shipments. Sign-up can take it over without
+// the email check (there's nothing to see), keeping the chat history.
+async function isBareContact(c) {
+  if (c.email) return false;
+  const a = c.address || {};
+  if (a.line1 || a.suburb || a.postcode) return false;
+  const s = c.senderDetails || {};
+  if (Object.values(s).some(Boolean)) return false;
+  const [booking, shipment] = await Promise.all([
+    bookings().findOne({ customerId: c._id }, { projection: { _id: 1 } }),
+    shipments().findOne({ customerId: c._id }, { projection: { _id: 1 } })
+  ]);
+  return !booking && !shipment;
 }
 
 module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessage, sendCustomerEmail, hashPassword, verifyPassword }) {
@@ -387,9 +403,47 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     if (body.privacyAccepted !== true) {
       return res.status(400).json({ error: 'Please tick that you agree to the Privacy Policy.', field: 'privacyAccepted' });
     }
-    const existing = await customers().findOne({ phoneNumber }, { projection: { passwordHash: 1, email: 1, name: 1 } });
+    const existing = await customers().findOne({ phoneNumber }, { projection: { passwordHash: 1, email: 1, name: 1, phoneNumber: 1, address: 1, senderDetails: 1 } });
     if (existing && existing.passwordHash) {
       return res.status(409).json({ error: 'This number already has an account. Please sign in instead.', reason: 'has_account' });
+    }
+    if (existing && await isBareContact(existing)) {
+      // Only a number we've chatted with (often saved on the office
+      // WhatsApp as "2026 418M") — nothing on it to protect, so they open
+      // the account straight away, on the same record (chats kept), and
+      // their own name replaces the placeholder.
+      if (await emailTakenByOtherAccount(email, existing._id)) {
+        return res.status(409).json({
+          error: 'This email is already used by another My Transco account. Please sign in, or use a different email.',
+          reason: 'email_taken',
+          field: 'email'
+        });
+      }
+      const now = new Date();
+      const set = {
+        passwordHash: hashPassword(body.password),
+        email,
+        phoneVerified: false,
+        preferredLanguage: LANGUAGES.includes(body.preferredLanguage) ? body.preferredLanguage : 'en',
+        portalJoinedAt: now,
+        acquisitionSource: ACQUISITION_SOURCES.includes(body.source) ? body.source : 'website',
+        lastPortalLoginAt: now,
+        privacyAcceptedAt: now,
+        privacyPolicyVersion: PRIVACY_POLICY_VERSION
+      };
+      if (!hasRealName(existing)) set.name = name;
+      const claimed = await customers().findOneAndUpdate(
+        { _id: existing._id, passwordHash: { $exists: false } },
+        { $set: set, $addToSet: { sources: 'portal' } },
+        { returnDocument: 'after' }
+      );
+      if (!claimed) return res.status(409).json({ error: 'This number already has an account. Please sign in instead.', reason: 'has_account' });
+      await tools.ensureCustomerCode(claimed);
+      return res.status(201).json({
+        token: customerAuth.signCustomerToken(claimed),
+        profile: tools.publicProfile(claimed),
+        needsName: false
+      });
     }
     if (existing) {
       // A number we already know (an earlier shipment or WhatsApp). The

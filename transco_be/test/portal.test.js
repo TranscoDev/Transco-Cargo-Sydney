@@ -575,8 +575,22 @@ test('password sign-up: a new number gets an account straight away and can book'
   assert.equal(list.body.bookings.length, 1);
 });
 
+test('sign-up takes over a saved WhatsApp contact with nothing on it, and its real name replaces the placeholder', async () => {
+  const { insertedId } = await db.collection('customers').insertOne({ phoneNumber: '61400333009', name: '2026 009M', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
+  const reg = await api('POST', '/api/portal/auth/register', {
+    body: { privacyAccepted: true, email: 'bare009@example.com', countryCode: '61', phone: '0400333009', name: 'Nimal Perera', password: 'long-enough-pw' }
+  });
+  assert.equal(reg.status, 201, JSON.stringify(reg.body));
+  assert.equal(reg.body.profile.name, 'Nimal Perera');
+  const stored = await db.collection('customers').findOne({ phoneNumber: '61400333009' });
+  assert.equal(String(stored._id), String(insertedId));
+  assert.equal(stored.name, 'Nimal Perera');
+  assert.equal(stored.phoneVerified, false);
+  assert.equal(await db.collection('customers').countDocuments({ phoneNumber: '61400333009' }), 1);
+});
+
 test('password sign-up is refused for a number that already has history, and for weak input', async () => {
-  await db.collection('customers').insertOne({ phoneNumber: '61400333002', name: 'Existing WhatsApp', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'] });
+  await db.collection('customers').insertOne({ phoneNumber: '61400333002', name: 'Existing WhatsApp', mode: 'CHATBOT', status: 'ACTIVE', sources: ['whatsapp'], address: { line1: '1 Old St', suburb: 'Auburn' } });
   const known = await api('POST', '/api/portal/auth/register', {
     body: { privacyAccepted: true, email: `reg576@example.com`, countryCode: '61', phone: '0400333002', name: 'Someone Else', password: 'long-enough-pw' }
   });

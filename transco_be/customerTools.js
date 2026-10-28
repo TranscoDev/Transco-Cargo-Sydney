@@ -127,13 +127,15 @@ function statusIndex(status) {
 
 // A customer created by WhatsApp with no profile name gets their phone
 // number as `name`; a web visitor gets "Website Visitor #XXXX". Neither
-// is something to greet a person with.
+// is something to greet a person with. Nor is a label staff gave a number
+// they saved on the office WhatsApp before knowing the name ("2026 418M")
+// — no real name starts with a digit.
 function hasRealName(customer) {
   const name = (customer.name || '').trim();
   if (!name) return false;
   if (name === customer.phoneNumber) return false;
   if (/^website visitor/i.test(name)) return false;
-  if (/^\+?\d[\d\s-]+$/.test(name)) return false;
+  if (/^\+?\d/.test(name)) return false;
   return true;
 }
 

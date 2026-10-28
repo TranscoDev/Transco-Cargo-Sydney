@@ -20,6 +20,7 @@ const { ObjectId } = require('mongodb');
 const { customers } = require('./db');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { emailTakenByOtherAccount } = require('./portalRoutes');
+const { hasRealName } = require('./customerTools');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -60,7 +61,7 @@ module.exports = function createLoginLinkRouter({ tools }) {
       // Same person already known (a booking, WhatsApp…) — keep their
       // history; fill in what's missing.
       const set = { staffAccountAt: customer.staffAccountAt || now, staffAccountBy: customer.staffAccountBy || staff(req) };
-      if (!customer.name || /^\+?\d[\d\s]*$/.test(customer.name)) set.name = name;
+      if (!hasRealName(customer)) set.name = name;
       if (email && !customer.email) {
         if (await emailTakenByOtherAccount(email, customer._id)) return res.status(409).json({ error: 'This email is already used by another My Transco account.', field: 'email' });
         set.email = email;
