@@ -171,6 +171,12 @@ function BatchDetailPage() {
             <SectionCard icon={Wallet} tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" title="Money">
               <div className="flex flex-col gap-2 text-sm">
                 <Line label="Income" value={AUD.format(batch.financials.grossIncome)} />
+                {batch.incomeFromCosting && (
+                  <p className="-mt-1 text-xs text-muted-foreground">
+                    From costing sheets — {batch.incomeFromCosting.withCosting} of {batch.incomeFromCosting.hbls} HBLs
+                    {batch.incomeFromCosting.withCosting < batch.incomeFromCosting.hbls ? " (the rest have no costing yet)" : ""}
+                  </p>
+                )}
                 <Line label="Expenses" value={AUD.format(batch.financials.totalExpenses)} />
                 <div className="mt-1 flex items-baseline justify-between rounded-lg bg-success-soft px-3 py-2">
                   <span className="font-medium text-success-foreground">Profit</span>
@@ -499,6 +505,7 @@ function EditShipmentDialog({
   const [peNumber, setPeNumber] = useState(batch.peNumber ?? "");
   const [dates, setDates] = useState<Record<DateKey, string>>(initialDates);
   const showMoney = getCurrentUser()?.role !== "warehouse";
+  const incomeAuto = !!batch.incomeFromCosting;
   const moneyText = (v: number) => (v ? String(v) : "");
   const [income, setIncome] = useState(moneyText(batch.financials.grossIncome));
   const [expenses, setExpenses] = useState(moneyText(batch.financials.totalExpenses));
@@ -541,7 +548,7 @@ function EditShipmentDialog({
         setError("Income and expenses must be amounts like 12500.50.");
         return;
       }
-      if (inc !== batch.financials.grossIncome) input.grossIncome = inc;
+      if (!incomeAuto && inc !== batch.financials.grossIncome) input.grossIncome = inc;
       if (exp !== batch.financials.totalExpenses) input.totalExpenses = exp;
     }
     if (!Object.keys(input).length) {
@@ -608,7 +615,8 @@ function EditShipmentDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-income">Income ($)</Label>
-                <Input id="edit-income" inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} placeholder="0.00" />
+                <Input id="edit-income" inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} placeholder="0.00" disabled={incomeAuto} />
+                {incomeAuto && <span className="text-xs text-muted-foreground">Added up from the costing sheets</span>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-expenses">Expenses ($)</Label>

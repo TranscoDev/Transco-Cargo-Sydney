@@ -690,6 +690,7 @@ interface BackendConsolidation {
   paymentTotals: { zeller: number; eft: number; cash: number };
   financials: ConsolidationFinancials;
   financialsNote?: string | null;
+  incomeFromCosting?: { withCosting: number; hbls: number };
   dates: ConsolidationDates;
   importedShipmentCount: number;
   liveBoxes?: LiveBoxCounts;
@@ -708,6 +709,7 @@ function mapConsolidation(c: BackendConsolidation): Consolidation {
     paymentTotals: c.paymentTotals,
     financials: c.financials,
     financialsNote: c.financialsNote,
+    incomeFromCosting: c.incomeFromCosting,
     dates: c.dates,
     importedShipmentCount: c.importedShipmentCount,
     liveBoxes: c.liveBoxes,

@@ -3998,11 +3998,56 @@ app.get('/api/next-bl', async (req, res) => {
 // it's how many shipments from this batch actually exist in `shipments`
 // so far, which will be smaller than totals.hbl until the rest of a
 // batch's rows are imported.
+// Income from the customers' costing sheets (booking.costing.total, saved
+// when the BL is assigned). Used for shipments made in the console — an
+// imported shipment keeps the sheet's money. Expenses stay typed in by
+// staff; profit = costing income − expenses. If no HBL has a costing sheet
+// yet, the typed-in income is kept.
+const isSheetImport = c => !!(c.source && typeof c.source === 'object');
+
+async function costingIncomeByConsolidation(consolidationIds) {
+  const result = new Map();
+  if (!consolidationIds.length) return result;
+  const list = await shipments().find(
+    { consolidationId: { $in: consolidationIds } },
+    { projection: { consolidationId: 1, bookingId: 1 } }
+  ).toArray();
+  const bookingIds = list.map(s => s.bookingId).filter(Boolean);
+  const costed = bookingIds.length
+    ? await bookings().find({ _id: { $in: bookingIds }, 'costing.total': { $type: 'number' } }, { projection: { 'costing.total': 1 } }).toArray()
+    : [];
+  const totalByBooking = new Map(costed.map(b => [String(b._id), b.costing.total]));
+  for (const s of list) {
+    const key = String(s.consolidationId);
+    const row = result.get(key) || { income: 0, withCosting: 0, hbls: 0 };
+    row.hbls += 1;
+    const total = s.bookingId ? totalByBooking.get(String(s.bookingId)) : undefined;
+    if (total !== undefined) { row.income += total; row.withCosting += 1; }
+    result.set(key, row);
+  }
+  return result;
+}
+
+function withCostingMoney(c, byId) {
+  if (isSheetImport(c)) return c;
+  const row = byId.get(String(c._id));
+  if (!row || !row.withCosting) return c;
+  const income = Math.round(row.income * 100) / 100;
+  const expenses = (c.financials && c.financials.totalExpenses) || 0;
+  return {
+    ...c,
+    financials: { grossIncome: income, totalExpenses: expenses, grossProfit: Math.round((income - expenses) * 100) / 100 },
+    incomeFromCosting: { withCosting: row.withCosting, hbls: row.hbls }
+  };
+}
+
 app.get('/api/consolidations', async (req, res) => {
 
   try {
 
-    const allConsolidations = await consolidations().find({}).sort({ batchNumber: -1 }).toArray();
+    const found = await consolidations().find({}).sort({ batchNumber: -1 }).toArray();
+    const costingById = await costingIncomeByConsolidation(found.filter(c => !isSheetImport(c)).map(c => c._id));
+    const allConsolidations = found.map(c => withCostingMoney(c, costingById));
 
     const counts = await shipments().aggregate([
       { $match: { consolidationId: { $ne: null } } },
@@ -4112,13 +4157,17 @@ app.get('/api/consolidations/:consolidationId', async (req, res) => {
       });
     }
 
-    const consolidation = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
+    const stored = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
 
-    if (!consolidation) {
+    if (!stored) {
       return res.status(404).json({
         error: 'Consolidation not found'
       });
     }
+
+    const consolidation = isSheetImport(stored)
+      ? stored
+      : withCostingMoney(stored, await costingIncomeByConsolidation([stored._id]));
 
     const batchShipments = await shipments()
       .find({ consolidationId: consolidation._id })
@@ -4256,6 +4305,9 @@ app.patch('/api/consolidations/:consolidationId', async (req, res) => {
         money[key] = Math.round(v * 100) / 100;
       }
       set.financials = { ...money, grossProfit: Math.round((money.grossIncome - money.totalExpenses) * 100) / 100 };
+      // Income typed in wins over the costing sheets; sent blank (null) it
+      // goes back to adding up the costing sheets.
+      if (body.grossIncome !== undefined) set.incomeManual = body.grossIncome !== null && body.grossIncome !== '';
     }
 
     if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to change.' });
@@ -4272,7 +4324,8 @@ app.patch('/api/consolidations/:consolidationId', async (req, res) => {
     }
 
     const importedShipmentCount = await shipments().countDocuments({ consolidationId: existing._id });
-    const result = { ...updated, importedShipmentCount };
+    const withMoney = isSheetImport(updated) ? updated : withCostingMoney(updated, await costingIncomeByConsolidation([updated._id]));
+    const result = { ...withMoney, importedShipmentCount };
     broadcast('consolidation.updated', { consolidation: result });
     res.status(200).json({ consolidation: result });
   } catch (err) {

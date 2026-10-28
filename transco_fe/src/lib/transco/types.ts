@@ -521,6 +521,8 @@ export interface Consolidation {
   paymentTotals: { zeller: number; eft: number; cash: number };
   financials: ConsolidationFinancials;
   financialsNote?: string | null | undefined;
+  /** Set when Income is added up from the customers' costing sheets (console-made shipments). */
+  incomeFromCosting?: { withCosting: number; hbls: number } | undefined;
   dates: ConsolidationDates;
   importedShipmentCount: number;
   /** Boxes in the BLs actually in this shipment now (fills up as BLs are added). */
