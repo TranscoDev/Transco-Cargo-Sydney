@@ -210,4 +210,4 @@ async function landingSheetPdf(sheet) {
   return Buffer.from(await doc.save());
 }
 
-module.exports = { buildLandingSheet, landingSheetPdf, COLUMNS };
+module.exports = { buildLandingSheet, landingSheetPdf, rowFor, COLUMNS };

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/transco/money-input";
 import { Label } from "@/components/ui/label";
-import { saveCosting, type DeclarationPrintData } from "@/lib/transco/declaration-print";
+import { saveCosting, type DeclarationPrintData, type PaymentMethod } from "@/lib/transco/declaration-print";
 import { formatDate } from "@/lib/transco/my-transco";
 import { friendlyError, notify } from "@/lib/transco/notify";
 
@@ -59,6 +59,16 @@ const isBoxKind = (k: string) => k in KIND_NAME && !EXTRA_KINDS.includes(k);
 const needsName = (k: string) => k === "other" || k === "odd";
 
 type Line = { kind: string; label: string; qty: string; amount: string };
+
+// Paid by — the Finance page's payment columns.
+const PAY_METHOD_NAME: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  zeller: "Zeller",
+  eftpos: "EFTPOS",
+  bank: "DD / Bank transfer",
+  other: "Other",
+};
+type Pay = { method: PaymentMethod; amount: string };
 
 /** The bot's price for this many of a box type, or null (staff fill it in). */
 function priceFor(kind: string, qty: number, d: DeclarationPrintData): number | null {
@@ -242,6 +252,7 @@ export function CostingCard({
 
   const [lines, setLines] = useState<Line[]>(() => (saved ? saved.lines.map(fromSaved) : suggestedLines(items, data)));
   const [discount, setDiscount] = useState(saved && saved.discount ? String(saved.discount) : "");
+  const [pays, setPays] = useState<Pay[]>(() => (saved?.payments ?? []).map((p) => ({ method: p.method, amount: String(p.amount) })));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [followed, setFollowed] = useState(false);
@@ -260,6 +271,8 @@ export function CostingCard({
     const sum = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
     return Math.max(0, sum - (Number(discount) || 0));
   }, [lines, discount]);
+  const paidTotal = pays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const money = (n: number) => `$${n.toFixed(2).replace(/\.00$/, "")}`;
 
   const update = (i: number, patch: Partial<Line>) => setLines((s) => s.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   // Type or count changed → the amount follows when the bot has a rate.
@@ -304,10 +317,15 @@ export function CostingCard({
       setError("The discount must be a number, 0 or more.");
       return;
     }
+    const payments = pays.map((p) => ({ method: p.method, amount: p.amount.trim() === "" ? NaN : Number(p.amount) }));
+    if (payments.some((p) => !Number.isFinite(p.amount) || p.amount <= 0)) {
+      setError("Enter the amount for each payment, or remove it.");
+      return;
+    }
     setSaving(true);
     try {
-      await saveCosting(data.bookingId, { lines: clean, discount: disc });
-      notify.success("Costing saved", `Total $${total.toFixed(2).replace(/\.00$/, "")} is now the booking's price.`);
+      await saveCosting(data.bookingId, { lines: clean, discount: disc, payments });
+      notify.success("Costing saved", `Total ${money(total)} is now the booking's price.`);
       onSaved();
     } catch (err) {
       setError(friendlyError(err, "Could not save the costing. Please try again."));
@@ -401,8 +419,57 @@ export function CostingCard({
         <span />
         <span className="text-base font-semibold text-foreground">Total</span>
         <span />
-        <span className="text-right text-base font-semibold tabular-nums text-foreground">${total.toFixed(2).replace(/\.00$/, "")}</span>
+        <span className="text-right text-base font-semibold tabular-nums text-foreground">{money(total)}</span>
         <span />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2 border-t pt-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-foreground">Paid by</h3>
+          {pays.length > 0 && (
+            <span className={`text-xs ${paidTotal + 0.005 < total ? "text-attention-foreground" : "text-muted-foreground"}`}>
+              Paid {money(paidTotal)}
+              {paidTotal + 0.005 < total ? ` · ${money(total - paidTotal)} still to pay` : ""}
+            </span>
+          )}
+        </div>
+        {pays.map((p, i) => (
+          <div key={i} className={cols}>
+            <select
+              aria-label={`Payment ${i + 1} method`}
+              value={p.method}
+              onChange={(e) => setPays((s) => s.map((x, j) => (j === i ? { ...x, method: e.target.value as PaymentMethod } : x)))}
+              className="h-9 min-w-0 rounded-md border border-input bg-card px-2 text-sm sm:w-48"
+            >
+              {(Object.keys(PAY_METHOD_NAME) as PaymentMethod[]).map((m) => (
+                <option key={m} value={m}>
+                  {PAY_METHOD_NAME[m]}
+                </option>
+              ))}
+            </select>
+            <span />
+            <MoneyInput
+              aria-label={`Payment ${i + 1} amount`}
+              value={p.amount}
+              onChange={(e) => setPays((s) => s.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))}
+              className="text-right tabular-nums"
+            />
+            <Button type="button" variant="ghost" size="icon" aria-label={`Remove payment ${i + 1}`} onClick={() => setPays((s) => s.filter((_, j) => j !== i))}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() =>
+            setPays((s) => [...s, { method: "zeller", amount: s.length ? "" : total > 0 ? String(Math.round(total * 100) / 100) : "" }])
+          }
+        >
+          <Plus className="mr-1 h-4 w-4" /> Add payment
+        </Button>
       </div>
 
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}

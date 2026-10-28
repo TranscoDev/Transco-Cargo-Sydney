@@ -179,6 +179,13 @@ function BatchDetailPage() {
                   </p>
                 )}
                 <Line label="Expenses" value={AUD.format(batch.financials.totalExpenses)} />
+                {batch.incomeFromCosting && (
+                  <p className="-mt-1 text-xs text-muted-foreground">
+                    {batch.expensesManual
+                      ? `Typed in — Finance works out ${AUD.format(batch.incomeFromCosting.expense)}`
+                      : "Worked out on the Finance page from the costing sheets"}
+                  </p>
+                )}
                 <div className="mt-1 flex items-baseline justify-between rounded-lg bg-success-soft px-3 py-2">
                   <span className="font-medium text-success-foreground">Profit</span>
                   <span className="text-xl font-semibold tabular-nums text-success-foreground">{AUD.format(batch.financials.grossProfit)}</span>
@@ -510,9 +517,11 @@ function EditShipmentDialog({
   const costing = batch.incomeFromCosting;
   const incomeAuto = !!costing && !batch.incomeManual;
   const moneyText = (v: number) => (v ? String(v) : "");
+  const expensesAuto = !!costing && !batch.expensesManual;
   const incomeText = () => (incomeAuto ? "" : moneyText(batch.financials.grossIncome));
+  const expensesText = () => (expensesAuto ? "" : moneyText(batch.financials.totalExpenses));
   const [income, setIncome] = useState(incomeText);
-  const [expenses, setExpenses] = useState(moneyText(batch.financials.totalExpenses));
+  const [expenses, setExpenses] = useState(expensesText);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -522,7 +531,7 @@ function EditShipmentDialog({
     setPeNumber(batch.peNumber ?? "");
     setDates(initialDates());
     setIncome(incomeText());
-    setExpenses(moneyText(batch.financials.totalExpenses));
+    setExpenses(expensesText());
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, batch]);
@@ -557,7 +566,11 @@ function EditShipmentDialog({
       } else if (incomeAuto || inc !== batch.financials.grossIncome) {
         input.grossIncome = inc;
       }
-      if (exp !== batch.financials.totalExpenses) input.totalExpenses = exp;
+      if (costing && !expenses.trim()) {
+        if (batch.expensesManual) input.totalExpenses = null;
+      } else if (expensesAuto || exp !== batch.financials.totalExpenses) {
+        input.totalExpenses = exp;
+      }
     }
     if (!Object.keys(input).length) {
       onOpenChange(false);
@@ -638,7 +651,16 @@ function EditShipmentDialog({
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-expenses">Expenses ($)</Label>
-                <Input id="edit-expenses" inputMode="decimal" value={expenses} onChange={(e) => setExpenses(e.target.value)} placeholder="0.00" />
+                <Input
+                  id="edit-expenses"
+                  inputMode="decimal"
+                  value={expenses}
+                  onChange={(e) => setExpenses(e.target.value)}
+                  placeholder={costing ? String(costing.expense) : "0.00"}
+                />
+                {costing && (
+                  <span className="text-xs text-muted-foreground">Leave blank to use Finance ({AUD.format(costing.expense)})</span>
+                )}
               </div>
               <p className="col-span-2 text-xs text-muted-foreground">Profit is worked out for you: income minus expenses.</p>
             </div>

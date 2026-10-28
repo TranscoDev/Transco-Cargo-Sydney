@@ -1023,6 +1023,8 @@ function createCustomerTools({
   // boxes at drop-off, a name was misspelt, …). Same validation as the
   // customer form; only the parts sent are changed. Every edit is recorded
   // (who, when, what) so there's a trail of changes to the declaration.
+  const PAYMENT_METHODS = ['cash', 'zeller', 'eftpos', 'bank', 'other'];
+
   // Staff costing for a booking: cost lines (name + amount) they can add,
   // change or remove, a discount, and the total. The total is also saved
   // as the booking's price, so lists and reports show it.
@@ -1048,7 +1050,21 @@ function createCustomerTools({
     const discount = input.discount === null || input.discount === undefined || input.discount === '' ? 0 : Number(input.discount);
     if (!Number.isFinite(discount) || discount < 0) return { error: 'The discount must be 0 or more.' };
     const total = Math.max(0, Math.round((lines.reduce((s, l) => s + l.amount, 0) - discount) * 100) / 100);
-    const costing = { lines, discount, total, updatedAt: new Date(), updatedBy: staffEmail || null };
+    // Paid by: how the customer paid (method + amount) — the Finance page's
+    // Cash / Zeller / EFTPOS / DD-bank / Other columns. Not sent = kept.
+    let payments = (b.costing && Array.isArray(b.costing.payments)) ? b.costing.payments : [];
+    if (input.payments !== undefined) {
+      if (!Array.isArray(input.payments) || input.payments.length > 10) return { error: 'Add up to 10 payments.' };
+      payments = [];
+      for (const p of input.payments) {
+        const method = p && PAYMENT_METHODS.includes(p.method) ? p.method : null;
+        const amount = Number(p && p.amount);
+        if (!method) return { error: 'Pick how each payment was made.' };
+        if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000) return { error: 'Each payment needs an amount more than 0.' };
+        payments.push({ method, amount: Math.round(amount * 100) / 100 });
+      }
+    }
+    const costing = { lines, discount, total, payments, updatedAt: new Date(), updatedBy: staffEmail || null };
     // Also fills the paper form's office-use boxes, so staff never enter
     // prices twice: "pickup" lines → Pickup, "door"/"delivery" lines → D to D,
     // everything else → Freight. Staff-only — never shown to customers.

@@ -10,7 +10,7 @@ const { ObjectId } = require('mongodb');
 
 const multer = require('multer');
 
-const { connectToDatabase, customers, messages, processedWhatsAppMessages, users, bookings, settings, shipmentHistory, shipments, consolidations, receivers, campaigns, segments } = require('./db');
+const { connectToDatabase, customers, messages, processedWhatsAppMessages, users, bookings, settings, shipmentHistory, shipments, consolidations, receivers, campaigns, segments, payments } = require('./db');
 const { initWebSocketServer, broadcast } = require('./websocket');
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { readRowsFromBuffer, processImportRows } = require('./importLogic');
@@ -4000,10 +4000,15 @@ app.get('/api/next-bl', async (req, res) => {
 // batch's rows are imported.
 // Income from the customers' costing sheets (booking.costing.total, saved
 // when the BL is assigned). Used for shipments made in the console — an
-// imported shipment keeps the sheet's money. Expenses stay typed in by
-// staff; profit = costing income − expenses. If no HBL has a costing sheet
-// yet, or staff typed an income in (incomeManual), the typed-in income is kept.
+// imported shipment keeps the sheet's money. Profit = income − expenses.
+// If no HBL has a costing sheet yet, or staff typed an amount in
+// (incomeManual / expensesManual), the typed-in amount is kept.
 const isSheetImport = c => !!(c.source && typeof c.source === 'object');
+
+// Expenses are worked out the same way as the Finance page (finance.js:
+// costing lines × cost rates), unless staff typed them in (expensesManual).
+const finance = require('./finance');
+const financeRates = async () => finance.ratesFrom(await settings().findOne({ _id: 'financeRates' }));
 
 async function costingIncomeByConsolidation(consolidationIds) {
   const result = new Map();
@@ -4014,15 +4019,16 @@ async function costingIncomeByConsolidation(consolidationIds) {
   ).toArray();
   const bookingIds = list.map(s => s.bookingId).filter(Boolean);
   const costed = bookingIds.length
-    ? await bookings().find({ _id: { $in: bookingIds }, 'costing.total': { $type: 'number' } }, { projection: { 'costing.total': 1 } }).toArray()
+    ? await bookings().find({ _id: { $in: bookingIds }, 'costing.total': { $type: 'number' } }, { projection: { costing: 1, 'receiver.town': 1 } }).toArray()
     : [];
-  const totalByBooking = new Map(costed.map(b => [String(b._id), b.costing.total]));
+  const rates = costed.length ? await financeRates() : null;
+  const moneyByBooking = new Map(costed.map(b => [String(b._id), finance.costingMoney(b.costing, b.receiver && b.receiver.town, rates)]));
   for (const s of list) {
     const key = String(s.consolidationId);
-    const row = result.get(key) || { income: 0, withCosting: 0, hbls: 0 };
+    const row = result.get(key) || { income: 0, expense: 0, withCosting: 0, hbls: 0 };
     row.hbls += 1;
-    const total = s.bookingId ? totalByBooking.get(String(s.bookingId)) : undefined;
-    if (total !== undefined) { row.income += total; row.withCosting += 1; }
+    const money = s.bookingId ? moneyByBooking.get(String(s.bookingId)) : undefined;
+    if (money) { row.income += money.income; row.expense += money.expense; row.withCosting += 1; }
     result.set(key, row);
   }
   return result;
@@ -4032,13 +4038,15 @@ function withCostingMoney(c, byId) {
   if (isSheetImport(c)) return c;
   const row = byId.get(String(c._id));
   if (!row || !row.withCosting) return c;
-  const income = Math.round(row.income * 100) / 100;
-  if (c.incomeManual) return { ...c, incomeFromCosting: { withCosting: row.withCosting, hbls: row.hbls, income } };
-  const expenses = (c.financials && c.financials.totalExpenses) || 0;
+  const r2 = n => Math.round(n * 100) / 100;
+  const fromCosting = { withCosting: row.withCosting, hbls: row.hbls, income: r2(row.income), expense: r2(row.expense) };
+  const typed = c.financials || {};
+  const income = c.incomeManual ? typed.grossIncome || 0 : fromCosting.income;
+  const expenses = c.expensesManual ? typed.totalExpenses || 0 : fromCosting.expense;
   return {
     ...c,
-    financials: { grossIncome: income, totalExpenses: expenses, grossProfit: Math.round((income - expenses) * 100) / 100 },
-    incomeFromCosting: { withCosting: row.withCosting, hbls: row.hbls, income }
+    financials: { grossIncome: income, totalExpenses: expenses, grossProfit: r2(income - expenses) },
+    incomeFromCosting: fromCosting
   };
 }
 
@@ -4245,6 +4253,115 @@ app.get('/api/consolidations/:consolidationId/landing-sheet.pdf', async (req, re
   }
 });
 
+// Finance (finance.js): the shipment money sheet per BL, read live from the
+// costing sheets; cost rates. Its own page key ('finance') — the warehouse
+// role never gets these routes.
+app.get('/api/finance/shipments', async (req, res) => {
+  try {
+    const found = await consolidations().find({}, { projection: { batchNumber: 1, label: 1, peNumber: 1, source: 1, financials: 1, incomeManual: 1, expensesManual: 1, 'dates.sydneyCalendarEtd': 1 } }).sort({ batchNumber: -1 }).toArray();
+    const costingById = await costingIncomeByConsolidation(found.filter(c => !isSheetImport(c)).map(c => c._id));
+    const counts = await shipments().aggregate([
+      { $match: { consolidationId: { $ne: null }, hblNumber: { $nin: [null, ''] } } },
+      { $group: { _id: '$consolidationId', count: { $sum: 1 } } }
+    ]).toArray();
+    const countById = new Map(counts.map(c => [String(c._id), c.count]));
+    res.json({
+      shipments: found.map(c => {
+        const m = withCostingMoney(c, costingById);
+        return {
+          id: String(c._id), batchNumber: c.batchNumber, label: c.label || '', peNumber: c.peNumber || null,
+          etd: (c.dates && c.dates.sydneyCalendarEtd) || null,
+          hbls: countById.get(String(c._id)) || 0,
+          financials: m.financials || { grossIncome: 0, totalExpenses: 0, grossProfit: 0 }
+        };
+      })
+    });
+  } catch (err) {
+    console.error('Error listing finance shipments:', err.message);
+    res.status(500).json({ error: 'Failed to load the shipments' });
+  }
+});
+
+async function loadFinanceSheet(consolidationId) {
+  if (!ObjectId.isValid(consolidationId)) return null;
+  const consolidation = await consolidations().findOne({ _id: new ObjectId(consolidationId) });
+  if (!consolidation) return null;
+  const list = await shipments().find({ consolidationId: consolidation._id }).toArray();
+  const bookingIds = list.map(s => s.bookingId).filter(Boolean);
+  const bookingList = bookingIds.length
+    ? await bookings().find({ _id: { $in: bookingIds } }, { projection: { items: 1, boxCount: 1, deliveryType: 1, 'receiver.town': 1, requestedDateISO: 1, createdAt: 1, costing: 1 } }).toArray()
+    : [];
+  const shipmentIds = list.map(s => s._id);
+  const invoiceList = await getDb().collection('invoices').find(
+    { shipmentId: { $in: shipmentIds } },
+    { projection: { shipmentId: 1, lineItems: 1, total: 1, otherCharges: 1, costBreakdown: 1 } }
+  ).toArray();
+  const paymentList = await payments().find({ shipmentId: { $in: shipmentIds }, direction: 'in' }, { projection: { shipmentId: 1, method: 1, amount: 1 } }).toArray();
+  const paymentsByShipment = new Map();
+  for (const p of paymentList) {
+    const k = String(p.shipmentId);
+    if (!paymentsByShipment.has(k)) paymentsByShipment.set(k, []);
+    paymentsByShipment.get(k).push(p);
+  }
+  return finance.buildFinanceSheet(
+    consolidation,
+    list,
+    new Map(bookingList.map(b => [String(b._id), b])),
+    new Map(invoiceList.map(i => [String(i.shipmentId), i])),
+    paymentsByShipment,
+    await financeRates()
+  );
+}
+
+app.get('/api/finance/shipments/:consolidationId', async (req, res) => {
+  try {
+    const sheet = await loadFinanceSheet(req.params.consolidationId);
+    if (!sheet) return res.status(404).json({ error: 'Shipment not found' });
+    res.json({ finance: sheet });
+  } catch (err) {
+    console.error('Error building finance sheet:', err.message);
+    res.status(500).json({ error: 'Failed to build the finance sheet' });
+  }
+});
+
+app.get('/api/finance/shipments/:consolidationId/sheet.xlsx', async (req, res) => {
+  try {
+    const sheet = await loadFinanceSheet(req.params.consolidationId);
+    if (!sheet) return res.status(404).json({ error: 'Shipment not found' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="Finance-Shipment-${sheet.shipment.batchNumber}.xlsx"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(finance.financeSheetXlsx(sheet));
+  } catch (err) {
+    console.error('Error making finance Excel:', err.message);
+    res.status(500).json({ error: 'Failed to make the Excel file' });
+  }
+});
+
+app.get('/api/finance/rates', async (req, res) => {
+  try {
+    const doc = await settings().findOne({ _id: 'financeRates' });
+    res.json({ rates: finance.ratesFrom(doc), labels: finance.RATE_LABELS, updatedAt: (doc && doc.updatedAt) || null, updatedBy: (doc && doc.updatedBy) || null });
+  } catch (err) {
+    console.error('Error loading cost rates:', err.message);
+    res.status(500).json({ error: 'Failed to load the cost rates' });
+  }
+});
+
+app.put('/api/finance/rates', async (req, res) => {
+  try {
+    const clean = finance.cleanRates(req.body);
+    if (clean.error) return res.status(400).json({ error: clean.error });
+    const updatedAt = new Date().toISOString();
+    const updatedBy = req.user && req.user.email ? req.user.email : 'staff';
+    await settings().updateOne({ _id: 'financeRates' }, { $set: { rates: clean.value, updatedAt, updatedBy } }, { upsert: true });
+    res.json({ rates: clean.value, labels: finance.RATE_LABELS, updatedAt, updatedBy });
+  } catch (err) {
+    console.error('Error saving cost rates:', err.message);
+    res.status(500).json({ error: 'Failed to save the cost rates' });
+  }
+});
+
 // Staff fix a shipment typed in wrong — number, PE number, dates, money. Only the
 // fields sent are changed. A new number also moves onto every HBL in it
 // (they keep a copy of the number, see the /move route).
@@ -4309,6 +4426,7 @@ app.patch('/api/consolidations/:consolidationId', async (req, res) => {
       // Income typed in wins over the costing sheets; sent blank (null) it
       // goes back to adding up the costing sheets.
       if (body.grossIncome !== undefined) set.incomeManual = body.grossIncome !== null && body.grossIncome !== '';
+      if (body.totalExpenses !== undefined) set.expensesManual = body.totalExpenses !== null && body.totalExpenses !== '';
     }
 
     if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to change.' });

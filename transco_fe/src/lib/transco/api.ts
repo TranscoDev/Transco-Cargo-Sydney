@@ -690,8 +690,9 @@ interface BackendConsolidation {
   paymentTotals: { zeller: number; eft: number; cash: number };
   financials: ConsolidationFinancials;
   financialsNote?: string | null;
-  incomeFromCosting?: { withCosting: number; hbls: number; income: number };
+  incomeFromCosting?: { withCosting: number; hbls: number; income: number; expense: number };
   incomeManual?: boolean;
+  expensesManual?: boolean;
   dates: ConsolidationDates;
   importedShipmentCount: number;
   liveBoxes?: LiveBoxCounts;
@@ -712,6 +713,7 @@ function mapConsolidation(c: BackendConsolidation): Consolidation {
     financialsNote: c.financialsNote,
     incomeFromCosting: c.incomeFromCosting,
     incomeManual: !!c.incomeManual,
+    expensesManual: !!c.expensesManual,
     dates: c.dates,
     importedShipmentCount: c.importedShipmentCount,
     liveBoxes: c.liveBoxes,
@@ -782,7 +784,7 @@ export async function updateConsolidation(
     peblEta?: string | null;
     peblDeliveryDate?: string | null;
     grossIncome?: number | null;
-    totalExpenses?: number;
+    totalExpenses?: number | null;
   },
 ): Promise<Consolidation> {
   const res = await fetch(`${API_BASE_URL}/api/consolidations/${consolidationId}`, {
@@ -1238,6 +1240,116 @@ export async function downloadLandingSheetPdf(consolidationId: string, batchNumb
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+// ---- Finance (console → Finance; backend finance.js) ----
+
+export interface FinanceShipmentSummary {
+  id: string;
+  batchNumber: number;
+  label: string;
+  peNumber: string | null;
+  etd: string | null;
+  hbls: number;
+  financials: ConsolidationFinancials;
+}
+
+export type FinancePayKey = "cash" | "zeller" | "eftpos" | "bank" | "other";
+
+export interface FinanceRow {
+  shipmentId: string;
+  bookingId: string | null;
+  hbl: string;
+  date: string;
+  memo: string;
+  destination: string;
+  counts: Record<string, number>;
+  cbm: number | null;
+  boxes: number;
+  /** costing = read from the BL's costing sheet; sheet = imported shipment sheet; none = no costing yet. */
+  source: "costing" | "sheet" | "none";
+  paid: Record<FinancePayKey, number>;
+  paidTotal: number;
+  income: number;
+  owing: number;
+  costs: Record<string, number>;
+  expense: number;
+  profit: number;
+  checks: string[];
+}
+
+export interface FinanceSheet {
+  shipment: { id: string; batchNumber: number; label: string; peNumber: string | null };
+  boxColumns: { key: string; label: string }[];
+  payColumns: { key: FinancePayKey; label: string }[];
+  costColumns: { key: string; label: string }[];
+  rows: FinanceRow[];
+  totals: {
+    hbls: number;
+    counts: Record<string, number>;
+    cbm: number;
+    boxes: number;
+    paid: Record<FinancePayKey, number>;
+    paidTotal: number;
+    income: number;
+    owing: number;
+    costs: Record<string, number>;
+    expense: number;
+    profit: number;
+    noCosting: number;
+    unpaid: number;
+    toCheck: number;
+  };
+}
+
+export interface CostRates {
+  rates: Record<string, number | null>;
+  labels: Record<string, string>;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+async function financeJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/api/finance${path}`, {
+    ...init,
+    headers: { ...authHeaders(), ...(init?.body ? { "Content-Type": "application/json" } : {}) },
+  });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+export async function fetchFinanceShipments(): Promise<FinanceShipmentSummary[]> {
+  return (await financeJson<{ shipments: FinanceShipmentSummary[] }>("/shipments")).shipments;
+}
+
+export async function fetchFinanceSheet(consolidationId: string): Promise<FinanceSheet> {
+  return (await financeJson<{ finance: FinanceSheet }>(`/shipments/${encodeURIComponent(consolidationId)}`)).finance;
+}
+
+/** Downloads the shipment's finance sheet as Excel (same columns as the hand-made sheet). */
+export async function downloadFinanceXlsx(consolidationId: string, batchNumber: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/finance/shipments/${encodeURIComponent(consolidationId)}/sheet.xlsx`, { headers: authHeaders() });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || `Failed to make the Excel file (${res.status})`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Finance-Shipment-${batchNumber}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+export async function fetchCostRates(): Promise<CostRates> {
+  return financeJson<CostRates>("/rates");
+}
+
+export async function saveCostRates(rates: Record<string, number | null>): Promise<CostRates> {
+  return financeJson<CostRates>("/rates", { method: "PUT", body: JSON.stringify(rates) });
 }
 
 // ---- Prices & promotions (console → Prices & Promotions) ----

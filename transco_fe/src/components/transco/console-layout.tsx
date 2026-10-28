@@ -7,7 +7,9 @@ import {
   ChevronDown,
   Clock3,
   Globe,
+  Landmark,
   LayoutDashboard,
+  SlidersHorizontal,
   ListTodo,
   LogOut,
   Mail,
@@ -112,6 +114,14 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    // Money per BL, read live from the costing sheets (not for the warehouse role).
+    label: "Finance",
+    items: [
+      { label: "Shipment money", to: "/console/finance", icon: Landmark },
+      { label: "Cost rates", to: "/console/finance/rates", icon: SlidersHorizontal },
+    ],
+  },
+  {
     label: "CRM",
     items: [
       { label: "Leads", to: "/console/leads", icon: Sparkles },
@@ -160,6 +170,8 @@ function LoadErrorBanner() {
 }
 
 function isActive(pathname: string, to: string) {
+  // Finance's own pages (Cost rates, …) sit under /console/finance.
+  if (to === "/console/finance") return pathname === to || pathname === `${to}/`;
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 

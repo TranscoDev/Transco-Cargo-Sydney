@@ -38,9 +38,11 @@ import { Route as ConsoleBookingsIndexRouteImport } from './routes/console/booki
 import { Route as ConsoleBookingsBookingIdRouteImport } from './routes/console/bookings/$bookingId'
 import { Route as ConsoleCustomersIndexRouteImport } from './routes/console/customers/index'
 import { Route as ConsoleCustomersCustomerIdRouteImport } from './routes/console/customers/$customerId'
+import { Route as ConsoleFinanceIndexRouteImport } from './routes/console.finance.index'
 import { Route as ConsoleFinanceExpensesRouteImport } from './routes/console.finance.expenses'
 import { Route as ConsoleFinanceInvoicesRouteImport } from './routes/console.finance.invoices'
 import { Route as ConsoleFinancePaymentsRouteImport } from './routes/console.finance.payments'
+import { Route as ConsoleFinanceRatesRouteImport } from './routes/console.finance.rates'
 import { Route as ConsoleFinanceReportsRouteImport } from './routes/console.finance.reports'
 import { Route as ConsoleInventoryActivityRouteImport } from './routes/console.inventory.activity'
 import { Route as ConsoleInventoryStockRouteImport } from './routes/console.inventory.stock'
@@ -198,6 +200,11 @@ const ConsoleCustomersCustomerIdRoute =
     path: '/$customerId',
     getParentRoute: () => ConsoleCustomersRouteRoute,
   } as any)
+const ConsoleFinanceIndexRoute = ConsoleFinanceIndexRouteImport.update({
+  id: '/finance/',
+  path: '/finance/',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
 const ConsoleFinanceExpensesRoute = ConsoleFinanceExpensesRouteImport.update({
   id: '/finance/expenses',
   path: '/finance/expenses',
@@ -211,6 +218,11 @@ const ConsoleFinanceInvoicesRoute = ConsoleFinanceInvoicesRouteImport.update({
 const ConsoleFinancePaymentsRoute = ConsoleFinancePaymentsRouteImport.update({
   id: '/finance/payments',
   path: '/finance/payments',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleFinanceRatesRoute = ConsoleFinanceRatesRouteImport.update({
+  id: '/finance/rates',
+  path: '/finance/rates',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
 const ConsoleFinanceReportsRoute = ConsoleFinanceReportsRouteImport.update({
@@ -295,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
   '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
   '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
+  '/console/finance/rates': typeof ConsoleFinanceRatesRoute
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
   '/console/inventory/activity': typeof ConsoleInventoryActivityRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
@@ -302,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/bookings/': typeof ConsoleBookingsIndexRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
+  '/console/finance/': typeof ConsoleFinanceIndexRoute
   '/console/my-transco/': typeof ConsoleMyTranscoIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
   '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
@@ -333,6 +347,7 @@ export interface FileRoutesByTo {
   '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
   '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
   '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
+  '/console/finance/rates': typeof ConsoleFinanceRatesRoute
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
   '/console/inventory/activity': typeof ConsoleInventoryActivityRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
@@ -340,6 +355,7 @@ export interface FileRoutesByTo {
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/bookings': typeof ConsoleBookingsIndexRoute
   '/console/customers': typeof ConsoleCustomersIndexRoute
+  '/console/finance': typeof ConsoleFinanceIndexRoute
   '/console/my-transco': typeof ConsoleMyTranscoIndexRoute
   '/console/shipments': typeof ConsoleShipmentsIndexRoute
   '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
@@ -377,6 +393,7 @@ export interface FileRoutesById {
   '/console/finance/expenses': typeof ConsoleFinanceExpensesRoute
   '/console/finance/invoices': typeof ConsoleFinanceInvoicesRoute
   '/console/finance/payments': typeof ConsoleFinancePaymentsRoute
+  '/console/finance/rates': typeof ConsoleFinanceRatesRoute
   '/console/finance/reports': typeof ConsoleFinanceReportsRoute
   '/console/inventory/activity': typeof ConsoleInventoryActivityRoute
   '/console/inventory/stock': typeof ConsoleInventoryStockRoute
@@ -384,6 +401,7 @@ export interface FileRoutesById {
   '/console/shipments/$shipmentId': typeof ConsoleShipmentsShipmentIdRoute
   '/console/bookings/': typeof ConsoleBookingsIndexRoute
   '/console/customers/': typeof ConsoleCustomersIndexRoute
+  '/console/finance/': typeof ConsoleFinanceIndexRoute
   '/console/my-transco/': typeof ConsoleMyTranscoIndexRoute
   '/console/shipments/': typeof ConsoleShipmentsIndexRoute
   '/console/shipments/batch/$batchId': typeof ConsoleShipmentsBatchBatchIdRoute
@@ -422,6 +440,7 @@ export interface FileRouteTypes {
     | '/console/finance/expenses'
     | '/console/finance/invoices'
     | '/console/finance/payments'
+    | '/console/finance/rates'
     | '/console/finance/reports'
     | '/console/inventory/activity'
     | '/console/inventory/stock'
@@ -429,6 +448,7 @@ export interface FileRouteTypes {
     | '/console/shipments/$shipmentId'
     | '/console/bookings/'
     | '/console/customers/'
+    | '/console/finance/'
     | '/console/my-transco/'
     | '/console/shipments/'
     | '/console/shipments/batch/$batchId'
@@ -460,6 +480,7 @@ export interface FileRouteTypes {
     | '/console/finance/expenses'
     | '/console/finance/invoices'
     | '/console/finance/payments'
+    | '/console/finance/rates'
     | '/console/finance/reports'
     | '/console/inventory/activity'
     | '/console/inventory/stock'
@@ -467,6 +488,7 @@ export interface FileRouteTypes {
     | '/console/shipments/$shipmentId'
     | '/console/bookings'
     | '/console/customers'
+    | '/console/finance'
     | '/console/my-transco'
     | '/console/shipments'
     | '/console/shipments/batch/$batchId'
@@ -503,6 +525,7 @@ export interface FileRouteTypes {
     | '/console/finance/expenses'
     | '/console/finance/invoices'
     | '/console/finance/payments'
+    | '/console/finance/rates'
     | '/console/finance/reports'
     | '/console/inventory/activity'
     | '/console/inventory/stock'
@@ -510,6 +533,7 @@ export interface FileRouteTypes {
     | '/console/shipments/$shipmentId'
     | '/console/bookings/'
     | '/console/customers/'
+    | '/console/finance/'
     | '/console/my-transco/'
     | '/console/shipments/'
     | '/console/shipments/batch/$batchId'
@@ -726,6 +750,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleCustomersCustomerIdRouteImport
       parentRoute: typeof ConsoleCustomersRouteRoute
     }
+    '/console/finance/': {
+      id: '/console/finance/'
+      path: '/finance'
+      fullPath: '/console/finance/'
+      preLoaderRoute: typeof ConsoleFinanceIndexRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
     '/console/finance/expenses': {
       id: '/console/finance/expenses'
       path: '/finance/expenses'
@@ -745,6 +776,13 @@ declare module '@tanstack/react-router' {
       path: '/finance/payments'
       fullPath: '/console/finance/payments'
       preLoaderRoute: typeof ConsoleFinancePaymentsRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/finance/rates': {
+      id: '/console/finance/rates'
+      path: '/finance/rates'
+      fullPath: '/console/finance/rates'
+      preLoaderRoute: typeof ConsoleFinanceRatesRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/finance/reports': {
@@ -903,9 +941,11 @@ interface ConsoleRouteRouteChildren {
   ConsoleFinanceExpensesRoute: typeof ConsoleFinanceExpensesRoute
   ConsoleFinanceInvoicesRoute: typeof ConsoleFinanceInvoicesRoute
   ConsoleFinancePaymentsRoute: typeof ConsoleFinancePaymentsRoute
+  ConsoleFinanceRatesRoute: typeof ConsoleFinanceRatesRoute
   ConsoleFinanceReportsRoute: typeof ConsoleFinanceReportsRoute
   ConsoleInventoryActivityRoute: typeof ConsoleInventoryActivityRoute
   ConsoleInventoryStockRoute: typeof ConsoleInventoryStockRoute
+  ConsoleFinanceIndexRoute: typeof ConsoleFinanceIndexRoute
 }
 
 const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
@@ -935,9 +975,11 @@ const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleFinanceExpensesRoute: ConsoleFinanceExpensesRoute,
   ConsoleFinanceInvoicesRoute: ConsoleFinanceInvoicesRoute,
   ConsoleFinancePaymentsRoute: ConsoleFinancePaymentsRoute,
+  ConsoleFinanceRatesRoute: ConsoleFinanceRatesRoute,
   ConsoleFinanceReportsRoute: ConsoleFinanceReportsRoute,
   ConsoleInventoryActivityRoute: ConsoleInventoryActivityRoute,
   ConsoleInventoryStockRoute: ConsoleInventoryStockRoute,
+  ConsoleFinanceIndexRoute: ConsoleFinanceIndexRoute,
 }
 
 const ConsoleRouteRouteWithChildren = ConsoleRouteRoute._addFileChildren(
