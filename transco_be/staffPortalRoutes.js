@@ -29,7 +29,8 @@ const { normalizePhoneNumber } = require('./normalizePhone');
 // "Has a My Transco account" = signed in at least once, or has a password.
 const ACCOUNT_QUERY = {
   channel: { $ne: 'website' },
-  $or: [{ portalJoinedAt: { $exists: true } }, { passwordHash: { $exists: true } }]
+  // staffAccountAt: made by staff with Quick register / a Login link.
+  $or: [{ portalJoinedAt: { $exists: true } }, { passwordHash: { $exists: true } }, { staffAccountAt: { $exists: true } }]
 };
 
 function accountSummary(c) {
@@ -50,7 +51,11 @@ function accountSummary(c) {
     source: c.acquisitionSource || null,
     sources: c.sources || [],
     preferredLanguage: c.preferredLanguage || 'en',
-    hasWhatsAppConversation: (c.sources || []).includes('whatsapp')
+    hasWhatsAppConversation: (c.sources || []).includes('whatsapp'),
+    // Made by staff for the customer (Quick register / Login link).
+    staffMade: Boolean(c.staffAccountAt),
+    loginLinkExpiresAt: c.invite && c.invite.direct && c.invite.expiresAt > now ? c.invite.expiresAt : null,
+    loginLinkUses: c.loginLinkUses || 0
   };
 }
 

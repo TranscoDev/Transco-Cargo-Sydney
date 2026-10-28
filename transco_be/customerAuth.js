@@ -22,6 +22,7 @@ const { ObjectId } = require('mongodb');
 const { customers } = require('./db');
 
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — returning customers stay signed in
+const LIFETIME_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000; // staff login link: until they sign out
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 
@@ -29,12 +30,15 @@ function createCustomerAuth(sessionSecret) {
   const tokenKey = crypto.createHmac('sha256', sessionSecret).update('customer-portal-v1').digest();
   const otpKey = crypto.createHmac('sha256', sessionSecret).update('customer-otp-v1').digest();
 
-  function signCustomerToken(customer) {
+  // lifetime: signed in with a staff login link (elderly customers) — the
+  // phone stays signed in until they sign out, or staff press "Sign out
+  // everywhere" (portalTokenVersion).
+  function signCustomerToken(customer, { lifetime = false } = {}) {
     const payload = {
       typ: 'customer',
       sub: String(customer._id),
       ver: customer.portalTokenVersion || 0,
-      exp: Date.now() + TOKEN_TTL_MS
+      exp: Date.now() + (lifetime ? LIFETIME_TTL_MS : TOKEN_TTL_MS)
     };
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const sig = crypto.createHmac('sha256', tokenKey).update(body).digest('base64url');

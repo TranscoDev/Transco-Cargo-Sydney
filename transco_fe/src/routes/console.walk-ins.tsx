@@ -4,6 +4,7 @@ import { Check, ExternalLink, FileText, QrCode, Search } from "lucide-react";
 
 import { EmptyState, PageHeader, PageShell, StatusBadge } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
+import { QuickRegisterButton } from "@/components/transco/login-link";
 import { cn } from "@/lib/utils";
 import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 import { useConversations } from "@/lib/transco/store";
@@ -104,6 +105,8 @@ function WalkInsPage() {
             <Button type="button" size="sm" onClick={() => void openPaperForm()}>
               <FileText className="mr-1.5 h-3.5 w-3.5" aria-hidden /> Type a paper form
             </Button>
+            {/* At the counter: a My Transco account + no-password link for customers who find sign-up hard. */}
+            <QuickRegisterButton />
             <Button asChild variant="outline" size="sm">
               <a href={FORM_URL} target="_blank" rel="noreferrer">
                 Open the form <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />

@@ -1499,13 +1499,17 @@ function createCustomerTools({
   // the WhatsApp message itself proves the number is theirs.
   const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
   const PORTAL_SITE_URL = (process.env.PORTAL_SITE_URL || 'https://my.transcosydney.com.au').replace(/\/$/, '');
-  async function createInviteLink(customer, createdBy = null) {
+  // direct: a staff "Login link" (elderly customers) — 7 days, can be
+  // opened more than once, signs them straight in with no password and
+  // keeps that phone signed in until they sign out.
+  const LOGIN_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  async function createInviteLink(customer, createdBy = null, { direct = false } = {}) {
     const crypto = require('crypto');
     const token = crypto.randomBytes(24).toString('base64url');
-    const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+    const expiresAt = new Date(Date.now() + (direct ? LOGIN_LINK_TTL_MS : INVITE_TTL_MS));
     const hash = crypto.createHash('sha256').update(token).digest('hex');
-    await customers().updateOne({ _id: customer._id }, { $set: { invite: { hash, expiresAt, createdBy } } });
-    return { link: `${PORTAL_SITE_URL}/account.html#/join/${token}`, expiresAt, hasAccount: Boolean(customer.passwordHash) };
+    await customers().updateOne({ _id: customer._id }, { $set: { invite: { hash, expiresAt, createdBy, ...(direct ? { direct: true } : {}) } } });
+    return { link: `${PORTAL_SITE_URL}/account.html#/join/${token}`, expiresAt, hasAccount: Boolean(customer.passwordHash) || direct };
   }
 
   // ---------- privacy ----------

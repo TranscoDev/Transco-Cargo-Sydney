@@ -43,6 +43,45 @@ export interface PortalAccountSummary {
   sources: string[];
   preferredLanguage: "en" | "si" | "ta" | string;
   hasWhatsAppConversation: boolean;
+  /** Made by staff for the customer (Quick register / Login link). */
+  staffMade?: boolean;
+  loginLinkExpiresAt?: string | null;
+  loginLinkUses?: number;
+}
+
+// ---------- Login links (elderly customers) ----------
+
+export interface LoginLink {
+  customerId: string;
+  name: string | null;
+  phoneNumber: string;
+  customerCode: string | null;
+  link: string;
+  expiresAt: string;
+  existing?: boolean;
+}
+
+async function loginLinkRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/api/login-links${path}`, {
+    method,
+    headers: headers(body !== undefined),
+    body: body !== undefined ? JSON.stringify(body) : null,
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data as T;
+}
+
+export function quickRegister(input: { name: string; phone: string; email?: string }): Promise<LoginLink> {
+  return loginLinkRequest("POST", "/quick-register", input);
+}
+
+export function createLoginLink(customerId: string): Promise<LoginLink> {
+  return loginLinkRequest("POST", `/${customerId}`, {});
+}
+
+export function cancelLoginLink(customerId: string): Promise<{ success: true }> {
+  return loginLinkRequest("DELETE", `/${customerId}`);
 }
 
 export interface PortalAccountRow extends PortalAccountSummary {

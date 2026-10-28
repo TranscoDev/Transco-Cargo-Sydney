@@ -32,6 +32,7 @@ import { useConversations } from "@/lib/transco/store";
 import { bookingTaskAbout } from "@/lib/transco/tasks";
 import { NewTaskButton, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
 import { EmailButton } from "@/components/transco/email-kit";
+import { LoginLinkButton } from "@/components/transco/login-link";
 
 /**
  * Everything staff need about one booking in one place — customer,
@@ -202,6 +203,7 @@ export function BookingWorkspace({ bookingId }: { bookingId: string }) {
                 }}
               />
             )}
+            {listed?.customerId && <LoginLinkButton customerId={listed.customerId} />}
             <Button type="button" variant="outline" onClick={() => setEditing(true)} disabled={!d}>
               <PenLine className="mr-2 h-4 w-4" /> Change details
             </Button>

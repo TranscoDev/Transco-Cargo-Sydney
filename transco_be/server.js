@@ -6882,6 +6882,8 @@ app.use('/api/schedule', scheduleRouters.staffRouter);
 
 // Staff tasks (taskRoutes.js): every staff login, whatever its page access.
 app.use('/api/tasks', require('./taskRoutes')({ broadcast, isStaffAdmin, canDeleteChats }));
+// My Transco login links for customers who find sign-up hard (loginLinkRoutes.js).
+app.use('/api/login-links', require('./loginLinkRoutes')({ tools: customerTools }));
 // Emails to customers from Gmail / Outlook (emailRoutes.js).
 const emailRouters = require('./emailRoutes')({ isStaffAdmin, broadcast });
 app.use('/api/emails', emailRouters.router);

@@ -34,6 +34,7 @@ import { bookingStatus, SENDER_LABEL, shipmentStatus } from "@/lib/transco/statu
 import { useConversations } from "@/lib/transco/store";
 import { NewTaskButton, OpenTasksLine, useOpenTasksAbout } from "@/components/transco/task-kit";
 import { CustomerEmails, EmailButton } from "@/components/transco/email-kit";
+import { LoginLinkButton } from "@/components/transco/login-link";
 
 function ProfileTasksLine({ customerId }: { customerId: string }) {
   const tasks = useOpenTasksAbout({ customerIds: [customerId] });
@@ -174,6 +175,8 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
             }}
           />
           {!viewOnly && <EmailButton about={{ customerId: p.id, customerName: p.customerName, chatCustomerIds: [p.id] }} />}
+          {/* My Transco with no password — for customers who find sign-up hard. */}
+          <LoginLinkButton customerId={p.id} />
           {!viewOnly && p.messages.length > 0 && (
             <Button type="button" onClick={openChat}>
               <MessageCircle className="mr-2 h-4 w-4" /> Open conversation

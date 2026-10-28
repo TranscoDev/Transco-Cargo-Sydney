@@ -657,7 +657,8 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     if (ipLimited(clientIp(req))) return res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
     const c = await customerForInvite(req.params.token);
     if (!c) return res.status(404).json({ error: 'This link has expired or was already used.', reason: 'bad_link' });
-    res.json({ phoneNumber: c.phoneNumber, name: hasRealName(c) ? c.name : '', email: c.email || '', hasAccount: Boolean(c.passwordHash) });
+    // A staff login link signs straight in, password or not.
+    res.json({ phoneNumber: c.phoneNumber, name: hasRealName(c) ? c.name : '', email: c.email || '', hasAccount: Boolean(c.passwordHash) || Boolean(c.invite.direct) });
   }));
 
   // Use the link: an existing account is simply signed in; otherwise the
@@ -668,7 +669,17 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     const c = await customerForInvite(body.token);
     if (!c) return res.status(400).json({ error: 'This link has expired or was already used.', reason: 'bad_link' });
     const now = new Date();
+    const direct = Boolean(c.invite.direct);
     const set = { lastPortalLoginAt: now, phoneVerified: true, phoneVerifiedAt: c.phoneVerifiedAt || now, portalJoinedAt: c.portalJoinedAt || now };
+    if (direct) {
+      // Staff login link: no password or forms. It stays usable until it
+      // expires (they may open it again from WhatsApp), and the phone stays
+      // signed in until they sign out.
+      set.lastLoginLinkUseAt = now;
+      const updated = await customers().findOneAndUpdate({ _id: c._id }, { $set: set, $inc: { loginLinkUses: 1 } }, { returnDocument: 'after' });
+      await tools.ensureCustomerCode(updated);
+      return res.json({ token: customerAuth.signCustomerToken(updated, { lifetime: true }), profile: tools.publicProfile(updated), needsName: !hasRealName(updated) });
+    }
     if (!c.passwordHash) {
       const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
       if (!EMAIL_RE.test(email) || email.length > 120) return res.status(400).json({ error: "That email address doesn't look right.", field: 'email' });

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { QuickRegisterButton } from "@/components/transco/login-link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/console/my-transco/")({
   component: MyTranscoAccountsPage,
 });
 
-type Filter = "all" | "unverified" | "needsDeclaration" | "withBookings" | "fromQr" | "locked" | "newThisWeek";
+type Filter = "all" | "unverified" | "needsDeclaration" | "withBookings" | "fromQr" | "locked" | "newThisWeek" | "staffMade";
 
 const FILTERS: { key: Filter; label: string; test: (c: PortalAccountRow) => boolean }[] = [
   { key: "all", label: "All", test: () => true },
@@ -39,6 +40,7 @@ const FILTERS: { key: Filter; label: string; test: (c: PortalAccountRow) => bool
   { key: "withBookings", label: "Has bookings", test: (c) => c.bookings.total > 0 },
   { key: "fromQr", label: "From warehouse QR", test: (c) => c.source === "warehouse_qr" },
   { key: "locked", label: "Locked out", test: (c) => c.locked },
+  { key: "staffMade", label: "Made by staff", test: (c) => !!c.staffMade },
 ];
 
 function MyTranscoAccountsPage() {
@@ -91,10 +93,14 @@ function MyTranscoAccountsPage() {
             status, bookings and BLs. Open a customer to manage their account and bookings.
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", loading && "animate-spin")} />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", loading && "animate-spin")} />
+            Refresh
+          </Button>
+          {/* For customers who find signing up hard — staff make the account. */}
+          <QuickRegisterButton onDone={load} />
+        </div>
       </div>
 
       {error && (
