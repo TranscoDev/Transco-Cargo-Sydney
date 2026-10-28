@@ -173,8 +173,9 @@ function BatchDetailPage() {
                 <Line label="Income" value={AUD.format(batch.financials.grossIncome)} />
                 {batch.incomeFromCosting && (
                   <p className="-mt-1 text-xs text-muted-foreground">
-                    From costing sheets — {batch.incomeFromCosting.withCosting} of {batch.incomeFromCosting.hbls} HBLs
-                    {batch.incomeFromCosting.withCosting < batch.incomeFromCosting.hbls ? " (the rest have no costing yet)" : ""}
+                    {batch.incomeManual
+                      ? `Typed in — the costing sheets add up to ${AUD.format(batch.incomeFromCosting.income)}`
+                      : `From costing sheets — ${batch.incomeFromCosting.withCosting} of ${batch.incomeFromCosting.hbls} HBLs${batch.incomeFromCosting.withCosting < batch.incomeFromCosting.hbls ? " (the rest have no costing yet)" : ""}`}
                   </p>
                 )}
                 <Line label="Expenses" value={AUD.format(batch.financials.totalExpenses)} />
@@ -505,9 +506,12 @@ function EditShipmentDialog({
   const [peNumber, setPeNumber] = useState(batch.peNumber ?? "");
   const [dates, setDates] = useState<Record<DateKey, string>>(initialDates);
   const showMoney = getCurrentUser()?.role !== "warehouse";
-  const incomeAuto = !!batch.incomeFromCosting;
+  // With costing sheets, a blank Income box means "add up the costing sheets".
+  const costing = batch.incomeFromCosting;
+  const incomeAuto = !!costing && !batch.incomeManual;
   const moneyText = (v: number) => (v ? String(v) : "");
-  const [income, setIncome] = useState(moneyText(batch.financials.grossIncome));
+  const incomeText = () => (incomeAuto ? "" : moneyText(batch.financials.grossIncome));
+  const [income, setIncome] = useState(incomeText);
   const [expenses, setExpenses] = useState(moneyText(batch.financials.totalExpenses));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -517,7 +521,7 @@ function EditShipmentDialog({
     setNumber(String(batch.batchNumber));
     setPeNumber(batch.peNumber ?? "");
     setDates(initialDates());
-    setIncome(moneyText(batch.financials.grossIncome));
+    setIncome(incomeText());
     setExpenses(moneyText(batch.financials.totalExpenses));
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -548,7 +552,11 @@ function EditShipmentDialog({
         setError("Income and expenses must be amounts like 12500.50.");
         return;
       }
-      if (!incomeAuto && inc !== batch.financials.grossIncome) input.grossIncome = inc;
+      if (costing && !income.trim()) {
+        if (batch.incomeManual) input.grossIncome = null;
+      } else if (incomeAuto || inc !== batch.financials.grossIncome) {
+        input.grossIncome = inc;
+      }
       if (exp !== batch.financials.totalExpenses) input.totalExpenses = exp;
     }
     if (!Object.keys(input).length) {
@@ -615,8 +623,18 @@ function EditShipmentDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-income">Income ($)</Label>
-                <Input id="edit-income" inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} placeholder="0.00" disabled={incomeAuto} />
-                {incomeAuto && <span className="text-xs text-muted-foreground">Added up from the costing sheets</span>}
+                <Input
+                  id="edit-income"
+                  inputMode="decimal"
+                  value={income}
+                  onChange={(e) => setIncome(e.target.value)}
+                  placeholder={costing ? String(costing.income) : "0.00"}
+                />
+                {costing && (
+                  <span className="text-xs text-muted-foreground">
+                    Leave blank to use the costing sheets ({AUD.format(costing.income)})
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-expenses">Expenses ($)</Label>

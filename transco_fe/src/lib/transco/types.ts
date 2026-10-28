@@ -522,7 +522,9 @@ export interface Consolidation {
   financials: ConsolidationFinancials;
   financialsNote?: string | null | undefined;
   /** Set when Income is added up from the customers' costing sheets (console-made shipments). */
-  incomeFromCosting?: { withCosting: number; hbls: number } | undefined;
+  incomeFromCosting?: { withCosting: number; hbls: number; income: number } | undefined;
+  /** Staff typed the income in — it wins over the costing sheets until cleared. */
+  incomeManual?: boolean | undefined;
   dates: ConsolidationDates;
   importedShipmentCount: number;
   /** Boxes in the BLs actually in this shipment now (fills up as BLs are added). */

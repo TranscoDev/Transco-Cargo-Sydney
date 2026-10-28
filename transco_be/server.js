@@ -4002,7 +4002,7 @@ app.get('/api/next-bl', async (req, res) => {
 // when the BL is assigned). Used for shipments made in the console — an
 // imported shipment keeps the sheet's money. Expenses stay typed in by
 // staff; profit = costing income − expenses. If no HBL has a costing sheet
-// yet, the typed-in income is kept.
+// yet, or staff typed an income in (incomeManual), the typed-in income is kept.
 const isSheetImport = c => !!(c.source && typeof c.source === 'object');
 
 async function costingIncomeByConsolidation(consolidationIds) {
@@ -4033,11 +4033,12 @@ function withCostingMoney(c, byId) {
   const row = byId.get(String(c._id));
   if (!row || !row.withCosting) return c;
   const income = Math.round(row.income * 100) / 100;
+  if (c.incomeManual) return { ...c, incomeFromCosting: { withCosting: row.withCosting, hbls: row.hbls, income } };
   const expenses = (c.financials && c.financials.totalExpenses) || 0;
   return {
     ...c,
     financials: { grossIncome: income, totalExpenses: expenses, grossProfit: Math.round((income - expenses) * 100) / 100 },
-    incomeFromCosting: { withCosting: row.withCosting, hbls: row.hbls }
+    incomeFromCosting: { withCosting: row.withCosting, hbls: row.hbls, income }
   };
 }
 

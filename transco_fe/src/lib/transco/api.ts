@@ -690,7 +690,8 @@ interface BackendConsolidation {
   paymentTotals: { zeller: number; eft: number; cash: number };
   financials: ConsolidationFinancials;
   financialsNote?: string | null;
-  incomeFromCosting?: { withCosting: number; hbls: number };
+  incomeFromCosting?: { withCosting: number; hbls: number; income: number };
+  incomeManual?: boolean;
   dates: ConsolidationDates;
   importedShipmentCount: number;
   liveBoxes?: LiveBoxCounts;
@@ -710,6 +711,7 @@ function mapConsolidation(c: BackendConsolidation): Consolidation {
     financials: c.financials,
     financialsNote: c.financialsNote,
     incomeFromCosting: c.incomeFromCosting,
+    incomeManual: !!c.incomeManual,
     dates: c.dates,
     importedShipmentCount: c.importedShipmentCount,
     liveBoxes: c.liveBoxes,
@@ -779,7 +781,7 @@ export async function updateConsolidation(
     arrivalDate?: string | null;
     peblEta?: string | null;
     peblDeliveryDate?: string | null;
-    grossIncome?: number;
+    grossIncome?: number | null;
     totalExpenses?: number;
   },
 ): Promise<Consolidation> {
