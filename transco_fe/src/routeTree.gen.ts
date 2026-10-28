@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConsoleRouteRouteImport } from './routes/console/route'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
 import { Route as ConsoleAllTasksRouteImport } from './routes/console/all-tasks'
+import { Route as ConsoleAskAiRouteImport } from './routes/console.ask-ai'
 import { Route as ConsoleBookingsRouteRouteImport } from './routes/console/bookings/route'
 import { Route as ConsoleConversationsRouteImport } from './routes/console/conversations'
 import { Route as ConsoleCustomersRouteRouteImport } from './routes/console/customers/route'
@@ -68,6 +69,11 @@ const ConsoleIndexRoute = ConsoleIndexRouteImport.update({
 const ConsoleAllTasksRoute = ConsoleAllTasksRouteImport.update({
   id: '/all-tasks',
   path: '/all-tasks',
+  getParentRoute: () => ConsoleRouteRoute,
+} as any)
+const ConsoleAskAiRoute = ConsoleAskAiRouteImport.update({
+  id: '/ask-ai',
+  path: '/ask-ai',
   getParentRoute: () => ConsoleRouteRoute,
 } as any)
 const ConsoleBookingsRouteRoute = ConsoleBookingsRouteRouteImport.update({
@@ -266,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/console/my-transco': typeof ConsoleMyTranscoRouteRouteWithChildren
   '/console/shipments': typeof ConsoleShipmentsRouteRouteWithChildren
   '/console/all-tasks': typeof ConsoleAllTasksRoute
+  '/console/ask-ai': typeof ConsoleAskAiRoute
   '/console/conversations': typeof ConsoleConversationsRoute
   '/console/dashboard': typeof ConsoleDashboardRoute
   '/console/emails': typeof ConsoleEmailsRoute
@@ -303,6 +310,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/console/all-tasks': typeof ConsoleAllTasksRoute
+  '/console/ask-ai': typeof ConsoleAskAiRoute
   '/console/conversations': typeof ConsoleConversationsRoute
   '/console/dashboard': typeof ConsoleDashboardRoute
   '/console/emails': typeof ConsoleEmailsRoute
@@ -346,6 +354,7 @@ export interface FileRoutesById {
   '/console/my-transco': typeof ConsoleMyTranscoRouteRouteWithChildren
   '/console/shipments': typeof ConsoleShipmentsRouteRouteWithChildren
   '/console/all-tasks': typeof ConsoleAllTasksRoute
+  '/console/ask-ai': typeof ConsoleAskAiRoute
   '/console/conversations': typeof ConsoleConversationsRoute
   '/console/dashboard': typeof ConsoleDashboardRoute
   '/console/emails': typeof ConsoleEmailsRoute
@@ -390,6 +399,7 @@ export interface FileRouteTypes {
     | '/console/my-transco'
     | '/console/shipments'
     | '/console/all-tasks'
+    | '/console/ask-ai'
     | '/console/conversations'
     | '/console/dashboard'
     | '/console/emails'
@@ -427,6 +437,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/console/all-tasks'
+    | '/console/ask-ai'
     | '/console/conversations'
     | '/console/dashboard'
     | '/console/emails'
@@ -469,6 +480,7 @@ export interface FileRouteTypes {
     | '/console/my-transco'
     | '/console/shipments'
     | '/console/all-tasks'
+    | '/console/ask-ai'
     | '/console/conversations'
     | '/console/dashboard'
     | '/console/emails'
@@ -537,6 +549,13 @@ declare module '@tanstack/react-router' {
       path: '/all-tasks'
       fullPath: '/console/all-tasks'
       preLoaderRoute: typeof ConsoleAllTasksRouteImport
+      parentRoute: typeof ConsoleRouteRoute
+    }
+    '/console/ask-ai': {
+      id: '/console/ask-ai'
+      path: '/ask-ai'
+      fullPath: '/console/ask-ai'
+      preLoaderRoute: typeof ConsoleAskAiRouteImport
       parentRoute: typeof ConsoleRouteRoute
     }
     '/console/bookings': {
@@ -863,6 +882,7 @@ interface ConsoleRouteRouteChildren {
   ConsoleMyTranscoRouteRoute: typeof ConsoleMyTranscoRouteRouteWithChildren
   ConsoleShipmentsRouteRoute: typeof ConsoleShipmentsRouteRouteWithChildren
   ConsoleAllTasksRoute: typeof ConsoleAllTasksRoute
+  ConsoleAskAiRoute: typeof ConsoleAskAiRoute
   ConsoleConversationsRoute: typeof ConsoleConversationsRoute
   ConsoleDashboardRoute: typeof ConsoleDashboardRoute
   ConsoleEmailsRoute: typeof ConsoleEmailsRoute
@@ -894,6 +914,7 @@ const ConsoleRouteRouteChildren: ConsoleRouteRouteChildren = {
   ConsoleMyTranscoRouteRoute: ConsoleMyTranscoRouteRouteWithChildren,
   ConsoleShipmentsRouteRoute: ConsoleShipmentsRouteRouteWithChildren,
   ConsoleAllTasksRoute: ConsoleAllTasksRoute,
+  ConsoleAskAiRoute: ConsoleAskAiRoute,
   ConsoleConversationsRoute: ConsoleConversationsRoute,
   ConsoleDashboardRoute: ConsoleDashboardRoute,
   ConsoleEmailsRoute: ConsoleEmailsRoute,

@@ -78,9 +78,9 @@ export function isAuthenticated(): boolean {
 export function canSee(page: string | undefined): boolean {
   // Settings (own password, theme) is open to every login; its staff
   // list checks the "settings" page itself. Tasks, and the dashboard
-  // (which shows only tasks to a login without the full dashboard), are
-  // open to every login too.
-  if (!page || page === "settings" || page === "tasks" || page === "dashboard") return true;
+  // (which shows only tasks to a login without the full dashboard), and
+  // Ask AI are open to every login too.
+  if (!page || page === "settings" || page === "tasks" || page === "dashboard" || page === "ask-ai") return true;
   const pages = getCurrentUser()?.pages;
   if (page === "customer-profile") return !pages || pages.includes(page) || pages.includes("customers");
   return !pages || pages.includes(page);

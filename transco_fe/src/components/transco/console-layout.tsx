@@ -35,6 +35,7 @@ import {
   BookOpenText,
   BadgePercent,
   MessagesSquare,
+  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -88,6 +89,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard", to: "/console/dashboard", icon: LayoutDashboard },
       { label: "Tasks", to: "/console/tasks", icon: ListTodo, badge: "tasks" },
       { label: "Conversations", to: "/console/conversations", icon: MessageCircle, badge: "conversations" },
+      // Staff type a caller's question and get the bot's prices.
+      { label: "Ask AI", to: "/console/ask-ai", icon: WandSparkles },
       { label: "Customers", to: "/console/customers", icon: Users },
       { label: "Emails", to: "/console/emails", icon: Mail, badge: "emails" },
       { label: "Bookings", to: "/console/bookings", icon: CalendarClock, badge: "bookings" },

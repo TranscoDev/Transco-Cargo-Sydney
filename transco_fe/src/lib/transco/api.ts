@@ -1135,6 +1135,18 @@ async function agentKnowledgeRequest<T>(path: string, init: RequestInit = {}): P
 
 export const fetchAgentKnowledge = () => agentKnowledgeRequest<AgentKnowledge>("");
 
+/** Ask AI page: the bot's answer to a question staff type in (nothing is saved). */
+export async function askAi(question: string, sessionId: string) {
+  const res = await fetch(`${API_BASE_URL}/api/ask-ai`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ question, sessionId }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || `Ask AI failed (${res.status})`);
+  return body as { reply: string; unsure: boolean };
+}
+
 export const saveAgentKnowledge = (body: { details: Record<string, string>; sections: Record<string, string> }) =>
   agentKnowledgeRequest<AgentKnowledge>("", { method: "PUT", body: JSON.stringify(body) });
 

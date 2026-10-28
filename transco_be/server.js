@@ -6931,6 +6931,30 @@ const agentKnowledgeRouters = require('./agentKnowledge').createAgentKnowledgeRo
 app.use('/api/public', agentKnowledgeRouters.publicRouter);
 app.use('/api/agent-knowledge', agentKnowledgeRouters.staffRouter);
 
+// Ask AI (console): staff type a customer's question (e.g. from a phone
+// call) and get the same answer the bot gives customers — the same
+// Flowise chatflow and price calculator. Nothing is saved to any
+// customer; Flowise remembers the chat by the page's session id.
+app.post('/api/ask-ai', async (req, res) => {
+  const question = typeof req.body?.question === 'string' ? req.body.question.trim().slice(0, 2000) : '';
+  if (!question) return res.status(400).json({ error: 'Type a question first.' });
+  const session = typeof req.body?.sessionId === 'string' && /^[a-z0-9-]{6,40}$/i.test(req.body.sessionId) ? req.body.sessionId : 'default';
+  try {
+    const reply = await getFlowiseReply(question, `staff-ask-${req.user.sub}-${session}`);
+    if (!reply) return res.status(502).json({ error: 'The AI could not answer just now. Please try again.' });
+    const unsure = reply.includes('[[HANDOFF]]');
+    const text = reply.replace(/\[\[[A-Z_]+[^\]]*\]\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    // A bare hand-off is the customer line "👍 … passed it to our team".
+    res.json({
+      reply: unsure && (!text || text.startsWith('👍')) ? "The AI isn't sure about this one — please check with the office." : text,
+      unsure
+    });
+  } catch (err) {
+    console.error('Ask AI failed:', err.message);
+    res.status(500).json({ error: 'The AI could not answer just now. Please try again.' });
+  }
+});
+
 // Prices & promotions: /api/public/prices (read by the Flowise tool's
 // calculator) and the console's Prices & Promotions page (admins edit).
 const priceRouters = require('./prices').createPriceRouters();
