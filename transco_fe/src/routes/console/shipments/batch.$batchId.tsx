@@ -498,6 +498,10 @@ function EditShipmentDialog({
   const [number, setNumber] = useState(String(batch.batchNumber));
   const [peNumber, setPeNumber] = useState(batch.peNumber ?? "");
   const [dates, setDates] = useState<Record<DateKey, string>>(initialDates);
+  const showMoney = getCurrentUser()?.role !== "warehouse";
+  const moneyText = (v: number) => (v ? String(v) : "");
+  const [income, setIncome] = useState(moneyText(batch.financials.grossIncome));
+  const [expenses, setExpenses] = useState(moneyText(batch.financials.totalExpenses));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -506,6 +510,8 @@ function EditShipmentDialog({
     setNumber(String(batch.batchNumber));
     setPeNumber(batch.peNumber ?? "");
     setDates(initialDates());
+    setIncome(moneyText(batch.financials.grossIncome));
+    setExpenses(moneyText(batch.financials.totalExpenses));
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, batch]);
@@ -527,6 +533,16 @@ function EditShipmentDialog({
     if (peNumber.trim() !== (batch.peNumber ?? "")) input.peNumber = peNumber.trim() || null;
     for (const d of DATE_FIELDS) {
       if (dates[d.key] !== before[d.key]) input[d.key] = dates[d.key] || null;
+    }
+    if (showMoney) {
+      const inc = income.trim() ? Number(income.replace(/[$,\s]/g, "")) : 0;
+      const exp = expenses.trim() ? Number(expenses.replace(/[$,\s]/g, "")) : 0;
+      if (!Number.isFinite(inc) || !Number.isFinite(exp) || inc < 0 || exp < 0) {
+        setError("Income and expenses must be amounts like 12500.50.");
+        return;
+      }
+      if (inc !== batch.financials.grossIncome) input.grossIncome = inc;
+      if (exp !== batch.financials.totalExpenses) input.totalExpenses = exp;
     }
     if (!Object.keys(input).length) {
       onOpenChange(false);
@@ -551,7 +567,7 @@ function EditShipmentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Edit Shipment {batch.batchNumber}</DialogTitle>
-          <DialogDescription>Fix a wrong number, PE number or date. Only what you change is saved.</DialogDescription>
+          <DialogDescription>Fix a wrong number, PE number or date, or fill in the money. Only what you change is saved.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -588,6 +604,19 @@ function EditShipmentDialog({
               );
             })}
           </div>
+          {showMoney && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-income">Income ($)</Label>
+                <Input id="edit-income" inputMode="decimal" value={income} onChange={(e) => setIncome(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-expenses">Expenses ($)</Label>
+                <Input id="edit-expenses" inputMode="decimal" value={expenses} onChange={(e) => setExpenses(e.target.value)} placeholder="0.00" />
+              </div>
+              <p className="col-span-2 text-xs text-muted-foreground">Profit is worked out for you: income minus expenses.</p>
+            </div>
+          )}
           {error && <p className="text-xs font-medium text-attention-foreground">{error}</p>}
         </div>
 

@@ -777,6 +777,8 @@ export async function updateConsolidation(
     arrivalDate?: string | null;
     peblEta?: string | null;
     peblDeliveryDate?: string | null;
+    grossIncome?: number;
+    totalExpenses?: number;
   },
 ): Promise<Consolidation> {
   const res = await fetch(`${API_BASE_URL}/api/consolidations/${consolidationId}`, {

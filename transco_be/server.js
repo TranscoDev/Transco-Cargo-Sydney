@@ -4195,7 +4195,7 @@ app.get('/api/consolidations/:consolidationId/landing-sheet.pdf', async (req, re
   }
 });
 
-// Staff fix a shipment typed in wrong — number, PE number, dates. Only the
+// Staff fix a shipment typed in wrong — number, PE number, dates, money. Only the
 // fields sent are changed. A new number also moves onto every HBL in it
 // (they keep a copy of the number, see the /move route).
 const CONSOLIDATION_DATE_FIELDS = {
@@ -4241,6 +4241,21 @@ app.patch('/api/consolidations/:consolidationId', async (req, res) => {
       const d = isoDateOrNull(body[key]);
       if (d.error) return res.status(400).json({ error: d.error });
       set[`dates.${field}`] = d.value;
+    }
+
+    // Money typed in by staff (a shipment made in the console has no sheet to
+    // import it from). Profit is always income minus expenses.
+    if (body.grossIncome !== undefined || body.totalExpenses !== undefined) {
+      const money = {};
+      for (const key of ['grossIncome', 'totalExpenses']) {
+        const raw = body[key] !== undefined ? body[key] : (existing.financials && existing.financials[key]) || 0;
+        const v = raw === null || raw === '' ? 0 : Number(raw);
+        if (!Number.isFinite(v) || v < 0 || v > 100000000) {
+          return res.status(400).json({ error: 'Income and expenses must be amounts like 12500.50.' });
+        }
+        money[key] = Math.round(v * 100) / 100;
+      }
+      set.financials = { ...money, grossProfit: Math.round((money.grossIncome - money.totalExpenses) * 100) / 100 };
     }
 
     if (!Object.keys(set).length) return res.status(400).json({ error: 'Nothing to change.' });
