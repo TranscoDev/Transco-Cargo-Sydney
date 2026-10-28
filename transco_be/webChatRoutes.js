@@ -444,7 +444,8 @@ module.exports = function createWebChatRouter({
       if (answerScheduleQuestion && !photo) {
         const scheduleReply = await answerScheduleQuestion({
           text: outgoingText,
-          country: (Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) && country) || customer.webCountry || null
+          country: (Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) && country) || customer.webCountry || null,
+          customerId: customer._id
         });
         if (scheduleReply) {
           const saved = await saveMessage({

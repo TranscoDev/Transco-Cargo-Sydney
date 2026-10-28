@@ -12,7 +12,7 @@
 // customer's OWN shipment ("when will my boxes arrive?") are tracking,
 // not the calendar, and are left alone.
 
-const { shippingSchedule } = require('./db');
+const { shippingSchedule, messages } = require('./db');
 
 const COUNTRY_LABEL = {
   en: { sri_lanka: 'Sri Lanka', india: 'India' },
@@ -141,16 +141,36 @@ module.exports = function createScheduleAnswerer({ getSydneyNow }) {
     return { text: lines.join('\n'), hasDates: true };
   }
 
+  // The country the customer last named in this chat ("Sri Lanka" button,
+  // "sending to India", ...) — newest message first, so a change of mind wins.
+  async function countryFromChat(customerId) {
+    if (!customerId) return null;
+    const recent = await messages()
+      .find({ customerId, senderType: 'CUSTOMER' }, { projection: { content: 1 } })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .toArray();
+    for (const m of recent) {
+      const c = countryInText(m.content);
+      if (c) return c;
+    }
+    return null;
+  }
+
   /**
    * Returns the reply text for a schedule question, or null if the
    * message isn't one (it then goes to the AI as usual).
-   * `country` is the best context we have (website page / earlier
-   * choice); a country named in the message wins over it.
+   * Country: named in this message > named earlier in this chat >
+   * `country` (website page / saved choice). Only when none is known
+   * are both calendars shown.
    */
-  async function answerScheduleQuestion({ text, country = null }) {
+  async function answerScheduleQuestion({ text, country = null, customerId = null }) {
     if (!isScheduleQuestion(text)) return null;
     const lang = languageOf(text);
-    const wanted = countryInText(text) || (COUNTRY_LABEL.en[country] ? country : null);
+    const wanted =
+      countryInText(text) ||
+      (await countryFromChat(customerId)) ||
+      (COUNTRY_LABEL.en[country] ? country : null);
     const countries = wanted ? [wanted] : ['sri_lanka', 'india'];
     const today = sydneyToday();
 

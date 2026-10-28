@@ -1174,6 +1174,15 @@ test('chat answers schedule questions from the shipping calendar, not the AI', a
   const india = await chat(sessionId, { message: 'when is the next shipment to India?', country: 'sri_lanka' });
   assert.match(india.body.reply, /Shipping calendar — India/);
 
+  // A country named earlier in the chat → only that calendar.
+  const chosenSession = `agentsite-schedule-chosen-${Date.now()}`;
+  flowiseReplyText = 'AI reply';
+  await chat(chosenSession, { message: 'I want to send 3 boxes to India' });
+  const chosen = await chat(chosenSession, { message: 'Can i see the shipping schedule' });
+  assert.match(chosen.body.reply, /Shipping calendar — India/);
+  assert.doesNotMatch(chosen.body.reply, /Sri Lanka/);
+  flowiseRequests = [];
+
   // Asked in Sinhala → answered in Sinhala.
   const si = await chat(sessionId, { message: 'ඔබේ shipping කාලසටහන මොකක්ද?', country: 'sri_lanka' });
   assert.match(si.body.reply, /Shipping දින දර්ශනය/);

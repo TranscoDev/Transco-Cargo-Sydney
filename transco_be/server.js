@@ -1945,7 +1945,8 @@ app.post('/webhook', async (req, res) => {
       // the AI, so the two can never disagree.
       const scheduleReply = photo ? null : await scheduleAnswerer.answerScheduleQuestion({
         text,
-        country: customer.webCountry || null
+        country: customer.webCountry || null,
+        customerId: customer._id
       });
       if (scheduleReply) {
         await sendAndTrackOutbound(customer, 'CHATBOT', scheduleReply, inboundMessage._id, isNewCustomer);
