@@ -3,7 +3,9 @@ import { Link } from "@tanstack/react-router";
 import {
   Bookmark,
   BookmarkPlus,
+  CheckCircle2,
   CheckSquare,
+  ChevronDown,
   Download,
   Globe,
   Info,
@@ -128,6 +130,33 @@ function statusFor(c: Conversation): CustomerStatus {
   return c.status ?? "ACTIVE";
 }
 
+/** "How they joined" filter chips, in the order staff mostly need them. */
+const SOURCE_FILTERS: ContactSourceFilter[] = ["all", "portal", "website", "manual", "whatsapp", "imported"];
+
+const SOURCE_FILTER_LABELS: Record<ContactSourceFilter, string> = {
+  all: "Everyone",
+  portal: "Online account",
+  website: "Website chat",
+  manual: "Added by staff",
+  whatsapp: "WhatsApp",
+  imported: "Old records",
+};
+
+const SOURCE_FILTER_HINTS: Record<ContactSourceFilter, string> = {
+  all: "Every customer",
+  portal: "Signed up on the website, by a quick register link, or at the counter",
+  website: "Chatted on the website",
+  manual: "Added here with Add customer",
+  whatsapp: "Messaged us on WhatsApp",
+  imported: "Only in the old shipment sheets — never contacted us online",
+};
+
+/** Can be emailed: has an email and isn't Do Not Contact / Blocked. */
+function canEmail(c: Conversation): boolean {
+  const s = statusFor(c);
+  return Boolean(c.email) && s !== "DO_NOT_CONTACT" && s !== "BLOCKED";
+}
+
 function matchesSourceFilter(c: Conversation, filter: ContactSourceFilter): boolean {
   if (filter === "all") return true;
   const sources = sourcesFor(c);
@@ -222,7 +251,8 @@ export function ContactsDirectory({
   const [profileId, setProfileId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailRecipients, setEmailRecipients] = useState<Conversation[] | null>(null);
+  const [savedOpen, setSavedOpen] = useState(false);
   const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
 
   const sorted = useMemo(
@@ -250,11 +280,18 @@ export function ContactsDirectory({
   }, [filtered, query]);
 
   const counts = useMemo(() => {
-    const c = { all: sorted.length, whatsapp: 0, website: 0, imported: 0 };
+    const c: Record<ContactSourceFilter, number> = {
+      all: sorted.length,
+      portal: 0,
+      website: 0,
+      manual: 0,
+      whatsapp: 0,
+      imported: 0,
+    };
     for (const conv of sorted) {
-      if (matchesSourceFilter(conv, "whatsapp")) c.whatsapp += 1;
-      if (matchesSourceFilter(conv, "website")) c.website += 1;
-      if (matchesSourceFilter(conv, "imported")) c.imported += 1;
+      for (const key of SOURCE_FILTERS) {
+        if (key !== "all" && matchesSourceFilter(conv, key)) c[key] += 1;
+      }
     }
     return c;
   }, [sorted]);
@@ -305,8 +342,6 @@ export function ContactsDirectory({
     [sorted, selectedIds],
   );
 
-  const exportRows = selectedIds.size > 0 ? selectedConversations : visible;
-
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
       <div className="border-b border-border px-4 py-4 md:px-6">
@@ -314,10 +349,9 @@ export function ContactsDirectory({
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">Customers</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Everyone we've talked to or shipped for. Click a name to see their profile, bookings and shipments.
+              Click a name to see their profile, bookings and shipments.
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <StatusBadge tone="neutral">{sorted.length} customers</StatusBadge>
+            <div className="mt-2 flex flex-wrap items-center gap-2 empty:hidden">
               {/* Only surfaced when non-zero — these need staff action, unlike
                   Active/Historical which are just the normal steady state. */}
               {stats.byStatus.REVIEW > 0 && <StatusBadge tone="pending">{stats.byStatus.REVIEW} need review</StatusBadge>}
@@ -338,35 +372,34 @@ export function ContactsDirectory({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {(
-            [
-              ["all", `All`],
-              ["whatsapp", `WhatsApp`],
-              ["website", `Website`],
-              ["imported", `Imported`],
-            ] as [ContactSourceFilter, string][]
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                filter === key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary/60 text-muted-foreground hover:bg-secondary",
-              )}
-            >
-              {label} <span className="opacity-70">{counts[key]}</span>
-            </button>
-          ))}
+        {/* One toolbar: search, then the filters, then the page actions. */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, phone, email or notes"
+              aria-label="Search customers"
+              className="h-9 w-full rounded-md border border-input bg-secondary/60 pl-8 pr-8 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:bg-panel"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-secondary"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as CustomerStatus | "any")}
             aria-label="Filter by status"
-            className="h-7 rounded-full border border-input bg-secondary/60 px-2 text-xs text-foreground outline-none focus:border-ring"
+            className="h-9 rounded-md border border-input bg-secondary/60 px-2 text-sm text-foreground outline-none focus:border-ring"
           >
             <option value="any">Any status</option>
             {CUSTOMER_STATUSES.map((s) => (
@@ -376,106 +409,157 @@ export function ContactsDirectory({
             ))}
           </select>
 
-          <label className="inline-flex items-center gap-1.5 rounded-full bg-secondary/60 px-2.5 py-1 text-xs text-muted-foreground">
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary/60 px-2.5 text-sm text-foreground">
             <input
               type="checkbox"
               checked={hasEmailOnly}
               onChange={(e) => setHasEmailOnly(e.target.checked)}
-              className="h-3 w-3"
+              className="h-3.5 w-3.5"
             />
-            Has email only ({stats.withEmail})
+            Has email <span className="text-muted-foreground">{stats.withEmail}</span>
           </label>
-        </div>
 
-        {(segments.length > 0 || onSaveSegment) && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Segments:</span>
-            {segments.map((s) => (
-              <span
-                key={s.id}
-                className="inline-flex items-center gap-1 rounded-full bg-secondary/60 pl-2.5 pr-1 py-1 text-xs text-muted-foreground"
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilter(s.filter.sourceFilter);
-                    setStatusFilter(s.filter.statusFilter);
-                    setHasEmailOnly(s.filter.hasEmailOnly);
-                  }}
-                  className="inline-flex items-center gap-1 hover:text-foreground"
-                >
-                  <Bookmark className="h-3 w-3" />
-                  {s.name}
-                </button>
-                {onDeleteSegment && (
-                  <button
-                    type="button"
-                    onClick={() => onDeleteSegment(s.id)}
-                    aria-label={`Delete segment ${s.name}`}
-                    className="rounded p-0.5 hover:bg-secondary"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                )}
-              </span>
-            ))}
-            {onSaveSegment && (
+          {(segments.length > 0 || onSaveSegment) && (
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => setSaveSegmentOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-dashed border-input px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary/60"
+                onClick={() => setSavedOpen((o) => !o)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-foreground hover:bg-secondary"
               >
-                <BookmarkPlus className="h-3 w-3" />
-                Save current filter
+                <Bookmark className="h-4 w-4" />
+                Saved lists{segments.length > 0 && <span className="text-muted-foreground">{segments.length}</span>}
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              {savedOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setSavedOpen(false)} />
+                  <div className="absolute left-0 z-30 mt-1 w-64 rounded-md border border-border bg-panel p-1 shadow-lg">
+                    {segments.length === 0 && (
+                      <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                        No saved lists yet. Pick your filters, then save them here to reuse later.
+                      </p>
+                    )}
+                    {segments.map((s) => (
+                      <div key={s.id} className="flex items-center rounded hover:bg-secondary">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilter(s.filter.sourceFilter);
+                            setStatusFilter(s.filter.statusFilter);
+                            setHasEmailOnly(s.filter.hasEmailOnly);
+                            setSavedOpen(false);
+                          }}
+                          className="flex-1 truncate px-2.5 py-1.5 text-left text-sm text-foreground"
+                        >
+                          {s.name}
+                        </button>
+                        {onDeleteSegment && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Delete the saved list "${s.name}"?`)) onDeleteSegment(s.id);
+                            }}
+                            aria-label={`Delete saved list ${s.name}`}
+                            className="mr-1 rounded p-1 text-muted-foreground hover:bg-panel hover:text-foreground"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {onSaveSegment && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSavedOpen(false);
+                          setSaveSegmentOpen(true);
+                        }}
+                        className="mt-1 flex w-full items-center gap-1.5 border-t border-border px-2.5 pb-1.5 pt-2 text-left text-sm text-primary hover:bg-secondary"
+                      >
+                        <BookmarkPlus className="h-4 w-4" />
+                        Save these filters
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => downloadCsv(visible)}
+              title="Download the customers shown below as a spreadsheet"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-foreground hover:bg-secondary"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+            {onSendEmailCampaign && (
+              <button
+                type="button"
+                onClick={() => setEmailRecipients(visible)}
+                disabled={visible.length === 0}
+                title="Email the customers shown below"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              >
+                <Mail className="h-4 w-4" />
+                Email {visible.length === sorted.length ? "everyone" : `these ${visible.length}`}
               </button>
             )}
           </div>
-        )}
+        </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="relative max-w-sm flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, phone, email, or notes"
-              aria-label="Search contacts"
-              className="h-9 w-full rounded-md border border-input bg-secondary/60 pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:bg-panel"
-            />
-          </div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {SOURCE_FILTERS.filter((key) => key === "all" || key === filter || counts[key] > 0).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              title={SOURCE_FILTER_HINTS[key]}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                filter === key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground",
+              )}
+            >
+              {SOURCE_FILTER_LABELS[key]} <span className="opacity-70">{counts[key]}</span>
+            </button>
+          ))}
+        </div>
 
-          <button
-            type="button"
-            onClick={() => downloadCsv(exportRows)}
-            className="inline-flex items-center gap-1 rounded-md border border-input px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export CSV{" "}
-            {selectedIds.size > 0 ? `(${selectedIds.size} selected)` : `(${visible.length} shown)`}
-          </button>
-
-          {onSendEmailCampaign && (
+        {selectedIds.size > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            <span className="font-medium text-foreground">{selectedIds.size} ticked</span>
+            {onSendEmailCampaign && (
+              <button
+                type="button"
+                onClick={() => setEmailRecipients(selectedConversations)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Email them
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setEmailModalOpen(true)}
-              disabled={selectedIds.size === 0}
-              className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              onClick={() => downloadCsv(selectedConversations)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-panel px-2.5 py-1 text-xs text-foreground hover:bg-secondary"
             >
-              <Mail className="h-3.5 w-3.5" />
-              Email Selected {selectedIds.size > 0 && `(${selectedIds.size})`}
+              <Download className="h-3.5 w-3.5" />
+              Export
             </button>
-          )}
-
-          {selectedIds.size > 0 && (
             <button
               type="button"
               onClick={() => setSelectedIds(new Set())}
-              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+              className="ml-auto text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
-              Clear selection
+              Untick all
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
@@ -543,10 +627,10 @@ export function ContactsDirectory({
         <AddContactModal onClose={() => setAddOpen(false)} onAddContact={onAddContact} />
       )}
 
-      {emailModalOpen && onSendEmailCampaign && (
+      {emailRecipients && onSendEmailCampaign && (
         <EmailCampaignModal
-          recipients={selectedConversations}
-          onClose={() => setEmailModalOpen(false)}
+          recipients={emailRecipients}
+          onClose={() => setEmailRecipients(null)}
           onSend={onSendEmailCampaign}
         />
       )}
@@ -1057,17 +1141,27 @@ function EmailCampaignModal({
     }
   };
 
+  const [confirming, setConfirming] = useState(false);
+  const [showWho, setShowWho] = useState(false);
+
+  // Same rules the server applies: blocked / do-not-contact first, then no email.
+  const willGet = recipients.filter(canEmail);
   const excludedCount = recipients.filter(
     (c) => statusFor(c) === "DO_NOT_CONTACT" || statusFor(c) === "BLOCKED",
   ).length;
-  const noEmailCount = recipients.filter((c) => !c.email).length;
-  const willSendCount = recipients.length - excludedCount - noEmailCount;
+  const noEmailCount = recipients.length - willGet.length - excludedCount;
+  const willSendCount = willGet.length;
+  const previewName = willGet[0]?.customerName ?? "there";
 
   const canSend =
     subject.trim().length > 0 && body.trim().length > 0 && !sending && willSendCount > 0;
 
   const handleSend = async () => {
     if (!canSend) return;
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
     setSending(true);
     setError(null);
     try {
@@ -1079,7 +1173,8 @@ function EmailCampaignModal({
       );
       setResult(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send campaign");
+      setError(err instanceof Error ? err.message : "Couldn't send the email — please try again.");
+      setConfirming(false);
     } finally {
       setSending(false);
     }
@@ -1091,13 +1186,20 @@ function EmailCampaignModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            {result ? "Campaign Sent" : "Email Selected Customers"}
-          </h3>
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">
+              {result ? "Email sent" : "Send an email"}
+            </h3>
+            {!result && (
+              <p className="text-xs text-muted-foreground">
+                One email to each customer, from Transco. Each person only sees their own name.
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -1109,53 +1211,105 @@ function EmailCampaignModal({
         </div>
 
         {result ? (
-          <div className="space-y-2 px-4 py-4 text-xs">
-            <p>
-              <span className="font-semibold text-foreground">{result.sent}</span> sent
-            </p>
-            <p className="text-muted-foreground">
-              {result.skippedNoEmail} skipped — no email on file
-            </p>
-            <p className="text-muted-foreground">
-              {result.skippedExcludedStatus} skipped — Do Not Contact / Blocked
-            </p>
-            {result.failed > 0 && <p className="text-attention-foreground">{result.failed} failed to send</p>}
+          <div className="space-y-3 px-5 py-6 text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-success-foreground" />
+              <p className="text-base">
+                Sent to <span className="font-semibold text-foreground">{result.sent}</span>{" "}
+                {result.sent === 1 ? "customer" : "customers"}
+              </p>
+            </div>
+            {result.skippedNoEmail > 0 && (
+              <p className="text-muted-foreground">{result.skippedNoEmail} skipped — no email address</p>
+            )}
+            {result.skippedExcludedStatus > 0 && (
+              <p className="text-muted-foreground">{result.skippedExcludedStatus} skipped — marked Do not contact / Blocked</p>
+            )}
+            {result.failed > 0 && (
+              <p className="text-attention-foreground">
+                {result.failed} didn't go through — their email address may be wrong.
+              </p>
+            )}
             <button
               type="button"
               onClick={onClose}
-              className="mt-2 w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+              className="mt-2 w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               Done
             </button>
           </div>
         ) : (
           <>
-            <div className="space-y-3 overflow-y-auto px-4 py-4 text-xs">
-              <p className="rounded-md bg-secondary/40 px-2.5 py-2 text-muted-foreground">
-                Sending to <span className="font-semibold text-foreground">{willSendCount}</span> of{" "}
-                {recipients.length} selected
-                {noEmailCount > 0 && ` — ${noEmailCount} have no email on file`}
-                {excludedCount > 0 && ` — ${excludedCount} excluded (Do Not Contact / Blocked)`}
-              </p>
+            <div className="space-y-4 overflow-y-auto px-5 py-4 text-sm">
+              <div className="rounded-md border border-border bg-secondary/30 px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-foreground">
+                    <span className="font-semibold">{willSendCount}</span>{" "}
+                    {willSendCount === 1 ? "customer will get it" : "customers will get it"}
+                  </p>
+                  {willSendCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowWho((v) => !v)}
+                      className="text-xs text-primary underline-offset-2 hover:underline"
+                    >
+                      {showWho ? "Hide list" : "See who"}
+                    </button>
+                  )}
+                </div>
+                {noEmailCount > 0 && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {noEmailCount} {noEmailCount === 1 ? "has" : "have"} no email address — skipped
+                  </p>
+                )}
+                {excludedCount > 0 && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {excludedCount} marked Do not contact / Blocked — skipped
+                  </p>
+                )}
+                {willSendCount === 0 && (
+                  <p className="mt-1 text-xs text-attention-foreground">
+                    Nobody here has an email address yet. Add emails on the Customers page first.
+                  </p>
+                )}
+                {showWho && (
+                  <ul className="mt-2 max-h-36 space-y-0.5 overflow-y-auto border-t border-border pt-2 text-xs">
+                    {willGet.map((c) => (
+                      <li key={c.id} className="flex justify-between gap-3">
+                        <span className="truncate text-foreground">{c.customerName}</span>
+                        <span className="truncate text-muted-foreground">{c.email}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               <Field label="Subject">
                 <input
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="h-8 w-full rounded-md border border-input bg-secondary/60 px-2 text-xs outline-none focus:border-ring"
+                  onChange={(e) => {
+                    setSubject(e.target.value);
+                    setConfirming(false);
+                  }}
+                  placeholder="e.g. Next shipment to Sri Lanka closes Friday"
+                  className="h-9 w-full rounded-md border border-input bg-secondary/60 px-2.5 text-sm outline-none focus:border-ring"
                   autoFocus
                 />
               </Field>
               <Field label="Message">
                 <textarea
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  rows={6}
-                  placeholder="Hi {name} gets prepended automatically — just write the message itself."
-                  className="w-full resize-none rounded-md border border-input bg-secondary/60 px-2 py-1.5 text-xs outline-none focus:border-ring"
+                  onChange={(e) => {
+                    setBody(e.target.value);
+                    setConfirming(false);
+                  }}
+                  rows={7}
+                  placeholder="Write your message. We add “Hi (their name),” at the top for you."
+                  className="w-full resize-y rounded-md border border-input bg-secondary/60 px-2.5 py-2 text-sm outline-none focus:border-ring"
                 />
               </Field>
 
-              <Field label="Flyer / image / PDF (optional)">
+              <Field label="Flyer, photo or PDF (optional)">
                 {attachment ? (
                   <div className="flex items-center justify-between rounded-md border border-input bg-secondary/60 px-2 py-1.5">
                     <span className="truncate text-foreground">{attachment.filename}</span>
@@ -1185,24 +1339,52 @@ function EmailCampaignModal({
                 )}
               </Field>
 
-              {error && <p className="text-xs text-attention-foreground">{error}</p>}
+              {(subject.trim() || body.trim()) && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">How it will look</p>
+                  <div className="rounded-md border border-border bg-background px-3 py-2.5 text-sm">
+                    <p className="font-semibold text-foreground">{subject.trim() || "(no subject)"}</p>
+                    <div className="mt-2 whitespace-pre-wrap text-foreground">
+                      <p>Hi {previewName},</p>
+                      <p className="mt-2">{body.trim()}</p>
+                    </div>
+                    {attachment && (
+                      <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Paperclip className="h-3 w-3" />
+                        {attachment.filename}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {error && <p className="text-sm text-attention-foreground">{error}</p>}
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3">
+              {confirming && !sending && (
+                <p className="mr-auto text-xs text-muted-foreground">
+                  Emails can't be taken back once sent.
+                </p>
+              )}
               <button
                 type="button"
-                onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary"
+                onClick={confirming ? () => setConfirming(false) : onClose}
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
               >
-                Cancel
+                {confirming ? "Go back" : "Cancel"}
               </button>
               <button
                 type="button"
                 onClick={handleSend}
                 disabled={!canSend}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
-                {sending ? "Sending…" : `Send to ${willSendCount}`}
+                {sending
+                  ? "Sending…"
+                  : confirming
+                    ? `Yes, send to ${willSendCount}`
+                    : `Send to ${willSendCount} ${willSendCount === 1 ? "customer" : "customers"}`}
               </button>
             </div>
           </>
@@ -1251,7 +1433,7 @@ function SaveSegmentModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h3 className="text-sm font-semibold text-foreground">Save Current Filter as Segment</h3>
+          <h3 className="text-sm font-semibold text-foreground">Save these filters as a list</h3>
           <button
             type="button"
             onClick={onClose}
@@ -1263,11 +1445,11 @@ function SaveSegmentModal({
         </div>
 
         <div className="space-y-3 px-4 py-4 text-xs">
-          <Field label="Segment name">
+          <Field label="List name">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Historical with email"
+              placeholder="e.g. Online accounts with email"
               className="h-8 w-full rounded-md border border-input bg-secondary/60 px-2 text-xs outline-none focus:border-ring"
               autoFocus
             />
@@ -1289,7 +1471,7 @@ function SaveSegmentModal({
             disabled={!canSave}
             className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Save Segment"}
+            {saving ? "Saving…" : "Save list"}
           </button>
         </div>
       </div>

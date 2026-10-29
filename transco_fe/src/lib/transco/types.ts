@@ -56,7 +56,7 @@ export interface ShipmentHistoryEntry {
 
 /** The Contacts page's filter tabs — "imported" means historical-only,
  * not yet matched to a live WhatsApp/website conversation. */
-export type ContactSourceFilter = "all" | "whatsapp" | "website" | "imported";
+export type ContactSourceFilter = "all" | "portal" | "website" | "manual" | "whatsapp" | "imported";
 
 /** A saved, reusable combination of Contacts filters — shared across
  * whoever's logged into the console (persisted server-side), not a
