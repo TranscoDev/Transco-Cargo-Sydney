@@ -92,6 +92,38 @@ function sourcesFor(c: Conversation): CustomerSource[] {
   return [c.channel === "website" ? "website" : "whatsapp"];
 }
 
+/** One row per customer. Every website chat a signed-in (or staff-linked)
+ * customer starts is its own record (one per browser), so without this the
+ * same person shows once per chat. Those chats fold into the account's row —
+ * their messages count toward its last activity and it gets the Website
+ * badge. Never by name or phone: an unlinked website visitor keeps a row. */
+function foldLinkedWebsiteChats(conversations: Conversation[]): Conversation[] {
+  const byId = new Map(conversations.map((c) => [c.id, c]));
+  const ownerOf = (c: Conversation) => {
+    const owner = c.channel === "website" && c.linkedAccount ? byId.get(c.linkedAccount.id) : undefined;
+    return owner && owner.id !== c.id ? owner : undefined;
+  };
+  const folded = new Map<string, Conversation[]>();
+  for (const c of conversations) {
+    const owner = ownerOf(c);
+    if (owner) folded.set(owner.id, [...(folded.get(owner.id) ?? []), c]);
+  }
+  return conversations
+    .filter((c) => !ownerOf(c))
+    .map((c) => {
+      const web = folded.get(c.id);
+      if (!web) return c;
+      const sources = sourcesFor(c);
+      return {
+        ...c,
+        sources: sources.includes("website") ? sources : [...sources, "website"],
+        messages: [c, ...web]
+          .flatMap((x) => x.messages)
+          .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+      };
+    });
+}
+
 function statusFor(c: Conversation): CustomerStatus {
   return c.status ?? "ACTIVE";
 }
@@ -194,7 +226,7 @@ export function ContactsDirectory({
   const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
 
   const sorted = useMemo(
-    () => [...conversations].sort((a, b) => a.customerName.localeCompare(b.customerName)),
+    () => foldLinkedWebsiteChats(conversations).sort((a, b) => a.customerName.localeCompare(b.customerName)),
     [conversations],
   );
 
