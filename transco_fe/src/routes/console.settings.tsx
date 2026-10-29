@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { KeyRound, Moon, Palette, Plus, Settings as SettingsIcon, Sun, Trash2, User, Users } from "lucide-react";
+import { Building2, KeyRound, Moon, Palette, Plus, Settings as SettingsIcon, Sun, Trash2, User, Users } from "lucide-react";
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,16 @@ import { getCurrentUser } from "@/lib/transco/auth";
 // Everyone opens Settings for their own password and theme; the staff
 // list needs the Settings page in their access.
 const hasPage = (page: string) => { const pages = getCurrentUser()?.pages; return !pages || pages.includes(page); };
-import { changePassword, createStaff, deleteStaff, fetchStaffWithAccess, updateStaffAccess } from "@/lib/transco/api";
+import {
+  changePassword,
+  createStaff,
+  deleteStaff,
+  fetchCompanySettings,
+  fetchStaffWithAccess,
+  saveCompanySettings,
+  updateStaffAccess,
+  type CompanySettings,
+} from "@/lib/transco/api";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
 import type { StaffAccess, StaffAccount } from "@/lib/transco/types";
 import { cn } from "@/lib/utils";
@@ -51,6 +60,7 @@ function SettingsPage() {
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <YourAccountCard email={me?.email ?? null} name={me?.name ?? null} />
+          <CompanyCard />
         </div>
         <div className="flex flex-col gap-6">
           <AppearanceCard />
@@ -229,6 +239,175 @@ function YourAccountCard({ email, name }: { email: string | null; name: string |
           </Button>
         </form>
       </div>
+    </SettingsCard>
+  );
+}
+
+/** Company details, grouped (Business, Contact, …). Admins edit; others read. */
+function CompanyCard() {
+  const [data, setData] = useState<CompanySettings | null>(null);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [logo, setLogo] = useState<string | null>(null);
+
+  const take = (d: CompanySettings) => {
+    setData(d);
+    setValues(Object.fromEntries(d.fields.map((f) => [f.key, f.value])));
+    setLogo(d.logo);
+  };
+
+  const pickLogo = (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) return setError("Please choose a PNG, JPG, WEBP or SVG picture.");
+    if (file.size > 500 * 1024) return setError("That picture is too big — please use one under 500 KB.");
+    const reader = new FileReader();
+    reader.onload = () => setLogo(typeof reader.result === "string" ? reader.result : null);
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    fetchCompanySettings()
+      .then(take)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load company details"));
+  }, []);
+
+  const changed = data ? data.fields.some((f) => (values[f.key] ?? "") !== f.value) || logo !== data.logo : false;
+  const groups = data ? [...new Set(data.fields.map((f) => f.group))] : [];
+  const readOnly = !data?.canEdit;
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      take(await saveCompanySettings(values, logo));
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save company details");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SettingsCard
+      icon={Building2}
+      tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+      title="Company"
+      description="Your business name, contacts, logo and colour."
+    >
+      {!data ? (
+        error ? <p className="text-xs text-destructive">{error}</p> : <p className="text-xs text-muted-foreground">Loading…</p>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {readOnly && (
+            <p className="rounded-lg bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">🔒 Only an admin can change the company details.</p>
+          )}
+          <div className="flex flex-col gap-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Logo</p>
+            <div className="flex items-center gap-4">
+              <div className="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white p-2">
+                {logo ? (
+                  <img src={logo} alt="Company logo" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <span className="text-center text-xs text-muted-foreground">No logo yet</span>
+                )}
+              </div>
+              {!readOnly && (
+                <div className="flex flex-col gap-2">
+                  <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-input px-3 py-1.5 text-sm font-medium hover:bg-secondary/60">
+                    {logo ? "Change logo" : "Upload logo"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      className="hidden"
+                      onChange={(e) => {
+                        pickLogo(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {logo && (
+                    <button type="button" onClick={() => setLogo(null)} className="text-left text-xs text-muted-foreground hover:text-destructive">
+                      Remove logo
+                    </button>
+                  )}
+                  <span className="text-xs text-muted-foreground">PNG, JPG, WEBP or SVG, under 500 KB.</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {groups.map((g) => (
+            <div key={g} className="flex flex-col gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.fields
+                  .filter((f) => f.group === g)
+                  .map((f) => (
+                    <div key={f.key} className={cn("flex flex-col gap-1.5", (f.multiline || f.hint || f.key === "address" || f.key === "name") && "sm:col-span-2")}>
+                      <Label htmlFor={`company-${f.key}`}>{f.label}</Label>
+                      {f.hint && <p className="-mt-1 text-xs text-muted-foreground">{f.hint}</p>}
+                      {f.type === "colour" ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            aria-label={f.label}
+                            disabled={readOnly}
+                            value={/^#[0-9a-f]{6}$/i.test(values[f.key] ?? "") ? values[f.key] : "#000000"}
+                            onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                            className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent p-1 disabled:cursor-default"
+                          />
+                          <Input
+                            id={`company-${f.key}`}
+                            value={values[f.key] ?? ""}
+                            readOnly={readOnly}
+                            onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                            className="font-mono"
+                          />
+                        </div>
+                      ) : f.multiline ? (
+                        <textarea
+                          id={`company-${f.key}`}
+                          rows={2}
+                          value={values[f.key] ?? ""}
+                          readOnly={readOnly}
+                          onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                          className="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                      ) : (
+                        <Input
+                          id={`company-${f.key}`}
+                          value={values[f.key] ?? ""}
+                          readOnly={readOnly}
+                          placeholder={readOnly ? "—" : "Not set yet"}
+                          onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          {saved && !changed && <p className="text-xs text-success-foreground">Company details saved.</p>}
+          {!readOnly && (
+            <div className="flex items-center gap-3">
+              <Button type="button" onClick={save} disabled={saving || !changed}>
+                {saving ? "Saving…" : "Save company details"}
+              </Button>
+              {data.updatedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Last saved {new Date(data.updatedAt).toLocaleString()}
+                  {data.updatedBy ? ` by ${data.updatedBy}` : ""}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </SettingsCard>
   );
 }

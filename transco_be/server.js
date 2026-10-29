@@ -7121,6 +7121,10 @@ const agentKnowledgeRouters = require('./agentKnowledge').createAgentKnowledgeRo
 app.use('/api/public', agentKnowledgeRouters.publicRouter);
 app.use('/api/agent-knowledge', agentKnowledgeRouters.staffRouter);
 
+// Company details (console → Settings → Company). Everyone sees them;
+// only an admin saves.
+app.use('/api/company', require('./company').createCompanyRouter({ isStaffAdmin }));
+
 // Ask AI (console): staff type a customer's question (e.g. from a phone
 // call) and get the same answer the bot gives customers — the same
 // Flowise chatflow and price calculator. Nothing is saved to any

@@ -1017,6 +1017,44 @@ export async function changePassword(currentPassword: string, newPassword: strin
   }
 }
 
+// Company details (Settings → Company). Only an admin saves (canEdit).
+export type CompanyField = {
+  key: string;
+  group: string;
+  label: string;
+  default: string;
+  value: string;
+  type?: "colour";
+  multiline?: boolean;
+  hint?: string;
+};
+export type CompanySettings = {
+  fields: CompanyField[];
+  logo: string | null;
+  canEdit: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+export async function fetchCompanySettings(): Promise<CompanySettings> {
+  const res = await fetch(`${API_BASE_URL}/api/company`, { headers: authHeaders() });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? `Failed to load company details (${res.status})`);
+  return data as CompanySettings;
+}
+
+// logo: a data URL to set, null to remove.
+export async function saveCompanySettings(values: Record<string, string>, logo: string | null): Promise<CompanySettings> {
+  const res = await fetch(`${API_BASE_URL}/api/company`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ values, logo }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? `Failed to save company details (${res.status})`);
+  return data as CompanySettings;
+}
+
 export async function setCustomerMode(customerId: string, mode: ConversationMode): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/mode`, {
     method: "PATCH",
