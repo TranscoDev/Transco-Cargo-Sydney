@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/transco/page-kit";
 import {
   CUSTOMER_STATUS_LABELS,
-  MODE_LABELS,
   STAFF_CUSTOMER_STATUSES,
   type CampaignAttachment,
   type ContactSourceFilter,
@@ -581,7 +580,7 @@ export function ContactsDirectory({
             No contacts match this search.
           </p>
         ) : (
-          <table className="w-full min-w-[1080px] border-collapse text-sm">
+          <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-panel text-left text-xs text-muted-foreground shadow-[0_1px_0_0_theme(colors.border)]">
               <tr>
                 <th className="px-2 py-2">
@@ -601,7 +600,6 @@ export function ContactsDirectory({
                 <th className="min-w-[200px] px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Source</th>
-                <th className="px-4 py-3 font-medium">Mode</th>
                 <th className="px-4 py-3 text-right font-medium">Bookings</th>
                 <th className="px-4 py-3 text-right font-medium">Shipments</th>
                 <th className="whitespace-nowrap px-4 py-3 font-medium">Last Activity</th>
@@ -770,7 +768,6 @@ function ContactRow({
       <td className="px-4 py-3">
         <SourceBadges sources={sourcesFor(conversation)} />
       </td>
-      <td className="px-4 py-3 text-muted-foreground">{MODE_LABELS[conversation.mode]}</td>
       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
         {conversation.totalBookings ?? 0}
       </td>
