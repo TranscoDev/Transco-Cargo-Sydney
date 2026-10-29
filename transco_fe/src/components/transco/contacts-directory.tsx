@@ -601,13 +601,13 @@ export function ContactsDirectory({
                 <th className="min-w-[200px] px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Source</th>
-                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Mode</th>
                 <th className="px-4 py-3 text-right font-medium">Bookings</th>
                 <th className="px-4 py-3 text-right font-medium">Shipments</th>
                 <th className="whitespace-nowrap px-4 py-3 font-medium">Last Activity</th>
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Notes</th>
+                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
@@ -770,21 +770,6 @@ function ContactRow({
       <td className="px-4 py-3">
         <SourceBadges sources={sourcesFor(conversation)} />
       </td>
-      <td className="px-4 py-3">
-        {/* Active/Historical are just the steady state — left blank — so
-            a tag only appears when staff need to notice it
-            (Review/DNC/Blocked). */}
-        {isNormal(status) ? null : (
-          <span
-            className={cn(
-              "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
-              STATUS_BADGE[status],
-            )}
-          >
-            {CUSTOMER_STATUS_LABELS[status]}
-          </span>
-        )}
-      </td>
       <td className="px-4 py-3 text-muted-foreground">{MODE_LABELS[conversation.mode]}</td>
       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
         {conversation.totalBookings ?? 0}
@@ -814,6 +799,22 @@ function ContactRow({
           placeholder="Add note"
           className="h-7 w-56 rounded border border-transparent bg-transparent px-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground hover:border-input focus:border-ring focus:bg-secondary/60"
         />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3">
+        {/* Active/Historical are just the steady state — left blank — so
+            a tag only appears when staff need to notice it
+            (Review/DNC/Blocked). Last column, so the blanks don't sit
+            in the middle of the table. */}
+        {isNormal(status) ? null : (
+          <span
+            className={cn(
+              "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
+              STATUS_BADGE[status],
+            )}
+          >
+            {CUSTOMER_STATUS_LABELS[status]}
+          </span>
+        )}
       </td>
       <td className="px-2 py-3">
         <div className="flex items-center gap-1">
