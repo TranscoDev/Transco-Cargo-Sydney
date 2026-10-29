@@ -34,13 +34,23 @@ export const CUSTOMER_STATUSES: CustomerStatus[] = [
   "BLOCKED",
 ];
 
+/** ACTIVE and HISTORICAL both read as "Normal" — HISTORICAL is only the
+ * old-sheet importer's default, and the "Old records" filter covers that. */
 export const CUSTOMER_STATUS_LABELS: Record<CustomerStatus, string> = {
-  ACTIVE: "Active",
-  HISTORICAL: "Historical",
-  REVIEW: "Needs Review",
-  DO_NOT_CONTACT: "Do Not Contact",
+  ACTIVE: "Normal",
+  HISTORICAL: "Normal",
+  REVIEW: "Needs review",
+  DO_NOT_CONTACT: "Do not contact",
   BLOCKED: "Blocked",
 };
+
+/** What staff can pick for a customer. HISTORICAL is never offered — an
+ * imported customer keeps it as saved and just shows as Normal. */
+export const STAFF_CUSTOMER_STATUSES: CustomerStatus[] = ["ACTIVE", "REVIEW", "DO_NOT_CONTACT", "BLOCKED"];
+
+/** Customers page status filter. "ok_email" = has an email and isn't Do
+ * not contact / Blocked. ACTIVE/HISTORICAL can still come from old saved lists. */
+export type CustomerStatusFilter = CustomerStatus | "any" | "ok_email";
 
 /** One sender→receiver shipment relationship pulled from the historical
  * Excel import — never created any other way. */
@@ -63,7 +73,7 @@ export type ContactSourceFilter = "all" | "portal" | "website" | "manual" | "wha
  * per-browser preference. */
 export interface SegmentFilter {
   sourceFilter: ContactSourceFilter;
-  statusFilter: CustomerStatus | "any";
+  statusFilter: CustomerStatusFilter;
   hasEmailOnly: boolean;
 }
 

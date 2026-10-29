@@ -24,14 +24,15 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/transco/page-kit";
 import {
-  CUSTOMER_STATUSES,
   CUSTOMER_STATUS_LABELS,
   MODE_LABELS,
+  STAFF_CUSTOMER_STATUSES,
   type CampaignAttachment,
   type ContactSourceFilter,
   type Conversation,
   type CustomerSource,
   type CustomerStatus,
+  type CustomerStatusFilter,
   type EmailCampaignResult,
   type Segment,
   type SegmentFilter,
@@ -151,6 +152,11 @@ const SOURCE_FILTER_HINTS: Record<ContactSourceFilter, string> = {
   imported: "Only in the old shipment sheets — never contacted us online",
 };
 
+/** Active and Historical are both just a normal customer — no tag. */
+function isNormal(s: CustomerStatus): boolean {
+  return s === "ACTIVE" || s === "HISTORICAL";
+}
+
 /** Can be emailed: has an email and isn't Do Not Contact / Blocked. */
 function canEmail(c: Conversation): boolean {
   const s = statusFor(c);
@@ -173,11 +179,15 @@ function matchesSourceFilter(c: Conversation, filter: ContactSourceFilter): bool
 function matchesAllFilters(
   c: Conversation,
   sourceFilter: ContactSourceFilter,
-  statusFilter: CustomerStatus | "any",
+  statusFilter: CustomerStatusFilter,
   hasEmailOnly: boolean,
 ): boolean {
   if (!matchesSourceFilter(c, sourceFilter)) return false;
-  if (statusFilter !== "any" && statusFor(c) !== statusFilter) return false;
+  if (statusFilter === "ok_email") {
+    if (!canEmail(c)) return false;
+  } else if (statusFilter === "ACTIVE" || statusFilter === "HISTORICAL") {
+    if (!isNormal(statusFor(c))) return false;
+  } else if (statusFilter !== "any" && statusFor(c) !== statusFilter) return false;
   if (hasEmailOnly && !c.email) return false;
   return true;
 }
@@ -246,7 +256,7 @@ export function ContactsDirectory({
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ContactSourceFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<CustomerStatus | "any">("any");
+  const [statusFilter, setStatusFilter] = useState<CustomerStatusFilter>("any");
   const [hasEmailOnly, setHasEmailOnly] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -311,6 +321,8 @@ export function ContactsDirectory({
     }
     return { total: sorted.length, byStatus, withEmail };
   }, [sorted]);
+
+  const okToEmailCount = useMemo(() => sorted.filter(canEmail).length, [sorted]);
 
   const profileContact = profileId ? (conversations.find((c) => c.id === profileId) ?? null) : null;
 
@@ -397,16 +409,17 @@ export function ContactsDirectory({
 
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as CustomerStatus | "any")}
+            onChange={(e) => setStatusFilter(e.target.value as CustomerStatusFilter)}
             aria-label="Filter by status"
             className="h-9 rounded-md border border-input bg-secondary/60 px-2 text-sm text-foreground outline-none focus:border-ring"
           >
-            <option value="any">Any status</option>
-            {CUSTOMER_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {CUSTOMER_STATUS_LABELS[s]}
-              </option>
-            ))}
+            <option value="any">Anyone</option>
+            <option value="ok_email">OK to email ({okToEmailCount})</option>
+            {/* Only when an old saved list asks for it. */}
+            {isNormal(statusFilter as CustomerStatus) && <option value={statusFilter}>Normal</option>}
+            <option value="REVIEW">Needs review ({stats.byStatus.REVIEW})</option>
+            <option value="DO_NOT_CONTACT">Do not contact ({stats.byStatus.DO_NOT_CONTACT})</option>
+            <option value="BLOCKED">Blocked ({stats.byStatus.BLOCKED})</option>
           </select>
 
           <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary/60 px-2.5 text-sm text-foreground">
@@ -758,12 +771,10 @@ function ContactRow({
         <SourceBadges sources={sourcesFor(conversation)} />
       </td>
       <td className="px-4 py-3">
-        {/* Active/Historical are just the steady state — plain text, no
-            pill — so the colored badge only draws the eye for statuses
-            that actually need staff attention (Review/DNC/Blocked). */}
-        {status === "ACTIVE" || status === "HISTORICAL" ? (
-          <span className="text-muted-foreground">{CUSTOMER_STATUS_LABELS[status]}</span>
-        ) : (
+        {/* Active/Historical are just the steady state — left blank — so
+            a tag only appears when staff need to notice it
+            (Review/DNC/Blocked). */}
+        {isNormal(status) ? null : (
           <span
             className={cn(
               "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
@@ -901,11 +912,11 @@ function ContactProfileModal({
             </p>
             {onUpdateStatus ? (
               <select
-                value={status}
+                value={isNormal(status) ? "ACTIVE" : status}
                 onChange={(e) => onUpdateStatus(conversation.id, e.target.value as CustomerStatus)}
                 className="h-8 rounded-md border border-input bg-secondary/60 px-2 text-xs text-foreground outline-none focus:border-ring"
               >
-                {CUSTOMER_STATUSES.map((s) => (
+                {STAFF_CUSTOMER_STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {CUSTOMER_STATUS_LABELS[s]}
                   </option>
