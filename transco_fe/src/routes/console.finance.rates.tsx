@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { SlidersHorizontal } from "lucide-react";
+import { Plus, SlidersHorizontal, X } from "lucide-react";
 
 import { ErrorState, LoadingRows, PageHeader, PageShell } from "@/components/transco/page-kit";
 import { MoneyInput } from "@/components/transco/money-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchCostRates, saveCostRates, type CostRates } from "@/lib/transco/api";
 import { notify } from "@/lib/transco/notify";
@@ -23,13 +24,17 @@ const OPTIONAL = ["wineBox", "tv"];
 function CostRatesPage() {
   const [data, setData] = useState<CostRates | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [custom, setCustom] = useState<{ name: string; rate: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const apply = (d: CostRates) => {
     setData(d);
     setValues(Object.fromEntries(Object.keys(d.labels).map((k) => [k, d.rates[k] == null ? "" : String(d.rates[k])])));
+    setCustom((d.custom ?? []).map((c) => ({ name: c.name, rate: String(c.rate) })));
   };
+  const editCustom = (i: number, patch: Partial<{ name: string; rate: string }>) =>
+    setCustom((list) => list.map((c, j) => (j === i ? { ...c, ...patch } : c)));
 
   const load = () => {
     setError(null);
@@ -44,7 +49,7 @@ function CostRatesPage() {
     for (const [k, v] of Object.entries(values)) rates[k] = v.trim() === "" ? null : Number(v);
     setSaving(true);
     try {
-      apply(await saveCostRates(rates));
+      apply(await saveCostRates(rates, custom));
       notify.success("Cost rates saved", "The Finance page uses them straight away.");
     } catch (err) {
       notify.error("Couldn't save the cost rates", err instanceof Error ? err.message : undefined);
@@ -81,6 +86,39 @@ function CostRatesPage() {
                 />
               </div>
             ))}
+            {custom.map((c, i) => (
+              <div key={i} className="grid grid-cols-[minmax(0,1fr)_8rem_2rem] items-center gap-3">
+                <Input
+                  aria-label="Item name"
+                  placeholder="Item name, e.g. Bicycle"
+                  value={c.name}
+                  onChange={(e) => editCustom(i, { name: e.target.value })}
+                />
+                <MoneyInput
+                  aria-label={`${c.name || "Item"} rate`}
+                  value={c.rate}
+                  onChange={(e) => editCustom(i, { rate: e.target.value })}
+                  className="text-right tabular-nums"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${c.name || "item"}`}
+                  onClick={() => setCustom((list) => list.filter((_, j) => j !== i))}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <div>
+              <Button type="button" variant="outline" size="sm" onClick={() => setCustom((list) => [...list, { name: "", rate: "" }])}>
+                <Plus className="mr-1 h-4 w-4" /> Add item
+              </Button>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Each, per item. On a costing sheet pick "Other" and type the same name — the Finance page then counts it.
+              </p>
+            </div>
             <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
               Door delivery (D2D Z1–Z3) and home pickup (SYD collect) cost what the costing sheet charges for them. The zone comes from the
               receiver's town.

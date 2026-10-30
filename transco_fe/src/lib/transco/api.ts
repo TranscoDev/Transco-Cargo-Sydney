@@ -1342,6 +1342,8 @@ export interface FinanceSheet {
 
 export interface CostRates {
   rates: Record<string, number | null>;
+  /** Items staff added: an "Other" costing line with this name costs qty × rate. */
+  custom: { name: string; rate: number }[];
   labels: Record<string, string>;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -1386,8 +1388,11 @@ export async function fetchCostRates(): Promise<CostRates> {
   return financeJson<CostRates>("/rates");
 }
 
-export async function saveCostRates(rates: Record<string, number | null>): Promise<CostRates> {
-  return financeJson<CostRates>("/rates", { method: "PUT", body: JSON.stringify(rates) });
+export async function saveCostRates(
+  rates: Record<string, number | null>,
+  custom: { name: string; rate: string }[],
+): Promise<CostRates> {
+  return financeJson<CostRates>("/rates", { method: "PUT", body: JSON.stringify({ ...rates, custom }) });
 }
 
 // ---- Prices & promotions (console → Prices & Promotions) ----

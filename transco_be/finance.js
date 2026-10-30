@@ -46,13 +46,30 @@ const ODD_DIMS = /(\d+(?:\.\d+)?)\s*[×x*]\s*(\d+(?:\.\d+)?)\s*[×x*]\s*(\d+(?:\
 function ratesFrom(doc) {
   const out = { ...DEFAULT_RATES };
   if (doc && doc.rates) for (const k of Object.keys(DEFAULT_RATES)) if (doc.rates[k] !== undefined) out[k] = doc.rates[k];
+  // Items staff added (Cost rates → Add item): an "Other" costing line with
+  // the same name costs qty × rate.
+  out.custom = (doc && doc.rates && Array.isArray(doc.rates.custom)) ? doc.rates.custom : [];
   return out;
 }
+
+const nameKey = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 // Rates from the Cost rates form. Blank = no rate (wine box / TV then cost
 // what the costing sheet charges).
 function cleanRates(body) {
-  const rates = {};
+  const rates = { custom: [] };
+  const seen = new Set();
+  for (const item of (body && Array.isArray(body.custom) ? body.custom : [])) {
+    const name = String((item && item.name) || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+    const raw = item ? item.rate : undefined;
+    if (!name && (raw === undefined || raw === null || raw === '')) continue;
+    if (!name) return { error: 'Each added item needs a name.' };
+    if (seen.has(nameKey(name))) return { error: `"${name}" is added twice.` };
+    seen.add(nameKey(name));
+    const v = Number(raw);
+    if (raw === undefined || raw === null || raw === '' || !Number.isFinite(v) || v < 0 || v > 100000) return { error: `${name} must be an amount of 0 or more.` };
+    rates.custom.push({ name, rate: r2(v) });
+  }
   for (const k of Object.keys(DEFAULT_RATES)) {
     const raw = body ? body[k] : undefined;
     if (raw === undefined || raw === null || raw === '') { rates[k] = null; continue; }
@@ -91,8 +108,12 @@ function costsFromCosting(costing, town, rates) {
       if (m) costs.obCost += qty * ((Number(m[1]) * Number(m[2]) * Number(m[3])) / 1e6) * (rates.oddPerCbm || 0);
       else checks.push('Odd-size item not measured');
     } else if (kind === 'general') costs.otherCost += amount;
-    // "other" lines (and old lines with no type) are a charge to the
-    // customer only — no cost.
+    else {
+      // "other" lines (and old lines with no type) are a charge to the
+      // customer only — no cost — unless their name is an added item.
+      const item = (rates.custom || []).find(c => nameKey(c.name) === nameKey(l.label));
+      if (item) costs.otherCost += qty * item.rate;
+    }
   }
   for (const k of COST_KEYS) costs[k] = r2(costs[k]);
   return { costs, checks };

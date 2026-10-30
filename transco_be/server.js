@@ -4341,7 +4341,8 @@ app.get('/api/finance/shipments/:consolidationId/sheet.xlsx', async (req, res) =
 app.get('/api/finance/rates', async (req, res) => {
   try {
     const doc = await settings().findOne({ _id: 'financeRates' });
-    res.json({ rates: finance.ratesFrom(doc), labels: finance.RATE_LABELS, updatedAt: (doc && doc.updatedAt) || null, updatedBy: (doc && doc.updatedBy) || null });
+    const { custom, ...rates } = finance.ratesFrom(doc);
+    res.json({ rates, custom, labels: finance.RATE_LABELS, updatedAt: (doc && doc.updatedAt) || null, updatedBy: (doc && doc.updatedBy) || null });
   } catch (err) {
     console.error('Error loading cost rates:', err.message);
     res.status(500).json({ error: 'Failed to load the cost rates' });
@@ -4355,7 +4356,8 @@ app.put('/api/finance/rates', async (req, res) => {
     const updatedAt = new Date().toISOString();
     const updatedBy = req.user && req.user.email ? req.user.email : 'staff';
     await settings().updateOne({ _id: 'financeRates' }, { $set: { rates: clean.value, updatedAt, updatedBy } }, { upsert: true });
-    res.json({ rates: clean.value, labels: finance.RATE_LABELS, updatedAt, updatedBy });
+    const { custom, ...rates } = clean.value;
+    res.json({ rates, custom, labels: finance.RATE_LABELS, updatedAt, updatedBy });
   } catch (err) {
     console.error('Error saving cost rates:', err.message);
     res.status(500).json({ error: 'Failed to save the cost rates' });
