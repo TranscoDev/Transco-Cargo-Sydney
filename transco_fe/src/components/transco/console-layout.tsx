@@ -1,6 +1,4 @@
 import {
-  Archive,
-  BarChart3,
   Bot,
   CalendarClock,
   CalendarDays,
@@ -23,7 +21,6 @@ import {
   PauseCircle,
   PlayCircle,
   QrCode,
-  Receipt,
   Settings as SettingsIcon,
   ShieldCheck,
   Ship,
@@ -32,8 +29,6 @@ import {
   Truck,
   UserRoundCheck,
   Users,
-  Wallet,
-  Warehouse,
   BookOpenText,
   BadgePercent,
   MessagesSquare,
@@ -139,18 +134,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Bot Q&A", to: "/console/ai/faqs", icon: MessagesSquare },
       { label: "Prices & Promotions", to: "/console/prices", icon: BadgePercent },
       { label: "Website notices", to: "/console/notices", icon: Megaphone },
-    ],
-  },
-  {
-    label: "Coming later",
-    later: true,
-    items: [
-      { label: "Warehouse", to: "/console/warehouse", icon: Warehouse },
-      { label: "Stock levels", to: "/console/inventory/stock", icon: Archive },
-      { label: "Invoices", to: "/console/finance/invoices", icon: Receipt },
-      { label: "Payments", to: "/console/finance/payments", icon: Wallet },
-      { label: "Expenses", to: "/console/finance/expenses", icon: Wallet },
-      { label: "Reports", to: "/console/finance/reports", icon: BarChart3 },
     ],
   },
 ];
