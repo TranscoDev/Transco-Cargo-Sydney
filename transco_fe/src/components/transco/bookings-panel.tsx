@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/transco/money-input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -440,6 +441,7 @@ function BookingCard({
   const openBooking = () => void navigate({ to: "/console/bookings/$bookingId", params: { bookingId: booking.id } });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [changeDetailsOpen, setChangeDetailsOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const isCancelled = booking.status === "cancelled";
   const finished = booking.status === "completed" && !!booking.shipmentId;
   const st = bookingStatus(booking.status);
@@ -548,6 +550,11 @@ function BookingCard({
               <DropdownMenuItem onClick={printIt}>
                 <Printer className="mr-2 h-4 w-4" /> Print forms
               </DropdownMenuItem>
+              {(booking.status === "pending" || booking.status === "confirmed") && booking.channel !== "walk_in" && (
+                <DropdownMenuItem onClick={() => setMoveOpen(true)}>
+                  <CalendarClock className="mr-2 h-4 w-4" /> Change date or time
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setChangeDetailsOpen(true)}>
                 <PenLine className="mr-2 h-4 w-4" /> Change boxes or details
               </DropdownMenuItem>
@@ -604,6 +611,17 @@ function BookingCard({
 
 
       <BookingDetailsEditor bookingId={booking.id} open={changeDetailsOpen} onOpenChange={setChangeDetailsOpen} />
+
+      {moveOpen && (
+        <ChangeTimeDialog
+          booking={booking}
+          onClose={() => setMoveOpen(false)}
+          onSave={(requestedDateISO, requestedTime) => {
+            onUpdateBooking(booking.id, { requestedDateISO, requestedTime });
+            setMoveOpen(false);
+          }}
+        />
+      )}
 
       <BookingEditSheet
         booking={booking}
@@ -963,3 +981,52 @@ function bookingToFormState(booking: Booking) {
 }
 
 const EMPTY_BL_FORM = { hblNumber: "", batchNumber: "", saving: false, error: "", done: "" };
+
+/** Move a drop-off when the customer phones to say they can't make it. */
+function ChangeTimeDialog({
+  booking,
+  onClose,
+  onSave,
+}: {
+  booking: Booking;
+  onClose: () => void;
+  onSave: (requestedDateISO: string, requestedTime: string) => void;
+}) {
+  const [date, setDate] = useState(booking.resolvedDate ?? "");
+  const [time, setTime] = useState(booking.requestedTime ?? "");
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(date) && /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
+  const unchanged = date === booking.resolvedDate && time === booking.requestedTime;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Change date or time</DialogTitle>
+          <DialogDescription>
+            {booking.customerName || formatPhone(booking.phoneNumber)}
+            {booking.bookingCode ? ` · ${booking.bookingCode}` : ""} — now {shortDay(booking.resolvedDate)}
+            {booking.requestedTime ? ` at ${booking.requestedTime}` : ""}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="move-date">New date</Label>
+            <Input id="move-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="move-time">New time</Label>
+            <Input id="move-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">The customer sees the new time in My Transco. Let them know on the phone.</p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={!ok || unchanged} onClick={() => onSave(date, time)}>
+            Save new time
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

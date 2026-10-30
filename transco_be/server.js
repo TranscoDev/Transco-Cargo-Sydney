@@ -3167,6 +3167,22 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
       updates[`${field.replace('Status', '')}UpdatedAt`] = new Date();
     }
 
+    // Staff move the drop-off (the customer phoned): date and time together.
+    let reschedule = null;
+    if ('requestedDateISO' in (req.body || {}) || 'requestedTime' in (req.body || {})) {
+      const { requestedDateISO: newDate, requestedTime: newTime } = req.body;
+      if (typeof newDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(newDate) || Number.isNaN(Date.parse(`${newDate}T00:00:00Z`))) {
+        return res.status(400).json({ error: 'Please pick a valid date.' });
+      }
+      if (typeof newTime !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(newTime)) {
+        return res.status(400).json({ error: 'Please pick a valid time.' });
+      }
+      updates.requestedDateISO = newDate;
+      updates.requestedTime = newTime;
+      updates.requestedDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(`${newDate}T00:00:00Z`).getUTCDay()];
+      reschedule = { at: new Date(), by: (req.user && req.user.email) || 'staff' };
+    }
+
     for (const field of BOOKING_UPDATABLE_FIELDS) {
       if (!(field in (req.body || {}))) continue;
 
@@ -3198,15 +3214,20 @@ app.patch('/api/bookings/:bookingId', async (req, res) => {
     // and customer always talk about the same reference.
     const existingBooking = await bookings().findOne(
       { _id: new ObjectId(bookingId) },
-      { projection: { bookingCode: 1 } }
+      { projection: { bookingCode: 1, requestedDateISO: 1, requestedTime: 1, requestedDay: 1 } }
     );
     if (existingBooking && !existingBooking.bookingCode) {
       updates.bookingCode = await customerTools.newBookingCode();
     }
+    // Keep what it was before, so staff can see it was moved.
+    if (reschedule && existingBooking) {
+      reschedule.fromDate = existingBooking.requestedDateISO || null;
+      reschedule.fromTime = existingBooking.requestedTime || null;
+    }
 
     const updated = await bookings().findOneAndUpdate(
       { _id: new ObjectId(bookingId) },
-      { $set: updates },
+      reschedule ? { $set: updates, $push: { rescheduleHistory: reschedule } } : { $set: updates },
       { returnDocument: 'after' }
     );
 

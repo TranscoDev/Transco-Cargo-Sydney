@@ -382,6 +382,9 @@ export interface BookingUpdateInput {
   notes?: string | null;
   declarationStatus?: BookingStageStatus;
   warehouseStatus?: BookingStageStatus;
+  /** Moving the drop-off (sent together): "YYYY-MM-DD" and "HH:MM". */
+  requestedDateISO?: string;
+  requestedTime?: string;
 }
 
 /** Candidate operational stages for a live shipment (Phase 2) — a

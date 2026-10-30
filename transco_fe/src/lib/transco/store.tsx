@@ -416,7 +416,8 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       prev.map((b) => {
         if (b.id !== bookingId) return b;
         previous = b;
-        return { ...b, ...updates };
+        // A moved drop-off moves to its new day in the lists straight away.
+        return { ...b, ...updates, ...(updates.requestedDateISO ? { resolvedDate: updates.requestedDateISO } : {}) };
       }),
     );
     updateBookingRequest(bookingId, updates).then(() => {
