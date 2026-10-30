@@ -476,7 +476,7 @@ export function CostingCard({
 
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
       <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Amounts start at the bot's rates. Change anything before saving.</p>
+        <p className="text-xs text-muted-foreground">Prices are filled in from what the customer entered. If you add or change anything, press Save.</p>
         <Button type="button" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save costing"}
         </Button>
