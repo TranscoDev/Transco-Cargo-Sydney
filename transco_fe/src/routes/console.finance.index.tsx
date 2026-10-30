@@ -202,8 +202,9 @@ const GROUP = {
 
 function FinanceTable({ sheet }: { sheet: FinanceSheet }) {
   const t = sheet.totals;
-  const th = "whitespace-nowrap border-b px-2.5 py-2 text-right text-xs font-semibold text-foreground";
-  const td = "whitespace-nowrap px-2.5 py-2 text-right tabular-nums";
+  // Light vertical lines between columns (none after the last one).
+  const th = "whitespace-nowrap border-b border-r border-border/60 px-2.5 py-2 text-right text-xs font-semibold text-foreground last:border-r-0";
+  const td = "whitespace-nowrap border-r border-border/60 px-2.5 py-2 text-right tabular-nums last:border-r-0";
   return (
     // Takes the rest of the window and scrolls both ways inside it.
     <div className="min-h-0 flex-1 overflow-auto rounded-xl border bg-card shadow-xs">
