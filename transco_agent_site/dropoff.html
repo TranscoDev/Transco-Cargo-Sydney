@@ -354,6 +354,7 @@
       "List everything in your boxes — Customs needs it. Value is for customs only.": "Box වල තියෙන හැම දෙයක්ම ලියන්න — Customs වලට ඕන. වටිනාකම customs සඳහා පමණයි.",
       "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.": "👕 ලංකාවට ඇඳුම් යවනවා නම්: පාවිච්චි කරපු ඇඳුම් යවන එක ප්‍රශ්නයක් නෑ. අලුත් ඇඳුම් යවනවා නම් brand label / tag ගලවන්න එපා — label කපපු ඇඳුම්, Sri Lanka Customs commercial purpose එකකට ගෙනාපු බඩු විදිහට සලකලා ලොකු tax එකක් ගහන්න පුළුවන්.",
       "Item {n}": "අයිතමය {n}", "Remove": "ඉවත් කරන්න", "e.g. Chocolate": "උදා: Chocolate",
+      "Select the number of units under each category.": "හැම වර්ගයකටම ගණන (කීයද) දාන්න.",
       "New": "අලුත්", "Used": "පාවිච්චි කළ", "How many": "කීයද", "Value ($)": "වටිනාකම ($)",
       "+ Add another item": "+ තවත් අයිතමයක්", "Total value": "මුළු වටිනාකම",
       "Almost done": "තව ටිකයි",
@@ -515,6 +516,7 @@
       "List everything in your boxes — Customs needs it. Value is for customs only.": "பெட்டிகளில் உள்ள அனைத்தையும் பட்டியலிடுங்கள் — Customs க்கு தேவை. மதிப்பு customs க்கு மட்டுமே.",
       "👕 Clothes to Sri Lanka: used clothes are no problem. If you send new clothes, keep the brand labels and tags on — Sri Lanka Customs can treat clothes with the labels cut off as goods for commercial purposes and charge a big tax.": "👕 இலங்கைக்கு ஆடைகள் அனுப்பினால்: பயன்படுத்திய ஆடைகளை அனுப்புவதில் பிரச்சினை இல்லை. புதிய ஆடைகள் அனுப்பினால் brand label / tag ஐ அகற்ற வேண்டாம் — label வெட்டப்பட்ட ஆடைகளை Sri Lanka Customs commercial நோக்கத்திற்கான பொருட்களாக கருதி அதிக வரி விதிக்கலாம்.",
       "Item {n}": "பொருள் {n}", "Remove": "நீக்கு", "e.g. Chocolate": "உதா: Chocolate",
+      "Select the number of units under each category.": "ஒவ்வொரு வகையின் கீழும் எத்தனை என்று உள்ளிடவும்.",
       "New": "புதியது", "Used": "பயன்படுத்தியது", "How many": "எத்தனை", "Value ($)": "மதிப்பு ($)",
       "+ Add another item": "+ இன்னொரு பொருள்", "Total value": "மொத்த மதிப்பு",
       "Almost done": "கிட்டத்தட்ட முடிந்தது",
@@ -985,7 +987,7 @@
       var i = state.contents.indexOf(row), bad = badFields["contents." + i];
       html += '<div class="item' + (bad ? " bad" : "") + '"><div class="item-top"><span>✓ ' + esc(t(c[1])) + "</span></div>" +
         (c[0] === "others" ? '<label for="d' + i + '">' + esc(t("What is it?")) + '</label><input id="d' + i + '" data-item="' + i + '" data-k="description" value="' + esc(row.description) + '" placeholder="' + esc(t("e.g. Kitchen utensils")) + '" style="margin-bottom:10px" />' : "") +
-        '<div class="item-grid two"><div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(row.qty) + '" inputmode="numeric" /></div>' +
+        '<div class="item-grid two"><div><label for="q' + i + '">' + esc(t("How many")) + '</label><input id="q' + i + '" data-item="' + i + '" data-k="qty" value="' + esc(row.qty) + '" inputmode="numeric" placeholder="0" /></div>' +
         '<div><label for="v' + i + '">' + esc(t("Value (AUD)")) + '</label><div class="money"><input id="v' + i + '" data-item="' + i + '" data-k="value" value="' + esc(row.value) + '" inputmode="decimal" /></div></div></div></div>';
     });
     html += '<div class="note" id="clothes-note" style="margin-top:6px;border-color:#f0d9a8;background:#fff9ec"' + (showClothesWarning() ? "" : " hidden") + ">" + esc(t(CLOTHES_WARNING)) + "</div>";
@@ -1260,7 +1262,7 @@
       b.onclick = function () {
         var key = b.getAttribute("data-cat"), row = catRow(key);
         if (row) state.contents.splice(state.contents.indexOf(row), 1);
-        else state.contents.push({ category: key, description: "", condition: "", qty: "1", value: "" });
+        else state.contents.push({ category: key, description: "", condition: "", qty: "", value: "" });
         badFields = {}; errorText = ""; saveDraft(); render();
       };
     });
@@ -1517,6 +1519,12 @@
     }
     if (stepName === "boxes" && !Object.keys(badFields).length && state.deliveryType) {
       if (!state.contents.length) return t("Please tap at least one thing you're sending.");
+      // A ticked category left at 0 / empty gets its own message.
+      var qtyMissing = false;
+      state.contents.forEach(function (c, i) {
+        if (!(Number.isInteger(Number(c.qty)) && Number(c.qty) >= 1 && Number(c.qty) <= 999)) { badFields["contents." + i] = 1; qtyMissing = true; }
+      });
+      if (qtyMissing) return t("Select the number of units under each category.");
       state.contents.forEach(function (c, i) {
         var q = Number(c.qty), v = String(c.value || "").trim();
         if ((c.category === "others" && String(c.description).trim().length < 2) || !(Number.isInteger(q) && q >= 1 && q <= 999) ||
