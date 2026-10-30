@@ -40,6 +40,23 @@ import {
   type ShipmentStatus,
 } from "@/lib/transco/types";
 
+// ETAs arrive as "2026-12-07" (tracker) or "October 10" (old sheets, no
+// year): all shown as YYYY-MM-DD. No year = the one closest to today.
+// Display only; anything unreadable is shown as it was saved.
+function etaDate(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim();
+  if (!s || /^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const now = new Date();
+  const candidates = /\b\d{4}\b/.test(s)
+    ? [new Date(s)]
+    : [-1, 0, 1].map((dy) => new Date(`${s} ${now.getFullYear() + dy}`));
+  const ok = candidates.filter((d) => !Number.isNaN(d.getTime()));
+  if (!ok.length) return s;
+  const d = ok.reduce((a, b) => (Math.abs(b.getTime() - now.getTime()) < Math.abs(a.getTime() - now.getTime()) ? b : a));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export const Route = createFileRoute("/console/shipments/")({
   component: ShipmentsPage,
 });
@@ -322,7 +339,7 @@ function BatchListView({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-base font-semibold text-foreground">Shipment {c.batchNumber}</span>
-                <span className="text-xs text-muted-foreground">{c.dates.peblEta ? `ETA ${c.dates.peblEta}` : c.label}</span>
+                <span className="text-xs text-muted-foreground">{c.dates.peblEta ? `ETA ${etaDate(c.dates.peblEta)}` : c.label}</span>
               </div>
               <p className="mt-1 text-sm tabular-nums text-muted-foreground">
                 {c.liveBoxes?.bls ?? c.importedShipmentCount} BLs · {c.liveBoxes?.total ?? 0} boxes
@@ -389,7 +406,7 @@ function BatchListView({
                 {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(c.financials.grossIncome)}</td>}
                 {showMoney && <td className="px-3 py-3 text-right tabular-nums">{money(c.financials.totalExpenses)}</td>}
                 {showMoney && <td className="px-3 py-3 text-right tabular-nums text-success-foreground">{money(c.financials.grossProfit)}</td>}
-                <td className="px-3 py-3 text-xs text-muted-foreground">{c.dates.peblEta || "—"}</td>
+                <td className="px-3 py-3 text-xs text-muted-foreground">{etaDate(c.dates.peblEta) || "—"}</td>
               </tr>
             ))}
           </tbody>
