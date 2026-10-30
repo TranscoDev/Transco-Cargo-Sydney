@@ -380,6 +380,25 @@
   .ag-msg.bot { align-self: flex-start; background: #eef1f6; color: #222; border: 1px solid #dde3ea; border-bottom-left-radius: 4px; }
   .ag-msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 13px; text-align: center; }
   .ag-msg img, .ag-msg video { max-width: 100%; border-radius: 8px; margin-top: 6px; display: block; }
+  /* Staff replies stand out from the bot's. */
+  .ag-msg.staff { align-self: flex-start; background: #fff4e3; color: #222; border: 1px solid #f0d6a8; border-bottom-left-radius: 4px; }
+  .ag-msg .who { display: block; font-size: 12px; font-weight: 700; color: #8a5300; margin-bottom: 2px; }
+  .ag-tools { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+  .ag-tools .ag-close { margin-left: 0; position: relative; }
+  .ag-tools .ag-close .dot { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: #d93025; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; padding: 0 4px; box-sizing: border-box; }
+  .ag-chats { display: flex; flex-direction: column; }
+  .ag-chats h3 { margin: 0 0 10px; font-size: 16px; }
+  .ag-chat-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid #dde3ea; border-radius: 12px; background: #fff; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .ag-chat-row.current { border-color: var(--sl-teal-deep, #0c7d6b); background: #eef8f5; }
+  .ag-chat-row .txt { flex: 1; min-width: 0; }
+  .ag-chat-row .top { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 15px; }
+  .ag-chat-row .top span { font-weight: 500; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .ag-chat-row .last { font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ag-chat-row .dot { min-width: 22px; height: 22px; border-radius: 11px; background: #d93025; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  /* Unread staff replies on the chat buttons (menu bar, tab bar). */
+  [data-agent-toggle] { position: relative; }
+  [data-agent-toggle] .unread-dot { position: absolute; top: 2px; right: calc(50% - 30px); min-width: 18px; height: 18px; border-radius: 9px; background: #d93025; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; padding: 0 4px; box-sizing: border-box; z-index: 1; }
+  .tab-ai .unread-dot { top: -6px; right: -6px; }
   .ag-typing { align-self: flex-start; display: flex; gap: 4px; padding: 11px 14px; background: #eef1f6; border: 1px solid #dde3ea; border-radius: 13px; border-bottom-left-radius: 4px; }
   .ag-typing span { width: 6px; height: 6px; border-radius: 50%; background: #9aa5b1; animation: agBounce 1.2s infinite ease-in-out; }
   .ag-typing span:nth-child(2) { animation-delay: 0.15s; } .ag-typing span:nth-child(3) { animation-delay: 0.3s; }
@@ -513,7 +532,7 @@
   var STRINGS = {
     en: {
       myTransco: "My Transco",
-      navHome: "Home", navAi: "Ask AI", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
+      navHome: "Home", navAi: "Chat", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
       goodMorning: "Good morning", goodAfternoon: "Good afternoon", goodEvening: "Good evening",
       howHelp: "How can we help today?", comingUp: "Coming up", slDistrict: "District", slChoose: "choose", slOther: "Other — type it below",
       qTrack: "Track my shipment", qPrice: "Get a price", qBook: "New booking",
@@ -533,6 +552,7 @@
       agentTitle: "Transco Agent", agentSub: "Prices, tracking and bookings — just ask.", agentHello: "Hi {name}! How can I help?", agentHelloNoName: "Hi! How can I help?",
       agentPlaceholder: "Type your question…", agentSend: "Send", agentClose: "Close chat",
       agentError: "Sorry, something went wrong. Please try again.", agentOffline: "Sorry, I couldn't reach our server. Please check your connection and try again.", agentHandedOff: "A staff member will reply here shortly.",
+      chatsTitle: "Your chats", chatsOpen: "Your chats", newChat: "Start a new chat", staffName: "Transco team", chatFrom: "Chat from {d}", chatDevice: "{d}", chatYou: "You: ",
       sugMyBookings: "My bookings", sugMyBl: "My BL number", sugDecl: "Declaration status", sugHours: "Opening hours",
       signInWith: "Sign in with", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "Please enter a valid email address.", emailLoginHelp: "Use the email saved on your My Transco account.",
@@ -653,7 +673,7 @@
 
     si: {
       myTransco: "My Transco",
-      navHome: "මුල් පිටුව", navAi: "AI අහන්න", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
+      navHome: "මුල් පිටුව", navAi: "Chat", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
       goodMorning: "සුබ උදෑසනක්", goodAfternoon: "සුබ දහවලක්", goodEvening: "සුබ සන්ධ්‍යාවක්",
       howHelp: "අද අපි ඔයාට උදව් කරන්නේ කොහොමද?", comingUp: "ළඟදීම", slDistrict: "දිස්ත්‍රික්කය", slChoose: "තෝරන්න", slOther: "වෙනත් — පහළ type කරන්න",
       qTrack: "මගේ shipment එක track කරන්න", qPrice: "මිලක් ගන්න", qBook: "අලුත් booking",
@@ -671,6 +691,7 @@
       agentTitle: "Transco Agent", agentSub: "මිල, tracking සහ bookings — අහන්න.", agentHello: "ආයුබෝවන් {name}! මම උදව් කරන්නේ කොහොමද?", agentHelloNoName: "ආයුබෝවන්! මම උදව් කරන්නේ කොහොමද?",
       agentPlaceholder: "ඔයාගේ ප්‍රශ්නය type කරන්න…", agentSend: "යවන්න", agentClose: "Chat එක වහන්න",
       agentError: "සමාවෙන්න, මොකක් හරි වැරැද්දක් වුණා. ආයෙත් try කරන්න.", agentOffline: "සමාවෙන්න, server එකට connect වෙන්න බැරි වුණා. Connection එක check කරලා ආයෙත් try කරන්න.", agentHandedOff: "අපේ team එකේ කෙනෙක් ඉක්මනින් මෙතන reply කරයි.",
+      chatsTitle: "ඔයාගේ chats", chatsOpen: "ඔයාගේ chats", newChat: "අලුත් chat එකක්", staffName: "Transco team", chatFrom: "{d} chat එක", chatYou: "ඔයා: ",
       sugMyBookings: "මගේ bookings", sugMyBl: "මගේ BL number එක", sugDecl: "Declaration තත්ත්වය", sugHours: "විවෘත වෙලාවන්",
       signInWith: "Sign in වෙන්නේ", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "කරුණාකරලා හරි email ලිපිනයක් දාන්න.", emailLoginHelp: "ඔයාගේ My Transco account එකේ save කරලා තියෙන email එක පාවිච්චි කරන්න.",
@@ -784,7 +805,7 @@
 
     ta: {
       myTransco: "My Transco",
-      navHome: "முகப்பு", navAi: "AI கேள்", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
+      navHome: "முகப்பு", navAi: "Chat", navBookings: "Bookings", navShipments: "Shipments", navProfile: "Profile", navDocuments: "Documents",
       goodMorning: "காலை வணக்கம்", goodAfternoon: "மதிய வணக்கம்", goodEvening: "மாலை வணக்கம்",
       howHelp: "இன்று நாங்கள் எப்படி உதவலாம்?", comingUp: "வரவிருப்பவை", slDistrict: "மாவட்டம்", slChoose: "தேர்ந்தெடுங்கள்", slOther: "வேறு — கீழே type செய்யுங்கள்",
       qTrack: "என் shipment ஐ track செய்", qPrice: "விலை பெறு", qBook: "புதிய booking",
@@ -802,6 +823,7 @@
       agentTitle: "Transco Agent", agentSub: "விலை, tracking மற்றும் bookings — கேளுங்கள்.", agentHello: "வணக்கம் {name}! நான் எப்படி உதவலாம்?", agentHelloNoName: "வணக்கம்! நான் எப்படி உதவலாம்?",
       agentPlaceholder: "உங்கள் கேள்வியை type செய்யுங்கள்…", agentSend: "அனுப்பு", agentClose: "Chat ஐ மூடு",
       agentError: "மன்னிக்கவும், ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.", agentOffline: "மன்னிக்கவும், server ஐ அணுக முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.", agentHandedOff: "எங்கள் குழுவில் ஒருவர் விரைவில் இங்கே பதிலளிப்பார்.",
+      chatsTitle: "உங்கள் chats", chatsOpen: "உங்கள் chats", newChat: "புதிய chat", staffName: "Transco team", chatFrom: "{d} chat", chatYou: "நீங்கள்: ",
       sugMyBookings: "என் bookings", sugMyBl: "என் BL number", sugDecl: "Declaration நிலை", sugHours: "திறந்திருக்கும் நேரம்",
       signInWith: "Sign in செய்ய", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "சரியான email முகவரியை உள்ளிடவும்.", emailLoginHelp: "உங்கள் My Transco account இல் save செய்த email ஐப் பயன்படுத்துங்கள்.",
@@ -1033,7 +1055,11 @@
     token = null; profile = null;
     store(TOKEN_KEY, null);
     session(AGENT_TRANSCRIPT_KEY, null);
+    // The next person on this device never carries on (or sees) this chat.
+    session(AGENT_SESSION_KEY, null);
+    store(CHAT_PICK_KEY, null);
     agent.built = false;
+    agent.chats = []; agent.chatId = null; agent.lastId = null; agent.unread = 0;
     var panel = document.getElementById("agent-panel");
     if (panel) panel.replaceChildren();
     document.body.classList.remove("agent-docked", "agent-open");
@@ -1143,7 +1169,11 @@
   var AGENT_SESSION_KEY = "transco_agent_site_session_id";
   var AGENT_TRANSCRIPT_KEY = "transco_agent_transcript";
   var AGENT_PANEL_KEY = "transco_agent_panel";
-  var agent = { built: false, sending: false, body: null, input: null, sendBtn: null, empty: null };
+  var agent = { built: false, sending: false, body: null, input: null, sendBtn: null, empty: null,
+    // The chat on screen (server id; null = a new chat not sent yet), the
+    // newest message id shown, and this account's chats (one per device).
+    chatId: null, lastId: null, chats: [], chatsBtn: null, closeBtn: null, polling: null };
+  var CHAT_PICK_KEY = "transco_portal_chat";
 
   function agentSessionId() {
     var id = session(AGENT_SESSION_KEY);
@@ -1189,6 +1219,7 @@
     } else {
       el.appendChild(formattedText(text));
     }
+    if (kind === "staff") el.insertBefore(h("span", { class: "who", text: t("staffName") }), el.firstChild);
     if (media && media.videoUrl) el.appendChild(h("video", { src: media.videoUrl, controls: true }));
     if (media && media.flyerUrl) el.appendChild(h("img", { src: media.flyerUrl, alt: "Promotional flyer" }));
     agent.body.appendChild(el);
@@ -1273,12 +1304,17 @@
       .then(function (res) { return res.json(); })
       .then(function (data) {
         typing.remove();
-        if (data.error) { addAgentMessage(t("agentError"), "system", null, false); return; }
+        if (data.error) {
+          // This chat is another account's: the next message starts a new one.
+          if (data.reason === "other_account") session(AGENT_SESSION_KEY, null);
+          addAgentMessage(t("agentError"), "system", null, false); return;
+        }
         if (data.handedOff) { addAgentMessage(data.note || t("agentHandedOff"), "system"); return; }
         addAgentMessage(data.reply || "", "bot", data.media);
         addAgentCards(data.cards);
         addAgentActions(data.actions);
         addAgentMenu(data.menu && data.menu.items);
+        if (!agent.chatId) setTimeout(chatTick, 500);
       })
       .catch(function () { typing.remove(); addAgentMessage(t("agentOffline"), "system", null, false); })
       .finally(function () { agent.sending = false; agent.sendBtn.disabled = false; });
@@ -1320,20 +1356,173 @@
     if (window.TranscoChatPhoto) TranscoChatPhoto.attach(agent.input, function (image, caption) {
       sendToAgent({ message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");
     });
+    // ☰ = your chats (only when there's more than one); + = a new chat.
+    agent.chatsBtn = h("button", { type: "button", class: "ag-close", "aria-label": t("chatsOpen"), title: t("chatsOpen"), text: "☰" });
+    agent.chatsBtn.addEventListener("click", showChatList);
+    agent.chatsBtn.hidden = agent.chats.length < 2;
+    var newBtn = h("button", { type: "button", class: "ag-close", "aria-label": t("newChat"), title: t("newChat"), text: "+" });
+    newBtn.addEventListener("click", startNewChat);
+    agent.form = form;
     panel.replaceChildren(
       h("div", { class: "ag-head" },
         h("span", { class: "ag-avatar", "aria-hidden": "true" }, chatIcon()),
         h("div", null, h("div", { class: "ag-name", text: t("agentTitle") }), h("div", { class: "ag-sub", text: t("agentSub") })),
-        closeBtn),
+        h("div", { class: "ag-tools" }, agent.chatsBtn, newBtn, closeBtn)),
       agent.body,
       form);
     agent.built = true;
     agent.empty = null;
+    agent.picked = false;
 
+    // What this tab already showed, straight away; the saved chat from
+    // the server replaces it a moment later (chatTick).
     var saved = [];
     try { saved = JSON.parse(session(AGENT_TRANSCRIPT_KEY) || "[]"); } catch (e) { saved = []; }
     if (saved.length) saved.forEach(function (m) { addAgentMessage(m.t, m.k, null, false); });
     else { agent.empty = agentSuggestions(); agent.body.appendChild(agent.empty); }
+    chatTick();
+  }
+
+  // ---------------------------------------------------------------
+  // Saved chats and staff replies
+  // ---------------------------------------------------------------
+  // Every device the customer chatted on (signed in) is its own chat,
+  // kept on the server. One chat: it simply opens. Several: ☰ lists
+  // them. Staff replies are checked every 15 seconds while the page is
+  // open and shown with a red count on the chat buttons.
+  function panelShowing() {
+    if (!agent.built || document.visibilityState !== "visible") return false;
+    return isWide() ? document.body.classList.contains("agent-docked") : document.body.classList.contains("agent-open");
+  }
+
+  function chatDate(iso) {
+    try { return new Date(iso).toLocaleDateString(lang === "en" ? "en-AU" : lang, { day: "numeric", month: "short" }); } catch (e) { return ""; }
+  }
+  function chatLabel(c) { return c.device || t("chatFrom", { d: chatDate(c.startedAt) }); }
+
+  function setUnreadBadges(n) {
+    agent.unread = n;
+    document.querySelectorAll("[data-agent-toggle]").forEach(function (b) {
+      var dot = b.querySelector(".unread-dot");
+      if (!n) { if (dot) dot.remove(); return; }
+      if (!dot) { dot = h("span", { class: "unread-dot" }); b.appendChild(dot); }
+      dot.textContent = n > 9 ? "9+" : String(n);
+    });
+    // Unread in another chat: a count on ☰.
+    if (agent.chatsBtn) {
+      var other = agent.chats.reduce(function (s, c) { return s + (c.id === agent.chatId ? 0 : c.unread); }, 0);
+      var d = agent.chatsBtn.querySelector(".dot");
+      if (!other) { if (d) d.remove(); }
+      else { if (!d) { d = h("span", { class: "dot" }); agent.chatsBtn.appendChild(d); } d.textContent = String(other); }
+    }
+  }
+
+  // Messages typed here go to that chat's own session id.
+  function useChat(chat) {
+    agent.chatId = chat ? chat.id : null;
+    agent.lastId = null;
+    agent.picked = true;
+    session(AGENT_SESSION_KEY, chat ? chat.sessionId : null);
+    session(AGENT_TRANSCRIPT_KEY, null);
+    store(CHAT_PICK_KEY, chat ? chat.id : null);
+  }
+
+  function openChat(chat) {
+    useChat(chat);
+    agent.form.hidden = false;
+    agent.body.replaceChildren();
+    agent.empty = null;
+    loadMessages(true);
+  }
+
+  function startNewChat() {
+    useChat(null);
+    agent.form.hidden = false;
+    agent.body.replaceChildren();
+    agent.empty = agentSuggestions();
+    agent.body.appendChild(agent.empty);
+    setUnreadBadges(agent.unread || 0);
+    if (agent.input) agent.input.focus({ preventScroll: true });
+  }
+
+  function showChatList() {
+    agent.form.hidden = true;
+    var list = h("div", { class: "ag-chats" }, h("h3", { text: t("chatsTitle") }));
+    agent.chats.forEach(function (c) {
+      var row = h("button", { type: "button", class: "ag-chat-row" + (c.id === agent.chatId ? " current" : "") },
+        h("span", { class: "txt" },
+          h("span", { class: "top" }, h("strong", { text: chatLabel(c) }), h("span", { text: chatDate(c.lastAt) })),
+          h("span", { class: "last", text: (c.last.from === "me" ? t("chatYou") : "") + c.last.text })),
+        c.unread ? h("span", { class: "dot", text: String(c.unread) }) : null);
+      row.addEventListener("click", function () { openChat(c); });
+      list.appendChild(row);
+    });
+    var add = h("button", { type: "button", class: "ag-chip solid", text: "+ " + t("newChat") });
+    add.addEventListener("click", startNewChat);
+    list.appendChild(add);
+    agent.body.replaceChildren(list);
+    agent.empty = null;
+  }
+
+  // full: the whole chat (opening it); otherwise only new staff replies.
+  // Opened on screen = its staff replies count as read.
+  function loadMessages(full) {
+    var id = agent.chatId;
+    if (!id || (!full && agent.loading)) return Promise.resolve();
+    // Only the latest load may add messages, so nothing shows twice.
+    var seq = agent.seq = (agent.seq || 0) + 1;
+    agent.loading = true;
+    var showing = panelShowing();
+    var q = [];
+    if (showing) q.push("read=1");
+    if (!full && agent.lastId) q.push("after=" + encodeURIComponent(agent.lastId));
+    return api("GET", "/messages/chats/" + encodeURIComponent(id) + (q.length ? "?" + q.join("&") : "")).then(function (data) {
+      if (seq !== agent.seq || agent.chatId !== id) return;
+      var list = data.messages || [];
+      list.forEach(function (m) {
+        if (full || m.from === "staff") addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, null, false);
+        agent.lastId = m.id;
+      });
+      if (full && !list.length) { agent.empty = agentSuggestions(); agent.body.appendChild(agent.empty); }
+      if (showing) {
+        agent.chats.forEach(function (c) { if (c.id === id) c.unread = 0; });
+        setUnreadBadges(agent.chats.reduce(function (s, c) { return s + c.unread; }, 0));
+      }
+    }).catch(function () {}).then(function () { if (seq === agent.seq) agent.loading = false; });
+  }
+
+  function chatTick() {
+    if (!token) return Promise.resolve();
+    return api("GET", "/messages/chats").then(function (data) {
+      agent.chats = data.chats || [];
+      if (agent.chatsBtn) agent.chatsBtn.hidden = agent.chats.length < 2;
+      setUnreadBadges(data.unread || 0);
+      if (!agent.built) return;
+      var mine = session(AGENT_SESSION_KEY);
+      var bySession = agent.chats.filter(function (c) { return c.sessionId === mine; })[0];
+      if (!agent.picked) {
+        // Opening: the chat they last used here, else this tab's, else the newest.
+        var picked = store(CHAT_PICK_KEY);
+        var chat = agent.chats.filter(function (c) { return c.id === picked; })[0] || bySession || agent.chats[0];
+        if (chat) openChat(chat); else agent.picked = true;
+        return;
+      }
+      if (!agent.chatId) {
+        // A new chat is saved once its first message is sent.
+        if (bySession) { agent.chatId = bySession.id; agent.lastId = bySession.lastId; store(CHAT_PICK_KEY, bySession.id); }
+        return;
+      }
+      var cur = agent.chats.filter(function (c) { return c.id === agent.chatId; })[0];
+      if (cur && (cur.lastId !== agent.lastId || (cur.unread && panelShowing())) && !agent.form.hidden) loadMessages(false);
+    }).catch(function () {});
+  }
+
+  function startChatPolling() {
+    if (agent.polling) return;
+    agent.polling = setInterval(function () {
+      if (token && document.visibilityState === "visible") chatTick();
+    }, 15000);
+    chatTick();
   }
 
   // Rebuilt on language change so its labels follow the page.
@@ -1345,6 +1534,8 @@
     if (isWide()) { document.body.classList.add("agent-docked"); agentPref("open"); }
     else { document.body.classList.add("agent-open"); }
     syncAgentButtons();
+    // Opening the chat = its staff replies are read.
+    if (agent.chatId && !agent.form.hidden) loadMessages(false);
     if (opts && opts.message) sendToAgent({ message: opts.message }, opts.label || opts.message);
     else if (opts && opts.action) sendToAgent({ action: opts.action, label: opts.label }, opts.label);
     setTimeout(function () { if (agent.input) agent.input.focus({ preventScroll: true }); }, 50);
@@ -1411,6 +1602,8 @@
       tab("profile", "#/profile", t("navProfile"))
     );
     syncAgentButtons();
+    setUnreadBadges(agent.unread || 0);
+    startChatPolling();
   }
 
   function renderLangSwitch() {

@@ -15,7 +15,8 @@
 
 const crypto = require('crypto');
 const express = require('express');
-const { customers, customerOtps, bookings, shipments } = require('./db');
+const { ObjectId } = require('mongodb');
+const { customers, customerOtps, bookings, shipments, messages } = require('./db');
 
 // "Forgot password" links: single use, 30 minutes. Only a hash of the
 // token is stored, so a database leak can't be used to reset passwords.
@@ -941,6 +942,71 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
 
   router.get('/documents', wrap(async (req, res) => {
     res.json(await tools.getCustomerDocuments(req.customer._id));
+  }));
+
+  // ---------- messages (the chat, with staff replies) ----------
+  //
+  // Each browser's website chat is its own record (channel 'website'),
+  // linked to the account when the customer chatted while signed in
+  // (linkedBy 'signin'). Only those are shown — never a chat staff linked
+  // by hand, which could be someone else's. Only customer, bot and staff
+  // messages are ever returned.
+
+  const SHOWN_SENDERS = ['CUSTOMER', 'CHATBOT', 'HUMAN'];
+  const myChatsFilter = (customer) => ({ channel: 'website', linkedCustomerId: customer._id, linkedBy: 'signin' });
+  const fromLabel = { CUSTOMER: 'me', CHATBOT: 'bot', HUMAN: 'staff' };
+  const publicMessage = (m) => ({ id: String(m._id), from: fromLabel[m.senderType], text: m.content || '', at: m.createdAt });
+
+  async function myChats(customer) {
+    const chats = await customers().find(myChatsFilter(customer), { projection: { sessionId: 1, device: 1, createdAt: 1, portalReadAt: 1 } }).limit(50).toArray();
+    if (!chats.length) return [];
+    const ids = chats.map(c => c._id);
+    const [lasts, staff] = await Promise.all([
+      messages().aggregate([
+        { $match: { customerId: { $in: ids }, senderType: { $in: SHOWN_SENDERS } } },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: '$customerId', last: { $first: '$$ROOT' } } }
+      ]).toArray(),
+      messages().find({ customerId: { $in: ids }, senderType: 'HUMAN' }, { projection: { customerId: 1, createdAt: 1 } }).toArray()
+    ]);
+    const lastBy = new Map(lasts.map(l => [String(l._id), l.last]));
+    return chats
+      .filter(c => lastBy.has(String(c._id)))
+      .map(c => {
+        const last = lastBy.get(String(c._id));
+        const unread = staff.filter(m => String(m.customerId) === String(c._id) && (!c.portalReadAt || m.createdAt > c.portalReadAt)).length;
+        return {
+          id: String(c._id),
+          sessionId: c.sessionId,
+          device: c.device || null,
+          startedAt: c.createdAt || null,
+          lastAt: last.createdAt,
+          lastId: String(last._id),
+          last: { from: fromLabel[last.senderType], text: String(last.content || '').slice(0, 120) },
+          unread
+        };
+      })
+      .sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt));
+  }
+
+  // The customer's chats, newest first, with unread staff replies.
+  router.get('/messages/chats', wrap(async (req, res) => {
+    const chats = await myChats(req.customer);
+    res.json({ chats, unread: chats.reduce((n, c) => n + c.unread, 0) });
+  }));
+
+  // One chat's messages (the latest 200, or only those after ?after=<id>).
+  // ?read=1 marks its staff replies as seen (the chat is open on screen).
+  router.get('/messages/chats/:chatId', wrap(async (req, res) => {
+    const { chatId } = req.params;
+    if (!ObjectId.isValid(chatId)) return res.status(404).json({ error: "We couldn't find that chat." });
+    const chat = await customers().findOne({ _id: new ObjectId(chatId), ...myChatsFilter(req.customer) }, { projection: { _id: 1 } });
+    if (!chat) return res.status(404).json({ error: "We couldn't find that chat." });
+    const query = { customerId: chat._id, senderType: { $in: SHOWN_SENDERS } };
+    if (typeof req.query.after === 'string' && ObjectId.isValid(req.query.after)) query._id = { $gt: new ObjectId(req.query.after) };
+    const list = await messages().find(query).sort({ _id: -1 }).limit(200).toArray();
+    if (req.query.read === '1') await customers().updateOne({ _id: chat._id }, { $set: { portalReadAt: new Date() } });
+    res.json({ messages: list.reverse().map(publicMessage) });
   }));
 
   // Customer-safe error envelope for anything unexpected.

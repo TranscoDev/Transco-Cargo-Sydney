@@ -1471,13 +1471,19 @@ async function sendAndTrackOutbound(
 
 
   try {
-    await sendWhatsAppMessage(
-      customer.phoneNumber,
-      cleanContent,
-      outgoing._id.toString()
-    );
+    // A website chat has no WhatsApp number (phoneNumber is its browser
+    // session id): the message is read in My Transco instead.
+    if (customer.channel === 'website') {
+      outgoing.whatsappStatus = null;
+    } else {
+      await sendWhatsAppMessage(
+        customer.phoneNumber,
+        cleanContent,
+        outgoing._id.toString()
+      );
 
-    outgoing.whatsappStatus = 'SENT';
+      outgoing.whatsappStatus = 'SENT';
+    }
 
   } catch (err) {
     console.error(

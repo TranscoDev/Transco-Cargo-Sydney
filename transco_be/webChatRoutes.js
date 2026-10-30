@@ -90,6 +90,16 @@ const WEB_GREETING_TEXT =
 // (see getSessionId() in web-chat-widget.html) and already reads
 // clearly as "not a real phone number", so it doubles as a safe,
 // collision-free placeholder without needing any database migration.
+function deviceLabel(ua) {
+  const s = String(ua || '');
+  if (/iPad/i.test(s)) return 'iPad';
+  if (/iPhone/i.test(s)) return 'iPhone';
+  if (/Android/i.test(s)) return /Mobile/i.test(s) ? 'Android phone' : 'Android tablet';
+  if (/Windows/i.test(s)) return 'Windows computer';
+  if (/Macintosh|Mac OS X/i.test(s)) return 'Mac';
+  return 'Computer';
+}
+
 async function findOrCreateWebCustomer(sessionId) {
   // A short, readable tag so staff can tell different visitors apart
   // in the console instead of seeing an identical "Website Visitor"
@@ -278,6 +288,12 @@ module.exports = function createWebChatRouter({
       // mode are never touched from here).
       // Kept in sync on every signed-in message, so a name the customer
       // changes in My Transco shows up in the console's Conversations too.
+      // A chat that belongs to another account (signed in on it) is never
+      // moved to this one — its history is shown in that account's My Transco.
+      if (account && customer.linkedBy === 'signin' && customer.linkedCustomerId && String(customer.linkedCustomerId) !== String(account._id)) {
+        return res.status(409).json({ error: 'This chat belongs to another account. Please send your message again.', reason: 'other_account' });
+      }
+
       if (account) {
         const link = {};
         if (String(customer.linkedCustomerId || '') !== String(account._id)) link.linkedCustomerId = account._id;
@@ -287,6 +303,15 @@ module.exports = function createWebChatRouter({
           await customers().updateOne({ _id: customer._id }, { $set: link });
           Object.assign(customer, link);
         }
+      }
+
+      // A plain device name ("iPhone", "Windows computer") so a customer
+      // with chats on several devices can tell them apart in My Transco.
+      // Only this short label is kept, never the browser's full details.
+      if (!customer.device) {
+        const device = deviceLabel(req.headers['user-agent']);
+        await customers().updateOne({ _id: customer._id }, { $set: { device } });
+        customer.device = device;
       }
 
       // What the customer "said", for the transcript and for staff to
