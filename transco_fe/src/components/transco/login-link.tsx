@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Copy, KeyRound, MessageCircle, Smartphone, UserPlus } from "lucide-react";
+import { Copy, KeyRound, MessageCircle, QrCode, Smartphone, UserPlus } from "lucide-react";
+import QRCode from "qrcode";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,16 @@ function LinkReady({ data, onCancelled }: { data: LoginLink; onCancelled: () => 
   const [lang, setLang] = useState<Lang>("en");
   const text = message(lang, data.name, data.link);
   const digits = data.phoneNumber.replace(/\D/g, "");
+  // At the counter: the customer scans it with their phone camera.
+  const [qr, setQr] = useState<string | null>(null);
+  const toggleQr = async () => {
+    if (qr) return setQr(null);
+    try {
+      setQr(await QRCode.toDataURL(data.link, { width: 240, margin: 1 }));
+    } catch {
+      toast.error("Couldn't make the QR code — send the link instead.");
+    }
+  };
 
   const copy = (value: string, what: string) => {
     void navigator.clipboard?.writeText(value).then(
@@ -67,10 +78,22 @@ function LinkReady({ data, onCancelled }: { data: LoginLink; onCancelled: () => 
           <Button type="button" variant="outline" onClick={() => copy(data.link, "Link")}>
             <Copy className="mr-1 h-4 w-4" aria-hidden /> Copy
           </Button>
+          <Button type="button" variant={qr ? "default" : "outline"} onClick={() => void toggleQr()} aria-pressed={!!qr}>
+            <QrCode className="mr-1 h-4 w-4" aria-hidden /> QR code
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground">
           Works until {fmtDay(data.expiresAt)} (7 days). The phone that opens it stays signed in until they sign out.
         </p>
+        {qr && (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-white p-3">
+            <img src={qr} alt={`QR code to sign ${data.name || "the customer"} in to My Transco`} width={240} height={240} />
+            <p className="text-center text-xs text-muted-foreground">
+              The customer opens their phone camera and points it at this code. Only show it to {data.name || "this customer"} —
+              whoever scans it is signed in to their account.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
