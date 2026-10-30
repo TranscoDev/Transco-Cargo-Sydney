@@ -1025,7 +1025,8 @@ function createCustomerTools({
   // boxes at drop-off, a name was misspelt, …). Same validation as the
   // customer form; only the parts sent are changed. Every edit is recorded
   // (who, when, what) so there's a trail of changes to the declaration.
-  const PAYMENT_METHODS = ['cash', 'zeller', 'eftpos', 'bank', 'other'];
+  // 'eftpos' stays valid for payments saved before PayID replaced it.
+  const PAYMENT_METHODS = ['cash', 'zeller', 'payid', 'eftpos', 'bank', 'other'];
 
   // Staff costing for a booking: cost lines (name + amount) they can add,
   // change or remove, a discount, and the total. The total is also saved

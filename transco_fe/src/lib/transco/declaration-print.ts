@@ -156,7 +156,7 @@ export interface BookingCosting {
   updatedBy: string | null;
 }
 
-export type PaymentMethod = "cash" | "zeller" | "eftpos" | "bank" | "other";
+export type PaymentMethod = "cash" | "zeller" | "payid" | "eftpos" | "bank" | "other";
 export interface CostingPayment {
   method: PaymentMethod;
   amount: number;

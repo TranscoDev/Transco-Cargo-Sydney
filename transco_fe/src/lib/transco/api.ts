@@ -1292,7 +1292,7 @@ export interface FinanceShipmentSummary {
   financials: ConsolidationFinancials;
 }
 
-export type FinancePayKey = "cash" | "zeller" | "eftpos" | "bank" | "other";
+export type FinancePayKey = "cash" | "zeller" | "payid" | "eftpos" | "bank" | "other";
 
 export interface FinanceRow {
   shipmentId: string;

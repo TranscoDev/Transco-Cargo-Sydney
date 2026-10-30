@@ -60,10 +60,12 @@ const needsName = (k: string) => k === "other" || k === "odd";
 
 type Line = { kind: string; label: string; qty: string; amount: string };
 
-// Paid by — the Finance page's payment columns.
+// Paid by — the Finance page's payment columns. EFTPOS is no longer
+// offered (PayID took its place); it only shows on a payment saved with it.
 const PAY_METHOD_NAME: Record<PaymentMethod, string> = {
   cash: "Cash",
   zeller: "Zeller",
+  payid: "PayID",
   eftpos: "EFTPOS",
   bank: "DD / Bank transfer",
   other: "Other",
@@ -441,7 +443,7 @@ export function CostingCard({
               onChange={(e) => setPays((s) => s.map((x, j) => (j === i ? { ...x, method: e.target.value as PaymentMethod } : x)))}
               className="h-9 min-w-0 rounded-md border border-input bg-card px-2 text-sm sm:w-48"
             >
-              {(Object.keys(PAY_METHOD_NAME) as PaymentMethod[]).map((m) => (
+              {(Object.keys(PAY_METHOD_NAME) as PaymentMethod[]).filter((m) => m !== "eftpos" || p.method === "eftpos").map((m) => (
                 <option key={m} value={m}>
                   {PAY_METHOD_NAME[m]}
                 </option>

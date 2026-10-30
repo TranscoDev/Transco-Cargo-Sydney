@@ -29,8 +29,9 @@ const RATE_LABELS = {
   emptyBox: 'Empty box (each)',
   tv: 'TV (each)'
 };
-const PAY_KEYS = ['cash', 'zeller', 'eftpos', 'bank', 'other'];
-const PAY_LABELS = { cash: 'Cash', zeller: 'Zeller', eftpos: 'EFTPOS', bank: 'DD / Bank trans', other: 'Other charges' };
+// EFTPOS was replaced by PayID: its column shows only on a shipment that has some.
+const PAY_KEYS = ['cash', 'zeller', 'payid', 'eftpos', 'bank', 'other'];
+const PAY_LABELS = { cash: 'Cash', zeller: 'Zeller', payid: 'PayID', eftpos: 'EFTPOS', bank: 'DD / Bank trans', other: 'Other charges' };
 const COST_KEYS = ['tcCost', 'obCost', 'gbCost', 'wbCost', 'otherCost', 'sydCollect', 'd2dZ1', 'd2dZ2', 'd2dZ3'];
 const COST_LABELS = {
   tcCost: 'TC cost', obCost: 'OB cost', gbCost: 'GB cost', wbCost: 'WB cost', otherCost: 'Other cost',
@@ -194,7 +195,7 @@ function buildFinanceSheet(consolidation, shipmentList, bookingById, invoiceBySh
       peNumber: consolidation.peNumber || null
     },
     boxColumns,
-    payColumns: PAY_KEYS.map(k => ({ key: k, label: PAY_LABELS[k] })),
+    payColumns: PAY_KEYS.filter(k => k !== 'eftpos' || totals.paid.eftpos).map(k => ({ key: k, label: PAY_LABELS[k] })),
     costColumns: COST_KEYS.map(k => ({ key: k, label: COST_LABELS[k] })),
     rows,
     totals
