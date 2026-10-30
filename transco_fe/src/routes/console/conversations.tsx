@@ -91,7 +91,14 @@ function ConversationsPage() {
   };
 
   const merged = web.length > 0 && selectedConversation;
-  const target = (merged && replyTo ? conversations.find((c) => c.id === replyTo) : null) ?? selectedConversation;
+  // Unless staff pick one, a reply goes where the customer last wrote: a
+  // My Transco (website) chat gets its answer there, not on WhatsApp.
+  const lastWrote = (c: Conversation) =>
+    c.messages.reduce((t, m) => (m.sender === "CUSTOMER" ? Math.max(t, Date.parse(m.createdAt) || 0) : t), 0);
+  const defaultReplyTo = merged
+    ? [merged, ...web].reduce((a, b) => (lastWrote(b) > lastWrote(a) ? b : a))
+    : selectedConversation;
+  const target = (merged && replyTo ? conversations.find((c) => c.id === replyTo) : null) ?? defaultReplyTo;
   const shown: Conversation | null = !selectedConversation || !target
     ? null
     : merged
@@ -177,7 +184,8 @@ function ConversationsPage() {
                       <option value={selectedConversation.id}>WhatsApp</option>
                       {web.map((w, i) => (
                         <option key={w.id} value={w.id}>
-                          Website chat{web.length > 1 ? ` ${i + 1}` : ""}
+                          {w.linkedAccount && !w.linkedAccount.byStaff ? "My Transco chat" : "Website chat"}
+                          {web.length > 1 ? ` ${i + 1}` : ""}
                         </option>
                       ))}
                     </select>
