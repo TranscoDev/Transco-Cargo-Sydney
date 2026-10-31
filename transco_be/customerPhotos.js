@@ -1,4 +1,6 @@
-// Photos customers send in chat (WhatsApp or the website widget).
+// Photos customers send in chat (WhatsApp or the website widget), and
+// WhatsApp voice notes (kept so staff can play the original — the bot
+// only reads the transcription).
 //
 // Private: stored on the volume outside the public /uploads folder and
 // served only at /api/messages/photo/<file>, which needs a staff login
@@ -18,7 +20,10 @@ const DIR = process.env.CUSTOMER_PHOTO_DIR || '/data/customer-photos';
 const KEEP_DAYS = 90;
 const MAX_BYTES = 6 * 1024 * 1024;
 const TYPES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
-const FILE_RE = /^[a-f0-9]{32}\.(jpg|png|webp)$/;
+// WhatsApp voice notes are audio/ogg (opus); other phones may send these.
+const VOICE_TYPES = { 'audio/ogg': '.ogg', 'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'audio/aac': '.aac', 'audio/amr': '.amr' };
+const VOICE_MAX_BYTES = 16 * 1024 * 1024;
+const FILE_RE = /^[a-f0-9]{32}\.(jpg|png|webp|ogg|mp3|m4a|aac|amr)$/;
 const URL_PREFIX = '/api/messages/photo/';
 
 fs.mkdirSync(DIR, { recursive: true });
@@ -33,6 +38,16 @@ async function save(buffer, mimeType) {
   const file = crypto.randomBytes(16).toString('hex') + TYPES[type];
   await fs.promises.writeFile(path.join(DIR, file), buffer);
   return { mediaUrl: URL_PREFIX + file, mediaType: 'image' };
+}
+
+// A voice note, same privacy and 90 days as photos.
+async function saveVoice(buffer, mimeType) {
+  const type = String(mimeType || '').toLowerCase().split(';')[0].trim();
+  if (!Object.prototype.hasOwnProperty.call(VOICE_TYPES, type)) throw new Error(`Not a supported voice type: ${mimeType}`);
+  if (!buffer || !buffer.length || buffer.length > VOICE_MAX_BYTES) throw new Error('Voice note is empty or too large');
+  const file = crypto.randomBytes(16).toString('hex') + VOICE_TYPES[type];
+  await fs.promises.writeFile(path.join(DIR, file), buffer);
+  return { mediaUrl: URL_PREFIX + file, mediaType: 'audio' };
 }
 
 function router() {
@@ -59,10 +74,9 @@ async function cleanup() {
       const st = await fs.promises.stat(full);
       if (st.mtimeMs < cutoff) { await fs.promises.unlink(full); removed++; }
     }
-    await messages().updateMany(
-      { mediaUrl: { $regex: '^' + URL_PREFIX.replace(/\//g, '\\/') }, createdAt: { $lt: new Date(cutoff) } },
-      { $set: { mediaUrl: null, mediaType: null, photoDeleted: true } }
-    );
+    const old = { mediaUrl: { $regex: '^' + URL_PREFIX.replace(/\//g, '\\/') }, createdAt: { $lt: new Date(cutoff) } };
+    await messages().updateMany({ ...old, mediaType: 'audio' }, { $set: { mediaUrl: null, mediaType: null, voiceDeleted: true } });
+    await messages().updateMany(old, { $set: { mediaUrl: null, mediaType: null, photoDeleted: true } });
     if (removed) console.log(`Customer photos: deleted ${removed} older than ${KEEP_DAYS} days`);
   } catch (err) {
     console.error('Customer photo cleanup failed:', err.message);
@@ -75,4 +89,4 @@ function startCleanup() {
   setInterval(cleanup, 24 * 60 * 60 * 1000).unref();
 }
 
-module.exports = { save, router, startCleanup, isPhotoType, MAX_BYTES, KEEP_DAYS };
+module.exports = { save, saveVoice, router, startCleanup, isPhotoType, MAX_BYTES, KEEP_DAYS };

@@ -1737,6 +1737,8 @@ app.post('/webhook', async (req, res) => {
 
     let text = message.text?.body;
     let isVoiceMessage = false;
+    let voiceUnsure = false;
+    let voiceMedia = null;
     // A photo the bot can look at (agentAnswer.js) — set below.
     let photo = null;
 
@@ -1804,8 +1806,16 @@ app.post('/webhook', async (req, res) => {
     if (!text && message.type === 'audio' && message.audio?.id) {
 
       try {
-        text = await transcribeWhatsAppAudio(message.audio.id);
+        const voice = await transcribeWhatsAppAudio(message.audio.id);
         isVoiceMessage = true;
+        voiceUnsure = voice.unsure;
+        text = voice.text || '(voice note)';
+        // The original, for staff to play in Conversations.
+        try {
+          voiceMedia = await customerPhotos.saveVoice(voice.audio.data, voice.audio.mimeType);
+        } catch (saveErr) {
+          console.error('Voice note save failed:', saveErr.message);
+        }
 
       } catch (err) {
         console.error(
@@ -1881,7 +1891,7 @@ app.post('/webhook', async (req, res) => {
       isRead: false,
       replyToMessageId: null,
       whatsappStatus: null,
-      ...(photoMedia || {})
+      ...(photoMedia || voiceMedia || {})
     });
 
 
@@ -1889,6 +1899,22 @@ app.post('/webhook', async (req, res) => {
       customer,
       inboundMessage
     );
+
+    // Voice notes: never answer a guess. Not sure what was said → ask
+    // them to type it (staff can still play the original). Otherwise say
+    // what was heard first, so a wrong word is easy to spot and correct.
+    if (isVoiceMessage && customer.mode === 'CHATBOT') {
+      if (voiceUnsure) {
+        await sendAndTrackOutbound(
+          customer,
+          'CHATBOT',
+          "🎤 Sorry, I couldn't hear that voice message clearly. Could you type your question, or send the voice note again somewhere quieter?",
+          inboundMessage._id
+        );
+        return;
+      }
+      await sendAndTrackOutbound(customer, 'CHATBOT', `🎤 I heard: "${text}"`, inboundMessage._id, true);
+    }
 
     if (menuLinkReply && customer.mode === 'CHATBOT') {
       await sendAndTrackOutbound(customer, 'CHATBOT', menuLinkReply, inboundMessage._id, true);
@@ -7439,6 +7465,45 @@ async function downloadWhatsAppMedia(mediaId) {
   return { data: Buffer.from(file.data), mimeType: mediaInfo.data.mime_type || 'image/jpeg' };
 }
 
+// Words Whisper should expect, so they're spelled our way ("Tea Chest",
+// not "tea chess"). Kept short: Whisper only reads the first ~220 tokens.
+const VOICE_HINT =
+  'Transco Cargo, Tea Chest, Gift Box, Wine Box, Quarter CBM box, TV, BL number, booking, drop-off, ' +
+  'Seven Hills, Sydney, Sri Lanka, India, sea freight, air freight, door delivery, Colombo, Gampaha, ' +
+  'Kandy, Negombo, Ja-Ela, Kurunegala, Galle, Matara, Jaffna, Dehiwala, Wattala, Kadawatha.';
+const VOICE_LANGUAGES = ['english', 'sinhala', 'tamil'];
+
+async function whisper(audio, language) {
+  const form = new FormData();
+  form.append('file', new Blob([audio.data], { type: audio.mimeType }), 'voice.ogg');
+  form.append('model', 'whisper-large-v3');
+  form.append('response_format', 'verbose_json');
+  form.append('temperature', '0');
+  form.append('prompt', VOICE_HINT);
+  if (language) form.append('language', language);
+  const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
+    body: form
+  });
+  if (!response.ok) {
+    throw new Error(`Groq transcription failed: ${response.status} ${await response.text()}`);
+  }
+  const result = await response.json();
+  const segments = Array.isArray(result.segments) ? result.segments : [];
+  const avg = (k) => (segments.length ? segments.reduce((s, x) => s + (Number(x[k]) || 0), 0) / segments.length : null);
+  return {
+    text: String(result.text || '').trim(),
+    language: String(result.language || language || '').toLowerCase(),
+    logprob: avg('avg_logprob'),
+    noSpeech: avg('no_speech_prob')
+  };
+}
+
+// A WhatsApp voice note → { text, unsure, audio }. The audio is returned
+// so staff can play the original. "unsure" = Whisper wasn't confident (or
+// heard nothing), so the bot asks the customer to type it instead of
+// answering a guess.
 async function transcribeWhatsAppAudio(mediaId) {
 
   if (!GROQ_API_KEY) {
@@ -7447,48 +7512,27 @@ async function transcribeWhatsAppAudio(mediaId) {
 
   const mediaInfo = await axios.get(
     `${WHATSAPP_API_BASE_URL}/${mediaId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_TOKEN}`
-      }
-    }
+    { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` }, timeout: 15000 }
   );
-
   const audioResponse = await axios.get(
     mediaInfo.data.url,
-    {
-      headers: {
-        Authorization: `Bearer ${WHATSAPP_TOKEN}`
-      },
-      responseType: 'arraybuffer'
-    }
+    { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` }, responseType: 'arraybuffer', timeout: 30000, maxContentLength: 16 * 1024 * 1024 }
   );
+  const audio = { data: Buffer.from(audioResponse.data), mimeType: mediaInfo.data.mime_type || 'audio/ogg' };
 
-  const audioBuffer = Buffer.from(audioResponse.data);
-  const mimeType = mediaInfo.data.mime_type || 'audio/ogg';
-
-  const form = new FormData();
-  form.append('file', new Blob([audioBuffer], { type: mimeType }), 'voice.ogg');
-  form.append('model', 'whisper-large-v3');
-
-  const transcriptionResponse = await fetch(
-    'https://api.groq.com/openai/v1/audio/transcriptions',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`
-      },
-      body: form
-    }
-  );
-
-  if (!transcriptionResponse.ok) {
-    const errText = await transcriptionResponse.text();
-    throw new Error(`Groq transcription failed: ${transcriptionResponse.status} ${errText}`);
+  // Let Whisper detect the language. If it lands on something our
+  // customers don't speak (it often mistakes Sinhala for Hindi), try again
+  // as Sinhala and as Tamil and keep the one it's more confident about.
+  let best = await whisper(audio);
+  if (!VOICE_LANGUAGES.includes(best.language)) {
+    const retries = await Promise.all(['si', 'ta'].map(l => whisper(audio, l).catch(() => null)));
+    for (const r of retries) if (r && r.text && (r.logprob ?? -9) > (best.logprob ?? -9)) best = r;
   }
 
-  const result = await transcriptionResponse.json();
-  return result.text;
+  const unsure = best.text.length < 2 ||
+    (best.noSpeech !== null && best.noSpeech > 0.6) ||
+    (best.logprob !== null && best.logprob < -1);
+  return { text: best.text, unsure, audio };
 }
 
 

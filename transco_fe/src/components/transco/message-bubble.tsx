@@ -10,9 +10,9 @@ import type { Message } from "@/lib/transco/types";
 
 import { MessageStatusIcon } from "./message-status";
 
-/** A customer's chat photo — staff-only, so it's loaded with the login
- * token rather than a public link. */
-function PrivatePhoto({ path, alt }: { path: string; alt: string }) {
+/** A customer's chat photo or voice note — staff-only, so it's loaded
+ * with the login token rather than a public link. */
+function PrivatePhoto({ path, alt, audio = false }: { path: string; alt: string; audio?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -37,11 +37,16 @@ function PrivatePhoto({ path, alt }: { path: string; alt: string }) {
   if (failed) {
     return (
       <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ImageOff className="h-3.5 w-3.5" /> Photo couldn't be loaded
+        <ImageOff className="h-3.5 w-3.5" /> {audio ? "Voice note couldn't be loaded" : "Photo couldn't be loaded"}
       </p>
     );
   }
-  if (!src) return <div className="mb-1 h-40 w-full animate-pulse rounded-md bg-black/5 dark:bg-white/5" />;
+  if (!src) return <div className={cn("mb-1 w-full animate-pulse rounded-md bg-black/5 dark:bg-white/5", audio ? "h-10" : "h-40")} />;
+  if (audio) {
+    // The customer's own voice — staff play it when the words look wrong.
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <audio src={src} controls className="mb-1 w-full min-w-[220px]" aria-label="Customer's voice note" />;
+  }
   return (
     <a href={src} target="_blank" rel="noopener noreferrer" className="block">
       <img src={src} alt={alt} className="mb-1 max-h-64 w-full rounded-md object-cover" />
@@ -50,16 +55,16 @@ function PrivatePhoto({ path, alt }: { path: string; alt: string }) {
 }
 
 function MediaContent({ message }: { message: Message }) {
-  if (message.photoDeleted) {
+  if (message.photoDeleted || message.voiceDeleted) {
     return (
       <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ImageOff className="h-3.5 w-3.5" /> Photo deleted after 90 days
+        <ImageOff className="h-3.5 w-3.5" /> {message.voiceDeleted ? "Voice note" : "Photo"} deleted after 90 days
       </p>
     );
   }
   if (!message.mediaUrl) return null;
   if (message.mediaUrl.startsWith("/api/messages/photo/")) {
-    return <PrivatePhoto path={message.mediaUrl} alt={message.body || "Customer photo"} />;
+    return <PrivatePhoto path={message.mediaUrl} alt={message.body || "Customer photo"} audio={message.mediaType === "audio"} />;
   }
   switch (message.mediaType) {
     case "image":

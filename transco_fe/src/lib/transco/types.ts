@@ -149,6 +149,7 @@ export interface Message {
   mediaUrl?: string | null | undefined;
   /** The customer's photo was deleted after 90 days. */
   photoDeleted?: boolean | undefined;
+  voiceDeleted?: boolean | undefined;
   /** Set when chats from several channels are shown together (one customer's WhatsApp + website chats). */
   via?: "whatsapp" | "website" | undefined;
   mediaType?: MediaType | null | undefined;
