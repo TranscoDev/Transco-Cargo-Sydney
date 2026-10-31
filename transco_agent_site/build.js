@@ -18,10 +18,16 @@ const previewOrigin = process.env.PREVIEW_API_ORIGIN || null;
 
 const htmlFiles = fs.readdirSync(__dirname).filter(f => f.endsWith('.html'));
 
+// Browser-tab icon (same logo as the old transcosydney.com.au site),
+// added to every page's <head> and served at /favicon.png.
+const FAVICON_PNG = fs.readFileSync(path.join(__dirname, 'favicon.png')).toString('base64');
+const FAVICON_TAGS = '<link rel="icon" type="image/png" href="/favicon.png"><link rel="apple-touch-icon" href="/favicon.png">';
+
 const pages = {};
 for (const file of htmlFiles) {
   let content = fs.readFileSync(path.join(__dirname, file), 'utf8');
   if (previewOrigin) content = content.split(LIVE_API_ORIGIN).join(previewOrigin);
+  content = content.replace('</head>', FAVICON_TAGS + '</head>');
   pages['/' + file] = content;
   if (file === 'index.html') pages['/'] = content;
 }
@@ -47,10 +53,15 @@ const worker = `const PAGES = ${JSON.stringify(pages)};
 const SCRIPTS = ${JSON.stringify(scripts)};
 const EXTRA_HEADERS = ${JSON.stringify(extraHeaders)};
 const REDIRECTS = ${JSON.stringify(redirects)};
+const FAVICON_PNG = ${JSON.stringify(FAVICON_PNG)};
 
 export default {
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname === "/favicon.png" || url.pathname === "/favicon.ico") {
+      const bytes = Uint8Array.from(atob(FAVICON_PNG), ch => ch.charCodeAt(0));
+      return new Response(bytes, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400", ...EXTRA_HEADERS } });
+    }
     const moved = REDIRECTS[url.pathname];
     if (moved) {
       return new Response(null, { status: 301, headers: { location: moved, ...EXTRA_HEADERS } });
