@@ -12,7 +12,9 @@ import type { ConversationChannel, ConversationMode } from "@/lib/transco/types"
  * avoid the ffmpeg/Railway resource cost that came with it. The
  * customer gets a playable audio file, just not the waveform bubble. */
 function pickRecorderMimeType(): string {
-  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  // m4a (AAC) first: iPhones and WhatsApp both play it; webm only when
+  // the browser can't record m4a.
+  const candidates = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
   for (const type of candidates) {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
   }
@@ -59,7 +61,9 @@ export function MessageComposer({
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isHuman = mode === "HUMAN";
-  const canAttach = isHuman && !disabled && channel !== "website" && !!onSendAttachment;
+  // Voice messages go to website (My Transco) chats too; files are WhatsApp-only.
+  const canRecord = isHuman && !disabled && !!onSendAttachment;
+  const canAttach = canRecord && channel !== "website";
   // Sending only actually works in HUMAN mode — the backend silently
   // rejects a CHATBOT-mode send with no visible error, so the composer
   // itself must block it here rather than let staff believe a message
@@ -239,6 +243,10 @@ export function MessageComposer({
               >
                 <Paperclip className="h-4 w-4" />
               </button>
+            </>
+          )}
+          {canRecord && (
+            <>
               <button
                 type="button"
                 onClick={startRecording}

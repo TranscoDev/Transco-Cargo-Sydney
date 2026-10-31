@@ -5182,10 +5182,33 @@ app.post(
         return res.status(409).json({ error: 'Conversation is not in HUMAN mode' });
       }
 
+      // Website / My Transco chats: staff voice messages only. Kept
+      // privately (never in the public uploads folder) — the customer plays
+      // it in My Transco, which checks the chat is theirs.
       if (customer.channel === 'website') {
-        return res.status(400).json({
-          error: 'Attachments are not supported for website chats yet — WhatsApp only for now'
-        });
+        const upload = req.file.path;
+        try {
+          if (!String(req.file.mimetype || '').toLowerCase().startsWith('audio/')) {
+            return res.status(400).json({ error: 'Website chats can get voice messages only — type anything else.' });
+          }
+          const voice = await customerPhotos.saveVoice(await fs.promises.readFile(upload), req.file.mimetype);
+          const outgoing = await saveMessage({
+            customerId: customer._id,
+            senderType: 'HUMAN',
+            content: caption && caption.trim() ? caption.trim() : '🎤 Voice message',
+            isRead: true,
+            replyToMessageId: null,
+            whatsappStatus: null,
+            ...voice
+          });
+          await broadcastMessageCreated(customer, outgoing);
+          return res.status(201).json({ message: outgoing });
+        } catch (err) {
+          console.error('Website voice message failed:', err.message);
+          return res.status(400).json({ error: "Couldn't send that voice message. Please record it again." });
+        } finally {
+          fs.promises.unlink(upload).catch(() => {});
+        }
       }
 
       if (!MEDIA_BASE_URL) {

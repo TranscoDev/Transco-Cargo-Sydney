@@ -381,6 +381,7 @@
   .ag-msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 13px; text-align: center; }
   .ag-msg img, .ag-msg video { max-width: 100%; border-radius: 8px; margin-top: 6px; display: block; }
   /* Staff replies stand out from the bot's. */
+  .ag-msg audio { display: block; width: 100%; min-width: 210px; margin-top: 6px; }
   .ag-msg.staff { align-self: flex-start; background: #fff4e3; color: #222; border: 1px solid #f0d6a8; border-bottom-left-radius: 4px; }
   .ag-msg .who { display: block; font-size: 12px; font-weight: 700; color: #8a5300; margin-bottom: 2px; }
   .ag-tools { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
@@ -552,7 +553,7 @@
       agentTitle: "Transco Agent", agentSub: "Prices, tracking and bookings — just ask.", agentHello: "Hi {name}! How can I help?", agentHelloNoName: "Hi! How can I help?",
       agentPlaceholder: "Type your question…", agentSend: "Send", agentClose: "Close chat",
       agentError: "Sorry, something went wrong. Please try again.", agentOffline: "Sorry, I couldn't reach our server. Please check your connection and try again.", agentHandedOff: "A staff member will reply here shortly.",
-      chatsTitle: "Your chats", chatsOpen: "Your chats", newChat: "Start a new chat", staffName: "Transco team", chatFrom: "Chat from {d}", chatDevice: "{d}", chatYou: "You: ",
+      chatsTitle: "Your chats", chatsOpen: "Your chats", newChat: "Start a new chat", staffName: "Transco team", voiceGone: "This voice message is no longer available.", chatFrom: "Chat from {d}", chatDevice: "{d}", chatYou: "You: ",
       sugMyBookings: "My bookings", sugMyBl: "My BL number", sugDecl: "Declaration status", sugHours: "Opening hours",
       signInWith: "Sign in with", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "Please enter a valid email address.", emailLoginHelp: "Use the email saved on your My Transco account.",
@@ -691,7 +692,7 @@
       agentTitle: "Transco Agent", agentSub: "මිල, tracking සහ bookings — අහන්න.", agentHello: "ආයුබෝවන් {name}! මම උදව් කරන්නේ කොහොමද?", agentHelloNoName: "ආයුබෝවන්! මම උදව් කරන්නේ කොහොමද?",
       agentPlaceholder: "ඔයාගේ ප්‍රශ්නය type කරන්න…", agentSend: "යවන්න", agentClose: "Chat එක වහන්න",
       agentError: "සමාවෙන්න, මොකක් හරි වැරැද්දක් වුණා. ආයෙත් try කරන්න.", agentOffline: "සමාවෙන්න, server එකට connect වෙන්න බැරි වුණා. Connection එක check කරලා ආයෙත් try කරන්න.", agentHandedOff: "අපේ team එකේ කෙනෙක් ඉක්මනින් මෙතන reply කරයි.",
-      chatsTitle: "ඔයාගේ chats", chatsOpen: "ඔයාගේ chats", newChat: "අලුත් chat එකක්", staffName: "Transco team", chatFrom: "{d} chat එක", chatYou: "ඔයා: ",
+      chatsTitle: "ඔයාගේ chats", chatsOpen: "ඔයාගේ chats", newChat: "අලුත් chat එකක්", staffName: "Transco team", voiceGone: "මේ voice message එක දැන් නෑ.", chatFrom: "{d} chat එක", chatYou: "ඔයා: ",
       sugMyBookings: "මගේ bookings", sugMyBl: "මගේ BL number එක", sugDecl: "Declaration තත්ත්වය", sugHours: "විවෘත වෙලාවන්",
       signInWith: "Sign in වෙන්නේ", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "කරුණාකරලා හරි email ලිපිනයක් දාන්න.", emailLoginHelp: "ඔයාගේ My Transco account එකේ save කරලා තියෙන email එක පාවිච්චි කරන්න.",
@@ -823,7 +824,7 @@
       agentTitle: "Transco Agent", agentSub: "விலை, tracking மற்றும் bookings — கேளுங்கள்.", agentHello: "வணக்கம் {name}! நான் எப்படி உதவலாம்?", agentHelloNoName: "வணக்கம்! நான் எப்படி உதவலாம்?",
       agentPlaceholder: "உங்கள் கேள்வியை type செய்யுங்கள்…", agentSend: "அனுப்பு", agentClose: "Chat ஐ மூடு",
       agentError: "மன்னிக்கவும், ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.", agentOffline: "மன்னிக்கவும், server ஐ அணுக முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.", agentHandedOff: "எங்கள் குழுவில் ஒருவர் விரைவில் இங்கே பதிலளிப்பார்.",
-      chatsTitle: "உங்கள் chats", chatsOpen: "உங்கள் chats", newChat: "புதிய chat", staffName: "Transco team", chatFrom: "{d} chat", chatYou: "நீங்கள்: ",
+      chatsTitle: "உங்கள் chats", chatsOpen: "உங்கள் chats", newChat: "புதிய chat", staffName: "Transco team", voiceGone: "இந்த voice message இப்போது கிடைக்காது.", chatFrom: "{d} chat", chatYou: "நீங்கள்: ",
       sugMyBookings: "என் bookings", sugMyBl: "என் BL number", sugDecl: "Declaration நிலை", sugHours: "திறந்திருக்கும் நேரம்",
       signInWith: "Sign in செய்ய", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "சரியான email முகவரியை உள்ளிடவும்.", emailLoginHelp: "உங்கள் My Transco account இல் save செய்த email ஐப் பயன்படுத்துங்கள்.",
@@ -1222,6 +1223,16 @@
     if (kind === "staff") el.insertBefore(h("span", { class: "who", text: t("staffName") }), el.firstChild);
     if (media && media.videoUrl) el.appendChild(h("video", { src: media.videoUrl, controls: true }));
     if (media && media.flyerUrl) el.appendChild(h("img", { src: media.flyerUrl, alt: "Promotional flyer" }));
+    // A staff voice message: fetched with the sign-in token (only the
+    // customer's own chats), then played here.
+    if (media && media.voiceId) {
+      var player = h("audio", { controls: true, preload: "metadata", "aria-label": t("staffName") });
+      el.appendChild(player);
+      fetch(API_BASE + "/messages/chats/" + encodeURIComponent(media.voiceChat) + "/voice/" + encodeURIComponent(media.voiceId), { headers: { Authorization: "Bearer " + token } })
+        .then(function (res) { return res.ok ? res.blob() : Promise.reject(); })
+        .then(function (blob) { player.src = URL.createObjectURL(blob); })
+        .catch(function () { player.replaceWith(h("div", { class: "small", text: t("voiceGone") })); });
+    }
     agent.body.appendChild(el);
     if (persist !== false) saveTranscript(kind, text);
     agentScroll();
@@ -1480,7 +1491,7 @@
       if (seq !== agent.seq || agent.chatId !== id) return;
       var list = data.messages || [];
       list.forEach(function (m) {
-        if (full || m.from === "staff") addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, null, false);
+        if (full || m.from === "staff") addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, m.voice ? { voiceChat: id, voiceId: m.id } : null, false);
         agent.lastId = m.id;
       });
       if (full && !list.length) { agent.empty = agentSuggestions(); agent.body.appendChild(agent.empty); }

@@ -21,9 +21,10 @@ const KEEP_DAYS = 90;
 const MAX_BYTES = 6 * 1024 * 1024;
 const TYPES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 // WhatsApp voice notes are audio/ogg (opus); other phones may send these.
-const VOICE_TYPES = { 'audio/ogg': '.ogg', 'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'audio/aac': '.aac', 'audio/amr': '.amr' };
+// webm = a staff recording from a browser that can't record m4a.
+const VOICE_TYPES = { 'audio/ogg': '.ogg', 'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a', 'audio/aac': '.aac', 'audio/amr': '.amr', 'audio/webm': '.webm' };
 const VOICE_MAX_BYTES = 16 * 1024 * 1024;
-const FILE_RE = /^[a-f0-9]{32}\.(jpg|png|webp|ogg|mp3|m4a|aac|amr)$/;
+const FILE_RE = /^[a-f0-9]{32}\.(jpg|png|webp|ogg|mp3|m4a|aac|amr|webm)$/;
 const URL_PREFIX = '/api/messages/photo/';
 
 fs.mkdirSync(DIR, { recursive: true });
@@ -89,4 +90,12 @@ function startCleanup() {
   setInterval(cleanup, 24 * 60 * 60 * 1000).unref();
 }
 
-module.exports = { save, saveVoice, router, startCleanup, isPhotoType, MAX_BYTES, KEEP_DAYS };
+// The file behind a stored mediaUrl, or null (bad name / deleted).
+function fileFor(mediaUrl) {
+  const file = String(mediaUrl || '').startsWith(URL_PREFIX) ? String(mediaUrl).slice(URL_PREFIX.length) : '';
+  if (!FILE_RE.test(file)) return null;
+  const full = path.join(DIR, file);
+  return fs.existsSync(full) ? full : null;
+}
+
+module.exports = { save, saveVoice, fileFor, router, startCleanup, isPhotoType, MAX_BYTES, KEEP_DAYS };

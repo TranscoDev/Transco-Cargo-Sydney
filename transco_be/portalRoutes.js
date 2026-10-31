@@ -16,6 +16,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const { ObjectId } = require('mongodb');
+const customerPhotos = require('./customerPhotos');
 const { customers, customerOtps, bookings, shipments, messages } = require('./db');
 
 // "Forgot password" links: single use, 30 minutes. Only a hash of the
@@ -955,7 +956,11 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
   const SHOWN_SENDERS = ['CUSTOMER', 'CHATBOT', 'HUMAN'];
   const myChatsFilter = (customer) => ({ channel: 'website', linkedCustomerId: customer._id, linkedBy: 'signin' });
   const fromLabel = { CUSTOMER: 'me', CHATBOT: 'bot', HUMAN: 'staff' };
-  const publicMessage = (m) => ({ id: String(m._id), from: fromLabel[m.senderType], text: m.content || '', at: m.createdAt });
+  // voice: a staff voice message to play (fetched from the route below).
+  const publicMessage = (m) => ({
+    id: String(m._id), from: fromLabel[m.senderType], text: m.content || '', at: m.createdAt,
+    ...(m.senderType === 'HUMAN' && m.mediaType === 'audio' && m.mediaUrl ? { voice: true } : {})
+  });
 
   async function myChats(customer) {
     const chats = await customers().find(myChatsFilter(customer), { projection: { sessionId: 1, device: 1, createdAt: 1, portalReadAt: 1 } }).limit(50).toArray();
@@ -1007,6 +1012,21 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     const list = await messages().find(query).sort({ _id: -1 }).limit(200).toArray();
     if (req.query.read === '1') await customers().updateOne({ _id: chat._id }, { $set: { portalReadAt: new Date() } });
     res.json({ messages: list.reverse().map(publicMessage) });
+  }));
+
+  // A staff voice message in one of the customer's own chats.
+  router.get('/messages/chats/:chatId/voice/:messageId', wrap(async (req, res) => {
+    const { chatId, messageId } = req.params;
+    const notFound = () => res.status(404).json({ error: "We couldn't find that voice message." });
+    if (!ObjectId.isValid(chatId) || !ObjectId.isValid(messageId)) return notFound();
+    const chat = await customers().findOne({ _id: new ObjectId(chatId), ...myChatsFilter(req.customer) }, { projection: { _id: 1 } });
+    if (!chat) return notFound();
+    const m = await messages().findOne({ _id: new ObjectId(messageId), customerId: chat._id, senderType: 'HUMAN', mediaType: 'audio' });
+    const file = m && customerPhotos.fileFor(m.mediaUrl);
+    if (!file) return notFound();
+    res.set('Cache-Control', 'private, max-age=86400');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(file);
   }));
 
   // Customer-safe error envelope for anything unexpected.
