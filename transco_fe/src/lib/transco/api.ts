@@ -82,6 +82,8 @@ export interface BackendCustomer {
   status?: CustomerStatus;
   totalBookings?: number;
   totalShipments?: number;
+  shipmentDates?: string[];
+  createdByImport?: boolean;
   totalRevenue?: number;
   outstandingBalance?: number | null;
   /** Website chats: the My Transco account the visitor was signed in to. */
@@ -381,6 +383,8 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     shipments: c.shipments?.map(mapShipment),
     totalBookings: c.totalBookings,
     totalShipments: c.totalShipments,
+    shipmentDates: c.shipmentDates,
+    createdByImport: c.createdByImport,
     totalRevenue: c.totalRevenue,
     outstandingBalance: c.outstandingBalance,
   };

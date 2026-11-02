@@ -193,6 +193,10 @@ export interface Conversation {
    * CustomerProfile for the explicit "not built yet" flag. */
   totalBookings?: number | undefined;
   totalShipments?: number | undefined;
+  /** YYYY-MM-DD of each shipment (BL) — for the Customers date summary. */
+  shipmentDates?: string[] | undefined;
+  /** First saved by a shipment sheet import (an old customer, not a new one). */
+  createdByImport?: boolean | undefined;
   totalRevenue?: number | undefined;
   outstandingBalance?: number | null | undefined;
   /** Website chats only: the My Transco account the visitor was signed in

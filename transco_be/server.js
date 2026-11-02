@@ -2679,6 +2679,14 @@ app.get('/api/customers', async (req, res) => {
         totalShipments:
           (liveShipmentsByCustomer.get(customer._id.toString()) ?? []).length,
 
+        // Customers page date summary: when each shipment (BL) went
+        // (YYYY-MM-DD), and whether the record was first made by a
+        // shipment sheet import (importedAt is only set on that insert).
+        shipmentDates: (liveShipmentsByCustomer.get(customer._id.toString()) ?? [])
+          .map(s => { const d = new Date(s.originDate || s.createdAt); return isNaN(d) ? null : d.toISOString().slice(0, 10); })
+          .filter(Boolean),
+        createdByImport: Boolean(customer.importedAt),
+
         totalRevenue: 0,
         outstandingBalance: null
 

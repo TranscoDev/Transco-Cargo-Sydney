@@ -211,11 +211,16 @@ const isoToDate = (iso: string) => new Date(`${iso}T00:00:00`);
 type DateRange = { from: string; to: string };
 type Funnel = "all" | "chatted" | "shipped" | "notShipped" | "sheet" | "silent";
 
-/** Only known from a shipment sheet import (no chat, sign-up or staff add). */
-const onlyFromSheet = (c: Conversation) => sourcesFor(c).every((s) => s === "historical");
+/** First saved by a shipment sheet import — an old customer, even if staff
+ * later added the same number again (that joins the same record and only
+ * adds the Manual tag). Their Added date is the import day. */
+const onlyFromSheet = (c: Conversation) =>
+  c.createdByImport ?? sourcesFor(c).every((s) => s === "historical");
 /** The customer sent at least one message — not just our welcome/bot ones. */
 const customerWrote = (c: Conversation) => c.messages.some((m) => m.sender === "CUSTOMER");
-const hasShipment = (c: Conversation) => (c.totalShipments ?? 0) > 0;
+/** Has a BL dated on/after `from` — an older shipment doesn't count. */
+const hasShipmentSince = (c: Conversation, from: string) =>
+  c.shipmentDates ? c.shipmentDates.some((d) => d >= from) : (c.totalShipments ?? 0) > 0;
 /** Opened the website chat but never typed — not someone we know yet. */
 const silentVisitor = (c: Conversation) => sourcesFor(c).every((s) => s === "website") && !customerWrote(c);
 /** Counted as a new customer in the summary. */
@@ -380,9 +385,10 @@ export function ContactsDirectory({
   // New customers → chatted → in a BL/shipment, for the dates picked.
   // Customers who only came in from a shipment sheet import aren't new
   // (their Added date is the import day) — counted on their own.
+  const from = range?.from ?? "";
   const summary = useMemo(() => {
     const fresh = filtered.filter(isFresh);
-    const shipped = fresh.filter(hasShipment).length;
+    const shipped = fresh.filter((c) => hasShipmentSince(c, from)).length;
     return {
       total: fresh.length,
       chatted: fresh.filter(customerWrote).length,
@@ -391,7 +397,7 @@ export function ContactsDirectory({
       sheet: filtered.filter(onlyFromSheet).length,
       silent: filtered.filter(silentVisitor).length,
     };
-  }, [filtered]);
+  }, [filtered, from]);
 
   const funnelled = useMemo(() => {
     if (!range) return filtered;
@@ -399,10 +405,10 @@ export function ContactsDirectory({
     if (funnel === "silent") return filtered.filter(silentVisitor);
     const fresh = filtered.filter(isFresh);
     if (funnel === "chatted") return fresh.filter(customerWrote);
-    if (funnel === "shipped") return fresh.filter(hasShipment);
-    if (funnel === "notShipped") return fresh.filter((c) => !hasShipment(c));
+    if (funnel === "shipped") return fresh.filter((c) => hasShipmentSince(c, from));
+    if (funnel === "notShipped") return fresh.filter((c) => !hasShipmentSince(c, from));
     return fresh;
-  }, [filtered, funnel, range]);
+  }, [filtered, funnel, range, from]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -731,10 +737,10 @@ export function ContactsDirectory({
               [
                 ["all", `${summary.total} new customer${summary.total === 1 ? "" : "s"}`, "Everyone added in these dates"],
                 ["chatted", `${summary.chatted} chatted with us`, "Sent at least one message (website, My Transco or WhatsApp bot)"],
-                ["shipped", `${summary.shipped} in a BL / shipment`, "Have a shipment (BL) with us — any shipment, not only this period's"],
+                ["shipped", `${summary.shipped} in a BL / shipment`, "Have a BL dated from the start of these dates onwards (a later shipment counts too; an older one doesn't)"],
                 ["notShipped", `${summary.notShipped} not shipped yet`, "No BL yet — people to follow up"],
                 ...(summary.sheet > 0
-                  ? ([["sheet", `+ ${summary.sheet} from shipment sheets`, "Added by importing a shipment sheet in these dates — not new customers, so not counted above"]] as const)
+                  ? ([["sheet", `+ ${summary.sheet} old customers (shipment sheets)`, "First saved by importing a shipment sheet in these dates (the Added date is the import day) — not new customers, so not counted above. Staff adding the same number later doesn't make them new."]] as const)
                   : []),
                 ...(summary.silent > 0
                   ? ([["silent", `+ ${summary.silent} opened the chat, never typed`, "Website visitors who didn't send a message — not counted above"]] as const)
