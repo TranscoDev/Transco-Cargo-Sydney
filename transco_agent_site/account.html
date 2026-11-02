@@ -442,6 +442,7 @@
 </style>
 <script src="/phone-format.js"></script>
 <script src="/sl-cities.js"></script>
+<script src="/live-prices.js" data-api="https://transco-backend-production.up.railway.app"></script>
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
 </head>
@@ -2819,7 +2820,7 @@
       tea_chest: "42 × 44 × 63 cm · max " + (sl ? 30 : 50) + " kg", quarter_cbm: "83 × 50 × 52 cm · max 50 kg"
     }[key];
     var price = sl && draft.service === "sea" ? BOX_PRICE[key] : null;
-    if (d && price) d += " · $" + price + " " + t("eachLbl") + (key === "tea_chest" ? " (" + t("teaFree") + ")" : "");
+    if (d && price) d += " · $" + price + " " + t("eachLbl") + (key === "tea_chest" && (!window.TranscoPrices || TranscoPrices.teaFreeThird) ? " (" + t("teaFree") + ")" : "");
     return d || (key === "tv" ? t("tvDesc") : key === "other" ? t("otherDesc") : null);
   }
 
@@ -2844,8 +2845,9 @@
     } else {
       if (q.tea_chest) {
         var tea = 0;
-        for (var p = 1; p <= q.tea_chest; p++) tea += p % 3 === 0 ? 0 : 75;
-        line(q.tea_chest + " × " + itemLabel("tea_chest") + (q.tea_chest >= 3 ? " (" + t("teaFree") + ")" : ""), tea);
+        var free3 = !window.TranscoPrices || TranscoPrices.teaFreeThird;
+        for (var p = 1; p <= q.tea_chest; p++) tea += free3 && p % 3 === 0 ? 0 : BOX_PRICE.tea_chest;
+        line(q.tea_chest + " × " + itemLabel("tea_chest") + (free3 && q.tea_chest >= 3 ? " (" + t("teaFree") + ")" : ""), tea);
       }
       ["gift_box", "wine_box", "quarter_cbm"].forEach(function (k) { if (q[k]) line(q[k] + " × " + itemLabel(k), q[k] * BOX_PRICE[k]); });
       for (var i = 0; i < (q.tv || 0); i++) {
@@ -2912,6 +2914,8 @@
     { key: "46to55", label: '46" – 55"', price: 300 }, { key: "60to65", label: '60" – 65"', price: 350 },
     { key: "66to75", label: '66" – 75"', price: 400 }, { key: "other", label: null, price: null }
   ];
+  // Live prices from the console's Prices & Promotions page (live-prices.js).
+  if (window.TranscoPrices) TranscoPrices.useIn({ box: BOX_PRICE, india: INDIA_PRICE, tv: TV_SIZES });
   function tvSizeOptions() {
     // Prices are Sri Lanka Sea Freight; Air Freight goes by weight.
     var showPrice = draft.country === "sri_lanka" && draft.service === "sea";

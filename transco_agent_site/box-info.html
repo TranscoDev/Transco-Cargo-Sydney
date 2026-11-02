@@ -292,7 +292,7 @@
 
         <div class="note" style="margin-top: 18px;" data-i18n="box.note">
           <strong>Sri Lanka:</strong> prices are for pickup from our Wattala warehouse — door delivery is priced by zone. Send 2 Tea Chests and the 3rd is free.
-          <br><strong>India:</strong> one flat rate for pickup or door delivery. A general cargo box (up to 30kg) is <span class="tabular">$400</span>.
+          <br><strong>India:</strong> one flat rate for pickup or door delivery. A general cargo box (up to 30kg) is <span class="tabular" data-price="in_general_1">$400</span>.
           <br><strong>TV freight</strong> to Sri Lanka: <span class="tabular">$280</span>.
         </div>
 
@@ -556,11 +556,12 @@
 // Published box figures. cm dimensions; prices per box, sea freight.
 // sl = Sri Lanka (Wattala pickup), in = India (flat rate); null = no
 // published price, shown as "Ask us".
+// key = the Prices & Promotions price that replaces it live (live-prices.js).
 var BOXES = [
-  { name: "Wine Box",    img: "giftbox-1-AoP4qaloK7CajBM7.png",  dims: [20, 23, 20], sl: { price: 30,  kg: 20 }, in: null },
-  { name: "Gift Box",    img: "giftbox-1-AoP4qaloK7CajBM7.png",  dims: [41, 44, 32], sl: { price: 45,  kg: 20 }, in: null },
-  { name: "Tea Chest",   img: "teachest-mv0P2MeZR9Clo6JM.png",   dims: [42, 44, 63], sl: { price: 75,  kg: 30 }, in: { price: 600, kg: 50 }, popular: true },
-  { name: "Quarter CBM", img: "quartercbm-AQEeD61Lj3IQj7vK.png", dims: [83, 50, 52], sl: { price: 150, kg: 50 }, in: { price: 600, kg: 50 } }
+  { name: "Wine Box",    img: "giftbox-1-AoP4qaloK7CajBM7.png",  dims: [20, 23, 20], sl: { price: 30,  kg: 20, key: "wine_box" }, in: null },
+  { name: "Gift Box",    img: "giftbox-1-AoP4qaloK7CajBM7.png",  dims: [41, 44, 32], sl: { price: 45,  kg: 20, key: "gift_box" }, in: null },
+  { name: "Tea Chest",   img: "teachest-mv0P2MeZR9Clo6JM.png",   dims: [42, 44, 63], sl: { price: 75,  kg: 30, key: "tea_chest" }, in: { price: 600, kg: 50, key: "in_tea_1" }, popular: true },
+  { name: "Quarter CBM", img: "quartercbm-AQEeD61Lj3IQj7vK.png", dims: [83, 50, 52], sl: { price: 150, kg: 50, key: "quarter_cbm" }, in: { price: 600, kg: 50, key: "in_quarter_1" } }
 ];
 
 (function () {
@@ -578,7 +579,8 @@ var BOXES = [
   function cost(kind, flag, entry) {
     var c = el("div", "cost " + kind + (entry ? "" : " ask"));
     c.appendChild(el("span", "ctry", flag));
-    c.appendChild(el("b", "tabular", entry ? "$" + entry.price : "Ask us"));
+    var price = c.appendChild(el("b", "tabular", entry ? "$" + entry.price : "Ask us"));
+    if (entry && entry.key) price.setAttribute("data-price", entry.key);
     if (entry) c.appendChild(el("small", null, "up to " + entry.kg + "kg"));
     return c;
   }
@@ -632,6 +634,7 @@ var BOXES = [
 </script>
 
 <script src="/i18n.js"></script>
+<script src="/live-prices.js" data-api="https://transco-backend-production.up.railway.app" defer></script>
 <script src="/notice.js" data-api="https://transco-backend-production.up.railway.app" defer></script>
 <script src="/agent-face.js" defer></script>
 </body>

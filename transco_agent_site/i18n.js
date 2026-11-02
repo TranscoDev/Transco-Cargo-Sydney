@@ -29,7 +29,7 @@
       "sl.dutyfree": "<strong>Duty-Free Allowance</strong> — ඔබේ පාර්සල් භාර දෙන්න කලින් අපේ warehouse කාර්ය මණ්ඩලයෙන් වර්තමාන විස්තර අහන්න.",
       "in.flat": "<strong>එකම flat rate එකක්</strong> — door delivery සහ warehouse pickup දෙකටම එකම මිල; ඉන්දියාව ඇතුළත නගරය අනුව මිල වෙනස් වෙන්නේ නෑ (ශ්‍රී ලංකාවේ zone ක්‍රමය වගේ නොවෙයි).",
       "in.filling": "<strong>තවම සම්පූර්ණ කරමින්</strong> — ශ්‍රී ලංකාවට වගේ ඉන්දියාවට තවම නම් කළ destination warehouse එකක් හෝ duty-free allowance සටහනක් නෑ. ඒ දෙකෙන් එකක් ඕන නම්, Transco Agent අනුමාන නොකර ඔබව කෙලින්ම අපේ කණ්ඩායමට සම්බන්ධ කරයි.",
-      "box.note": "<strong>ශ්‍රී ලංකාව:</strong> මිල ගණන් අපේ Wattala warehouse එකෙන් ගන්නා විට — door delivery zone අනුව. Tea Chests 2ක් යවන්න, 3 වැන්න නොමිලේ.<br><strong>ඉන්දියාව:</strong> pickup හෝ door delivery දෙකටම එකම මිල. General cargo box එකක් (30kg දක්වා) <span class=\"tabular\">$400</span>.<br><strong>TV freight</strong> ශ්‍රී ලංකාවට: <span class=\"tabular\">$280</span>.",
+      "box.note": "<strong>ශ්‍රී ලංකාව:</strong> මිල ගණන් අපේ Wattala warehouse එකෙන් ගන්නා විට — door delivery zone අනුව. Tea Chests 2ක් යවන්න, 3 වැන්න නොමිලේ.<br><strong>ඉන්දියාව:</strong> pickup හෝ door delivery දෙකටම එකම මිල. General cargo box එකක් (30kg දක්වා) <span class=\"tabular\" data-price=\"in_general_1\">$400</span>.<br><strong>TV freight</strong> ශ්‍රී ලංකාවට: <span class=\"tabular\">$280</span>.",
       "contact.hours": "<strong>ව්‍යාපාරික වේලාවන්</strong> — පරණ වෙන්න පුළුවන් වේලාවක් මෙතන දානවා වෙනුවට, අපේ වර්තමාන වේලාවන් Transco Agent ගෙන් අහන්න; එය හැමවිටම යාවත්කාලීනයි."
     },
     ta: {
@@ -38,7 +38,7 @@
       "sl.dutyfree": "<strong>Duty-Free Allowance</strong> — உங்கள் பொதிகளை ஒப்படைப்பதற்கு முன் தற்போதைய விவரங்களை எங்கள் warehouse ஊழியர்களிடம் கேளுங்கள்.",
       "in.flat": "<strong>ஒரே flat rate</strong> — door delivery க்கும் warehouse pickup க்கும் ஒரே விலை; இந்தியாவுக்குள் நகரத்தைப் பொறுத்து விலை மாறாது (இலங்கையின் zone முறை போலல்ல).",
       "in.filling": "<strong>இன்னும் சேர்க்கப்படுகிறது</strong> — இலங்கையைப் போல இந்தியாவுக்கு இன்னும் பெயரிடப்பட்ட destination warehouse அல்லது duty-free allowance குறிப்பு இல்லை. இவற்றில் எதுவும் தேவைப்பட்டால், Transco Agent ஊகிக்காமல் உங்களை நேரடியாக எங்கள் குழுவுடன் இணைக்கும்.",
-      "box.note": "<strong>இலங்கை:</strong> விலைகள் எங்கள் Wattala warehouse இல் பெற்றுக்கொள்வதற்கானவை — door delivery zone அடிப்படையில். 2 Tea Chests அனுப்புங்கள், 3வது இலவசம்.<br><strong>இந்தியா:</strong> pickup அல்லது door delivery இரண்டுக்கும் ஒரே விலை. ஒரு General cargo box (30kg வரை) <span class=\"tabular\">$400</span>.<br><strong>TV freight</strong> இலங்கைக்கு: <span class=\"tabular\">$280</span>.",
+      "box.note": "<strong>இலங்கை:</strong> விலைகள் எங்கள் Wattala warehouse இல் பெற்றுக்கொள்வதற்கானவை — door delivery zone அடிப்படையில். 2 Tea Chests அனுப்புங்கள், 3வது இலவசம்.<br><strong>இந்தியா:</strong> pickup அல்லது door delivery இரண்டுக்கும் ஒரே விலை. ஒரு General cargo box (30kg வரை) <span class=\"tabular\" data-price=\"in_general_1\">$400</span>.<br><strong>TV freight</strong> இலங்கைக்கு: <span class=\"tabular\">$280</span>.",
       "contact.hours": "<strong>வணிக நேரம்</strong> — காலாவதியாகக்கூடிய நேரத்தை இங்கே போடுவதற்குப் பதிலாக, எங்கள் தற்போதைய நேரத்தை Transco Agent இடம் கேளுங்கள்; அது எப்போதும் புதுப்பிக்கப்பட்டிருக்கும்."
     }
   };

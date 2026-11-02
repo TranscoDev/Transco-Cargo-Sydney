@@ -324,14 +324,14 @@
           <div class="box-type-card">
             <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=200,fit=contain/A3Q7bo0gbPUjX8Jp/giftbox-1-AoP4qaloK7CajBM7.png" alt="" loading="lazy" />
             <h3>Wine Box</h3>
-            <div class="price tabular">$30</div>
+            <div class="price tabular" data-price="wine_box">$30</div>
             <div class="weight">Max 20kg</div>
             <div class="dims">20 × 23 × 20cm</div>
           </div>
           <div class="box-type-card">
             <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=200,fit=contain/A3Q7bo0gbPUjX8Jp/giftbox-1-AoP4qaloK7CajBM7.png" alt="" loading="lazy" />
             <h3>Gift Box</h3>
-            <div class="price tabular">$45</div>
+            <div class="price tabular" data-price="gift_box">$45</div>
             <div class="weight">Max 20kg</div>
             <div class="dims">41 × 44 × 32cm</div>
           </div>
@@ -339,14 +339,14 @@
             <span class="badge">Most Popular</span>
             <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=200,fit=contain/A3Q7bo0gbPUjX8Jp/teachest-mv0P2MeZR9Clo6JM.png" alt="" loading="lazy" />
             <h3>Tea Chest</h3>
-            <div class="price tabular">$75</div>
+            <div class="price tabular" data-price="tea_chest">$75</div>
             <div class="weight">Max 30kg</div>
             <div class="dims">42 × 44 × 63cm</div>
           </div>
           <div class="box-type-card">
             <img src="https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=200,fit=contain/A3Q7bo0gbPUjX8Jp/quartercbm-AQEeD61Lj3IQj7vK.png" alt="" loading="lazy" />
             <h3>Quarter CBM</h3>
-            <div class="price tabular">$150</div>
+            <div class="price tabular" data-price="quarter_cbm">$150</div>
             <div class="weight">Max 50kg</div>
             <div class="dims">83 × 50 × 52cm</div>
           </div>
@@ -359,9 +359,9 @@
         <h2>Pickup from Wattala Warehouse</h2>
         <p class="sub">The cheaper option — the receiver collects the box(es) themselves.</p>        <table class="price-table">
           <tr><th>Boxes</th><th>Weight</th><th>Price</th></tr>
-          <tr><td>1 Box</td><td class="tabular">30kg</td><td class="price tabular">$75</td></tr>
-          <tr><td>2 Boxes</td><td class="tabular">60kg</td><td class="price tabular">$150</td></tr>
-          <tr><td>3 Boxes</td><td class="tabular">90kg</td><td class="price tabular">$150</td></tr>
+          <tr><td>1 Box</td><td class="tabular">30kg</td><td class="price tabular" data-price="sl_tea_1">$75</td></tr>
+          <tr><td>2 Boxes</td><td class="tabular">60kg</td><td class="price tabular" data-price="sl_tea_2">$150</td></tr>
+          <tr><td>3 Boxes</td><td class="tabular">90kg</td><td class="price tabular" data-price="sl_tea_3">$150</td></tr>
         </table>
       </div>
 
@@ -372,27 +372,27 @@
           <h3>Zone 1 — Up to 20km from Colombo Fort</h3>
           <div class="towns">e.g. Moratuwa, Nugegoda, Kaduwela, Kadawatha</div>
           <div class="zone-prices">
-            <span>1 Box: <b class="tabular">$125</b></span>
-            <span>2 Boxes: <b class="tabular">$225</b></span>
-            <span>3 Boxes: <b class="tabular">$250</b></span>
+            <span>1 Box: <b class="tabular" data-price="sl_z1_1">$125</b></span>
+            <span>2 Boxes: <b class="tabular" data-price="sl_z1_2">$225</b></span>
+            <span>3 Boxes: <b class="tabular" data-price="sl_z1_3">$250</b></span>
           </div>
         </div>
         <div class="zone-block">
           <h3>Zone 2 — 21–100km from Colombo Fort</h3>
           <div class="towns">e.g. Negombo, Kalutara, Kegalle, Ambalangoda</div>
           <div class="zone-prices">
-            <span>1 Box: <b class="tabular">$145</b></span>
-            <span>2 Boxes: <b class="tabular">$255</b></span>
-            <span>3 Boxes: <b class="tabular">$290</b></span>
+            <span>1 Box: <b class="tabular" data-price="sl_z2_1">$145</b></span>
+            <span>2 Boxes: <b class="tabular" data-price="sl_z2_2">$255</b></span>
+            <span>3 Boxes: <b class="tabular" data-price="sl_z2_3">$290</b></span>
           </div>
         </div>
         <div class="zone-block">
           <h3>Zone 3 — Over 100km from Colombo Fort</h3>
           <div class="towns">e.g. Kandy, Kurunegala, Hatton, Galle, Jaffna</div>
           <div class="zone-prices">
-            <span>1 Box: <b class="tabular">$155</b></span>
-            <span>2 Boxes: <b class="tabular">$270</b></span>
-            <span>3 Boxes: <b class="tabular">$310</b></span>
+            <span>1 Box: <b class="tabular" data-price="sl_z3_1">$155</b></span>
+            <span>2 Boxes: <b class="tabular" data-price="sl_z3_2">$270</b></span>
+            <span>3 Boxes: <b class="tabular" data-price="sl_z3_3">$310</b></span>
           </div>
         </div>
       </div>
@@ -798,6 +798,7 @@
 </script>
 
 <script src="/i18n.js"></script>
+<script src="/live-prices.js" data-api="https://transco-backend-production.up.railway.app" defer></script>
 <script src="/notice.js" data-api="https://transco-backend-production.up.railway.app" defer></script>
 <script src="/agent-face.js" defer></script>
 </body>

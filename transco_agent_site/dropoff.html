@@ -168,6 +168,7 @@
 </style>
 <script src="/phone-format.js"></script>
 <script src="/sl-cities.js"></script>
+<script src="/live-prices.js" data-api="https://transco-backend-production.up.railway.app"></script>
 </head>
 <body>
 <header>
@@ -820,7 +821,7 @@
     if (state.country === "india") {
       Object.keys(INDIA_PRICE).forEach(function (k) { var n = q[k] || 0, p = INDIA_PRICE[k]; if (n) line(n + " × " + label(k), n <= 3 ? p[n - 1] : p[2] + (n - 3) * (p[2] - p[1])); });
     } else {
-      if (q.tea_chest) { var tea = 0; for (var i = 1; i <= q.tea_chest; i++) tea += i % 3 === 0 ? 0 : 75; line(q.tea_chest + " × " + label("tea_chest") + (q.tea_chest >= 3 ? " (" + t("every 3rd free") + ")" : ""), tea); }
+      if (q.tea_chest) { var free3 = !window.TranscoPrices || TranscoPrices.teaFreeThird, tea = 0; for (var i = 1; i <= q.tea_chest; i++) tea += free3 && i % 3 === 0 ? 0 : BOX_PRICE.tea_chest; line(q.tea_chest + " × " + label("tea_chest") + (free3 && q.tea_chest >= 3 ? " (" + t("every 3rd free") + ")" : ""), tea); }
       ["gift_box", "wine_box", "quarter_cbm"].forEach(function (k) { if (q[k]) line(q[k] + " × " + label(k), q[k] * BOX_PRICE[k]); });
       for (var j = 0; j < (q.tv || 0); j++) {
         var band = TV_SIZES.filter(function (x) { return x.key === state.tvSizes[j]; })[0];
@@ -842,6 +843,8 @@
     { key: "46to55", label: '46" – 55"', price: 300 }, { key: "60to65", label: '60" – 65"', price: 350 },
     { key: "66to75", label: '66" – 75"', price: 400 }, { key: "other", label: null, price: null }
   ];
+  // Live prices from the console's Prices & Promotions page (live-prices.js).
+  if (window.TranscoPrices) TranscoPrices.useIn({ box: BOX_PRICE, india: INDIA_PRICE, tv: TV_SIZES });
   function validTvSize(v) { return TV_SIZES.some(function (s) { return s.key === v; }); }
 
   // Under the TV row: pick a screen size per TV (TV prices go by size).

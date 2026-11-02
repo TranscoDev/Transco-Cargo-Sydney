@@ -88,6 +88,14 @@
     if (!r || !(items > 0)) return null;
     return r[0] + (items - 1) * r[1];
   }
+  // The website's booking forms pass the live Prices page rates here
+  // (live-prices.js); anything missing keeps the numbers above.
+  function setRates(rates) {
+    for (var z in ZONE_RATES) {
+      var r = rates && rates[z];
+      if (r && typeof r[0] === 'number' && typeof r[1] === 'number') ZONE_RATES[z] = [r[0], r[1]];
+    }
+  }
 
   function districtOf(town) {
     var want = String(town || '').trim().toLowerCase();
@@ -155,5 +163,5 @@
     });
   }
 
-  return { DISTRICTS: DISTRICTS, ZONES: ZONES, ZONE_LABEL: ZONE_LABEL, districtOf: districtOf, zoneOf: zoneOf, deliveryCharge: deliveryCharge, attach: attach };
+  return { DISTRICTS: DISTRICTS, ZONES: ZONES, ZONE_LABEL: ZONE_LABEL, districtOf: districtOf, zoneOf: zoneOf, deliveryCharge: deliveryCharge, setRates: setRates, attach: attach };
 });
