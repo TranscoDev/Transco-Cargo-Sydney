@@ -315,9 +315,14 @@ async function suggestReply(thread, getFlowiseReply) {
   }
   if (!reply) reply = await agentAnswer.answer({ question, customer, history });
   if (!reply) return null;
-  const unsure = reply.includes('[[HANDOFF]]');
+  let unsure = reply.includes('[[HANDOFF]]');
   let text = reply.replace(/\[\[[A-Z_]+[^\]]*\]\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
-  if (!unsure && text) text = await checkReply(text, question, history);
+  if (text) {
+    const checked = await checkReply(text, question, history);
+    // A hand-off the check answered from the facts isn't "unsure" any more.
+    if (unsure && !/team|connect you|get back to you|check with/i.test(checked)) unsure = false;
+    text = checked;
+  }
   return {
     text: unsure && (!text || text.startsWith('👍')) ? "The AI isn't sure about this one — please check with the office." : text,
     unsure
@@ -332,17 +337,16 @@ async function suggestReply(thread, getFlowiseReply) {
 // if the check can't run.
 async function checkReply(text, question, history) {
   try {
-    const kb = await require('./agentKnowledge').botKnowledge();
-    const facts = [
-      ...Object.entries(kb.details).map(([k, v]) => `${k}: ${v}`),
-      ...kb.sections.map(s => `## ${s.title}\n${s.text}`)
-    ].join('\n').slice(0, 12000);
+    // Prices, shipping calendar dates, contacts and the knowledge page.
+    const facts = (await agentAnswer.buildFacts()).text.slice(0, 20000);
     const fixed = String(await agentAnswer.callGemini(
       'You check a cargo company\'s (Transco Cargo Sydney) WhatsApp reply before staff send it to a customer. Use ONLY the company facts given.\n' +
       '1. Keep only what answers the customer\'s new message (read the earlier chat for context). Drop extras they did not ask about: address/map, contacts, tracking, booking links, fees — unless the question is about them.\n' +
       '2. If the reply agrees with something in the question that the facts show is wrong or incomplete, correct it plainly. ' +
       'Example: "open Saturday only?" → No — Saturdays 11am–3pm, and also Tuesday to Friday 5pm–6pm by appointment; closed Sunday and Monday.\n' +
-      '3. Never change or invent a fact, number, time, price or link. Keep the reply\'s friendly tone and WhatsApp *bold* style; short.\n' +
+      '3. If the reply says it doesn\'t have something (dates, prices, hours…) or passes the customer to the team, but the facts DO have it, answer from the facts instead ' +
+      '(e.g. shipping dates → the cut-off dates from NEXT SHIPPING DATES; confirm or correct the dates the customer mentions).\n' +
+      '4. Never change or invent a fact, number, date, time, price or link. Keep the reply\'s friendly tone and WhatsApp *bold* style; short.\n' +
       'Return only the reply text.',
       `Company facts:\n${facts}\n\n` +
       (history ? `Earlier chat:\n${history.slice(-3000)}\n\n` : '') +

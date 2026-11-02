@@ -7229,9 +7229,13 @@ app.post('/api/ask-ai', async (req, res) => {
   try {
     const reply = await getFlowiseReply(question, `staff-ask-${req.user.sub}-${session}`);
     if (!reply) return res.status(502).json({ error: 'The AI could not answer just now. Please try again.' });
-    const unsure = reply.includes('[[HANDOFF]]');
+    let unsure = reply.includes('[[HANDOFF]]');
     let text = reply.replace(/\[\[[A-Z_]+[^\]]*\]\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    if (!unsure && text) text = await require('./askAiThreads').checkReply(text, question, '');
+    if (text) {
+      text = await require('./askAiThreads').checkReply(text, question, '');
+      // A hand-off the check answered from the facts isn't "unsure" any more.
+      if (unsure && !/team|connect you|get back to you|check with/i.test(text)) unsure = false;
+    }
     // A bare hand-off is the customer line "👍 … passed it to our team".
     res.json({
       reply: unsure && (!text || text.startsWith('👍')) ? "The AI isn't sure about this one — please check with the office." : text,
