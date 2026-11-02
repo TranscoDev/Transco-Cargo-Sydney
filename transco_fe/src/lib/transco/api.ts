@@ -1242,6 +1242,11 @@ export const addAiThreadMessage = (id: string, text: string, from: "customer" | 
     method: "POST",
     body: JSON.stringify({ text, from, askAi }),
   });
+export const importAiThreadMessages = (id: string, messages: { from: "customer" | "us"; text: string; at: string | null }[], askAi: boolean) =>
+  aiThreadRequest<{ thread: AiThread; added: number; skipped: number; aiError: string | null }>(`/${id}/import`, {
+    method: "POST",
+    body: JSON.stringify({ messages, askAi }),
+  });
 export const suggestAiThreadReply = (id: string) =>
   aiThreadRequest<{ thread: AiThread }>(`/${id}/suggest`, { method: "POST" }).then((r) => r.thread);
 export const editAiThreadMessage = (id: string, msgId: string, body: { text?: string; remove?: boolean }) =>

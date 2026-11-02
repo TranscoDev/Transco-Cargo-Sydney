@@ -163,6 +163,60 @@ function createAskAiThreadsRouter({ getFlowiseReply }) {
     }
   });
 
+  // Several messages copied from WhatsApp at once, each with its real
+  // time. Messages already in the chat are skipped, so copying a few
+  // older ones along with the new ones is fine. Kept in time order.
+  router.post('/:id/import', async (req, res) => {
+    const list = Array.isArray(req.body?.messages) ? req.body.messages.slice(0, 300) : [];
+    try {
+      const t = await findThread(req, res);
+      if (!t) return;
+      const now = new Date();
+      const existing = t.messages || [];
+      const isDup = m => existing.some(e => {
+        if (e.from !== m.from || e.text !== m.text) return false;
+        const gap = Math.abs(new Date(e.at) - m.at);
+        // Both with WhatsApp times → the same minute; otherwise the paste
+        // time is only roughly the real one.
+        return e.whatsappTime ? gap < 60000 : gap < 86400000;
+      });
+      const add = [];
+      let skipped = 0;
+      for (const raw of list) {
+        const text = clean(raw?.text, MAX_TEXT);
+        if (!text) continue;
+        const at = raw?.at ? new Date(raw.at) : null;
+        const real = !!at && !isNaN(at) && at <= now;
+        const m = {
+          id: new ObjectId().toString(), from: raw?.from === 'us' ? 'us' : 'customer', text,
+          at: real ? at : now, whatsappTime: real, pastedAt: now, by: staffName(req)
+        };
+        if (isDup(m)) skipped++; else add.push(m);
+      }
+      if (add.length) {
+        await store().updateOne({ _id: t._id }, { $push: { messages: { $each: add, $sort: { at: 1 } } }, $set: { updatedAt: now } });
+      }
+
+      let fresh = await store().findOne({ _id: t._id });
+      let aiError = null;
+      const last = fresh.messages[fresh.messages.length - 1];
+      if (req.body?.askAi && add.length && last?.from === 'customer') {
+        const reply = await suggestReply(fresh, getFlowiseReply);
+        if (reply) {
+          const aiMsg = { id: new ObjectId().toString(), from: 'us', ai: true, unsure: reply.unsure, text: reply.text, at: new Date(), by: 'AI' };
+          await store().updateOne({ _id: t._id }, { $push: { messages: aiMsg }, $set: { updatedAt: aiMsg.at } });
+          fresh = await store().findOne({ _id: t._id });
+        } else {
+          aiError = 'The AI could not answer just now. The messages are saved — press "Ask AI again" to retry.';
+        }
+      }
+      res.json({ thread: fresh, added: add.length, skipped, aiError });
+    } catch (err) {
+      console.error('Ask AI thread import failed:', err.message);
+      res.status(500).json({ error: 'Could not save the messages.' });
+    }
+  });
+
   // Suggest a reply to the latest customer message again.
   router.post('/:id/suggest', async (req, res) => {
     try {

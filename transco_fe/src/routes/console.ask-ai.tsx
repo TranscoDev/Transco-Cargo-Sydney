@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  ArrowLeft, Check, Copy, Loader2, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserRound, WandSparkles, X,
+  ArrowLeft, Check, ClipboardPaste, Copy, Loader2, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserRound, WandSparkles, X,
 } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addAiThreadMessage, askAi, createAiThread, editAiThreadMessage, fetchAiThread, fetchAiThreads,
-  suggestAiThreadReply, updateAiThread,
+  importAiThreadMessages, suggestAiThreadReply, updateAiThread,
   type AiThread, type AiThreadMessage, type AiThreadRow,
 } from "@/lib/transco/api";
+import { parseWhatsAppPaste, senderIsPhone } from "@/lib/transco/whatsapp-paste";
 
 // Ask AI: staff get the bot's answer with prices, from the same facts the
 // WhatsApp/website bot uses. "Quick question" is not saved. Customer
@@ -33,6 +35,10 @@ function AskAiPage() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
+  // Bumped after a paste so the open chat reloads; notice says what was added.
+  const [reloadTick, setReloadTick] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -44,7 +50,7 @@ function AskAiPage() {
   }, []);
   useEffect(() => { void loadList(); }, [loadList]);
 
-  const open = (id: string) => { setSelected(id); setShowChat(true); setAdding(false); };
+  const open = (id: string) => { setSelected(id); setShowChat(true); setAdding(false); setNotice(null); };
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -61,11 +67,14 @@ function AskAiPage() {
         description="Get the prices and a reply straight away. Customer chats remember what each office-WhatsApp customer said before — paste their messages in."
       />
 
-      <div className="mt-4 grid h-[calc(100vh-13rem)] min-h-[480px] overflow-hidden rounded-xl border bg-card md:grid-cols-[300px_1fr]">
+      <div className="mt-4 grid h-[calc(100vh-13rem)] min-h-120 overflow-hidden rounded-xl border bg-card md:grid-cols-[300px_1fr]">
         {/* Chat list */}
         <aside className={`flex min-h-0 flex-col border-r ${showChat ? "hidden md:flex" : "flex"}`}>
           <div className="space-y-2 border-b p-3">
-            <Button size="sm" className="w-full" onClick={() => setAdding((a) => !a)}>
+            <Button size="sm" className="w-full" onClick={() => setPasting(true)}>
+              <ClipboardPaste className="mr-1.5 h-4 w-4" /> Paste from WhatsApp
+            </Button>
+            <Button size="sm" variant="outline" className="w-full" onClick={() => setAdding((a) => !a)}>
               <Plus className="mr-1.5 h-4 w-4" /> New customer chat
             </Button>
             {adding && <NewThreadForm onDone={async (id) => { await loadList(); open(id); }} onCancel={() => setAdding(false)} />}
@@ -103,10 +112,31 @@ function AskAiPage() {
           {selected === QUICK ? (
             <QuickChat onBack={() => setShowChat(false)} />
           ) : (
-            <ThreadChat key={selected} id={selected} onBack={() => setShowChat(false)} onChanged={loadList} onDeleted={() => { setSelected(QUICK); setShowChat(false); void loadList(); }} />
+            <ThreadChat
+              key={`${selected}:${reloadTick}`}
+              id={selected}
+              notice={notice}
+              onBack={() => setShowChat(false)}
+              onChanged={loadList}
+              onDeleted={() => { setSelected(QUICK); setShowChat(false); void loadList(); }}
+            />
           )}
         </section>
       </div>
+
+      <PasteDialog
+        open={pasting}
+        onOpenChange={setPasting}
+        threads={threads}
+        currentId={selected === QUICK ? null : selected}
+        onDone={async (id, message) => {
+          setPasting(false);
+          await loadList();
+          open(id);
+          setNotice(message);
+          setReloadTick((n) => n + 1);
+        }}
+      />
     </PageShell>
   );
 }
@@ -162,6 +192,195 @@ function NewThreadForm({ onDone, onCancel }: { onDone: (id: string) => void | Pr
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </div>
+  );
+}
+
+// ---- Paste from WhatsApp ----
+// Staff copy several messages in WhatsApp and paste them here. Nothing is
+// saved until they check who is who and which chat it goes to.
+
+const NEW = "new";
+const looksLikeUs = (sender: string) => /transco|^you$/i.test(sender);
+const phoneTail = (v: string) => v.replace(/\D/g, "").slice(-9);
+
+function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  threads: AiThreadRow[];
+  currentId: string | null;
+  onDone: (threadId: string, notice: string) => void | Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  // Staff choices; null = use the guess.
+  const [roles, setRoles] = useState<Record<string, "customer" | "us">>({});
+  const [target, setTarget] = useState<string | null>(null);
+  const [newName, setNewName] = useState<string | null>(null);
+  const [newPhone, setNewPhone] = useState<string | null>(null);
+  const [askAiToo, setAskAiToo] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setText(""); setRoles({}); setTarget(null); setNewName(null); setNewPhone(null); setAskAiToo(true); setError(null);
+    }
+  }, [open]);
+
+  const parsed = useMemo(() => parseWhatsAppPaste(text), [text]);
+  const senders = useMemo(() => [...new Set(parsed.map((m) => m.sender))], [parsed]);
+  const roleOf = (s: string) => roles[s] ?? (looksLikeUs(s) ? "us" : "customer");
+  const customers = senders.filter((s) => roleOf(s) === "customer");
+  const who = customers[0] || "";
+  const whoIsPhone = senderIsPhone(who);
+
+  const match = who
+    ? threads.find((t) => (whoIsPhone ? t.phone && phoneTail(t.phone) === phoneTail(who) : t.name.trim().toLowerCase() === who.toLowerCase()))
+    : undefined;
+  const chosen = target ?? currentId ?? match?._id ?? NEW;
+  const chosenThread = threads.find((t) => t._id === chosen);
+  const name = newName ?? (whoIsPhone ? "" : who);
+  const phone = newPhone ?? (whoIsPhone ? who : "");
+  const first = parsed[0];
+  const lastParsed = parsed[parsed.length - 1];
+  const lastIsCustomer = !!lastParsed && roleOf(lastParsed.sender) === "customer";
+  const otherName =
+    chosenThread && who && !whoIsPhone && chosenThread.name && chosenThread.name.trim().toLowerCase() !== who.toLowerCase();
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      let id = chosen;
+      let existed = false;
+      if (id === NEW) {
+        const r = await createAiThread(name, phone);
+        id = r.thread._id;
+        existed = !!r.existed;
+      }
+      const r = await importAiThreadMessages(
+        id,
+        parsed.map((m) => ({ from: roleOf(m.sender), text: m.text, at: m.at })),
+        askAiToo && lastIsCustomer,
+      );
+      const parts = [
+        existed ? "That number already had a chat, so they were added there." : "",
+        `Added ${r.added} message${r.added === 1 ? "" : "s"}.`,
+        r.skipped ? `${r.skipped} ${r.skipped === 1 ? "was" : "were"} already in the chat.` : "",
+        r.aiError || "",
+      ];
+      await onDone(id, parts.filter(Boolean).join(" "));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the messages.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmt = (iso: string | null) => (iso ? `${listTime(iso)} ${timeLabel(iso)}` : "");
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Paste from WhatsApp</DialogTitle>
+          <DialogDescription>
+            In WhatsApp, press and hold a message, tap the others to select them, then Copy. Paste here — each message keeps its time.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={"[10:15 am, 02/11/2026] Kamal Perera: How much for a TV?"}
+          rows={5}
+          className="resize-y text-sm"
+          autoFocus
+        />
+
+        {text.trim() && parsed.length === 0 && (
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            No WhatsApp messages found — the copy needs the names and times, like the example. Select the messages in WhatsApp and use Copy (not copying the text inside one message).
+          </p>
+        )}
+
+        {parsed.length > 0 && (
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Found <b className="text-foreground">{parsed.length}</b> message{parsed.length === 1 ? "" : "s"} · {fmt(first?.at ?? null)}
+              {parsed.length > 1 && <> – {fmt(lastParsed?.at ?? null)}</>}
+            </p>
+
+            <div className="space-y-1.5">
+              <p className="font-medium">Who is who?</p>
+              {senders.map((s) => (
+                <div key={s} className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5">
+                  <span className="truncate">{s}</span>
+                  <span className="flex shrink-0 overflow-hidden rounded-md border text-xs">
+                    {(["customer", "us"] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRoles((x) => ({ ...x, [s]: r }))}
+                        className={`px-2.5 py-1 ${roleOf(s) === r ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                      >
+                        {r === "customer" ? "Customer" : "Us (Transco)"}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              ))}
+              {customers.length === 0 && <p className="text-amber-700 dark:text-amber-400">Mark which name is the customer.</p>}
+              {customers.length > 1 && <p className="text-amber-700 dark:text-amber-400">More than one name is marked as the customer — check this is one person's chat.</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="font-medium">Add to</p>
+              <select
+                value={chosen}
+                onChange={(e) => setTarget(e.target.value)}
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              >
+                <option value={NEW}>+ New customer chat</option>
+                {threads.map((t) => (
+                  <option key={t._id} value={t._id}>{t.name || t.phone}{t.name && t.phone ? ` · ${t.phone}` : ""}</option>
+                ))}
+              </select>
+              {chosen === NEW && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={name} onChange={(e) => setNewName(e.target.value)} placeholder="Customer name" className="h-9" />
+                  <Input value={phone} onChange={(e) => setNewPhone(e.target.value)} placeholder="WhatsApp number (if you have it)" inputMode="tel" className="h-9" />
+                </div>
+              )}
+              {otherName && (
+                <p className="text-amber-700 dark:text-amber-400">
+                  The messages are from “{who}” but this chat is “{chosenThread?.name}”. Make sure it's the same person.
+                </p>
+              )}
+            </div>
+
+            {lastIsCustomer && (
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={askAiToo} onChange={(e) => setAskAiToo(e.target.checked)} className="h-4 w-4" />
+                Ask AI for a reply to the last message
+              </label>
+            )}
+          </div>
+        )}
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button
+            onClick={() => void save()}
+            disabled={busy || parsed.length === 0 || customers.length === 0 || (chosen === NEW && !name.trim() && !phone.trim())}
+          >
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            {busy && askAiToo && lastIsCustomer ? "Saving and asking AI…" : `Add ${parsed.length || ""} message${parsed.length === 1 ? "" : "s"}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -288,7 +507,9 @@ function QuickChat({ onBack }: { onBack: () => void }) {
 
 // ---- Customer chat (saved) ----
 
-function ThreadChat({ id, onBack, onChanged, onDeleted }: { id: string; onBack: () => void; onChanged: () => void; onDeleted: () => void }) {
+function ThreadChat({ id, notice, onBack, onChanged, onDeleted }: {
+  id: string; notice: string | null; onBack: () => void; onChanged: () => void; onDeleted: () => void;
+}) {
   const [thread, setThread] = useState<AiThread | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<"" | "customer" | "us" | "again">("");
@@ -369,6 +590,7 @@ function ThreadChat({ id, onBack, onChanged, onDeleted }: { id: string; onBack: 
           </Button>
         }
       />
+      {notice && <p className="border-b bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">{notice}</p>}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-muted/30 p-4">
         {thread.messages.length === 0 && (
           <div className="m-auto max-w-sm text-center text-sm text-muted-foreground">
@@ -470,7 +692,7 @@ function Bubble({ m, threadId, onSaved, onError }: {
         {m.ai && <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">AI suggestion</p>}
         {editing ? (
           <div className="space-y-2">
-            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} className="min-w-[240px] bg-background text-sm" autoFocus />
+            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} className="min-w-60 bg-background text-sm" autoFocus />
             <div className="flex gap-2">
               <Button size="sm" onClick={() => void save({ text: draft })} disabled={!draft.trim()}>Save</Button>
               <Button size="sm" variant="ghost" onClick={() => { setDraft(m.text); setEditing(false); }}>Cancel</Button>
