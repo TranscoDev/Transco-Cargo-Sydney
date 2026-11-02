@@ -209,7 +209,7 @@ const shortDate = (d: Date) => d.toLocaleDateString("en-AU", { day: "numeric", m
 const isoToDate = (iso: string) => new Date(`${iso}T00:00:00`);
 
 type DateRange = { from: string; to: string };
-type Funnel = "all" | "chatted" | "shipped" | "notShipped" | "sheet" | "silent";
+type Funnel = "all" | "chatted" | "shipped" | "notShipped" | "returning" | "sheet" | "silent";
 
 /** First saved by a shipment sheet import — an old customer, even if staff
  * later added the same number again (that joins the same record and only
@@ -386,6 +386,20 @@ export function ContactsDirectory({
   // Customers who only came in from a shipment sheet import aren't new
   // (their Added date is the import day) — counted on their own.
   const from = range?.from ?? "";
+  const to = range?.to ?? "";
+  // Returning customers: not new in these dates (added earlier, or an old
+  // shipment-sheet customer) but with a BL dated inside them.
+  const returning = useMemo(() => {
+    if (!range) return [];
+    const fresh = new Set(filtered.filter(isFresh).map((c) => c.id));
+    return sorted.filter(
+      (c) =>
+        !fresh.has(c.id) &&
+        matchesAllFilters(c, filter, statusFilter, hasEmailOnly) &&
+        (c.shipmentDates ?? []).some((d) => d >= from && d <= to),
+    );
+  }, [range, filtered, sorted, filter, statusFilter, hasEmailOnly, from, to]);
+
   const summary = useMemo(() => {
     const fresh = filtered.filter(isFresh);
     const shipped = fresh.filter((c) => hasShipmentSince(c, from)).length;
@@ -396,11 +410,13 @@ export function ContactsDirectory({
       notShipped: fresh.length - shipped,
       sheet: filtered.filter(onlyFromSheet).length,
       silent: filtered.filter(silentVisitor).length,
+      returning: returning.length,
     };
-  }, [filtered, from]);
+  }, [filtered, from, returning]);
 
   const funnelled = useMemo(() => {
     if (!range) return filtered;
+    if (funnel === "returning") return returning;
     if (funnel === "sheet") return filtered.filter(onlyFromSheet);
     if (funnel === "silent") return filtered.filter(silentVisitor);
     const fresh = filtered.filter(isFresh);
@@ -408,7 +424,7 @@ export function ContactsDirectory({
     if (funnel === "shipped") return fresh.filter((c) => hasShipmentSince(c, from));
     if (funnel === "notShipped") return fresh.filter((c) => !hasShipmentSince(c, from));
     return fresh;
-  }, [filtered, funnel, range, from]);
+  }, [filtered, funnel, range, from, returning]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -739,6 +755,9 @@ export function ContactsDirectory({
                 ["chatted", `${summary.chatted} chatted with us`, "Sent at least one message (website, My Transco or WhatsApp bot)"],
                 ["shipped", `${summary.shipped} in a BL / shipment`, "Have a BL dated from the start of these dates onwards (a later shipment counts too; an older one doesn't)"],
                 ["notShipped", `${summary.notShipped} not shipped yet`, "No BL yet — people to follow up"],
+                ...(summary.returning > 0
+                  ? ([["returning", `+ ${summary.returning} returning customer${summary.returning === 1 ? "" : "s"} shipped`, "Customers we already had (added earlier, or from old shipment sheets) with a BL dated in these dates"]] as const)
+                  : []),
                 ...(summary.sheet > 0
                   ? ([["sheet", `+ ${summary.sheet} old customers (shipment sheets)`, "First saved by importing a shipment sheet in these dates (the Added date is the import day) — not new customers, so not counted above. Staff adding the same number later doesn't make them new."]] as const)
                   : []),
