@@ -209,7 +209,7 @@ const shortDate = (d: Date) => d.toLocaleDateString("en-AU", { day: "numeric", m
 const isoToDate = (iso: string) => new Date(`${iso}T00:00:00`);
 
 type DateRange = { from: string; to: string };
-type Funnel = "all" | "chatted" | "shipped" | "notShipped" | "returning" | "sheet" | "silent";
+type Funnel = "all" | "chatted" | "shipped" | "notShipped" | "returning" | "allShipped" | "sheet" | "silent";
 
 /** First saved by a shipment sheet import — an old customer, even if staff
  * later added the same number again (that joins the same record and only
@@ -417,6 +417,7 @@ export function ContactsDirectory({
   const funnelled = useMemo(() => {
     if (!range) return filtered;
     if (funnel === "returning") return returning;
+    if (funnel === "allShipped") return [...filtered.filter((c) => isFresh(c) && hasShipmentSince(c, from)), ...returning];
     if (funnel === "sheet") return filtered.filter(onlyFromSheet);
     if (funnel === "silent") return filtered.filter(silentVisitor);
     const fresh = filtered.filter(isFresh);
@@ -743,46 +744,51 @@ export function ContactsDirectory({
         </div>
 
         {range && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm">
-            <span className="text-muted-foreground">
-              {range.from === "0000-01-01" ? "Up to" : shortDate(isoToDate(range.from))}
-              {range.to !== "9999-12-31" && <> – {shortDate(isoToDate(range.to))}</>}
-              {range.from !== "0000-01-01" && range.to === "9999-12-31" && " onwards"}:
-            </span>
-            {(
-              [
-                ["all", `${summary.total} new customer${summary.total === 1 ? "" : "s"}`, "Everyone added in these dates"],
-                ["chatted", `${summary.chatted} chatted with us`, "Sent at least one message (website, My Transco or WhatsApp bot)"],
-                ["shipped", `${summary.shipped} in a BL / shipment`, "Have a BL dated from the start of these dates onwards (a later shipment counts too; an older one doesn't)"],
-                ["notShipped", `${summary.notShipped} not shipped yet`, "No BL yet — people to follow up"],
-                ...(summary.returning > 0
-                  ? ([["returning", `+ ${summary.returning} returning customer${summary.returning === 1 ? "" : "s"} shipped`, "Customers we already had (added earlier, or from old shipment sheets) with a BL dated in these dates"]] as const)
-                  : []),
-                ...(summary.sheet > 0
-                  ? ([["sheet", `+ ${summary.sheet} old customers (shipment sheets)`, "First saved by importing a shipment sheet in these dates (the Added date is the import day) — not new customers, so not counted above. Staff adding the same number later doesn't make them new."]] as const)
-                  : []),
-                ...(summary.silent > 0
-                  ? ([["silent", `+ ${summary.silent} opened the chat, never typed`, "Website visitors who didn't send a message — not counted above"]] as const)
-                  : []),
-              ] as const
-            ).map(([key, label, hint]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFunnel(key)}
-                title={hint}
-                className={cn(
-                  "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                  funnel === key ? "bg-primary text-primary-foreground" : "bg-panel text-foreground hover:bg-secondary",
+          // Two plain answers for the dates picked: how many new customers
+          // came and how many of them shipped; how many customers shipped
+          // in total. Every number filters the list below.
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-md border border-border bg-secondary/30 px-3 py-2.5">
+              <SummaryNumber active={funnel === "all"} onClick={() => setFunnel("all")} value={summary.total} label="new customers" big />
+              <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+                <SummaryNumber active={funnel === "chatted"} onClick={() => setFunnel("chatted")} value={summary.chatted} label="chatted" />
+                <SummaryNumber
+                  active={funnel === "shipped"}
+                  onClick={() => setFunnel("shipped")}
+                  value={summary.shipped}
+                  label={`shipped${summary.total ? ` (${Math.round((summary.shipped / summary.total) * 100)}%)` : ""}`}
+                />
+                <SummaryNumber active={funnel === "notShipped"} onClick={() => setFunnel("notShipped")} value={summary.notShipped} label="not shipped yet" />
+              </p>
+            </div>
+            <div className="rounded-md border border-border bg-secondary/30 px-3 py-2.5">
+              <SummaryNumber
+                active={funnel === "allShipped"}
+                onClick={() => setFunnel("allShipped")}
+                value={summary.shipped + summary.returning}
+                label="customers shipped"
+                big
+              />
+              <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+                <SummaryNumber active={funnel === "shipped"} onClick={() => setFunnel("shipped")} value={summary.shipped} label="new" />
+                <SummaryNumber active={funnel === "returning"} onClick={() => setFunnel("returning")} value={summary.returning} label="returning" />
+              </p>
+            </div>
+            {(summary.sheet > 0 || summary.silent > 0) && (
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                Not counted as new:{" "}
+                {summary.sheet > 0 && (
+                  <button type="button" onClick={() => setFunnel("sheet")} className={cn("underline-offset-2 hover:underline", funnel === "sheet" && "font-semibold text-foreground")}>
+                    {summary.sheet} old customers from shipment sheets
+                  </button>
                 )}
-              >
-                {label}
-              </button>
-            ))}
-            {summary.total > 0 && (
-              <span className="text-xs text-muted-foreground">
-                → {Math.round((summary.shipped / summary.total) * 100)}% shipped
-              </span>
+                {summary.sheet > 0 && summary.silent > 0 && " · "}
+                {summary.silent > 0 && (
+                  <button type="button" onClick={() => setFunnel("silent")} className={cn("underline-offset-2 hover:underline", funnel === "silent" && "font-semibold text-foreground")}>
+                    {summary.silent} website visitors who never typed
+                  </button>
+                )}
+              </p>
             )}
           </div>
         )}
@@ -1405,6 +1411,24 @@ function AddContactModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function SummaryNumber({ value, label, active, onClick, big }: {
+  value: number; label: string; active: boolean; onClick: () => void; big?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded text-left underline-offset-4 hover:underline",
+        active && "underline decoration-2 decoration-primary",
+        big ? "text-base text-foreground" : "",
+      )}
+    >
+      <b className={cn("tabular-nums text-foreground", big && "text-xl")}>{value}</b> {label}
+    </button>
   );
 }
 
