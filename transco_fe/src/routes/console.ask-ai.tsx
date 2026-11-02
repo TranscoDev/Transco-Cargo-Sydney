@@ -202,6 +202,15 @@ function NewThreadForm({ onDone, onCancel }: { onDone: (id: string) => void | Pr
 const NEW = "new";
 const looksLikeUs = (sender: string) => /transco|^you$/i.test(sender);
 const phoneTail = (v: string) => v.replace(/\D/g, "").slice(-9);
+const PLAIN = "";
+// "…Thanks\nMarina" → "Marina": a short last line of only letters is
+// usually the customer's name. Only a suggestion — staff can change it.
+function signOffName(text: string) {
+  const last = text.trim().split("\n").pop()?.trim() ?? "";
+  return /^[A-Za-z][A-Za-z .'-]{1,24}$/.test(last) && last.split(/\s+/).length <= 3 && !/^(thanks?|thank you|regards|cheers|ok|okay)$/i.test(last)
+    ? last
+    : "";
+}
 
 function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
   open: boolean;
@@ -226,11 +235,15 @@ function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
     }
   }, [open]);
 
-  const parsed = useMemo(() => parseWhatsAppPaste(text), [text]);
+  // Copying one message (e.g. on WhatsApp Web) gives only its text, with
+  // no name or time — that's saved as one message, timed now.
+  const found = useMemo(() => parseWhatsAppPaste(text), [text]);
+  const plain = found.length === 0 && !!text.trim();
+  const parsed = useMemo(() => (plain ? [{ sender: PLAIN, text: text.trim(), at: null }] : found), [plain, found, text]);
   const senders = useMemo(() => [...new Set(parsed.map((m) => m.sender))], [parsed]);
   const roleOf = (s: string) => roles[s] ?? (looksLikeUs(s) ? "us" : "customer");
   const customers = senders.filter((s) => roleOf(s) === "customer");
-  const who = customers[0] || "";
+  const who = plain ? (roleOf(PLAIN) === "customer" ? signOffName(text) : "") : customers[0] || "";
   const whoIsPhone = senderIsPhone(who);
 
   const match = who
@@ -244,7 +257,7 @@ function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
   const lastParsed = parsed[parsed.length - 1];
   const lastIsCustomer = !!lastParsed && roleOf(lastParsed.sender) === "customer";
   const otherName =
-    chosenThread && who && !whoIsPhone && chosenThread.name && chosenThread.name.trim().toLowerCase() !== who.toLowerCase();
+    !plain && chosenThread && who && !whoIsPhone && chosenThread.name && chosenThread.name.trim().toLowerCase() !== who.toLowerCase();
 
   const save = async () => {
     setBusy(true);
@@ -284,37 +297,38 @@ function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
         <DialogHeader>
           <DialogTitle>Paste from WhatsApp</DialogTitle>
           <DialogDescription>
-            In WhatsApp, press and hold a message, tap the others to select them, then Copy. Paste here — each message keeps its time.
+            Copy the customer's message in WhatsApp Web or the WhatsApp app and paste it here (Ctrl+V).
+            To bring several messages with their times, drag the mouse across them in WhatsApp Web, then Ctrl+C.
           </DialogDescription>
         </DialogHeader>
 
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={"[10:15 am, 02/11/2026] Kamal Perera: How much for a TV?"}
+          placeholder="Paste the WhatsApp message here (Ctrl+V)"
           rows={5}
           className="resize-y text-sm"
           autoFocus
         />
 
-        {text.trim() && parsed.length === 0 && (
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            No WhatsApp messages found — the copy needs the names and times, like the example. Select the messages in WhatsApp and use Copy (not copying the text inside one message).
-          </p>
-        )}
-
         {parsed.length > 0 && (
           <div className="space-y-3 text-sm">
             <p className="text-muted-foreground">
-              Found <b className="text-foreground">{parsed.length}</b> message{parsed.length === 1 ? "" : "s"} · {fmt(first?.at ?? null)}
-              {parsed.length > 1 && <> – {fmt(lastParsed?.at ?? null)}</>}
+              {plain ? (
+                <>One message — saved with the time now.</>
+              ) : (
+                <>
+                  Found <b className="text-foreground">{parsed.length}</b> message{parsed.length === 1 ? "" : "s"} · {fmt(first?.at ?? null)}
+                  {parsed.length > 1 && <> – {fmt(lastParsed?.at ?? null)}</>}
+                </>
+              )}
             </p>
 
             <div className="space-y-1.5">
-              <p className="font-medium">Who is who?</p>
+              <p className="font-medium">{plain ? "This message is from" : "Who is who?"}</p>
               {senders.map((s) => (
                 <div key={s} className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5">
-                  <span className="truncate">{s}</span>
+                  <span className="truncate">{s === PLAIN ? "The pasted message" : s}</span>
                   <span className="flex shrink-0 overflow-hidden rounded-md border text-xs">
                     {(["customer", "us"] as const).map((r) => (
                       <button
@@ -329,7 +343,7 @@ function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
                   </span>
                 </div>
               ))}
-              {customers.length === 0 && <p className="text-amber-700 dark:text-amber-400">Mark which name is the customer.</p>}
+              {!plain && customers.length === 0 && <p className="text-amber-700 dark:text-amber-400">Mark which name is the customer.</p>}
               {customers.length > 1 && <p className="text-amber-700 dark:text-amber-400">More than one name is marked as the customer — check this is one person's chat.</p>}
             </div>
 
@@ -373,7 +387,7 @@ function PasteDialog({ open, onOpenChange, threads, currentId, onDone }: {
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button
             onClick={() => void save()}
-            disabled={busy || parsed.length === 0 || customers.length === 0 || (chosen === NEW && !name.trim() && !phone.trim())}
+            disabled={busy || parsed.length === 0 || (!plain && customers.length === 0) || (chosen === NEW && !name.trim() && !phone.trim())}
           >
             {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
             {busy && askAiToo && lastIsCustomer ? "Saving and asking AI…" : `Add ${parsed.length || ""} message${parsed.length === 1 ? "" : "s"}`}
