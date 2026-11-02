@@ -1195,6 +1195,58 @@ export async function askAi(question: string, sessionId: string) {
   return body as { reply: string; unsure: boolean };
 }
 
+// ---- Ask AI customer threads (one saved chat per office-WhatsApp customer) ----
+
+export interface AiThreadMessage {
+  id: string;
+  from: "customer" | "us";
+  text: string;
+  at: string;
+  by?: string;
+  ai?: boolean;
+  unsure?: boolean;
+  editedBy?: string;
+}
+
+export interface AiThreadRow {
+  _id: string;
+  name: string;
+  phone: string;
+  updatedAt: string;
+  last: { from: "customer" | "us"; text: string } | null;
+}
+
+export interface AiThread extends Omit<AiThreadRow, "last"> {
+  messages: AiThreadMessage[];
+  summary?: string;
+}
+
+async function aiThreadRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}/api/ask-ai/threads${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init.headers || {}) },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+  return body as T;
+}
+
+export const fetchAiThreads = () => aiThreadRequest<{ threads: AiThreadRow[] }>("").then((r) => r.threads);
+export const createAiThread = (name: string, phone: string) =>
+  aiThreadRequest<{ thread: { _id: string }; existed?: boolean }>("", { method: "POST", body: JSON.stringify({ name, phone }) });
+export const fetchAiThread = (id: string) => aiThreadRequest<{ thread: AiThread }>(`/${id}`).then((r) => r.thread);
+export const updateAiThread = (id: string, body: { name?: string; phone?: string; deleted?: boolean }) =>
+  aiThreadRequest<{ ok: true }>(`/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const addAiThreadMessage = (id: string, text: string, from: "customer" | "us", askAi: boolean) =>
+  aiThreadRequest<{ thread: AiThread; aiError: string | null }>(`/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ text, from, askAi }),
+  });
+export const suggestAiThreadReply = (id: string) =>
+  aiThreadRequest<{ thread: AiThread }>(`/${id}/suggest`, { method: "POST" }).then((r) => r.thread);
+export const editAiThreadMessage = (id: string, msgId: string, body: { text?: string; remove?: boolean }) =>
+  aiThreadRequest<{ thread: AiThread }>(`/${id}/messages/${msgId}`, { method: "PATCH", body: JSON.stringify(body) }).then((r) => r.thread);
+
 export const saveAgentKnowledge = (body: { details: Record<string, string>; sections: Record<string, string> }) =>
   agentKnowledgeRequest<AgentKnowledge>("", { method: "PUT", body: JSON.stringify(body) });
 

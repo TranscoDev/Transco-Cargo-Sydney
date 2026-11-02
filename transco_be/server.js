@@ -7227,6 +7227,10 @@ app.post('/api/ask-ai', async (req, res) => {
   }
 });
 
+// Ask AI customer threads: one saved chat per office-WhatsApp customer,
+// so the AI's suggested replies remember that customer's earlier messages.
+app.use('/api/ask-ai/threads', require('./askAiThreads').createAskAiThreadsRouter({ getFlowiseReply }));
+
 // Prices & promotions: /api/public/prices (read by the Flowise tool's
 // calculator) and the console's Prices & Promotions page (admins edit).
 const priceRouters = require('./prices').createPriceRouters();

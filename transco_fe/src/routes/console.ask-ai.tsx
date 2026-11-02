@@ -1,25 +1,194 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, RotateCcw, SendHorizontal, WandSparkles } from "lucide-react";
+import {
+  ArrowLeft, Check, Copy, Loader2, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserRound, WandSparkles, X,
+} from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { askAi } from "@/lib/transco/api";
+import {
+  addAiThreadMessage, askAi, createAiThread, editAiThreadMessage, fetchAiThread, fetchAiThreads,
+  suggestAiThreadReply, updateAiThread,
+  type AiThread, type AiThreadMessage, type AiThreadRow,
+} from "@/lib/transco/api";
 
-// Ask AI: staff type a caller's question and get the bot's answer with
-// prices, from the same facts the WhatsApp/website bot uses. Nothing is
-// saved or sent to anyone — the chat lives only on this page.
+// Ask AI: staff get the bot's answer with prices, from the same facts the
+// WhatsApp/website bot uses. "Quick question" is not saved. Customer
+// chats are saved (shared by all staff): paste what an office-WhatsApp
+// customer wrote, and the AI's suggestion reads that customer's earlier
+// messages. Nothing here is sent to the customer.
 export const Route = createFileRoute("/console/ask-ai")({
   component: AskAiPage,
 });
 
+const QUICK = "quick";
+
+function AskAiPage() {
+  const [threads, setThreads] = useState<AiThreadRow[]>([]);
+  const [selected, setSelected] = useState<string>(QUICK);
+  // Phones show the list or the chat, not both.
+  const [showChat, setShowChat] = useState(false);
+  const [search, setSearch] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+
+  const loadList = useCallback(async () => {
+    try {
+      setThreads(await fetchAiThreads());
+      setListError(null);
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : "Could not load the customer chats.");
+    }
+  }, []);
+  useEffect(() => { void loadList(); }, [loadList]);
+
+  const open = (id: string) => { setSelected(id); setShowChat(true); setAdding(false); };
+
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return threads;
+    const qd = q.replace(/\D/g, "");
+    return threads.filter((t) => t.name.toLowerCase().includes(q) || (qd && t.phone.replace(/\D/g, "").includes(qd)));
+  }, [threads, search]);
+
+  return (
+    <PageShell width="full">
+      <PageHeader
+        icon={WandSparkles}
+        title="Ask AI"
+        description="Get the prices and a reply straight away. Customer chats remember what each office-WhatsApp customer said before — paste their messages in."
+      />
+
+      <div className="mt-4 grid h-[calc(100vh-13rem)] min-h-[480px] overflow-hidden rounded-xl border bg-card md:grid-cols-[300px_1fr]">
+        {/* Chat list */}
+        <aside className={`flex min-h-0 flex-col border-r ${showChat ? "hidden md:flex" : "flex"}`}>
+          <div className="space-y-2 border-b p-3">
+            <Button size="sm" className="w-full" onClick={() => setAdding((a) => !a)}>
+              <Plus className="mr-1.5 h-4 w-4" /> New customer chat
+            </Button>
+            {adding && <NewThreadForm onDone={async (id) => { await loadList(); open(id); }} onCancel={() => setAdding(false)} />}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or phone" className="h-9 pl-8" />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <ListRow
+              active={selected === QUICK}
+              onClick={() => open(QUICK)}
+              icon={<Sparkles className="h-4 w-4" />}
+              title="Quick question"
+              preview="Not saved — for a phone call or the counter"
+            />
+            {listError && <p className="p-3 text-sm text-destructive">{listError}</p>}
+            {shown.map((t) => (
+              <ListRow
+                key={t._id}
+                active={selected === t._id}
+                onClick={() => open(t._id)}
+                icon={<UserRound className="h-4 w-4" />}
+                title={t.name || t.phone}
+                time={listTime(t.updatedAt)}
+                preview={t.last ? (t.last.from === "us" ? "You: " : "") + t.last.text : t.phone || "No messages yet"}
+              />
+            ))}
+            {threads.length > 0 && shown.length === 0 && <p className="p-3 text-sm text-muted-foreground">No chat matches “{search}”.</p>}
+          </div>
+        </aside>
+
+        {/* Chat */}
+        <section className={`min-h-0 flex-col ${showChat ? "flex" : "hidden md:flex"}`}>
+          {selected === QUICK ? (
+            <QuickChat onBack={() => setShowChat(false)} />
+          ) : (
+            <ThreadChat key={selected} id={selected} onBack={() => setShowChat(false)} onChanged={loadList} onDeleted={() => { setSelected(QUICK); setShowChat(false); void loadList(); }} />
+          )}
+        </section>
+      </div>
+    </PageShell>
+  );
+}
+
+function ListRow({ active, onClick, icon, title, time, preview }: {
+  active: boolean; onClick: () => void; icon: ReactNode; title: string; time?: string; preview: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 border-b px-3 py-2.5 text-left hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-sm font-semibold">{title}</span>
+          {time && <span className="shrink-0 text-xs text-muted-foreground">{time}</span>}
+        </span>
+        <span className="block truncate text-xs text-muted-foreground">{preview}</span>
+      </span>
+    </button>
+  );
+}
+
+function NewThreadForm({ onDone, onCancel }: { onDone: (id: string) => void | Promise<void>; onCancel: () => void }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await createAiThread(name, phone);
+      await onDone(r.thread._id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the chat.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-2 rounded-lg border bg-background p-2.5">
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" className="h-9" autoFocus />
+      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="WhatsApp number" inputMode="tel" className="h-9" />
+      <p className="text-xs text-muted-foreground">Same number again opens their existing chat.</p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => void save()} disabled={busy || (!name.trim() && !phone.trim())}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Start chat"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+function ChatHeader({ onBack, title, sub, actions }: { onBack: () => void; title: string; sub?: string; actions?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 border-b px-3 py-2.5">
+      <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={onBack}>
+        <ArrowLeft className="h-4 w-4" />
+        <span className="sr-only">Back to chats</span>
+      </Button>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{title}</p>
+        {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+// ---- Quick question (not saved) ----
+
 type Turn = { from: "staff" | "ai"; text: string; unsure?: boolean };
 
 const newSession = () => Math.random().toString(36).slice(2, 12);
-const EXAMPLE ="2 gift boxes to Colombo, plus 3 more boxes including a tree, with collection from Colombo. How much?";
+const EXAMPLE = "2 gift boxes to Colombo, plus 3 more boxes including a tree, with collection from Colombo. How much?";
 
-function AskAiPage() {
+function QuickChat({ onBack }: { onBack: () => void }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,11 +219,11 @@ function AskAiPage() {
   };
 
   return (
-    <PageShell width="narrow">
-      <PageHeader
-        icon={WandSparkles}
-        title="Ask AI"
-        description="Type a customer's question — from a call or the counter — and get the prices straight away. Only you see this chat."
+    <>
+      <ChatHeader
+        onBack={onBack}
+        title="Quick question"
+        sub="Only you see this chat. Not saved."
         actions={
           turns.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => { setTurns([]); setError(null); setSessionId(newSession()); }} disabled={busy}>
@@ -63,16 +232,11 @@ function AskAiPage() {
           )
         }
       />
-
-      <div className="mt-4 flex min-h-[50vh] flex-col gap-3 rounded-xl border bg-card p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
         {turns.length === 0 && !busy && (
           <div className="m-auto max-w-md text-center text-sm text-muted-foreground">
             <p>Ask anything a customer would: prices, box sizes, a TV, a bicycle, delivery to Kandy…</p>
-            <button
-              type="button"
-              className="mt-3 rounded-full border px-3 py-1.5 text-xs hover:bg-muted"
-              onClick={() => setText(EXAMPLE)}
-            >
+            <button type="button" className="mt-3 rounded-full border px-3 py-1.5 text-xs hover:bg-muted" onClick={() => setText(EXAMPLE)}>
               Try: “{EXAMPLE}”
             </button>
           </div>
@@ -98,10 +262,8 @@ function AskAiPage() {
         )}
         <div ref={endRef} />
       </div>
-
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-
-      <div className="mt-3 flex items-end gap-2">
+      {error && <p className="px-3 pb-1 text-sm text-destructive">{error}</p>}
+      <div className="flex items-end gap-2 border-t p-3">
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -120,6 +282,245 @@ function AskAiPage() {
           <span className="sr-only">Send</span>
         </Button>
       </div>
-    </PageShell>
+    </>
   );
+}
+
+// ---- Customer chat (saved) ----
+
+function ThreadChat({ id, onBack, onChanged, onDeleted }: { id: string; onBack: () => void; onChanged: () => void; onDeleted: () => void }) {
+  const [thread, setThread] = useState<AiThread | null>(null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState<"" | "customer" | "us" | "again">("");
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchAiThread(id).then(setThread).catch((err) => setError(err instanceof Error ? err.message : "Could not load the chat."));
+  }, [id]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [thread?.messages.length, busy]);
+
+  const update = (t: AiThread) => { setThread(t); onChanged(); };
+
+  const add = async (from: "customer" | "us") => {
+    const msg = text.trim();
+    if (!msg || busy) return;
+    setBusy(from);
+    setError(null);
+    try {
+      const r = await addAiThreadMessage(id, msg, from, from === "customer");
+      setText("");
+      update(r.thread);
+      if (r.aiError) setError(r.aiError);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the message.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const again = async () => {
+    setBusy("again");
+    setError(null);
+    try {
+      update(await suggestAiThreadReply(id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The AI could not answer just now.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const remove = async () => {
+    if (!thread || !window.confirm(`Remove the chat with ${thread.name || thread.phone}? It will no longer show in the list.`)) return;
+    try {
+      await updateAiThread(id, { deleted: true });
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove the chat.");
+    }
+  };
+
+  if (!thread) {
+    return (
+      <>
+        <ChatHeader onBack={onBack} title="Loading…" />
+        <div className="m-auto text-sm text-muted-foreground">
+          {error ? <span className="text-destructive">{error}</span> : <Loader2 className="h-5 w-5 animate-spin" />}
+        </div>
+      </>
+    );
+  }
+
+  const last = thread.messages[thread.messages.length - 1];
+
+  return (
+    <>
+      <ChatHeader
+        onBack={onBack}
+        title={thread.name || thread.phone}
+        sub={thread.name && thread.phone ? thread.phone : "Office WhatsApp customer"}
+        actions={
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => void remove()} title="Remove chat">
+            <Trash2 className="h-4 w-4" />
+            <span className="sr-only">Remove chat</span>
+          </Button>
+        }
+      />
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-muted/30 p-4">
+        {thread.messages.length === 0 && (
+          <div className="m-auto max-w-sm text-center text-sm text-muted-foreground">
+            <p>Paste what the customer wrote on WhatsApp and press <b>Customer said → Ask AI</b>.</p>
+            <p className="mt-2">Paste what you sent them with <b>We sent</b>, so the AI knows the whole chat next time.</p>
+          </div>
+        )}
+        {thread.messages.map((m, i) => {
+          const prev = thread.messages[i - 1];
+          const newDay = !prev || dayKey(prev.at) !== dayKey(m.at);
+          return (
+            <div key={m.id}>
+              {newDay && (
+                <div className="my-2 flex justify-center">
+                  <span className="rounded-md bg-background px-2.5 py-0.5 text-xs text-muted-foreground shadow-sm">{dayLabel(m.at)}</span>
+                </div>
+              )}
+              <Bubble m={m} threadId={id} onSaved={update} onError={setError} />
+            </div>
+          );
+        })}
+        {busy && busy !== "us" && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Reading the chat and working out a reply…
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+      {error && <p className="px-3 pb-1 pt-2 text-sm text-destructive">{error}</p>}
+      {last?.from === "customer" && !busy && (
+        <div className="px-3 pt-2">
+          <Button variant="outline" size="sm" onClick={() => void again()}>
+            <Sparkles className="mr-1.5 h-4 w-4" /> Ask AI again
+          </Button>
+        </div>
+      )}
+      <div className="space-y-2 border-t p-3">
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void add("customer");
+            }
+          }}
+          placeholder="Paste the customer's WhatsApp message…"
+          rows={2}
+          className="min-h-15 resize-none"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void add("customer")} disabled={!!busy || !text.trim()}>
+            {busy === "customer" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+            Customer said → Ask AI
+          </Button>
+          <Button variant="outline" onClick={() => void add("us")} disabled={!!busy || !text.trim()}>
+            {busy === "us" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <SendHorizontal className="mr-1.5 h-4 w-4" />}
+            We sent
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Bubble({ m, threadId, onSaved, onError }: {
+  m: AiThreadMessage; threadId: string; onSaved: (t: AiThread) => void; onError: (e: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(m.text);
+  const [copied, setCopied] = useState(false);
+  const ours = m.from === "us";
+
+  const save = async (body: { text?: string; remove?: boolean }) => {
+    try {
+      onSaved(await editAiThreadMessage(threadId, m.id, body));
+      setEditing(false);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not save.");
+    }
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(m.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      onError("Could not copy — select the text and copy it instead.");
+    }
+  };
+
+  return (
+    <div className={`group flex ${ours ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
+          ours ? "rounded-br-sm bg-emerald-100 text-emerald-950 dark:bg-emerald-900/50 dark:text-emerald-50" : "rounded-bl-sm bg-background"
+        }`}
+      >
+        {m.ai && <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">AI suggestion</p>}
+        {editing ? (
+          <div className="space-y-2">
+            <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} className="min-w-[240px] bg-background text-sm" autoFocus />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => void save({ text: draft })} disabled={!draft.trim()}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setDraft(m.text); setEditing(false); }}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap">{m.text}</p>
+        )}
+        {m.unsure && !editing && <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Not fully sure — double-check before sending.</p>}
+        <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-muted-foreground">
+          {!editing && (
+            <span className="flex gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+              {ours && (
+                <IconBtn label={copied ? "Copied" : "Copy"} onClick={() => void copy()}>
+                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </IconBtn>
+              )}
+              <IconBtn label="Edit" onClick={() => { setDraft(m.text); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /></IconBtn>
+              <IconBtn label="Remove" onClick={() => { if (window.confirm("Remove this message from the chat?")) void save({ remove: true }); }}>
+                <X className="h-3.5 w-3.5" />
+              </IconBtn>
+            </span>
+          )}
+          <span>{m.editedBy ? "edited · " : ""}{timeLabel(m.at)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} title={label} className="rounded p-1 hover:bg-black/5 dark:hover:bg-white/10">
+      {children}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+const dayKey = (iso: string) => new Date(iso).toDateString();
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(Date.now() - 86400000);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+function listTime(iso: string) {
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString() ? timeLabel(iso) : d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
