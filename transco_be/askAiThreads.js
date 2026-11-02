@@ -289,8 +289,9 @@ function createAskAiThreadsRouter({ getFlowiseReply, normalizePhoneNumber, onCus
 }
 
 // The reply to the newest customer message(s), reading this customer's
-// summary + recent messages. agentAnswer (all console facts) first; the
-// Flowise bot with the chat written into the question if that can't run.
+// summary + recent messages. The same Flowise bot as WhatsApp first (staff
+// trust its answers), with the chat written into the question; agentAnswer
+// only if that can't run.
 async function suggestReply(thread, getFlowiseReply) {
   thread = await refreshSummary(thread);
   const all = thread.messages;
@@ -306,21 +307,52 @@ async function suggestReply(thread, getFlowiseReply) {
 
   let reply = null;
   try {
-    reply = await agentAnswer.answer({ question, customer, history });
-  } catch (err) {
-    console.error('Ask AI thread: agent answer failed:', err.message);
-  }
-  if (!reply) {
-    const asked = (history ? `Earlier in this chat with the customer:\n${history}\n\n` : '') + `The customer's new message:\n${question}`;
+    // No history = the exact text WhatsApp would send the bot.
+    const asked = history ? `Earlier in this chat with the customer:\n${history}\n\nThe customer's new message:\n${question}` : question;
     reply = await getFlowiseReply(asked.slice(-6000), `staff-thread-${thread._id}-${Date.now()}`, customer);
+  } catch (err) {
+    console.error('Ask AI thread: bot reply failed:', err.message);
   }
+  if (!reply) reply = await agentAnswer.answer({ question, customer, history });
   if (!reply) return null;
   const unsure = reply.includes('[[HANDOFF]]');
-  const text = reply.replace(/\[\[[A-Z_]+[^\]]*\]\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  let text = reply.replace(/\[\[[A-Z_]+[^\]]*\]\]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  if (!unsure && text) text = await checkReply(text, question, history);
   return {
     text: unsure && (!text || text.startsWith('👍')) ? "The AI isn't sure about this one — please check with the office." : text,
     unsure
   };
 }
 
-module.exports = { createAskAiThreadsRouter };
+// Staff copy these replies straight to customers, so check the bot's reply
+// against the Agent Transco knowledge: drop the welcome-pack extras it adds
+// (it sees each question as a new customer), and correct it when it agrees
+// with a wrong assumption or leaves out what the customer needs ("open
+// Saturday only?" → "Yes!" without the weekday hours). The bot's reply as is
+// if the check can't run.
+async function checkReply(text, question, history) {
+  try {
+    const kb = await require('./agentKnowledge').botKnowledge();
+    const facts = [
+      ...Object.entries(kb.details).map(([k, v]) => `${k}: ${v}`),
+      ...kb.sections.map(s => `## ${s.title}\n${s.text}`)
+    ].join('\n').slice(0, 12000);
+    const fixed = String(await agentAnswer.callGemini(
+      'You check a cargo company\'s (Transco Cargo Sydney) WhatsApp reply before staff send it to a customer. Use ONLY the company facts given.\n' +
+      '1. Keep only what answers the customer\'s new message (read the earlier chat for context). Drop extras they did not ask about: address/map, contacts, tracking, booking links, fees — unless the question is about them.\n' +
+      '2. If the reply agrees with something in the question that the facts show is wrong or incomplete, correct it plainly. ' +
+      'Example: "open Saturday only?" → No — Saturdays 11am–3pm, and also Tuesday to Friday 5pm–6pm by appointment; closed Sunday and Monday.\n' +
+      '3. Never change or invent a fact, number, time, price or link. Keep the reply\'s friendly tone and WhatsApp *bold* style; short.\n' +
+      'Return only the reply text.',
+      `Company facts:\n${facts}\n\n` +
+      (history ? `Earlier chat:\n${history.slice(-3000)}\n\n` : '') +
+      `Customer's new message:\n${question}\n\nBot reply:\n${text}`
+    ) || '').trim();
+    return fixed || text;
+  } catch (err) {
+    console.error('Ask AI: reply check failed:', err.message);
+    return text;
+  }
+}
+
+module.exports = { createAskAiThreadsRouter, checkReply };
