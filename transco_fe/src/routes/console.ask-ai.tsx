@@ -471,6 +471,11 @@ function QuickChat({ onBack }: { onBack: () => void }) {
             >
               {t.text}
               {t.unsure && <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Not fully sure — double-check before quoting.</p>}
+              {t.from === "ai" && (
+                <div className="mt-1.5 flex justify-end">
+                  <CopyReply text={t.text} />
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -502,6 +507,30 @@ function QuickChat({ onBack }: { onBack: () => void }) {
         </Button>
       </div>
     </>
+  );
+}
+
+// Copies the AI's reply, ready to paste into WhatsApp for the customer.
+function CopyReply({ text }: { text: string }) {
+  const [state, setState] = useState<"" | "copied" | "failed">("");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    setTimeout(() => setState(""), 2000);
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
+    >
+      {state === "copied" ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+      {state === "copied" ? "Copied" : state === "failed" ? "Select the text to copy" : "Copy reply"}
+    </button>
   );
 }
 
@@ -702,6 +731,11 @@ function Bubble({ m, threadId, onSaved, onError }: {
           <p className="whitespace-pre-wrap">{m.text}</p>
         )}
         {m.unsure && !editing && <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400">Not fully sure — double-check before sending.</p>}
+        {m.ai && !editing && (
+          <div className="mt-1.5">
+            <CopyReply text={m.text} />
+          </div>
+        )}
         <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-muted-foreground">
           {!editing && (
             <span className="flex gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
