@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  ArrowLeft, Check, ClipboardPaste, Copy, Loader2, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserRound, WandSparkles, X,
+  ArrowLeft, Check, ClipboardPaste, Copy, Loader2, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserPlus, UserRound, WandSparkles, X,
 } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addAiThreadMessage, askAi, createAiThread, editAiThreadMessage, fetchAiThread, fetchAiThreads,
-  importAiThreadMessages, suggestAiThreadReply, updateAiThread,
+  importAiThreadMessages, saveAiThreadCustomer, suggestAiThreadReply, updateAiThread,
   type AiThread, type AiThreadMessage, type AiThreadRow,
 } from "@/lib/transco/api";
 import { parseWhatsAppPaste, senderIsPhone } from "@/lib/transco/whatsapp-paste";
@@ -566,6 +566,9 @@ function ThreadChat({ id, notice, onBack, onChanged, onDeleted }: {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [thread?.messages.length, busy]);
 
+  const [saving, setSaving] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+
   const update = (t: AiThread) => { setThread(t); onChanged(); };
 
   const add = async (from: "customer" | "us") => {
@@ -627,13 +630,38 @@ function ThreadChat({ id, notice, onBack, onChanged, onDeleted }: {
         title={thread.name || thread.phone}
         sub={thread.name && thread.phone ? thread.phone : "Office WhatsApp customer"}
         actions={
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => void remove()} title="Remove chat">
-            <Trash2 className="h-4 w-4" />
-            <span className="sr-only">Remove chat</span>
-          </Button>
+          <>
+            {thread.customerId ? (
+              <Link
+                to="/console/customers/$customerId"
+                params={{ customerId: thread.customerId }}
+                className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted"
+                title="Open their customer profile"
+              >
+                <UserRound className="h-3.5 w-3.5" /> {thread.customerName || "Customer"}
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setSaving((s) => !s)}>
+                <UserPlus className="mr-1.5 h-4 w-4" /> Save as customer
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => void remove()} title="Remove chat">
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Remove chat</span>
+            </Button>
+          </>
         }
       />
-      {notice && <p className="border-b bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">{notice}</p>}
+      {saving && !thread.customerId && (
+        <SaveCustomerForm
+          thread={thread}
+          onCancel={() => setSaving(false)}
+          onSaved={(t, msg) => { setSaving(false); update(t); setSaveNotice(msg); }}
+        />
+      )}
+      {(saveNotice || notice) && (
+        <p className="border-b bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">{saveNotice || notice}</p>
+      )}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-muted/30 p-4">
         {thread.messages.length === 0 && (
           <div className="m-auto max-w-sm text-center text-sm text-muted-foreground">
@@ -696,6 +724,48 @@ function ThreadChat({ id, notice, onBack, onChanged, onDeleted }: {
         </div>
       </div>
     </>
+  );
+}
+
+// Adds this person to Customers. If their number is already saved, the
+// chat is linked to that customer instead — never a second record.
+function SaveCustomerForm({ thread, onCancel, onSaved }: {
+  thread: AiThread; onCancel: () => void; onSaved: (t: AiThread, notice: string) => void;
+}) {
+  const [name, setName] = useState(thread.name);
+  const [phone, setPhone] = useState(thread.phone);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await saveAiThreadCustomer(thread._id, name, phone);
+      onSaved(
+        r.thread,
+        r.existed
+          ? `This number is already a customer (${r.customer.name}) — the chat is now linked to them. No new customer was made.`
+          : `Saved ${r.customer.name} as a new customer (Customers → Added by staff).`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the customer.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-2 border-b bg-muted/40 px-3 py-2.5 text-sm">
+      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" className="h-9" />
+        <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="WhatsApp number" inputMode="tel" className="h-9" />
+        <Button size="sm" className="h-9" onClick={() => void save()} disabled={busy || !name.trim() || !phone.trim()}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-9" onClick={onCancel}>Cancel</Button>
+      </div>
+      <p className="text-xs text-muted-foreground">If this number is already saved, the chat is linked to that customer instead of making a new one.</p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
   );
 }
 

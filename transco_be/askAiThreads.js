@@ -58,7 +58,7 @@ async function refreshSummary(thread) {
   }
 }
 
-function createAskAiThreadsRouter({ getFlowiseReply }) {
+function createAskAiThreadsRouter({ getFlowiseReply, normalizePhoneNumber, onCustomerAdded = () => {} }) {
   const router = express.Router();
 
   router.get('/', async (req, res) => {
@@ -214,6 +214,36 @@ function createAskAiThreadsRouter({ getFlowiseReply }) {
     } catch (err) {
       console.error('Ask AI thread import failed:', err.message);
       res.status(500).json({ error: 'Could not save the messages.' });
+    }
+  });
+
+  // "Save as customer": the same number already saved → this chat is
+  // linked to that customer (never a second one); otherwise a new
+  // customer is added, as Customers → Add customer does.
+  router.post('/:id/save-customer', async (req, res) => {
+    try {
+      const t = await findThread(req, res);
+      if (!t) return;
+      const name = clean(req.body?.name, 80) || t.name;
+      const phoneNumber = normalizePhoneNumber(clean(req.body?.phone, 30) || t.phone);
+      if (!name) return res.status(400).json({ error: 'Type the customer\'s name.' });
+      if (!phoneNumber) return res.status(400).json({ error: 'Type their WhatsApp number — check the digits and country code.' });
+
+      let customer = await getDb().collection('customers').findOne({ phoneNumber });
+      const existed = !!customer;
+      if (!customer) {
+        const doc = { phoneNumber, name, mode: 'CHATBOT', status: 'ACTIVE', sources: ['manual'] };
+        const { insertedId } = await getDb().collection('customers').insertOne(doc);
+        customer = { _id: insertedId, ...doc };
+        onCustomerAdded(customer);
+      }
+      await store().updateOne({ _id: t._id }, {
+        $set: { customerId: customer._id, customerName: customer.name || name, phone: t.phone || clean(req.body?.phone, 30), name: t.name || name }
+      });
+      res.json({ thread: await store().findOne({ _id: t._id }), existed, customer: { id: customer._id, name: customer.name || name } });
+    } catch (err) {
+      console.error('Ask AI save customer failed:', err.message);
+      res.status(500).json({ error: 'Could not save the customer.' });
     }
   });
 

@@ -1219,6 +1219,9 @@ export interface AiThreadRow {
 export interface AiThread extends Omit<AiThreadRow, "last"> {
   messages: AiThreadMessage[];
   summary?: string;
+  /** Set by "Save as customer": the Customers record this chat belongs to. */
+  customerId?: string;
+  customerName?: string;
 }
 
 async function aiThreadRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -1246,6 +1249,11 @@ export const importAiThreadMessages = (id: string, messages: { from: "customer" 
   aiThreadRequest<{ thread: AiThread; added: number; skipped: number; aiError: string | null }>(`/${id}/import`, {
     method: "POST",
     body: JSON.stringify({ messages, askAi }),
+  });
+export const saveAiThreadCustomer = (id: string, name: string, phone: string) =>
+  aiThreadRequest<{ thread: AiThread; existed: boolean; customer: { id: string; name: string } }>(`/${id}/save-customer`, {
+    method: "POST",
+    body: JSON.stringify({ name, phone }),
   });
 export const suggestAiThreadReply = (id: string) =>
   aiThreadRequest<{ thread: AiThread }>(`/${id}/suggest`, { method: "POST" }).then((r) => r.thread);

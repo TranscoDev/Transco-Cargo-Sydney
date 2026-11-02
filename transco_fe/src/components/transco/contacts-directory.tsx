@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Bookmark,
@@ -37,6 +37,7 @@ import {
   type SegmentFilter,
 } from "@/lib/transco/types";
 import { formatPhone, phoneMatches } from "@/lib/transco/phone";
+import { fetchSchedule, type ScheduleDate } from "@/lib/transco/schedule";
 
 /**
  * Address-book view of every customer — separate from ContactList (the
@@ -191,18 +192,86 @@ function matchesAllFilters(
   return true;
 }
 
+/** When the customer first came to us: every record's id holds the time
+ * it was made (MongoDB ObjectId), so this works for every customer, even
+ * ones saved before we kept a separate date. Old records show the day
+ * they were imported. */
+function addedAt(c: Conversation): Date | null {
+  return /^[0-9a-f]{24}$/i.test(c.id) ? new Date(parseInt(c.id.slice(0, 8), 16) * 1000) : null;
+}
+
+/** YYYY-MM-DD in the browser's own (Sydney) time. */
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const shortDate = (d: Date) => d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+const isoToDate = (iso: string) => new Date(`${iso}T00:00:00`);
+
+type DateRange = { from: string; to: string };
+type Funnel = "all" | "chatted" | "shipped" | "notShipped" | "sheet" | "silent";
+
+/** Only known from a shipment sheet import (no chat, sign-up or staff add). */
+const onlyFromSheet = (c: Conversation) => sourcesFor(c).every((s) => s === "historical");
+/** The customer sent at least one message — not just our welcome/bot ones. */
+const customerWrote = (c: Conversation) => c.messages.some((m) => m.sender === "CUSTOMER");
+const hasShipment = (c: Conversation) => (c.totalShipments ?? 0) > 0;
+/** Opened the website chat but never typed — not someone we know yet. */
+const silentVisitor = (c: Conversation) => sourcesFor(c).every((s) => s === "website") && !customerWrote(c);
+/** Counted as a new customer in the summary. */
+const isFresh = (c: Conversation) => !onlyFromSheet(c) && !silentVisitor(c);
+
+function presetRanges(): Record<string, { label: string; range: DateRange }> {
+  const now = new Date();
+  const today = ymd(now);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+  return {
+    today: { label: "Today", range: { from: today, to: today } },
+    week: { label: "This week", range: { from: ymd(monday), to: today } },
+    month: { label: "This month", range: { from: ymd(monthStart), to: today } },
+    lastMonth: { label: "Last month", range: { from: ymd(lastStart), to: ymd(lastEnd) } },
+  };
+}
+
+/** One shipment period = the day after the last cutoff up to this cutoff
+ * (Shipping calendar, Sri Lanka). Only periods that have started. */
+function shipmentPeriods(dates: ScheduleDate[]): { key: string; label: string; range: DateRange }[] {
+  const cutoffs = [...new Set(dates.map((d) => d.cutoff))].sort();
+  const today = ymd(new Date());
+  const out: { key: string; label: string; range: DateRange }[] = [];
+  for (let i = 1; i < cutoffs.length; i++) {
+    const prev = isoToDate(cutoffs[i - 1] as string);
+    prev.setDate(prev.getDate() + 1);
+    const from = ymd(prev);
+    const to = cutoffs[i] as string;
+    if (from > today) continue;
+    out.push({
+      key: `ship:${to}`,
+      label: `Shipment closing ${shortDate(isoToDate(to))} (from ${shortDate(prev)})`,
+      range: { from, to },
+    });
+  }
+  return out.reverse();
+}
+
 function toCsvCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;
 }
 
 function downloadCsv(rows: Conversation[]) {
-  const header = ["Name", "Phone", "Email", "Sources", "Status", "Notes"];
+  const header = ["Name", "Added", "Phone", "Email", "Sources", "Status", "Notes"];
   const lines = [header.join(",")];
   for (const c of rows) {
+    const added = addedAt(c);
     lines.push(
       [
         c.customerName,
+        added ? ymd(added) : "",
         c.phoneNumber,
         c.email ?? "",
         sourcesFor(c).join(" | "),
@@ -263,21 +332,82 @@ export function ContactsDirectory({
   const [emailRecipients, setEmailRecipients] = useState<Conversation[] | null>(null);
   const [savedOpen, setSavedOpen] = useState(false);
   const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
+  // "When added" filter: "any", a preset key, "ship:<cutoff>", or "custom".
+  const [rangeKey, setRangeKey] = useState("any");
+  const [custom, setCustom] = useState<DateRange>({ from: "", to: "" });
+  const [funnel, setFunnel] = useState<Funnel>("all");
+  const [sortBy, setSortBy] = useState<"name" | "added">("name");
+  const [schedule, setSchedule] = useState<ScheduleDate[]>([]);
 
-  const sorted = useMemo(
-    () => foldLinkedWebsiteChats(conversations).sort((a, b) => a.customerName.localeCompare(b.customerName)),
-    [conversations],
-  );
+  useEffect(() => {
+    fetchSchedule("sri_lanka")
+      .then((r) => setSchedule(r.dates))
+      .catch(() => setSchedule([]));
+  }, []);
+
+  const presets = useMemo(() => presetRanges(), []);
+  const periods = useMemo(() => shipmentPeriods(schedule), [schedule]);
+  const range: DateRange | null =
+    rangeKey === "any"
+      ? null
+      : rangeKey === "custom"
+        ? custom.from || custom.to
+          ? { from: custom.from || "0000-01-01", to: custom.to || "9999-12-31" }
+          : null
+        : (presets[rangeKey]?.range ?? periods.find((p) => p.key === rangeKey)?.range ?? null);
+
+  const sorted = useMemo(() => {
+    const rows = foldLinkedWebsiteChats(conversations);
+    return sortBy === "added"
+      ? rows.sort((a, b) => (addedAt(b)?.getTime() ?? 0) - (addedAt(a)?.getTime() ?? 0))
+      : rows.sort((a, b) => a.customerName.localeCompare(b.customerName));
+  }, [conversations, sortBy]);
+
+  const inRange = useMemo(() => {
+    if (!range) return sorted;
+    return sorted.filter((c) => {
+      const d = addedAt(c);
+      const day = d ? ymd(d) : "";
+      return day >= range.from && day <= range.to;
+    });
+  }, [sorted, range?.from, range?.to]);
 
   const filtered = useMemo(
-    () => sorted.filter((c) => matchesAllFilters(c, filter, statusFilter, hasEmailOnly)),
-    [sorted, filter, statusFilter, hasEmailOnly],
+    () => inRange.filter((c) => matchesAllFilters(c, filter, statusFilter, hasEmailOnly)),
+    [inRange, filter, statusFilter, hasEmailOnly],
   );
+
+  // New customers → chatted → in a BL/shipment, for the dates picked.
+  // Customers who only came in from a shipment sheet import aren't new
+  // (their Added date is the import day) — counted on their own.
+  const summary = useMemo(() => {
+    const fresh = filtered.filter(isFresh);
+    const shipped = fresh.filter(hasShipment).length;
+    return {
+      total: fresh.length,
+      chatted: fresh.filter(customerWrote).length,
+      shipped,
+      notShipped: fresh.length - shipped,
+      sheet: filtered.filter(onlyFromSheet).length,
+      silent: filtered.filter(silentVisitor).length,
+    };
+  }, [filtered]);
+
+  const funnelled = useMemo(() => {
+    if (!range) return filtered;
+    if (funnel === "sheet") return filtered.filter(onlyFromSheet);
+    if (funnel === "silent") return filtered.filter(silentVisitor);
+    const fresh = filtered.filter(isFresh);
+    if (funnel === "chatted") return fresh.filter(customerWrote);
+    if (funnel === "shipped") return fresh.filter(hasShipment);
+    if (funnel === "notShipped") return fresh.filter((c) => !hasShipment(c));
+    return fresh;
+  }, [filtered, funnel, range]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return filtered;
-    return filtered.filter((c) => {
+    if (!q) return funnelled;
+    return funnelled.filter((c) => {
       // phoneMatches: "0418 448 203", "0418" or "61418…" all find 61418448203.
       return (
         c.customerName.toLowerCase().includes(q) ||
@@ -286,24 +416,25 @@ export function ContactsDirectory({
         (c.notes ?? "").toLowerCase().includes(q)
       );
     });
-  }, [filtered, query]);
+  }, [funnelled, query]);
 
+  // Chip counts follow the dates picked.
   const counts = useMemo(() => {
     const c: Record<ContactSourceFilter, number> = {
-      all: sorted.length,
+      all: inRange.length,
       portal: 0,
       website: 0,
       manual: 0,
       whatsapp: 0,
       imported: 0,
     };
-    for (const conv of sorted) {
+    for (const conv of inRange) {
       for (const key of SOURCE_FILTERS) {
         if (key !== "all" && matchesSourceFilter(conv, key)) c[key] += 1;
       }
     }
     return c;
-  }, [sorted]);
+  }, [inRange]);
 
   const stats = useMemo(() => {
     const byStatus: Record<CustomerStatus, number> = {
@@ -420,6 +551,53 @@ export function ContactsDirectory({
             <option value="DO_NOT_CONTACT">Do not contact ({stats.byStatus.DO_NOT_CONTACT})</option>
             <option value="BLOCKED">Blocked ({stats.byStatus.BLOCKED})</option>
           </select>
+
+          <select
+            value={rangeKey}
+            onChange={(e) => {
+              setRangeKey(e.target.value);
+              setFunnel("all");
+            }}
+            aria-label="When the customer was added"
+            title="When the customer first came to us"
+            className={cn(
+              "h-9 max-w-[260px] rounded-md border border-input bg-secondary/60 px-2 text-sm text-foreground outline-none focus:border-ring",
+              range && "border-primary bg-primary/5",
+            )}
+          >
+            <option value="any">Added: any time</option>
+            {Object.entries(presets).map(([key, p]) => (
+              <option key={key} value={key}>Added: {p.label.toLowerCase()}</option>
+            ))}
+            {periods.length > 0 && (
+              <optgroup label="Shipment period (Sri Lanka)">
+                {periods.map((p) => (
+                  <option key={p.key} value={p.key}>{p.label}</option>
+                ))}
+              </optgroup>
+            )}
+            <option value="custom">Added: pick dates…</option>
+          </select>
+
+          {rangeKey === "custom" && (
+            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+              <input
+                type="date"
+                value={custom.from}
+                onChange={(e) => setCustom((r) => ({ ...r, from: e.target.value }))}
+                aria-label="Added from"
+                className="h-9 rounded-md border border-input bg-secondary/60 px-2 text-sm text-foreground outline-none focus:border-ring"
+              />
+              to
+              <input
+                type="date"
+                value={custom.to}
+                onChange={(e) => setCustom((r) => ({ ...r, to: e.target.value }))}
+                aria-label="Added to"
+                className="h-9 rounded-md border border-input bg-secondary/60 px-2 text-sm text-foreground outline-none focus:border-ring"
+              />
+            </span>
+          )}
 
           <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-secondary/60 px-2.5 text-sm text-foreground">
             <input
@@ -542,6 +720,48 @@ export function ContactsDirectory({
           ))}
         </div>
 
+        {range && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-secondary/30 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              {range.from === "0000-01-01" ? "Up to" : shortDate(isoToDate(range.from))}
+              {range.to !== "9999-12-31" && <> – {shortDate(isoToDate(range.to))}</>}
+              {range.from !== "0000-01-01" && range.to === "9999-12-31" && " onwards"}:
+            </span>
+            {(
+              [
+                ["all", `${summary.total} new customer${summary.total === 1 ? "" : "s"}`, "Everyone added in these dates"],
+                ["chatted", `${summary.chatted} chatted with us`, "Sent at least one message (website, My Transco or WhatsApp bot)"],
+                ["shipped", `${summary.shipped} in a BL / shipment`, "Have a shipment (BL) with us — any shipment, not only this period's"],
+                ["notShipped", `${summary.notShipped} not shipped yet`, "No BL yet — people to follow up"],
+                ...(summary.sheet > 0
+                  ? ([["sheet", `+ ${summary.sheet} from shipment sheets`, "Added by importing a shipment sheet in these dates — not new customers, so not counted above"]] as const)
+                  : []),
+                ...(summary.silent > 0
+                  ? ([["silent", `+ ${summary.silent} opened the chat, never typed`, "Website visitors who didn't send a message — not counted above"]] as const)
+                  : []),
+              ] as const
+            ).map(([key, label, hint]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFunnel(key)}
+                title={hint}
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                  funnel === key ? "bg-primary text-primary-foreground" : "bg-panel text-foreground hover:bg-secondary",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+            {summary.total > 0 && (
+              <span className="text-xs text-muted-foreground">
+                → {Math.round((summary.shipped / summary.total) * 100)}% shipped
+              </span>
+            )}
+          </div>
+        )}
+
         {selectedIds.size > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
             <span className="font-medium text-foreground">{selectedIds.size} ticked</span>
@@ -597,9 +817,27 @@ export function ContactsDirectory({
                     )}
                   </button>
                 </th>
-                <th className="min-w-[200px] px-4 py-3 font-medium">Name</th>
+                <th className="min-w-[200px] px-4 py-3 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setSortBy("name")}
+                    className={cn("hover:text-foreground", sortBy === "name" && "text-foreground")}
+                  >
+                    Name{sortBy === "name" && " ↑"}
+                  </button>
+                </th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Source</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setSortBy("added")}
+                    title="When the customer first came to us — old records show the day they were imported"
+                    className={cn("hover:text-foreground", sortBy === "added" && "text-foreground")}
+                  >
+                    Added{sortBy === "added" && " ↓"}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-right font-medium">Bookings</th>
                 <th className="px-4 py-3 text-right font-medium">Shipments</th>
                 <th className="whitespace-nowrap px-4 py-3 font-medium">Last Activity</th>
@@ -635,7 +873,7 @@ export function ContactsDirectory({
       )}
 
       {addOpen && onAddContact && (
-        <AddContactModal onClose={() => setAddOpen(false)} onAddContact={onAddContact} />
+        <AddContactModal customers={sorted} onClose={() => setAddOpen(false)} onAddContact={onAddContact} />
       )}
 
       {emailRecipients && onSendEmailCampaign && (
@@ -767,6 +1005,12 @@ function ContactRow({
       </td>
       <td className="px-4 py-3">
         <SourceBadges sources={sourcesFor(conversation)} />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+        {(() => {
+          const d = addedAt(conversation);
+          return d ? shortDate(d) : "—";
+        })()}
       </td>
       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
         {conversation.totalBookings ?? 0}
@@ -970,10 +1214,18 @@ function ContactProfileModal({
   );
 }
 
+/** Same number, however it's typed: 0412 345 678 = +61 412 345 678. */
+function samePhone(a: string, b: string): boolean {
+  const tail = (v: string) => v.replace(/\D/g, "").slice(-9);
+  return tail(a).length === 9 && tail(a) === tail(b);
+}
+
 function AddContactModal({
+  customers,
   onClose,
   onAddContact,
 }: {
+  customers: Conversation[];
   onClose: () => void;
   onAddContact: (info: {
     name: string;
@@ -989,7 +1241,20 @@ function AddContactModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const canSave = name.trim().length > 0 && phone.trim().length > 0 && !saving;
+  // Like saving a contact on a phone: while staff type, show who we
+  // already have, so the same customer isn't added twice.
+  const phoneDigits = phone.replace(/\D/g, "");
+  // Website chat visitors have an id here, not a number.
+  const withPhone = useMemo(() => customers.filter((c) => /^\+?[\d\s()-]{8,}$/.test(c.phoneNumber)), [customers]);
+  const exact = phoneDigits.length >= 9 ? withPhone.find((c) => samePhone(c.phoneNumber, phone)) : undefined;
+  const byPhone = phoneDigits.length >= 4 && !exact ? withPhone.filter((c) => phoneMatches(c.phoneNumber, phone)).slice(0, 4) : [];
+  const nameQ = name.trim().toLowerCase();
+  const byName =
+    nameQ.length >= 3
+      ? customers.filter((c) => c.id !== exact?.id && !byPhone.includes(c) && c.customerName.toLowerCase().includes(nameQ)).slice(0, 4)
+      : [];
+
+  const canSave = name.trim().length > 0 && phone.trim().length > 0 && !saving && !exact;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -1048,6 +1313,24 @@ function AddContactModal({
               className="h-8 w-full rounded-md border border-input bg-secondary/60 px-2 text-xs outline-none focus:border-ring"
             />
           </Field>
+          {exact && (
+            <div className="rounded-md border border-border bg-warning-soft px-2.5 py-2 text-warning-foreground">
+              <p className="font-medium">This number is already saved:</p>
+              <ExistingCustomer c={exact} onOpen={onClose} />
+            </div>
+          )}
+          {byPhone.length > 0 && (
+            <div className="rounded-md border border-border bg-secondary/40 px-2.5 py-2">
+              <p className="text-muted-foreground">Numbers like this already saved — is it one of them?</p>
+              {byPhone.map((c) => <ExistingCustomer key={c.id} c={c} onOpen={onClose} />)}
+            </div>
+          )}
+          {byName.length > 0 && (
+            <div className="rounded-md border border-border bg-secondary/40 px-2.5 py-2">
+              <p className="text-muted-foreground">Same name already saved (check it isn't them with another number):</p>
+              {byName.map((c) => <ExistingCustomer key={c.id} c={c} onOpen={onClose} />)}
+            </div>
+          )}
           <Field label="Email (optional)">
             <input
               value={email}
@@ -1075,17 +1358,47 @@ function AddContactModal({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? "Adding…" : "Add customer"}
-          </button>
+          {exact ? (
+            <Link
+              to="/console/customers/$customerId"
+              params={{ customerId: exact.id }}
+              onClick={onClose}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            >
+              Open this customer
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!canSave}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {saving ? "Adding…" : "Add customer"}
+            </button>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function ExistingCustomer({ c, onOpen }: { c: Conversation; onOpen: () => void }) {
+  const shipments = c.totalShipments ?? 0;
+  return (
+    <Link
+      to="/console/customers/$customerId"
+      params={{ customerId: c.id }}
+      onClick={onOpen}
+      className="mt-1 flex items-center justify-between gap-2 rounded px-1 py-0.5 text-foreground hover:bg-panel"
+    >
+      <span className="min-w-0 truncate">
+        <span className="font-medium">{c.customerName}</span>
+        <span className="text-muted-foreground"> · {formatPhone(c.phoneNumber)}</span>
+        {shipments > 0 && <span className="text-muted-foreground"> · {shipments} shipment{shipments === 1 ? "" : "s"}</span>}
+      </span>
+      <span className="shrink-0 text-primary">Open →</span>
+    </Link>
   );
 }
 
