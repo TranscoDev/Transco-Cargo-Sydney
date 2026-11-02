@@ -368,7 +368,8 @@ export function ContactsDirectory({
       : rows.sort((a, b) => a.customerName.localeCompare(b.customerName));
   }, [conversations, sortBy]);
 
-  const inRange = useMemo(() => {
+  // Every record whose Added date falls in the dates picked.
+  const dated = useMemo(() => {
     if (!range) return sorted;
     return sorted.filter((c) => {
       const d = addedAt(c);
@@ -377,21 +378,28 @@ export function ContactsDirectory({
     });
   }, [sorted, range?.from, range?.to]);
 
+  // With dates picked, the page shows only who first came to us in them:
+  // old shipment-sheet customers (Added = import day) and website
+  // visitors who never typed are left out of the list, chips and counts.
+  const inRange = useMemo(() => (range ? dated.filter(isFresh) : sorted), [range, dated, sorted]);
+
   const filtered = useMemo(
     () => inRange.filter((c) => matchesAllFilters(c, filter, statusFilter, hasEmailOnly)),
     [inRange, filter, statusFilter, hasEmailOnly],
   );
 
-  // New customers → chatted → in a BL/shipment, for the dates picked.
-  // Customers who only came in from a shipment sheet import aren't new
-  // (their Added date is the import day) — counted on their own.
+  const leftOut = useMemo(
+    () => (range ? dated.filter((c) => !isFresh(c) && matchesAllFilters(c, filter, statusFilter, hasEmailOnly)) : []),
+    [range, dated, filter, statusFilter, hasEmailOnly],
+  );
+
   const from = range?.from ?? "";
   const to = range?.to ?? "";
-  // Returning customers: not new in these dates (added earlier, or an old
-  // shipment-sheet customer) but with a BL dated inside them.
+  // Returning customers: we had them before these dates (or from old
+  // shipment sheets) and they made a new shipment (BL) inside them.
   const returning = useMemo(() => {
     if (!range) return [];
-    const fresh = new Set(filtered.filter(isFresh).map((c) => c.id));
+    const fresh = new Set(filtered.map((c) => c.id));
     return sorted.filter(
       (c) =>
         !fresh.has(c.id) &&
@@ -401,31 +409,29 @@ export function ContactsDirectory({
   }, [range, filtered, sorted, filter, statusFilter, hasEmailOnly, from, to]);
 
   const summary = useMemo(() => {
-    const fresh = filtered.filter(isFresh);
-    const shipped = fresh.filter((c) => hasShipmentSince(c, from)).length;
+    const shipped = filtered.filter((c) => hasShipmentSince(c, from)).length;
     return {
-      total: fresh.length,
-      chatted: fresh.filter(customerWrote).length,
+      total: filtered.length,
+      chatted: filtered.filter(customerWrote).length,
       shipped,
-      notShipped: fresh.length - shipped,
-      sheet: filtered.filter(onlyFromSheet).length,
-      silent: filtered.filter(silentVisitor).length,
+      notShipped: filtered.length - shipped,
+      sheet: leftOut.filter(onlyFromSheet).length,
+      silent: leftOut.filter(silentVisitor).length,
       returning: returning.length,
     };
-  }, [filtered, from, returning]);
+  }, [filtered, leftOut, from, returning]);
 
   const funnelled = useMemo(() => {
     if (!range) return filtered;
     if (funnel === "returning") return returning;
-    if (funnel === "allShipped") return [...filtered.filter((c) => isFresh(c) && hasShipmentSince(c, from)), ...returning];
-    if (funnel === "sheet") return filtered.filter(onlyFromSheet);
-    if (funnel === "silent") return filtered.filter(silentVisitor);
-    const fresh = filtered.filter(isFresh);
-    if (funnel === "chatted") return fresh.filter(customerWrote);
-    if (funnel === "shipped") return fresh.filter((c) => hasShipmentSince(c, from));
-    if (funnel === "notShipped") return fresh.filter((c) => !hasShipmentSince(c, from));
-    return fresh;
-  }, [filtered, funnel, range, from, returning]);
+    if (funnel === "allShipped") return [...filtered.filter((c) => hasShipmentSince(c, from)), ...returning];
+    if (funnel === "sheet") return leftOut.filter(onlyFromSheet);
+    if (funnel === "silent") return leftOut.filter(silentVisitor);
+    if (funnel === "chatted") return filtered.filter(customerWrote);
+    if (funnel === "shipped") return filtered.filter((c) => hasShipmentSince(c, from));
+    if (funnel === "notShipped") return filtered.filter((c) => !hasShipmentSince(c, from));
+    return filtered;
+  }, [filtered, leftOut, funnel, range, from, returning]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
