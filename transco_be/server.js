@@ -2682,7 +2682,14 @@ app.get('/api/customers', async (req, res) => {
         // Customers page date summary: when each shipment (BL) went
         // (YYYY-MM-DD), and whether the record was first made by a
         // shipment sheet import (importedAt is only set on that insert).
+        // For those old customers, the BLs that came in with that same
+        // import are their old shipment — only later BLs are listed.
         shipmentDates: (liveShipmentsByCustomer.get(customer._id.toString()) ?? [])
+          .filter(s => {
+            if (!customer.importedAt) return true;
+            const made = new Date(s.createdAt).getTime();
+            return !(made <= new Date(customer.importedAt).getTime() + 10 * 60 * 1000);
+          })
           .map(s => { const d = new Date(s.originDate || s.createdAt); return isNaN(d) ? null : d.toISOString().slice(0, 10); })
           .filter(Boolean),
         createdByImport: Boolean(customer.importedAt),
