@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, KeyRound, Moon, Palette, Plus, Settings as SettingsIcon, Sun, Trash2, User, Users } from "lucide-react";
+import { Bell, BellOff, BellRing, Building2, KeyRound, Moon, Palette, Plus, Settings as SettingsIcon, Sun, Trash2, User, Users } from "lucide-react";
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   type CompanySettings,
 } from "@/lib/transco/api";
 import { applyTheme, getStoredTheme, type Theme } from "@/lib/transco/theme";
+import { getPushState, pushSupport, turnOffPush, turnOnPush, type PushPrefs, type PushSupport } from "@/lib/transco/push";
 import type { StaffAccess, StaffAccount } from "@/lib/transco/types";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,7 @@ function SettingsPage() {
           <CompanyCard />
         </div>
         <div className="flex flex-col gap-6">
+          <NotificationsCard />
           <AppearanceCard />
           {hasPage("settings") && <StaffAccountsCard currentUserId={me?.id ?? null} />}
         </div>
@@ -107,6 +109,99 @@ function SettingsCard({
       </CardHeader>
       <CardContent className="p-5 pt-2">{children}</CardContent>
     </Card>
+  );
+}
+
+/** Pop-ups for new bookings and tasks on this computer/phone (lib/transco/push.ts). */
+function NotificationsCard() {
+  const [support, setSupport] = useState<PushSupport>("ok");
+  const [subscribed, setSubscribed] = useState(false);
+  const [prefs, setPrefs] = useState<PushPrefs>({ bookings: false, tasks: true });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = pushSupport();
+    setSupport(s);
+    getPushState()
+      .then((st) => {
+        setSubscribed(st.subscribed);
+        setPrefs(st.prefs);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async (next: PushPrefs, on = true) => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (on) {
+        const st = await turnOnPush(next);
+        setSubscribed(true);
+        setPrefs(st.prefs);
+      } else {
+        await turnOffPush();
+        setSubscribed(false);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't change notifications.");
+      setSupport(pushSupport());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = (key: keyof PushPrefs) => {
+    const next = { ...prefs, [key]: !prefs[key] };
+    setPrefs(next);
+    if (subscribed) void save(next);
+  };
+
+  return (
+    <SettingsCard
+      icon={Bell}
+      tone="bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+      title="Notifications"
+      description="A pop-up on this computer or phone for new bookings and tasks — even when the console isn't open."
+    >
+      {support === "unsupported" ? (
+        <p className="text-sm text-muted-foreground">This browser can't show notifications. Use Chrome or Edge on a computer or Android phone.</p>
+      ) : (
+        <div className="space-y-3 text-sm">
+          {(["tasks", "bookings"] as const).map((key) => (
+            <label key={key} className="flex items-center gap-2 text-foreground">
+              <input type="checkbox" checked={prefs[key]} disabled={busy || loading} onChange={() => toggle(key)} />
+              {key === "tasks" ? "Tasks for me (or my team)" : "New bookings and walk-ins"}
+            </label>
+          ))}
+          {support === "blocked" && (
+            <p className="text-xs text-attention-foreground">
+              Notifications are blocked for this site. Click the 🔒 next to the address, allow Notifications, then reload.
+            </p>
+          )}
+          {error && <p className="text-xs text-attention-foreground">{error}</p>}
+          <div className="flex items-center gap-2">
+            {subscribed ? (
+              <>
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-foreground">
+                  <BellRing className="h-4 w-4" /> On for this device
+                </span>
+                <Button variant="outline" size="sm" className="ml-auto" disabled={busy} onClick={() => void save(prefs, false)}>
+                  <BellOff className="mr-1.5 h-4 w-4" /> Turn off
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" disabled={busy || loading || support === "blocked" || (!prefs.tasks && !prefs.bookings)} onClick={() => void save(prefs)}>
+                <Bell className="mr-1.5 h-4 w-4" /> {busy ? "Turning on…" : "Turn on notifications"}
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">Turn it on once on each computer or phone you use.</p>
+        </div>
+      )}
+    </SettingsCard>
   );
 }
 

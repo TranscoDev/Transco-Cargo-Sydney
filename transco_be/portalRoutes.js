@@ -40,6 +40,7 @@ const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex
 const { normalizePhoneNumber } = require('./normalizePhone');
 const { OTP_TTL_MS, OTP_MAX_ATTEMPTS } = require('./customerAuth');
 const { hasRealName } = require('./customerTools');
+const pushNotify = require('./pushNotify');
 
 const ALLOWED_COUNTRY_CODES = ['61', '94', '91'];
 const ACQUISITION_SOURCES = ['warehouse_qr', 'website', 'direct'];
@@ -1027,6 +1028,24 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     res.set('Cache-Control', 'private, max-age=86400');
     res.set('X-Content-Type-Options', 'nosniff');
     res.sendFile(file);
+  }));
+
+  // ---------- notifications (a pop-up when the Transco team replies) ----------
+  // pushNotify.js; key null = notifications aren't set up on the server.
+  router.get('/push', wrap(async (req, res) => {
+    res.json({
+      key: pushNotify.enabled ? process.env.VAPID_PUBLIC_KEY : null,
+      subscribed: await pushNotify.customerSubscribed(req.customer._id, req.query.endpoint)
+    });
+  }));
+  router.post('/push', wrap(async (req, res) => {
+    const ok = await pushNotify.subscribeCustomer(req.customer._id, req.body && req.body.subscription);
+    if (!ok) return res.status(400).json({ error: "Your browser didn't allow notifications. Please try again." });
+    res.json({ subscribed: true });
+  }));
+  router.delete('/push', wrap(async (req, res) => {
+    await pushNotify.unsubscribeCustomer(req.customer._id, req.body && req.body.endpoint);
+    res.json({ subscribed: false });
   }));
 
   // Customer-safe error envelope for anything unexpected.

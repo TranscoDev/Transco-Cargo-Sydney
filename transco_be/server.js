@@ -1606,6 +1606,11 @@ async function linkedAccountFor(customer) {
 }
 
 async function broadcastMessageCreated(customer, message) {
+  // A staff message in a My Transco chat → a pop-up on the customer's
+  // phone/computer if they turned notifications on (pushNotify.js).
+  if (message.senderType === 'HUMAN' && customer.channel === 'website' && customer.linkedBy === 'signin' && customer.linkedCustomerId) {
+    require('./pushNotify').notifyCustomer(customer.linkedCustomerId, message.mediaType === 'audio' ? '🎤 Voice message' : message.content);
+  }
   // Like WhatsApp: a new customer message brings an archived (unless
   // muted) or deleted chat back into the main list.
   const inbox = customer.inbox;
@@ -7326,6 +7331,15 @@ app.post('/api/ask-ai', async (req, res) => {
     console.error('Ask AI failed:', err.message);
     res.status(500).json({ error: 'The AI could not answer just now. Please try again.' });
   }
+});
+
+// Push notifications (pushNotify.js): staff get new bookings and their
+// tasks, My Transco customers get staff messages. Booking pop-ups ride on
+// the booking.created event every booking path already sends.
+const pushNotify = require('./pushNotify');
+app.use('/api/push', pushNotify.createPushRouter({ isStaffAdmin }));
+require('./websocket').onBroadcast((type, payload) => {
+  if (type === 'booking.created') pushNotify.notifyBooking(payload);
 });
 
 // Ask AI customer threads: one saved chat per office-WhatsApp customer,

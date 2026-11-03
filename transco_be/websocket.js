@@ -44,7 +44,15 @@ function initWebSocketServer(httpServer, { verifySession } = {}) {
   return wss;
 }
 
+// Server-side listeners for the same events (e.g. push notifications on
+// booking.created). A listener can never break the live stream.
+const listeners = [];
+function onBroadcast(fn) { listeners.push(fn); }
+
 function broadcast(type, payload) {
+  for (const fn of listeners) {
+    try { fn(type, payload); } catch (err) { console.error('Broadcast listener failed:', err.message); }
+  }
   if (!wss) return;
   const message = JSON.stringify({ type, payload });
   for (const client of wss.clients) {
@@ -54,4 +62,4 @@ function broadcast(type, payload) {
   }
 }
 
-module.exports = { initWebSocketServer, broadcast, STAFF_PROTOCOL };
+module.exports = { initWebSocketServer, broadcast, onBroadcast, STAFF_PROTOCOL };

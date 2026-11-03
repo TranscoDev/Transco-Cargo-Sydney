@@ -26,6 +26,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const { staffTasks, users } = require('./db');
+const pushNotify = require('./pushNotify');
 
 const ASSIGN_TO = ['me', 'person', 'team'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -210,6 +211,7 @@ module.exports = function createTaskRouter({ broadcast, isStaffAdmin, canDeleteC
     };
     const { insertedId } = await staffTasks().insertOne(doc);
     changed(insertedId);
+    pushNotify.notifyTask({ ...doc, _id: insertedId }, { byId: user.id });
     res.status(201).json({ task: shape({ ...doc, _id: insertedId }) });
   }));
 
@@ -316,6 +318,7 @@ module.exports = function createTaskRouter({ broadcast, isStaffAdmin, canDeleteC
     const result = await staffTasks().findOneAndUpdate({ _id: task._id }, { $set: set }, { returnDocument: 'after' });
     const updated = result && result.value !== undefined ? result.value : result;
     changed(task._id);
+    if (updated && updated.status !== 'done') pushNotify.notifyTask(updated, { byId: me(req).id, reassigned: true });
     res.json({ task: shape(updated) });
   }));
 

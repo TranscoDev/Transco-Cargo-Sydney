@@ -43,6 +43,14 @@ for (const file of fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && !N
 // price menu uses it too) and served here for the booking forms.
 scripts['/sl-cities.js'] = fs.readFileSync(path.join(__dirname, '..', 'transco_be', 'slCities.js'), 'utf8');
 
+// My Transco as a home-screen app (account.html links it) — iPhones only
+// allow notifications from a home-screen app.
+const MANIFEST = JSON.stringify({
+  name: 'My Transco', short_name: 'My Transco', start_url: '/account.html', scope: '/',
+  display: 'standalone', background_color: '#fbfaf7', theme_color: '#182233',
+  icons: [{ src: '/favicon.png', sizes: '192x192', type: 'image/png' }]
+});
+
 const extraHeaders = previewOrigin ? { 'x-robots-tag': 'noindex, nofollow' } : {};
 
 // Pages that were removed or renamed — old links and bookmarks land on
@@ -54,6 +62,7 @@ const SCRIPTS = ${JSON.stringify(scripts)};
 const EXTRA_HEADERS = ${JSON.stringify(extraHeaders)};
 const REDIRECTS = ${JSON.stringify(redirects)};
 const FAVICON_PNG = ${JSON.stringify(FAVICON_PNG)};
+const MANIFEST = ${JSON.stringify(MANIFEST)};
 
 export default {
   async fetch(request) {
@@ -61,6 +70,9 @@ export default {
     if (url.pathname === "/favicon.png" || url.pathname === "/favicon.ico") {
       const bytes = Uint8Array.from(atob(FAVICON_PNG), ch => ch.charCodeAt(0));
       return new Response(bytes, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400", ...EXTRA_HEADERS } });
+    }
+    if (url.pathname === "/manifest.webmanifest") {
+      return new Response(MANIFEST, { headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=3600", ...EXTRA_HEADERS } });
     }
     const moved = REDIRECTS[url.pathname];
     if (moved) {
