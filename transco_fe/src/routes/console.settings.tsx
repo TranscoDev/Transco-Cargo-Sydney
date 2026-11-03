@@ -17,8 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getCurrentUser } from "@/lib/transco/auth";
 
-// Everyone opens Settings for their own password and theme; the staff
-// list needs the Settings page in their access.
+// Everyone opens Settings for their own password, notifications and theme;
+// the Company card and staff list need the Settings page in their access.
 const hasPage = (page: string) => { const pages = getCurrentUser()?.pages; return !pages || pages.includes(page); };
 import {
   changePassword,
@@ -61,7 +61,7 @@ function SettingsPage() {
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <YourAccountCard email={me?.email ?? null} name={me?.name ?? null} />
-          <CompanyCard />
+          {hasPage("settings") && <CompanyCard />}
         </div>
         <div className="flex flex-col gap-6">
           <NotificationsCard />
