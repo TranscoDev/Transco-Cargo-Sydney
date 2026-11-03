@@ -88,19 +88,21 @@ function cleanAccess(body) {
 // briefly) so a role change applies within seconds, without signing out.
 function createAccessMiddleware({ users, ObjectId }) {
   const cache = new Map();
-  async function pagesFor(sub) {
+  async function accessFor(sub) {
     const hit = cache.get(sub);
-    if (hit && Date.now() - hit.at < 30 * 1000) return hit.pages;
-    const record = ObjectId.isValid(sub) ? await users().findOne({ _id: new ObjectId(sub) }, { projection: { email: 1, role: 1, pages: 1 } }) : null;
-    const pages = effectivePages(record);
-    cache.set(sub, { at: Date.now(), pages });
-    return pages;
+    if (hit && Date.now() - hit.at < 30 * 1000) return hit;
+    const record = ObjectId.isValid(sub) ? await users().findOne({ _id: new ObjectId(sub) }, { projection: { email: 1, name: 1, role: 1, pages: 1 } }) : null;
+    const entry = { at: Date.now(), pages: effectivePages(record), name: record && typeof record.name === 'string' && record.name.trim() ? record.name.trim() : null };
+    cache.set(sub, entry);
+    return entry;
   }
   const middleware = async (req, res, next) => {
     if (!req.user || !req.user.sub) return next();
     try {
-      const pages = await pagesFor(req.user.sub);
+      const { pages, name } = await accessFor(req.user.sub);
       req.staffPages = pages;
+      // The admin may have renamed them since they signed in.
+      if (name) req.user.name = name;
       if (canUse(pages, req.path, req.method)) return next();
       return res.status(403).json({ error: "Your account doesn't have access to this page. Ask the admin if you need it.", reason: 'no_page_access' });
     } catch (err) {

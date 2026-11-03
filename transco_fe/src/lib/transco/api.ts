@@ -981,6 +981,18 @@ export async function updateStaffAccess(staffId: string, access: StaffAccess): P
   return mapStaffAccount(data.staff as BackendStaffAccount);
 }
 
+/** Admin: change the name shown in the console (sign-in email and password stay). */
+export async function renameStaff(staffId: string, name: string): Promise<StaffAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/staff/${staffId}/name`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error ?? `Failed to change the name (${res.status})`);
+  return mapStaffAccount(data.staff as BackendStaffAccount);
+}
+
 export async function createStaff(info: {
   email: string;
   name: string;

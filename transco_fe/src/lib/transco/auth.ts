@@ -107,8 +107,9 @@ export async function refreshAccess(): Promise<StaffUser | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/session`, { headers: { Authorization: `Bearer ${session.token}` } });
     if (!res.ok) return session.user;
-    const data = (await res.json()) as { user?: { pages?: string[] | null } };
-    const user = { ...session.user, pages: data.user?.pages ?? null };
+    const data = (await res.json()) as { user?: { pages?: string[] | null; name?: string | null } };
+    // The name too — the admin may have renamed them since they signed in.
+    const user = { ...session.user, pages: data.user?.pages ?? null, ...(data.user?.name ? { name: data.user.name } : {}) };
     window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, user }));
     return user;
   } catch {

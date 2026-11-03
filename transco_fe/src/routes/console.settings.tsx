@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, BellOff, BellRing, Building2, KeyRound, Moon, Palette, Plus, Settings as SettingsIcon, Sun, Trash2, User, Users } from "lucide-react";
+import { Bell, BellOff, BellRing, Building2, KeyRound, Pencil, Moon, Palette, Plus, Settings as SettingsIcon, Sun, Trash2, User, Users } from "lucide-react";
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getCurrentUser } from "@/lib/transco/auth";
+import { getCurrentUser, refreshAccess } from "@/lib/transco/auth";
 
 // Everyone opens Settings for their own password, notifications and theme;
 // the Company card and staff list need the Settings page in their access.
@@ -26,6 +26,7 @@ import {
   deleteStaff,
   fetchCompanySettings,
   fetchStaffWithAccess,
+  renameStaff,
   saveCompanySettings,
   updateStaffAccess,
   type CompanySettings,
@@ -667,6 +668,25 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
     load();
   }, []);
 
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const [renameSaving, setRenameSaving] = useState(false);
+  const handleRename = async () => {
+    if (!renaming || !renaming.name.trim()) return;
+    setRenameSaving(true);
+    try {
+      await renameStaff(renaming.id, renaming.name.trim());
+      setRenaming(null);
+      setError(null);
+      load();
+      // Your own name: reload so the greeting and menus show it straight away.
+      if (renaming.id === currentUserId) void refreshAccess().then(() => window.location.reload());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to change the name");
+    } finally {
+      setRenameSaving(false);
+    }
+  };
+
   const handleDelete = async (id: string, label: string) => {
     if (
       !window.confirm(`Remove ${label}'s staff account? They will no longer be able to sign in.`)
@@ -713,14 +733,50 @@ function StaffAccountsCard({ currentUserId }: { currentUserId: string | null }) 
                   {initials(s.name || s.email)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-foreground">
-                    {s.name}
-                    {s.id === currentUserId && (
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                        (you)
-                      </span>
-                    )}
-                  </p>
+                  {renaming?.id === s.id ? (
+                    <form
+                      className="flex items-center gap-1.5"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void handleRename();
+                      }}
+                    >
+                      <Input
+                        value={renaming.name}
+                        onChange={(e) => setRenaming({ id: s.id, name: e.target.value })}
+                        maxLength={60}
+                        autoFocus
+                        aria-label="Name shown in the console"
+                        className="h-8"
+                      />
+                      <Button type="submit" size="sm" disabled={renameSaving || !renaming.name.trim()}>
+                        {renameSaving ? "Saving…" : "Save"}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : (
+                    <p className="font-medium text-foreground">
+                      {s.name}
+                      {s.id === currentUserId && (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          (you)
+                        </span>
+                      )}
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setRenaming({ id: s.id, name: s.name })}
+                          aria-label={`Change ${s.name}'s name`}
+                          title="Change the name shown in the console (sign-in email and password stay the same)"
+                          className="ml-1.5 inline-flex rounded p-1 align-middle text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">{s.email}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     <span className="rounded bg-secondary px-1.5 py-0.5 font-medium text-foreground">

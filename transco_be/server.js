@@ -2153,7 +2153,8 @@ app.get('/api/auth/session', (req, res) => {
     user: {
       id: session.sub,
       email: session.email,
-      name: session.name,
+      // Current name (the admin may have renamed them since they signed in).
+      name: (req.user && req.user.name) || session.name,
       // Current page access (null = all) — the console refreshes its menu from this.
       pages: req.staffPages === undefined ? null : req.staffPages
     }
@@ -2372,6 +2373,29 @@ app.patch('/api/staff/:staffId/access', async (req, res) => {
   } catch (err) {
     console.error('Error changing staff access:', err.message);
     res.status(500).json({ error: 'Failed to change staff access' });
+  }
+});
+
+// Rename a staff member (admin only) — only the name shown in the console
+// changes; their sign-in email and password stay the same.
+app.patch('/api/staff/:staffId/name', async (req, res) => {
+  try {
+    if (!(await isStaffAdmin(req))) return res.status(403).json({ error: 'Only the Transco admin can change staff names.' });
+    const { staffId } = req.params;
+    if (!ObjectId.isValid(staffId)) return res.status(400).json({ error: 'Invalid staff id' });
+    const name = typeof req.body?.name === 'string' ? req.body.name.replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+    if (!name) return res.status(400).json({ error: 'Type a name.' });
+    const result = await users().findOneAndUpdate(
+      { _id: new ObjectId(staffId) },
+      { $set: { name, nameUpdatedAt: new Date(), nameUpdatedBy: req.user.email || null } },
+      { returnDocument: 'after', projection: { passwordHash: 0 } }
+    );
+    if (!result) return res.status(404).json({ error: 'Staff member not found' });
+    pageAccess.forget(staffId);
+    res.json({ staff: result });
+  } catch (err) {
+    console.error('Error renaming staff:', err.message);
+    res.status(500).json({ error: 'Failed to change the name' });
   }
 });
 
