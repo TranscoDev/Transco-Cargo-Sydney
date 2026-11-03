@@ -11,6 +11,7 @@ import {
   Info,
   Mail,
   MessageCircle,
+  MessageSquare,
   Package,
   Paperclip,
   Plus,
@@ -38,6 +39,7 @@ import {
 } from "@/lib/transco/types";
 import { formatPhone, phoneMatches } from "@/lib/transco/phone";
 import { fetchSchedule, type ScheduleDate } from "@/lib/transco/schedule";
+import { sendPortalMessage, type PortalMessageResult } from "@/lib/transco/api";
 
 /**
  * Address-book view of every customer — separate from ContactList (the
@@ -335,6 +337,7 @@ export function ContactsDirectory({
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [emailRecipients, setEmailRecipients] = useState<Conversation[] | null>(null);
+  const [portalRecipients, setPortalRecipients] = useState<Conversation[] | null>(null);
   const [savedOpen, setSavedOpen] = useState(false);
   const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
   // "When added" filter: "any", a preset key, "ship:<cutoff>", or "custom".
@@ -727,6 +730,16 @@ export function ContactsDirectory({
                 Email {visible.length === sorted.length ? "everyone" : `these ${visible.length}`}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setPortalRecipients(visible)}
+              disabled={visible.length === 0}
+              title="Send a message into the My Transco chat of the customers shown below"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary px-3 text-sm font-medium text-primary hover:bg-primary/5 disabled:opacity-40"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Message on My Transco
+            </button>
           </div>
         </div>
 
@@ -812,6 +825,14 @@ export function ContactsDirectory({
                 Email them
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setPortalRecipients(selectedConversations)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Message on My Transco
+            </button>
             <button
               type="button"
               onClick={() => downloadCsv(selectedConversations)}
@@ -918,6 +939,14 @@ export function ContactsDirectory({
           recipients={emailRecipients}
           onClose={() => setEmailRecipients(null)}
           onSend={onSendEmailCampaign}
+        />
+      )}
+
+      {portalRecipients && (
+        <PortalMessageModal
+          recipients={portalRecipients}
+          onClose={() => setPortalRecipients(null)}
+          onSendEmail={onSendEmailCampaign}
         />
       )}
 
@@ -1476,6 +1505,224 @@ function readFileAsAttachment(file: File): Promise<CampaignAttachment> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * One message into each customer's My Transco chat (shows as "Transco team"
+ * with a red unread count when they open the website). Only customers with a
+ * My Transco account get it — the server counts them first (dry run).
+ * Optionally the same message by email too (the email campaign above).
+ */
+function PortalMessageModal({
+  recipients,
+  onClose,
+  onSendEmail,
+}: {
+  recipients: Conversation[];
+  onClose: () => void;
+  onSendEmail?: ((customerIds: string[], subject: string, body: string) => Promise<EmailCampaignResult>) | undefined;
+}) {
+  const ids = useMemo(() => recipients.map((c) => c.id), [recipients]);
+  const [count, setCount] = useState<PortalMessageResult | null>(null);
+  const [countError, setCountError] = useState<string | null>(null);
+  const [body, setBody] = useState("");
+  const [alsoEmail, setAlsoEmail] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ portal: PortalMessageResult; email: EmailCampaignResult | null; emailError: string | null } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    sendPortalMessage(ids, "", true)
+      .then((r) => !cancelled && setCount(r))
+      .catch((e: unknown) => !cancelled && setCountError(e instanceof Error ? e.message : "Couldn't count who can get it."));
+    return () => {
+      cancelled = true;
+    };
+  }, [ids]);
+
+  const emailCount = recipients.filter(canEmail).length;
+  const willReach = count?.willReach ?? 0;
+  const canSend =
+    body.trim().length > 0 && !sending && willReach > 0 && (!alsoEmail || subject.trim().length > 0);
+
+  const handleSend = async () => {
+    if (!canSend) return;
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const portal = await sendPortalMessage(ids, body.trim());
+      let email: EmailCampaignResult | null = null;
+      let emailError: string | null = null;
+      if (alsoEmail && onSendEmail && emailCount > 0) {
+        try {
+          email = await onSendEmail(ids, subject.trim(), body.trim());
+        } catch (e) {
+          emailError = e instanceof Error ? e.message : "The email didn't go out.";
+        }
+      }
+      setResult({ portal, email, emailError });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send — please try again.");
+      setConfirming(false);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">
+              {result ? "Message sent" : "Message on My Transco"}
+            </h3>
+            {!result && (
+              <p className="text-xs text-muted-foreground">
+                Shows in each customer's My Transco chat from "Transco team", with a red count when they open the website.
+              </p>
+            )}
+          </div>
+          <button type="button" onClick={onClose} className="rounded p-1 hover:bg-secondary" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {result ? (
+          <div className="space-y-2 px-5 py-6 text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-success-foreground" />
+              <p className="text-base">
+                In the My Transco chat of <span className="font-semibold text-foreground">{result.portal.sent}</span>{" "}
+                {result.portal.sent === 1 ? "customer" : "customers"}
+              </p>
+            </div>
+            {result.portal.failed > 0 && (
+              <p className="text-attention-foreground">{result.portal.failed} didn't go through — try them again later.</p>
+            )}
+            {result.email && (
+              <p className="text-muted-foreground">
+                Also emailed {result.email.sent} {result.email.sent === 1 ? "customer" : "customers"}
+                {result.email.failed > 0 ? ` (${result.email.failed} failed)` : ""}.
+              </p>
+            )}
+            {result.emailError && <p className="text-attention-foreground">Email: {result.emailError}</p>}
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-2 w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-4 overflow-y-auto px-5 py-4 text-sm">
+              <div className="rounded-md border border-border bg-secondary/30 px-3 py-2.5">
+                {countError ? (
+                  <p className="text-attention-foreground">{countError}</p>
+                ) : !count ? (
+                  <p className="text-muted-foreground">Checking who has a My Transco account…</p>
+                ) : (
+                  <>
+                    <p className="text-foreground">
+                      Will reach <span className="font-semibold">{willReach}</span> of {recipients.length}
+                    </p>
+                    {count.skippedNoAccount > 0 && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {count.skippedNoAccount} {count.skippedNoAccount === 1 ? "has" : "have"} no My Transco account — skipped
+                      </p>
+                    )}
+                    {count.skippedExcludedStatus > 0 && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {count.skippedExcludedStatus} marked Do not contact / Blocked — skipped
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <Field label="Message">
+                <textarea
+                  value={body}
+                  onChange={(e) => {
+                    setBody(e.target.value);
+                    setConfirming(false);
+                  }}
+                  rows={6}
+                  autoFocus
+                  placeholder="e.g. Hi! Our next shipment to Sri Lanka closes Saturday 7 Nov. Book online in 2 minutes from your My Transco."
+                  className="w-full resize-y rounded-md border border-input bg-secondary/60 px-2.5 py-2 text-sm outline-none focus:border-ring"
+                />
+              </Field>
+
+              {onSendEmail && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={alsoEmail}
+                      onChange={(e) => {
+                        setAlsoEmail(e.target.checked);
+                        setConfirming(false);
+                      }}
+                    />
+                    Also send by email ({emailCount} {emailCount === 1 ? "has" : "have"} an email address)
+                  </label>
+                  {alsoEmail && (
+                    <Field label="Email subject">
+                      <input
+                        value={subject}
+                        onChange={(e) => {
+                          setSubject(e.target.value);
+                          setConfirming(false);
+                        }}
+                        placeholder="e.g. Next shipment to Sri Lanka closes Saturday"
+                        className="h-9 w-full rounded-md border border-input bg-secondary/60 px-2.5 text-sm outline-none focus:border-ring"
+                      />
+                    </Field>
+                  )}
+                </div>
+              )}
+
+              {error && <p className="text-sm text-attention-foreground">{error}</p>}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3">
+              {confirming && !sending && (
+                <p className="mr-auto text-xs text-muted-foreground">Messages can't be taken back once sent.</p>
+              )}
+              <button
+                type="button"
+                onClick={confirming ? () => setConfirming(false) : onClose}
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
+              >
+                {confirming ? "Go back" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!canSend}
+                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              >
+                {sending ? "Sending…" : confirming ? `Yes, send to ${willReach}` : "Send"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function EmailCampaignModal({

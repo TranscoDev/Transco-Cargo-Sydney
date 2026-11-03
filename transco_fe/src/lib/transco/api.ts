@@ -1638,6 +1638,34 @@ export async function sendEmailCampaign(
   return data as EmailCampaignResult;
 }
 
+export interface PortalMessageResult {
+  requested: number;
+  sent: number;
+  skippedNoAccount: number;
+  skippedExcludedStatus: number;
+  failed: number;
+  /** dryRun only: how many have a My Transco account and can get it. */
+  willReach?: number;
+}
+
+/** One staff message into each customer's My Transco chat. dryRun = counts only. */
+export async function sendPortalMessage(
+  customerIds: string[],
+  body: string,
+  dryRun = false,
+): Promise<PortalMessageResult> {
+  const res = await fetch(`${API_BASE_URL}/api/campaigns/portal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ customerIds, body, dryRun }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Failed to send the My Transco message (${res.status})`);
+  }
+  return data as PortalMessageResult;
+}
+
 interface BackendSegment {
   _id: string;
   name: string;

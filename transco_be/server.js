@@ -5862,6 +5862,87 @@ app.post('/api/campaigns/email', async (req, res) => {
   }
 });
 
+// ============================================================
+// MY TRANSCO MESSAGE (broadcast to customers' website chats)
+// ============================================================
+//
+// POST /api/campaigns/portal  { customerIds, body, dryRun? }
+// One staff message into each customer's My Transco chat — the same
+// "Transco team" message a staff reply is, so it shows with the red unread
+// count when they next open the website. Goes into their most recent
+// signed-in chat; a customer with an account but no chat yet gets a new
+// website chat linked to their account (exactly the shape webChatRoutes
+// makes, so replying there works as normal). The bot keeps answering —
+// mode is never changed. Only customers with a My Transco account
+// (password or quick-register sign-in); DO_NOT_CONTACT/BLOCKED skipped.
+// dryRun: the counts only, nothing sent.
+
+app.post('/api/campaigns/portal', async (req, res) => {
+  try {
+    const { customerIds, body, dryRun } = req.body ?? {};
+    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+      return res.status(400).json({ error: 'customerIds must be a non-empty array' });
+    }
+    const text = typeof body === 'string' ? body.trim().slice(0, 4000) : '';
+    if (!dryRun && !text) return res.status(400).json({ error: 'Type the message first.' });
+
+    const validIds = customerIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+    const targets = await customers().find({ _id: { $in: validIds } }).toArray();
+    const results = { requested: customerIds.length, sent: 0, skippedNoAccount: 0, skippedExcludedStatus: 0, failed: 0 };
+
+    const reachable = [];
+    for (const customer of targets) {
+      if (customer.status === 'DO_NOT_CONTACT' || customer.status === 'BLOCKED') results.skippedExcludedStatus += 1;
+      else if (!customer.passwordHash && !customer.portalJoinedAt) results.skippedNoAccount += 1;
+      else reachable.push(customer);
+    }
+    if (dryRun) return res.json({ ...results, willReach: reachable.length });
+
+    for (const account of reachable) {
+      try {
+        let chat = (await customers().find({ channel: 'website', linkedCustomerId: account._id, linkedBy: 'signin' })
+          .sort({ _id: -1 }).limit(1).toArray())[0];
+        if (!chat) {
+          const sessionId = `web-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+          const doc = {
+            sessionId,
+            phoneNumber: sessionId,
+            name: account.name || `Website Visitor #${sessionId.slice(-4).toUpperCase()}`,
+            mode: 'CHATBOT',
+            channel: 'website',
+            status: 'ACTIVE',
+            sources: ['website'],
+            createdAt: new Date(),
+            linkedCustomerId: account._id,
+            linkedBy: 'signin'
+          };
+          const { insertedId } = await customers().insertOne(doc);
+          chat = { ...doc, _id: insertedId };
+        }
+        const outgoing = await saveMessage({
+          customerId: chat._id,
+          senderType: 'HUMAN',
+          content: text,
+          isRead: true,
+          replyToMessageId: null,
+          whatsappStatus: null
+        });
+        await broadcastMessageCreated(chat, outgoing);
+        results.sent += 1;
+      } catch (sendErr) {
+        console.error(`My Transco message failed for ${account._id}:`, sendErr.message);
+        results.failed += 1;
+      }
+    }
+
+    await campaigns().insertOne({ channel: 'portal', body: text, ...results, sentBy: req.user?.email ?? null, sentAt: new Date() });
+    res.json(results);
+  } catch (err) {
+    console.error('Error sending My Transco message:', err.message);
+    res.status(500).json({ error: 'Failed to send the My Transco message' });
+  }
+});
+
 
 // ============================================================
 // SAVED SEGMENTS (reusable Contacts filter combinations)
