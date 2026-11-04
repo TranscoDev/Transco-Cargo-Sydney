@@ -7276,6 +7276,8 @@ app.post('/api/customers/:customerId/portal-password', async (req, res) => {
 // staff auth — '/my-transco' is not in PUBLIC_API_PREFIXES.
 const createStaffPortalRouter = require('./staffPortalRoutes');
 app.use('/api/my-transco', createStaffPortalRouter({ tools: customerTools }));
+// Costing → Receipt: preview, then email it (receiptRoutes.js).
+app.use('/api/my-transco', require('./receiptRoutes')({ broadcast }));
 
 // Shipping calendar: public read for the website, staff management in the console.
 const scheduleRouters = require('./scheduleRoutes')({ getSydneyNow });

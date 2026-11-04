@@ -119,9 +119,13 @@ async function gmailAccessToken() {
 // RFC 2047 for non-ASCII headers (names, subjects in Sinhala/Tamil).
 const encodeHeader = s => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s, 'utf8').toString('base64')}?=`);
 
-function buildMime({ from, to, cc, subject, textBody, htmlBody, inReplyTo }) {
+// attachments (optional): [{ filename, contentType, content: Buffer }] —
+// without them the message is the same multipart/alternative as before.
+function buildMime({ from, to, cc, subject, textBody, htmlBody, inReplyTo, attachments }) {
   const boundary = 'tc_' + crypto.randomBytes(12).toString('hex');
   const b64 = s => Buffer.from(s, 'utf8').toString('base64').replace(/.{76}/g, '$&\r\n');
+  const files = Array.isArray(attachments) ? attachments : [];
+  const mixed = files.length ? 'tm_' + crypto.randomBytes(12).toString('hex') : null;
   return [
     `From: ${from}`,
     `To: ${to}`,
@@ -130,6 +134,7 @@ function buildMime({ from, to, cc, subject, textBody, htmlBody, inReplyTo }) {
     // Keeps a reply in the customer's thread in their email app.
     ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`, `References: ${inReplyTo}`] : []),
     'MIME-Version: 1.0',
+    ...(mixed ? [`Content-Type: multipart/mixed; boundary="${mixed}"`, '', `--${mixed}`] : []),
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     '',
     `--${boundary}`,
@@ -143,6 +148,15 @@ function buildMime({ from, to, cc, subject, textBody, htmlBody, inReplyTo }) {
     '',
     b64(htmlBody),
     `--${boundary}--`,
+    ...files.flatMap(f => [
+      `--${mixed}`,
+      `Content-Type: ${f.contentType}; name="${f.filename}"`,
+      `Content-Disposition: attachment; filename="${f.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      f.content.toString('base64').replace(/.{76}/g, '$&\r\n')
+    ]),
+    ...(mixed ? [`--${mixed}--`] : []),
     ''
   ].join('\r\n');
 }
@@ -959,4 +973,42 @@ module.exports = function createEmailRouters({ isStaffAdmin, broadcast }) {
   }));
 
   return { router, oauthRouter, assistRouter };
+};
+
+// For other features that email a customer a file (the receipt): sends
+// from the connected Gmail and logs it in sentEmails like any CRM email,
+// so it shows on the Emails page and the customer's history, and their
+// reply is picked up. Throws with a readable message if it can't send.
+module.exports.sendLoggedGmail = async function sendLoggedGmail({ to, subject, textBody, htmlBody, attachments, customer, booking, sentBy, broadcast }) {
+  if (!(await gmailAccount())) throw new Error('Gmail is not connected. An admin can connect it in Emails → Email accounts.');
+  let result;
+  try {
+    result = await sendViaGmail({ to, subject, textBody, htmlBody, attachments });
+  } catch (err) {
+    const detail = err.response?.data?.error?.message || err.message;
+    throw new Error(`The email wasn't sent: ${String(detail).slice(0, 200)}`);
+  }
+  const doc = {
+    account: 'gmail',
+    fromAddress: result.fromAddress,
+    providerId: result.providerId,
+    to,
+    cc: null,
+    subject,
+    body: textBody,
+    attachments: (attachments || []).map(f => f.filename),
+    customerId: customer ? String(customer._id) : null,
+    customerName: customer ? customer.name || null : null,
+    bookingId: booking ? String(booking._id) : null,
+    bookingCode: booking ? booking.bookingCode || null : null,
+    sentById: sentBy.id,
+    sentByName: sentBy.name,
+    aiDrafted: false,
+    sentAt: new Date(),
+    threadId: result.threadId || null,
+    isReply: false
+  };
+  const { insertedId } = await sentEmails().insertOne(doc);
+  if (broadcast) broadcast('email.sent', { id: String(insertedId), customerId: doc.customerId });
+  return { sentAt: doc.sentAt, fromAddress: result.fromAddress };
 };

@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { FileText, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/transco/money-input";
 import { Label } from "@/components/ui/label";
-import { saveCosting, type DeclarationPrintData, type PaymentMethod } from "@/lib/transco/declaration-print";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  fetchReceiptInfo,
+  fetchReceiptPdf,
+  saveCosting,
+  sendReceipt,
+  type DeclarationPrintData,
+  type PaymentMethod,
+  type ReceiptInfo,
+} from "@/lib/transco/declaration-print";
+import { getCurrentUser } from "@/lib/transco/auth";
 import { formatDate } from "@/lib/transco/my-transco";
 import { friendlyError, notify } from "@/lib/transco/notify";
 
@@ -481,6 +491,123 @@ export function CostingCard({
           {saving ? "Saving…" : "Save costing"}
         </Button>
       </div>
+      {saved && <ReceiptSection bookingId={data.bookingId} />}
     </section>
+  );
+}
+
+/**
+ * Costing → Receipt: once the saved costing is paid in full, staff
+ * preview the receipt (PDF) and email it to the customer from the
+ * connected Gmail. Never sent automatically. Made from the SAVED costing.
+ */
+function ReceiptSection({ bookingId }: { bookingId: string }) {
+  const [info, setInfo] = useState<ReceiptInfo | null>(null);
+  const [open, setOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [to, setTo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    fetchReceiptInfo(bookingId)
+      .then((i) => {
+        if (!live) return;
+        setInfo(i);
+        setTo(i.to);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [bookingId]);
+  useEffect(() => () => {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+  }, [pdfUrl]);
+
+  if (!info) return null;
+  const last = info.sent[0];
+
+  const preview = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const blob = await fetchReceiptPdf(bookingId);
+      setPdfUrl(URL.createObjectURL(blob));
+      setOpen(true);
+    } catch (err) {
+      notify.error("Couldn't make the receipt", friendlyError(err, "Please try again."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const send = async () => {
+    setError("");
+    if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(to.trim())) {
+      setError("Enter the customer's email address.");
+      return;
+    }
+    setSending(true);
+    try {
+      const r = await sendReceipt(bookingId, to.trim());
+      notify.success("Receipt sent", `Emailed to ${r.to}.`);
+      setInfo((i) => (i ? { ...i, sent: [{ at: r.sentAt, by: getCurrentUser()?.name ?? null, to: r.to }, ...i.sent] } : i));
+      setOpen(false);
+    } catch (err) {
+      setError(friendlyError(err, "The receipt wasn't sent. Please try again."));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-foreground">Receipt</h3>
+        <p className="text-xs text-muted-foreground">
+          {info.problem ??
+            (last
+              ? `Sent ${formatDate(last.at)}${last.by ? ` by ${last.by}` : ""} to ${last.to}${info.sent.length > 1 ? ` · sent ${info.sent.length} times` : ""}`
+              : "Paid in full — preview the receipt, then email it to the customer.")}
+        </p>
+      </div>
+      <Button type="button" variant="outline" size="sm" disabled={Boolean(info.problem) || loading} onClick={preview}>
+        <FileText className="mr-1 h-4 w-4" /> {loading ? "Making…" : last ? "Preview / send again" : "Preview receipt"}
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Receipt{info.blNumber ? ` — BL ${info.blNumber}` : ""}</DialogTitle>
+            <DialogDescription>Check it before it goes. It's emailed from the Transco Gmail with this PDF attached.</DialogDescription>
+          </DialogHeader>
+          {pdfUrl && (
+            <>
+              <iframe title="Receipt preview" src={pdfUrl} className="h-[60vh] w-full rounded-md border bg-white" />
+              <a href={pdfUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline underline-offset-2">
+                Open the PDF in a new tab
+              </a>
+            </>
+          )}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="receipt-to">Send to</Label>
+            <Input id="receipt-to" type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="customer@example.com" />
+            {!info.to && <p className="text-xs text-muted-foreground">No email saved for this customer — type it in.</p>}
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={send} disabled={sending}>
+              {sending ? "Sending…" : "Send to customer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -177,6 +177,45 @@ export async function saveCosting(
   return data.costing;
 }
 
+/** Costing → Receipt (transco_be/receiptRoutes.js): only for a booking paid in full. */
+export interface ReceiptInfo {
+  /** Why it can't be sent yet (not saved / not fully paid), or null. */
+  problem: string | null;
+  /** The customer's email, to start the "Send to" box with. */
+  to: string;
+  blNumber: string | null;
+  /** Earlier sends, newest first. */
+  sent: { at: string; by: string | null; to: string }[];
+}
+
+export async function fetchReceiptInfo(bookingId: string): Promise<ReceiptInfo> {
+  const res = await fetch(`${API_BASE_URL}/api/my-transco/bookings/${bookingId}/receipt`, { headers: authHeaders() });
+  const data = (await res.json().catch(() => ({}))) as Partial<ReceiptInfo> & { error?: string };
+  if (!res.ok) throw new Error(data.error || `Could not check the receipt (${res.status})`);
+  return { problem: data.problem ?? null, to: data.to ?? "", blNumber: data.blNumber ?? null, sent: data.sent ?? [] };
+}
+
+/** The receipt PDF, for staff to look at before sending. */
+export async function fetchReceiptPdf(bookingId: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE_URL}/api/my-transco/bookings/${bookingId}/receipt.pdf`, { headers: authHeaders() });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error || `Could not make the receipt (${res.status})`);
+  }
+  return res.blob();
+}
+
+export async function sendReceipt(bookingId: string, to: string): Promise<{ sentAt: string; to: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/my-transco/bookings/${bookingId}/receipt/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ to }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; sentAt?: string; to?: string };
+  if (!res.ok || !data.sentAt) throw new Error(data.error || `The receipt wasn't sent (${res.status})`);
+  return { sentAt: data.sentAt, to: data.to ?? to };
+}
+
 /**
  * Opens the filled form (PDF) in a new tab, where staff print it. The tab
  * is opened straight away (inside the click) so pop-up blockers allow it,
