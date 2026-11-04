@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ShipmentPicker } from "@/components/transco/shipment-picker";
 import { moveShipment } from "@/lib/transco/api";
+import { getCurrentUser } from "@/lib/transco/auth";
 import { friendlyError, notify } from "@/lib/transco/notify";
 
 const name = (n: number | null) => (n ? `Shipment ${n}` : "no shipment");
@@ -45,6 +46,8 @@ export function MoveShipmentControl({
   const targetNumber = target === "" ? null : Number(target);
   const changed = targetNumber !== currentBatchNumber;
   const who = [blNumber ? `BL ${blNumber}` : "This BL", customerName ? `(${customerName})` : null].filter(Boolean).join(" ");
+  // The office moves BLs between shipments — not the warehouse team.
+  if (getCurrentUser()?.role === "warehouse") return null;
 
   const move = async () => {
     setMoving(true);
