@@ -5457,10 +5457,16 @@ app.patch(
     try {
 
       const { customerId } = req.params;
-      const { email, notes } = req.body ?? {};
+      const { email, notes, name } = req.body ?? {};
 
       if (!ObjectId.isValid(customerId)) {
         return res.status(400).json({ error: 'Invalid customer id' });
+      }
+
+      // Staff fixing a customer's display name (e.g. a saved-contact
+      // placeholder like "2026 418M"). Never blank — that would lose it.
+      if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 80)) {
+        return res.status(400).json({ error: 'Name must be 1–80 characters' });
       }
 
       if (email !== undefined && typeof email !== 'string') {
@@ -5474,9 +5480,14 @@ app.patch(
       const setFields = {};
       if (email !== undefined) setFields.email = email.trim();
       if (notes !== undefined) setFields.notes = notes.trim();
+      if (name !== undefined) {
+        setFields.name = name.trim();
+        setFields.nameEditedAt = new Date();
+        setFields.nameEditedBy = (req.user && (req.user.name || req.user.email)) || null;
+      }
 
       if (Object.keys(setFields).length === 0) {
-        return res.status(400).json({ error: 'email or notes is required' });
+        return res.status(400).json({ error: 'email, notes or name is required' });
       }
 
       const updated = await customers().findOneAndUpdate(

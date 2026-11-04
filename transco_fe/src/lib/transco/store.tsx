@@ -150,7 +150,7 @@ interface ConversationsApi {
    * for "Pause Website Bot", or both together for "Stop All"/"Resume All". */
   updatePauseState: (partial: Partial<PauseState>) => void;
   /** Staff-entered contact details, editable from the Contacts directory. */
-  updateContact: (conversationId: string, info: { email?: string; notes?: string }) => void;
+  updateContact: (conversationId: string, info: { email?: string; notes?: string; name?: string }) => void;
   /** Independent of Source — staff-controlled classification (Active,
    * Historical, Needs Review, Do Not Contact, Blocked). */
   updateStatus: (conversationId: string, status: CustomerStatus) => void;
@@ -491,11 +491,12 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateContact = useCallback(
-    (conversationId: string, info: { email?: string; notes?: string }) => {
+    (conversationId: string, info: { email?: string; notes?: string; name?: string }) => {
       patch(conversationId, (c) => ({
         ...c,
         email: info.email !== undefined ? info.email : c.email,
         notes: info.notes !== undefined ? info.notes : c.notes,
+        customerName: info.name !== undefined ? info.name : c.customerName,
       }));
       updateContactInfoRequest(conversationId, info).catch((err) => {
         console.error("Failed to persist contact info:", err);
@@ -867,7 +868,9 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
           const { customerId, customer } = event.payload as ContactUpdatedPayload;
           setConversations((prev) =>
             prev.map((c) =>
-              c.id === customerId ? { ...c, email: customer.email, notes: customer.notes } : c,
+              c.id === customerId
+                ? { ...c, email: customer.email, notes: customer.notes, customerName: customer.name || c.customerName }
+                : c,
             ),
           );
           return;

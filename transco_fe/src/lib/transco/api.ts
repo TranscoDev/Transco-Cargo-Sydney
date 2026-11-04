@@ -1584,7 +1584,7 @@ export async function setPauseState(partial: Partial<PauseState>): Promise<Pause
 
 export async function updateContactInfo(
   customerId: string,
-  info: { email?: string; notes?: string },
+  info: { email?: string; notes?: string; name?: string },
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/contact-info`, {
     method: "PATCH",

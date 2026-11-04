@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Package,
   Paperclip,
+  Pencil,
   Plus,
   Search,
   Square,
@@ -311,7 +312,7 @@ export function ContactsDirectory({
 }: {
   conversations: Conversation[];
   onSelect: (id: string) => void;
-  onUpdateContact: (id: string, info: { email?: string; notes?: string }) => void;
+  onUpdateContact: (id: string, info: { email?: string; notes?: string; name?: string }) => void;
   onUpdateStatus?: (id: string, status: CustomerStatus) => void;
   onAddContact?: (info: {
     name: string;
@@ -998,14 +999,29 @@ function ContactRow({
 }: {
   conversation: Conversation;
   onSelect: (id: string) => void;
-  onUpdateContact: (id: string, info: { email?: string; notes?: string }) => void;
+  onUpdateContact: (id: string, info: { email?: string; notes?: string; name?: string }) => void;
   onViewProfile: () => void;
   selected: boolean;
   onToggleSelected: () => void;
 }) {
   const [email, setEmail] = useState(conversation.email ?? "");
   const [notes, setNotes] = useState(conversation.notes ?? "");
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName] = useState(conversation.customerName);
   const status = statusFor(conversation);
+
+  const startNameEdit = () => {
+    setName(conversation.customerName);
+    setEditingName(true);
+  };
+
+  // Blank or unchanged = keep the old name (a name is never cleared).
+  const commitName = () => {
+    const trimmed = name.trim().slice(0, 80);
+    setEditingName(false);
+    if (trimmed && trimmed !== conversation.customerName)
+      onUpdateContact(conversation.id, { name: trimmed });
+  };
 
   const commitEmail = () => {
     const trimmed = email.trim();
@@ -1045,15 +1061,45 @@ function ContactRow({
           {/* The name opens the customer's profile (the usual first stop
               when a customer calls or walks in); the chat icon opens their
               conversation. */}
-          <Link
-            to="/console/customers/$customerId"
-            params={{ customerId: conversation.id }}
-            title="Open customer profile"
-            className="font-medium text-foreground underline-offset-2 hover:underline"
-          >
-            {conversation.customerName}
-          </Link>
-          {conversation.messages.length > 0 && (
+          {editingName ? (
+            <input
+              autoFocus
+              value={name}
+              maxLength={80}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setName(conversation.customerName);
+                  setEditingName(false);
+                }
+              }}
+              aria-label="Customer name"
+              className="h-7 w-48 rounded border border-ring bg-secondary/60 px-1.5 text-sm font-medium text-foreground outline-none"
+            />
+          ) : (
+            <>
+              <Link
+                to="/console/customers/$customerId"
+                params={{ customerId: conversation.id }}
+                title="Open customer profile"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                {conversation.customerName}
+              </Link>
+              <button
+                type="button"
+                onClick={startNameEdit}
+                aria-label={`Edit name of ${conversation.customerName}`}
+                title="Edit name"
+                className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+          {!editingName && conversation.messages.length > 0 && (
             <button
               type="button"
               onClick={() => onSelect(conversation.id)}
