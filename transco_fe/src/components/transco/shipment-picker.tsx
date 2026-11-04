@@ -34,11 +34,14 @@ export function ShipmentPicker({
   value,
   onChange,
   className,
+  noneLabel = "Not in a shipment yet",
 }: {
   id?: string;
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** What the empty choice says (e.g. "Take it out of the shipment" when moving). */
+  noneLabel?: string;
 }) {
   const [shipments, setShipments] = useState<Consolidation[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -75,7 +78,7 @@ export function ShipmentPicker({
       disabled={!shipments}
       className={className ?? "h-9 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground"}
     >
-      <option value="">{shipments ? "Not in a shipment yet" : "Loading…"}</option>
+      <option value="">{shipments ? noneLabel : "Loading…"}</option>
       {/* Only the newest few — plus the one already chosen, if it's older. */}
       {(shipments ?? [])
         .filter((s, i) => i < SHOWN || String(s.batchNumber) === value)

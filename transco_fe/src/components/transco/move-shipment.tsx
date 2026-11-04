@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRightLeft } from "lucide-react";
 
 import {
@@ -36,7 +36,10 @@ export function MoveShipmentControl({
   customerName?: string | null | undefined;
   onMoved: () => void;
 }) {
-  const [target, setTarget] = useState("");
+  // Starts on the shipment it's in now, so the box never contradicts the line above.
+  const current = currentBatchNumber ? String(currentBatchNumber) : "";
+  const [target, setTarget] = useState(current);
+  useEffect(() => setTarget(current), [current]);
   const [confirming, setConfirming] = useState(false);
   const [moving, setMoving] = useState(false);
   const targetNumber = target === "" ? null : Number(target);
@@ -49,7 +52,7 @@ export function MoveShipmentControl({
       const r = await moveShipment(shipmentId, targetNumber);
       notify.success(`Moved to ${name(r.to)}`, `${who} was moved from ${name(r.from)}. It's recorded in the BL's history.`);
       setConfirming(false);
-      setTarget("");
+      setTarget(r.to ? String(r.to) : "");
       onMoved();
     } catch (err) {
       notify.error("Couldn't move it", friendlyError(err, "Nothing was changed — please try again."));
@@ -69,14 +72,20 @@ export function MoveShipmentControl({
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Move to</span>
+        <span className="text-xs text-muted-foreground">Change to</span>
         <div className="min-w-44 flex-1">
-          <ShipmentPicker value={target} onChange={setTarget} className="h-8 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground" />
+          <ShipmentPicker
+            value={target}
+            onChange={setTarget}
+            noneLabel={currentBatchNumber ? "No shipment (take it out)" : "Not in a shipment yet"}
+            className="h-8 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground"
+          />
         </div>
         <Button type="button" size="sm" variant="outline" disabled={!changed || moving} onClick={() => setConfirming(true)}>
-          Move
+          {changed ? `Move to ${name(targetNumber)}` : "Move"}
         </Button>
       </div>
+      {!changed && <p className="mt-1.5 text-xs text-muted-foreground">Only if it's in the wrong shipment — pick another one, then Move.</p>}
 
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
