@@ -87,6 +87,28 @@
     return out + textHtml(s.slice(last));
   }
 
+  // "🏠 Back to menu" — same look as "📝 Book now →", at the end of the
+  // newest bot reply (older ones lose theirs). Not on the welcome menu
+  // itself (its options include the Shipment Calendar). onTap sends the
+  // "menu_home" tap, which shows the welcome menu again (webChatRoutes.js).
+  var MENU_LABEL = { en: "Back to menu", si: "ප්‍රධාන මෙනුවට", ta: "முதன்மை மெனுவுக்கு" };
+  function backToMenu(bubble, items, onTap) {
+    var old = document.querySelectorAll(".tc-menu-back");
+    for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+    if (!bubble || !bubble.textContent.trim()) return;
+    if ((items || []).some(function (it) { return it && it.id === "menu_calendar"; })) return;
+    var lang = (document.documentElement.lang || "en").slice(0, 2);
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "tc-linkbtn tc-home tc-menu-back";
+    b.textContent = "🏠 " + (MENU_LABEL[lang] || MENU_LABEL.en);
+    b.addEventListener("click", function () {
+      if (b.parentNode) b.parentNode.removeChild(b);
+      onTap();
+    });
+    bubble.appendChild(b);
+  }
+
   if (!document.getElementById("tc-linkbtn-css")) {
     var css = document.createElement("style");
     css.id = "tc-linkbtn-css";
@@ -103,9 +125,11 @@
       ".tc-whatsapp{--bg:#e7f8ec;--fg:#1a7a3c;--bd:#a9e2bd}" +
       ".tc-contact{--bg:#fdecef;--fg:#a8324a;--bd:#f3bdc8}" +
       ".tc-privacy,.tc-open{--bg:#f1f3f5;--fg:#3d4a57;--bd:#d5dbe1}" +
+      ".tc-home{--bg:#eef3f8;--fg:#24425f;--bd:#c3d3e3}" +
+      "button.tc-linkbtn{font-family:inherit;cursor:pointer;margin-bottom:4px}" +
       ".tc-tel{color:inherit;font-weight:700;text-decoration:underline;white-space:nowrap}";
     (document.head || document.documentElement).appendChild(css);
   }
 
-  window.TranscoChatLinks = { html: html };
+  window.TranscoChatLinks = { html: html, backToMenu: backToMenu };
 })();

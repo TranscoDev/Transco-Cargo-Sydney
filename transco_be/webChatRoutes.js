@@ -56,6 +56,8 @@ const COUNTRY_CONTEXT_PHRASES = {
 };
 const BOOK_DROPOFF_RE = /^\[\[BOOK_DROPOFF:day=([a-z]+);time=([0-9:]+)(?:;date=([0-9-]*))?(?:;boxes=([^;\]]*))?(?:;name=([^;\]]*))?(?:;phone=([^;\]]*))?\]\]/i;
 const SET_NAME_RE = /^\[\[SET_NAME:([^\]]+)\]\]/;
+// Typed in the website chat → the welcome menu, without asking the AI.
+const MENU_WORDS_RE = /^(main\s+)?menu[.!]?$|^back\s+to\s+(the\s+)?(main\s+)?menu[.!]?$/i;
 
 // Shown once, prepended to a brand-new visitor's real answer when
 // their very first message is itself a real question rather than a
@@ -181,6 +183,10 @@ module.exports = function createWebChatRouter({
     if (menuItemId === 'menu_website') {
       return { bypass: 'website_link', title: '🌐 Our Website' };
     }
+    // Website only: the "🏠 Back to menu" button (chat-links.js).
+    if (menuItemId === 'menu_home') {
+      return { bypass: 'main_menu', title: '🏠 Back to menu' };
+    }
 
     const item =
       (WELCOME_MENU_ITEMS || []).find(i => i.id === menuItemId) ||
@@ -258,6 +264,9 @@ module.exports = function createWebChatRouter({
         if (!resolvedTap) {
           return res.status(400).json({ error: 'Unrecognized menuItemId' });
         }
+      } else if (!photo && typeof message === 'string' && MENU_WORDS_RE.test(message.trim())) {
+        // Typed "menu" / "main menu" — same as the button, shown as typed.
+        resolvedTap = { ...resolveMenuTap('menu_home'), title: message.trim() };
       } else if (!photo && (!message || typeof message !== 'string' || !message.trim())) {
         return res.status(400).json({ error: 'message is required' });
       }
@@ -388,6 +397,9 @@ module.exports = function createWebChatRouter({
         if (resolvedTap.bypass === 'box_type_menu') {
           bypassReply = '📦 What type of box are you sending?';
           bypassMenu = { items: BOX_TYPE_MENU_ITEMS };
+        } else if (resolvedTap.bypass === 'main_menu') {
+          bypassReply = WEB_GREETING_TEXT + '\n\nHow can I help you today?';
+          bypassMenu = { items: WELCOME_MENU_ITEMS };
         } else if (resolvedTap.bypass === 'ask_typed_quantity') {
           bypassReply = "No problem! Just type in the exact number of boxes you're sending (up to 30) and I'll work out the price.";
         } else {

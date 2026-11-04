@@ -1142,10 +1142,11 @@
           addMessage(data.note || "A staff member will be with you shortly.", "system");
           return;
         }
-        addMessage(data.reply || "", "bot", data.media, true);
+        var botEl = addMessage(data.reply || "", "bot", data.media, true);
         addCards(data.cards);
         addActions(data.actions);
         addMenu(data.menu && data.menu.items);
+        if (window.TranscoChatLinks && TranscoChatLinks.backToMenu) TranscoChatLinks.backToMenu(botEl, data.menu && data.menu.items, function () { sendPayload({ sessionId: sessionId, menuItemId: "menu_home" }, "🏠 Back to menu"); });
       })
       .catch(function () {
         typingEl.remove();

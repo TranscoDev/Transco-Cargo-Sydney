@@ -486,8 +486,9 @@
         typingEl.remove();
         if (data.error) { addMessage("Sorry, something went wrong. Please try again.", "bot"); return; }
         if (data.handedOff) { addMessage(data.note || "A staff member will be with you shortly.", "bot"); return; }
-        addMessage(data.reply || "", "bot", data.media, true);
+        var botEl = addMessage(data.reply || "", "bot", data.media, true);
         addMenu(data.menu && data.menu.items);
+        if (window.TranscoChatLinks && TranscoChatLinks.backToMenu) TranscoChatLinks.backToMenu(botEl, data.menu && data.menu.items, function () { sendPayload({ sessionId: sessionId, menuItemId: "menu_home" }, "🏠 Back to menu"); });
       })
       .catch(function () {
         typingEl.remove();
