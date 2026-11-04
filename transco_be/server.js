@@ -5226,30 +5226,34 @@ app.post(
         return res.status(409).json({ error: 'Conversation is not in HUMAN mode' });
       }
 
-      // Website / My Transco chats: staff voice messages only. Kept
-      // privately (never in the public uploads folder) — the customer plays
-      // it in My Transco, which checks the chat is theirs.
+      // Website / My Transco chats: staff voice messages and pictures
+      // (flyers, photos). Kept privately (never in the public uploads
+      // folder) — the customer sees them in My Transco, which checks the
+      // chat is theirs.
       if (customer.channel === 'website') {
         const upload = req.file.path;
         try {
-          if (!String(req.file.mimetype || '').toLowerCase().startsWith('audio/')) {
-            return res.status(400).json({ error: 'Website chats can get voice messages only — type anything else.' });
+          const type = String(req.file.mimetype || '').toLowerCase();
+          const isPicture = customerPhotos.isPhotoType(type);
+          if (!type.startsWith('audio/') && !isPicture) {
+            return res.status(400).json({ error: 'Website chats can get pictures (JPG or PNG) and voice messages only.' });
           }
-          const voice = await customerPhotos.saveVoice(await fs.promises.readFile(upload), req.file.mimetype);
+          const bytes = await fs.promises.readFile(upload);
+          const media = isPicture ? await customerPhotos.save(bytes, type) : await customerPhotos.saveVoice(bytes, req.file.mimetype);
           const outgoing = await saveMessage({
             customerId: customer._id,
             senderType: 'HUMAN',
-            content: caption && caption.trim() ? caption.trim() : '🎤 Voice message',
+            content: caption && caption.trim() ? caption.trim() : isPicture ? '🖼️ Picture' : '🎤 Voice message',
             isRead: true,
             replyToMessageId: null,
             whatsappStatus: null,
-            ...voice
+            ...media
           });
           await broadcastMessageCreated(customer, outgoing);
           return res.status(201).json({ message: outgoing });
         } catch (err) {
-          console.error('Website voice message failed:', err.message);
-          return res.status(400).json({ error: "Couldn't send that voice message. Please record it again." });
+          console.error('Website attachment failed:', err.message);
+          return res.status(400).json({ error: "Couldn't send that. A picture must be JPG or PNG under 6 MB; a voice message, record it again." });
         } finally {
           fs.promises.unlink(upload).catch(() => {});
         }
@@ -5906,7 +5910,9 @@ app.post('/api/campaigns/email', async (req, res) => {
 // MY TRANSCO MESSAGE (broadcast to customers' website chats)
 // ============================================================
 //
-// POST /api/campaigns/portal  { customerIds, body, dryRun? }
+// POST /api/campaigns/portal  { customerIds, body, image?, dryRun? }
+// image: { data: base64, mimeType } — a flyer/photo (JPG/PNG, 6 MB), saved
+// once privately and shown in each customer's chat with the message.
 // One staff message into each customer's My Transco chat — the same
 // "Transco team" message a staff reply is, so it shows with the red unread
 // count when they next open the website. Goes into their most recent
@@ -5919,12 +5925,21 @@ app.post('/api/campaigns/email', async (req, res) => {
 
 app.post('/api/campaigns/portal', async (req, res) => {
   try {
-    const { customerIds, body, dryRun } = req.body ?? {};
+    const { customerIds, body, image, dryRun } = req.body ?? {};
     if (!Array.isArray(customerIds) || customerIds.length === 0) {
       return res.status(400).json({ error: 'customerIds must be a non-empty array' });
     }
     const text = typeof body === 'string' ? body.trim().slice(0, 4000) : '';
-    if (!dryRun && !text) return res.status(400).json({ error: 'Type the message first.' });
+    let picture = null;
+    if (!dryRun && image) {
+      const mimeType = typeof image.mimeType === 'string' ? image.mimeType.toLowerCase() : '';
+      const data = typeof image.data === 'string' ? Buffer.from(image.data, 'base64') : null;
+      if (!customerPhotos.isPhotoType(mimeType) || !data || !data.length || data.length > customerPhotos.MAX_BYTES) {
+        return res.status(400).json({ error: 'The picture must be a JPG or PNG under 6 MB.' });
+      }
+      picture = await customerPhotos.save(data, mimeType);
+    }
+    if (!dryRun && !text && !picture) return res.status(400).json({ error: 'Type the message or add a picture first.' });
 
     const validIds = customerIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
     const targets = await customers().find({ _id: { $in: validIds } }).toArray();
@@ -5962,10 +5977,11 @@ app.post('/api/campaigns/portal', async (req, res) => {
         const outgoing = await saveMessage({
           customerId: chat._id,
           senderType: 'HUMAN',
-          content: text,
+          content: text || '🖼️ Picture',
           isRead: true,
           replyToMessageId: null,
-          whatsappStatus: null
+          whatsappStatus: null,
+          ...(picture || {})
         });
         await broadcastMessageCreated(chat, outgoing);
         results.sent += 1;
@@ -5975,7 +5991,7 @@ app.post('/api/campaigns/portal', async (req, res) => {
       }
     }
 
-    await campaigns().insertOne({ channel: 'portal', body: text, ...results, sentBy: req.user?.email ?? null, sentAt: new Date() });
+    await campaigns().insertOne({ channel: 'portal', body: text, ...(picture ? { mediaUrl: picture.mediaUrl } : {}), ...results, sentBy: req.user?.email ?? null, sentAt: new Date() });
     res.json(results);
   } catch (err) {
     console.error('Error sending My Transco message:', err.message);

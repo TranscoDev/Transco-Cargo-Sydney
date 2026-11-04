@@ -1665,11 +1665,13 @@ export async function sendPortalMessage(
   customerIds: string[],
   body: string,
   dryRun = false,
+  /** A flyer/photo (JPG/PNG) shown with the message in each chat. */
+  image?: { data: string; mimeType: string } | undefined,
 ): Promise<PortalMessageResult> {
   const res = await fetch(`${API_BASE_URL}/api/campaigns/portal`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ customerIds, body, dryRun }),
+    body: JSON.stringify({ customerIds, body, dryRun, ...(image ? { image } : {}) }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {

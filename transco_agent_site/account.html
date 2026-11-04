@@ -386,6 +386,7 @@
   .ag-msg.bot { align-self: flex-start; background: #eef1f6; color: #222; border: 1px solid #dde3ea; border-bottom-left-radius: 4px; }
   .ag-msg.system { align-self: center; background: transparent; color: var(--muted); font-size: 13px; text-align: center; }
   .ag-msg img, .ag-msg video { max-width: 100%; border-radius: 8px; margin-top: 6px; display: block; }
+  .ag-msg img.ag-pic { min-height: 80px; background: rgba(0,0,0,.04); cursor: zoom-in; }
   /* Staff replies stand out from the bot's. */
   .ag-msg audio { display: block; width: 100%; min-width: 210px; margin-top: 6px; }
   .ag-msg.staff { align-self: flex-start; background: #fff4e3; color: #222; border: 1px solid #f0d6a8; border-bottom-left-radius: 4px; }
@@ -561,7 +562,7 @@
       agentPlaceholder: "Type your question…", agentSend: "Send", agentClose: "Close chat",
       agentError: "Sorry, something went wrong. Please try again.", agentOffline: "Sorry, I couldn't reach our server. Please check your connection and try again.", agentHandedOff: "A staff member will reply here shortly.", backToMenu: "Back to menu",
       notifyAsk: "🔔 Get a notification when the Transco team replies", notifyOn: "Turn on", notifyDone: "🔔 Notifications are on", notifyIos: "🔔 For notifications on iPhone: tap Share ⬆️ → Add to Home Screen, then open My Transco from your home screen.", notifyBlocked: "Notifications are blocked — allow them in your browser settings.", notifyLater: "Not now",
-      chatsTitle: "Your chats", chatsOpen: "Your chats", newChat: "Start a new chat", staffName: "Transco team", voiceGone: "This voice message is no longer available.", chatFrom: "Chat from {d}", chatDevice: "{d}", chatYou: "You: ",
+      chatsTitle: "Your chats", chatsOpen: "Your chats", newChat: "Start a new chat", staffName: "Transco team", voiceGone: "This voice message is no longer available.", staffPicture: "Picture from the Transco team", pictureGone: "This picture is no longer available.", chatFrom: "Chat from {d}", chatDevice: "{d}", chatYou: "You: ",
       sugMyBookings: "My bookings", sugMyBl: "My BL number", sugDecl: "Declaration status", sugHours: "Opening hours",
       signInWith: "Sign in with", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "Please enter a valid email address.", emailLoginHelp: "Use the email saved on your My Transco account.",
@@ -701,7 +702,7 @@
       agentPlaceholder: "ඔයාගේ ප්‍රශ්නය type කරන්න…", agentSend: "යවන්න", agentClose: "Chat එක වහන්න",
       agentError: "සමාවෙන්න, මොකක් හරි වැරැද්දක් වුණා. ආයෙත් try කරන්න.", agentOffline: "සමාවෙන්න, server එකට connect වෙන්න බැරි වුණා. Connection එක check කරලා ආයෙත් try කරන්න.", agentHandedOff: "අපේ team එකේ කෙනෙක් ඉක්මනින් මෙතන reply කරයි.", backToMenu: "ප්‍රධාන මෙනුවට",
       notifyAsk: "🔔 Transco team එක reply කළාම notification එකක් ගන්න", notifyOn: "On කරන්න", notifyDone: "🔔 Notifications on", notifyIos: "🔔 iPhone එකේ notifications සඳහා: Share ⬆️ → Add to Home Screen ඔබලා, home screen එකෙන් My Transco open කරන්න.", notifyBlocked: "Notifications block කරලා — browser settings වලින් allow කරන්න.", notifyLater: "පස්සේ",
-      chatsTitle: "ඔයාගේ chats", chatsOpen: "ඔයාගේ chats", newChat: "අලුත් chat එකක්", staffName: "Transco team", voiceGone: "මේ voice message එක දැන් නෑ.", chatFrom: "{d} chat එක", chatYou: "ඔයා: ",
+      chatsTitle: "ඔයාගේ chats", chatsOpen: "ඔයාගේ chats", newChat: "අලුත් chat එකක්", staffName: "Transco team", voiceGone: "මේ voice message එක දැන් නෑ.", staffPicture: "Transco team එකෙන් picture එකක්", pictureGone: "මේ picture එක දැන් නෑ.", chatFrom: "{d} chat එක", chatYou: "ඔයා: ",
       sugMyBookings: "මගේ bookings", sugMyBl: "මගේ BL number එක", sugDecl: "Declaration තත්ත්වය", sugHours: "විවෘත වෙලාවන්",
       signInWith: "Sign in වෙන්නේ", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "කරුණාකරලා හරි email ලිපිනයක් දාන්න.", emailLoginHelp: "ඔයාගේ My Transco account එකේ save කරලා තියෙන email එක පාවිච්චි කරන්න.",
@@ -834,7 +835,7 @@
       agentPlaceholder: "உங்கள் கேள்வியை type செய்யுங்கள்…", agentSend: "அனுப்பு", agentClose: "Chat ஐ மூடு",
       agentError: "மன்னிக்கவும், ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.", agentOffline: "மன்னிக்கவும், server ஐ அணுக முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.", agentHandedOff: "எங்கள் குழுவில் ஒருவர் விரைவில் இங்கே பதிலளிப்பார்.", backToMenu: "முதன்மை மெனுவுக்கு",
       notifyAsk: "🔔 Transco team பதில் அனுப்பும்போது notification பெறுங்கள்", notifyOn: "On செய்", notifyDone: "🔔 Notifications on", notifyIos: "🔔 iPhone இல் notifications பெற: Share ⬆️ → Add to Home Screen அழுத்தி, home screen இலிருந்து My Transco திறக்கவும்.", notifyBlocked: "Notifications தடுக்கப்பட்டுள்ளன — browser settings இல் அனுமதிக்கவும்.", notifyLater: "பிறகு",
-      chatsTitle: "உங்கள் chats", chatsOpen: "உங்கள் chats", newChat: "புதிய chat", staffName: "Transco team", voiceGone: "இந்த voice message இப்போது கிடைக்காது.", chatFrom: "{d} chat", chatYou: "நீங்கள்: ",
+      chatsTitle: "உங்கள் chats", chatsOpen: "உங்கள் chats", newChat: "புதிய chat", staffName: "Transco team", voiceGone: "இந்த voice message இப்போது கிடைக்காது.", staffPicture: "Transco team அனுப்பிய படம்", pictureGone: "இந்த படம் இப்போது கிடைக்காது.", chatFrom: "{d} chat", chatYou: "நீங்கள்: ",
       sugMyBookings: "என் bookings", sugMyBl: "என் BL number", sugDecl: "Declaration நிலை", sugHours: "திறந்திருக்கும் நேரம்",
       signInWith: "Sign in செய்ய", loginByPhone: "Mobile number", loginByEmail: "Email", emailPlaceholder: "you@example.com",
       emailInvalid: "சரியான email முகவரியை உள்ளிடவும்.", emailLoginHelp: "உங்கள் My Transco account இல் save செய்த email ஐப் பயன்படுத்துங்கள்.",
@@ -1244,6 +1245,21 @@
         .then(function (blob) { player.src = URL.createObjectURL(blob); })
         .catch(function () { player.replaceWith(h("div", { class: "small", text: t("voiceGone") })); });
     }
+    // A staff picture (flyer, photo) — same: only from the customer's own chats.
+    if (media && media.imageId) {
+      var pic = h("img", { alt: t("staffPicture"), class: "ag-pic" });
+      el.appendChild(pic);
+      fetch(API_BASE + "/messages/chats/" + encodeURIComponent(media.voiceChat) + "/image/" + encodeURIComponent(media.imageId), { headers: { Authorization: "Bearer " + token } })
+        .then(function (res) { return res.ok ? res.blob() : Promise.reject(); })
+        .then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          pic.src = url;
+          pic.addEventListener("load", agentScroll, { once: true });
+          // Tap to see it full size.
+          pic.addEventListener("click", function () { window.open(url, "_blank"); });
+        })
+        .catch(function () { pic.replaceWith(h("div", { class: "small", text: t("pictureGone") })); });
+    }
     agent.body.appendChild(el);
     if (persist !== false) saveTranscript(kind, text);
     agentScroll();
@@ -1569,7 +1585,7 @@
       if (seq !== agent.seq || agent.chatId !== id) return;
       var list = data.messages || [];
       list.forEach(function (m) {
-        if (full || m.from === "staff") addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, m.voice ? { voiceChat: id, voiceId: m.id } : null, false);
+        if (full || m.from === "staff") addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, m.voice ? { voiceChat: id, voiceId: m.id } : m.image ? { voiceChat: id, imageId: m.id } : null, false);
         agent.lastId = m.id;
       });
       if (full && !list.length) { agent.empty = agentSuggestions(); agent.body.appendChild(agent.empty); }

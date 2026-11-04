@@ -40,9 +40,8 @@ export function MessageComposer({
   aiSlot,
 }: {
   mode: ConversationMode;
-  /** Attachments are WhatsApp-only for now (see sendAttachment in
-   * store.tsx) — the attach button hides itself for a website channel
-   * rather than offering something that can't actually be sent. */
+  /** Any file for WhatsApp; a website (My Transco) chat gets pictures
+   * and voice messages only (see the /attachments route in server.js). */
   channel?: ConversationChannel | undefined;
   disabled?: boolean;
   onSend: (body: string) => void;
@@ -61,9 +60,11 @@ export function MessageComposer({
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isHuman = mode === "HUMAN";
-  // Voice messages go to website (My Transco) chats too; files are WhatsApp-only.
+  // Voice messages go to website (My Transco) chats too; there, 📎 sends
+  // pictures only (flyers, photos) — any file type is WhatsApp-only.
   const canRecord = isHuman && !disabled && !!onSendAttachment;
-  const canAttach = canRecord && channel !== "website";
+  const canAttach = canRecord;
+  const picturesOnly = channel === "website";
   // Sending only actually works in HUMAN mode — the backend silently
   // rejects a CHATBOT-mode send with no visible error, so the composer
   // itself must block it here rather than let staff believe a message
@@ -110,6 +111,14 @@ export function MessageComposer({
     e.target.value = "";
     if (!file || !onSendAttachment) return;
     setAttachError(null);
+    if (picturesOnly && !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setAttachError("Website chats can get pictures only (JPG or PNG).");
+      return;
+    }
+    if (picturesOnly && file.size > 6 * 1024 * 1024) {
+      setAttachError("That picture is too big (max 6 MB).");
+      return;
+    }
     setSendingFile(true);
     try {
       // Whatever's typed becomes the caption, same as WhatsApp's own
@@ -229,7 +238,7 @@ export function MessageComposer({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*,.pdf,.doc,.docx"
+                accept={picturesOnly ? "image/jpeg,image/png,image/webp" : "image/*,video/*,.pdf,.doc,.docx"}
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -237,8 +246,8 @@ export function MessageComposer({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={sendingFile}
-                aria-label="Attach a file"
-                title="Attach a flyer, photo, video, or document"
+                aria-label={picturesOnly ? "Send a picture" : "Attach a file"}
+                title={picturesOnly ? "Send a flyer or photo (JPG or PNG)" : "Attach a flyer, photo, video, or document"}
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-human-foreground transition-colors hover:bg-human-soft disabled:opacity-40"
               >
                 <Paperclip className="h-4 w-4" />

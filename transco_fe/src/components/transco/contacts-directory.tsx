@@ -1566,12 +1566,41 @@ function PortalMessageModal({
 }: {
   recipients: Conversation[];
   onClose: () => void;
-  onSendEmail?: ((customerIds: string[], subject: string, body: string) => Promise<EmailCampaignResult>) | undefined;
+  onSendEmail?:
+    | ((customerIds: string[], subject: string, body: string, attachment?: CampaignAttachment | undefined) => Promise<EmailCampaignResult>)
+    | undefined;
 }) {
   const ids = useMemo(() => recipients.map((c) => c.id), [recipients]);
   const [count, setCount] = useState<PortalMessageResult | null>(null);
   const [countError, setCountError] = useState<string | null>(null);
   const [body, setBody] = useState("");
+  // A flyer/photo shown with the message (and attached to the email, if ticked).
+  const [picture, setPicture] = useState<{ file: CampaignAttachment; previewUrl: string } | null>(null);
+  const [pictureError, setPictureError] = useState<string | null>(null);
+  useEffect(() => () => {
+    if (picture) URL.revokeObjectURL(picture.previewUrl);
+  }, [picture]);
+
+  const pickPicture = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setPictureError(null);
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setPictureError("Pick a picture (JPG or PNG).");
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setPictureError("That picture is too big (max 6 MB).");
+      return;
+    }
+    try {
+      setPicture({ file: await readFileAsAttachment(file), previewUrl: URL.createObjectURL(file) });
+      setConfirming(false);
+    } catch {
+      setPictureError("Couldn't read that picture. Try another one.");
+    }
+  };
   const [alsoEmail, setAlsoEmail] = useState(false);
   const [subject, setSubject] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -1592,7 +1621,10 @@ function PortalMessageModal({
   const emailCount = recipients.filter(canEmail).length;
   const willReach = count?.willReach ?? 0;
   const canSend =
-    body.trim().length > 0 && !sending && willReach > 0 && (!alsoEmail || subject.trim().length > 0);
+    (body.trim().length > 0 || picture !== null) &&
+    !sending &&
+    willReach > 0 &&
+    (!alsoEmail || (subject.trim().length > 0 && body.trim().length > 0));
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -1603,12 +1635,17 @@ function PortalMessageModal({
     setSending(true);
     setError(null);
     try {
-      const portal = await sendPortalMessage(ids, body.trim());
+      const portal = await sendPortalMessage(
+        ids,
+        body.trim(),
+        false,
+        picture ? { data: picture.file.contentBase64, mimeType: picture.file.contentType } : undefined,
+      );
       let email: EmailCampaignResult | null = null;
       let emailError: string | null = null;
       if (alsoEmail && onSendEmail && emailCount > 0) {
         try {
-          email = await onSendEmail(ids, subject.trim(), body.trim());
+          email = await onSendEmail(ids, subject.trim(), body.trim(), picture?.file);
         } catch (e) {
           emailError = e instanceof Error ? e.message : "The email didn't go out.";
         }
@@ -1710,6 +1747,36 @@ function PortalMessageModal({
                   placeholder="e.g. Hi! Our next shipment to Sri Lanka closes Saturday 7 Nov. Book online in 2 minutes from your My Transco."
                   className="w-full resize-y rounded-md border border-input bg-secondary/60 px-2.5 py-2 text-sm outline-none focus:border-ring"
                 />
+              </Field>
+
+              <Field label="Flyer or photo (optional)">
+                {picture ? (
+                  <div className="flex items-start gap-3 rounded-md border border-input bg-secondary/40 p-2">
+                    <img src={picture.previewUrl} alt="Picture to send" className="h-24 w-24 shrink-0 rounded object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-foreground">{picture.file.filename}</p>
+                      <p className="text-xs text-muted-foreground">Shows in their chat with the message.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPicture(null);
+                        setConfirming(false);
+                      }}
+                      aria-label="Remove picture"
+                      className="rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input text-muted-foreground hover:bg-secondary/40">
+                    <Paperclip className="h-3.5 w-3.5" />
+                    Add a picture
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickPicture} className="hidden" />
+                  </label>
+                )}
+                {pictureError && <p className="mt-1 text-xs text-attention-foreground">{pictureError}</p>}
               </Field>
 
               {onSendEmail && (
