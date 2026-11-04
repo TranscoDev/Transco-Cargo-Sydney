@@ -93,11 +93,16 @@ module.exports = function createReceiptRouter({ broadcast }) {
       '',
       `Track your boxes any time at https://${COMPANY.web}${r.blNumber ? ` with your BL number ${r.blNumber}` : ''}.`,
       '',
-      `Questions? Call ${COMPANY.phone} or reply to this email.`,
+      // The manager wants questions to go to the chat assistant first.
+      `Any questions? Ask our chat assistant any time, day or night: https://${COMPANY.web}/#chat`,
+      '',
+      `Or call us on ${COMPANY.phone}.`,
       '',
       COMPANY.name
     ].join('\n');
-    const htmlBody = textBody.split('\n').map(l => (l ? `<p style="margin:0 0 4px">${esc(l)}</p>` : '<br>')).join('');
+    // Web addresses become links in the HTML version.
+    const linked = l => esc(l).replace(/https:\/\/[^\s<]+/g, u => `<a href="${u}">${u.replace(/^https:\/\//, '')}</a>`);
+    const htmlBody = textBody.split('\n').map(l => (l ? `<p style="margin:0 0 4px">${linked(l)}</p>` : '<br>')).join('');
     const sentBy = { id: String(req.user && req.user.sub || ''), name: String((req.user && (req.user.name || req.user.email)) || 'Staff').trim() };
 
     let sent;
