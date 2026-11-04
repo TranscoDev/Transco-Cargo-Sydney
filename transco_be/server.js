@@ -4331,7 +4331,7 @@ app.get('/api/consolidations/:consolidationId/landing-sheet', async (req, res) =
     res.status(200).json({ landingSheet: sheet });
   } catch (err) {
     console.error('Error building landing sheet:', err.message);
-    res.status(500).json({ error: 'Failed to build the landing sheet' });
+    res.status(500).json({ error: 'Failed to build the loading sheet' });
   }
 });
 
@@ -4341,12 +4341,12 @@ app.get('/api/consolidations/:consolidationId/landing-sheet.pdf', async (req, re
     if (!sheet) return res.status(404).json({ error: 'Shipment not found' });
     const pdf = await landingSheetPdf(sheet);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Landing-sheet-Shipment-${sheet.shipment.batchNumber}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Loading-sheet-Shipment-${sheet.shipment.batchNumber}.pdf"`);
     res.setHeader('Cache-Control', 'no-store');
     res.send(pdf);
   } catch (err) {
     console.error('Error making landing sheet PDF:', err.message);
-    res.status(500).json({ error: 'Failed to make the landing sheet PDF' });
+    res.status(500).json({ error: 'Failed to make the loading sheet PDF' });
   }
 });
 

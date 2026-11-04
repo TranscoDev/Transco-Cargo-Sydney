@@ -1318,7 +1318,7 @@ export async function deleteAgentFaq(id: string): Promise<void> {
   }
 }
 
-// ---- Landing sheet (Shipments → Shipment NN) ----
+// ---- Loading sheet (Shipments → Shipment NN; "landing" in code/URLs) ----
 
 export interface LandingSheet {
   shipment: { id: string; batchNumber: number; label: string; peNumber: string | null; etd: string | null };
@@ -1341,12 +1341,12 @@ export async function fetchLandingSheet(consolidationId: string): Promise<Landin
   const res = await fetch(`${API_BASE_URL}/api/consolidations/${encodeURIComponent(consolidationId)}/landing-sheet`, { headers: authHeaders() });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `Failed to load the landing sheet (${res.status})`);
+    throw new Error(body?.error || `Failed to load the loading sheet (${res.status})`);
   }
   return ((await res.json()) as { landingSheet: LandingSheet }).landingSheet;
 }
 
-/** Downloads the landing sheet PDF (the file staff send to the PE operations team). */
+/** Downloads the loading sheet PDF (the file staff send to the PE operations team). */
 export async function downloadLandingSheetPdf(consolidationId: string, batchNumber: number): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/api/consolidations/${encodeURIComponent(consolidationId)}/landing-sheet.pdf`, { headers: authHeaders() });
   if (!res.ok) {
@@ -1356,7 +1356,7 @@ export async function downloadLandingSheetPdf(consolidationId: string, batchNumb
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Landing-sheet-Shipment-${batchNumber}.pdf`;
+  a.download = `Loading-sheet-Shipment-${batchNumber}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -1,4 +1,4 @@
-// Landing sheet: the one-page summary of a shipment (container) that staff
+// Loading sheet (named "landing" in the code and URLs): the one-page summary of a shipment (container) that staff
 // send to the PE operations team and Supun — per HBL the date, memo, door
 // delivery town (blank = collect at Wattala), box counts, CBM and boxes,
 // with a totals row. Same columns as the sheet staff used to type by hand.
@@ -153,7 +153,7 @@ async function landingSheetPdf(sheet) {
     });
   };
 
-  const title = `Landing sheet — Shipment ${sheet.shipment.batchNumber}${sheet.shipment.label ? ` (${sheet.shipment.label})` : ''}`;
+  const title = `Loading sheet — Shipment ${sheet.shipment.batchNumber}${sheet.shipment.label ? ` (${sheet.shipment.label})` : ''}`;
   const pe = sheet.shipment.peNumber;
   const sub = [pe ? (/^PE/i.test(pe) ? pe : `PE ${pe}`) : null, sheet.shipment.etd ? `Leaves Sydney ${sheet.shipment.etd}` : null,
     `${sheet.totals.hbls} HBLs · ${sheet.totals.boxes} boxes · ${sheet.totals.cbm} CBM`].filter(Boolean).join('   ·   ');

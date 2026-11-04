@@ -137,7 +137,7 @@ function BatchDetailPage() {
             <div className="flex gap-2">
               <Button type="button" size="sm" className="gap-1.5" onClick={() => setLandingOpen(true)}>
                 <FileText className="h-3.5 w-3.5" />
-                Landing sheet
+                Loading sheet
               </Button>
               <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setEditOpen(true)}>
                 <PenLine className="h-3.5 w-3.5" />
@@ -321,7 +321,7 @@ function BatchDetailPage() {
   );
 }
 
-/** The shipment's landing sheet (per HBL: date, memo, delivery town, boxes, CBM) — preview + PDF to send to the PE operations team. */
+/** The shipment's loading sheet (per HBL: date, memo, delivery town, boxes, CBM) — preview + PDF to send to the PE operations team. */
 function LandingSheetDialog({
   open,
   onOpenChange,
@@ -343,7 +343,7 @@ function LandingSheetDialog({
     setError(null);
     fetchLandingSheet(consolidationId)
       .then(setSheet)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load the landing sheet"));
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load the loading sheet"));
   }, [open, consolidationId]);
 
   const download = async () => {
@@ -362,7 +362,7 @@ function LandingSheetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Landing sheet — Shipment {batchNumber}</DialogTitle>
+          <DialogTitle>Loading sheet — Shipment {batchNumber}</DialogTitle>
           <DialogDescription>
             Made from the HBLs in this shipment. Blank destination = collect from the Wattala warehouse.
           </DialogDescription>
