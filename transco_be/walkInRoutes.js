@@ -105,7 +105,9 @@ function validateDropOff(input, { paper = false } = {}) {
   const items = validateItems(country, body.items, { requireDetails: true });
   if (items.error) return { error: items.error, field: 'items' };
 
-  if (!DELIVERY_LABELS[body.deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
+  // Air Freight is door delivery only (Sri Lanka-wide, included).
+  const deliveryType = serviceType === 'air' ? 'door' : body.deliveryType;
+  if (!DELIVERY_LABELS[deliveryType]) return { error: 'Please choose door delivery or collection.', field: 'deliveryType' };
 
   const contents = validateContents(body.contents, { requireValue: true });
   if (contents.error) return contents;
@@ -125,7 +127,7 @@ function validateDropOff(input, { paper = false } = {}) {
     value: {
       country, serviceType,
       sender: sender.value, receiver: receiver.value,
-      items: items.value, deliveryType: body.deliveryType,
+      items: items.value, deliveryType,
       contents: contents.value, insurance: signOff.value.insurance,
       signedName: signOff.value.signedName, signatureImage: signOff.value.signatureImage, dangerousGoods, notes: notes || null
     }

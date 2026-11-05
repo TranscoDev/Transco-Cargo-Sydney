@@ -90,6 +90,9 @@ async function priceQuoteReply({ quote, account, tools, lang }) {
       known = fmt(words.known, { c: PQ_OPTIONS.country[key].title }) + '\n\n';
     }
   }
+  // Air Freight is door delivery only, the same price anywhere in Sri
+  // Lanka — so no delivery, district or town questions for it.
+  if (q.service === 'air') q.delivery = 'door';
   const ask = ['country', 'service', 'delivery'].find(k => !q[k]);
   if (ask) {
     const items = Object.keys(PQ_OPTIONS[ask]).map(v => {
@@ -101,7 +104,7 @@ async function priceQuoteReply({ quote, account, tools, lang }) {
   // Sri Lanka door delivery is priced by where it goes: district, then town.
   const base = `pq:${q.country}:${q.service}:${q.delivery}`;
   let where = '';
-  if (q.country === 'sri_lanka' && q.delivery === 'door') {
+  if (q.country === 'sri_lanka' && q.delivery === 'door' && q.service !== 'air') {
     if (q.district === null) {
       return { reply: words.district, menu: { items: SL.DISTRICTS.map((d, i) => ({ id: `${base}:${i}`, title: d[0] })) } };
     }
@@ -118,7 +121,9 @@ async function priceQuoteReply({ quote, account, tools, lang }) {
       : ` in ${towns[q.town]} (${district} District)` + (zone ? ` — delivery zone ${zone} (${SL.ZONE_LABEL[zone]})` : '');
   }
   return {
-    flowiseText: `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} ${PQ_OPTIONS.service[q.service].text}, ${PQ_OPTIONS.delivery[q.delivery].text}${where}. Please ask me which boxes I'm sending and give me the price.`
+    flowiseText: q.service === 'air'
+      ? `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} by Air Freight (door delivery included). Please ask me which boxes I'm sending and their weight, and give me the price.`
+      : `I'd like a price quote. I'm shipping to ${PQ_OPTIONS.country[q.country].text} ${PQ_OPTIONS.service[q.service].text}, ${PQ_OPTIONS.delivery[q.delivery].text}${where}. Please ask me which boxes I'm sending and give me the price.`
   };
 }
 

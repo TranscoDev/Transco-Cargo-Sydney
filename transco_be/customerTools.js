@@ -1314,7 +1314,8 @@ function createCustomerTools({
       dangerousGoods = dg.value;
     }
 
-    const deliveryType = body.deliveryType;
+    // Air Freight is door delivery only (Sri Lanka-wide, included).
+    const deliveryType = service === 'air' ? 'door' : body.deliveryType;
     if (!DELIVERY_LABELS[deliveryType]) return { error: 'Please choose door delivery or collection.' };
 
     // The receiver's town, whichever delivery option — a collection

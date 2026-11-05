@@ -34,10 +34,11 @@ const BOXES = [
   { key: 'quarter_cbm', name: 'Quarter CBM', dims: '83 x 50 x 52 cm', kg: 50 }
 ];
 
-// Air freight is billed at 12kg minimum (charged as a Gift Box), 23kg for
-// 12–23kg (charged as a Tea Chest), then by the kg up to 30kg per box —
-// the Flowise calculator's rule.
+// Air freight per box (warehouse manager's rule, 2026-11-05 — same as the
+// Flowise calculator): Gift Box 12kg minimum up to 20kg, Tea Chest 23kg
+// minimum up to 30kg, $ per kg over the minimum. Door delivery only.
 const AIR_TIERS = [12, 23];
+const AIR_GIFT_MAX_KG = 20;
 const AIR_MAX_KG = 30;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -121,10 +122,13 @@ async function buildFacts() {
   lines.push('', '# AIR FREIGHT TO SRI LANKA (per box, max 30kg per box)');
   lines.push(`- ${money(v.air_per_kg)} per kg + ${money(v.air_doc_fee)} documentation fee per box + ${money(v.air_transport)} Local transport per box.`);
   const airBox = kg => round2(kg * v.air_per_kg + v.air_doc_fee + v.air_transport);
-  lines.push(`- Price per box by weight: 12kg or less = ${money(airBox(AIR_TIERS[0]))} (charged as a Gift Box); over 12kg up to 23kg = ${money(airBox(AIR_TIERS[1]))} (charged as a Tea Chest); over 23kg up to 30kg = ${money(v.air_per_kg)} per kg + the two fees (${money(airBox(AIR_TIERS[1]))} + ${money(v.air_per_kg)} for each kg above 23kg).`);
-  lines.push('- When the customer gives a weight, quote ONLY that box\'s price (work it out with the rule above). When no weight is given, give the 12kg and 23kg prices and the per-kg rule, and ask the weight. Never list a price for every weight.');
-  for (let kg = AIR_TIERS[1] + 1; kg <= AIR_MAX_KG; kg++) extraAmounts.push(airBox(kg));
+  lines.push(`- Gift Box: ${money(airBox(AIR_TIERS[0]))} for up to 12kg (12kg minimum), then ${money(v.air_per_kg)} for each kg over 12kg — a Gift Box takes at most ${AIR_GIFT_MAX_KG}kg (${money(airBox(AIR_GIFT_MAX_KG))} at ${AIR_GIFT_MAX_KG}kg).`);
+  lines.push(`- Tea Chest: ${money(airBox(AIR_TIERS[1]))} for up to 23kg (23kg minimum), then ${money(v.air_per_kg)} for each kg over 23kg — a Tea Chest takes at most ${AIR_MAX_KG}kg (${money(airBox(AIR_MAX_KG))} at ${AIR_MAX_KG}kg).`);
+  lines.push(`- No box type given: up to ${AIR_GIFT_MAX_KG}kg goes in a Gift Box, over ${AIR_GIFT_MAX_KG}kg in a Tea Chest. Over ${AIR_MAX_KG}kg needs more than one box.`);
+  lines.push('- When the customer gives a weight, quote ONLY that box\'s price (work it out with the rule above). When no weight is given, give the Gift Box and Tea Chest prices and the per-kg rule, and ask the weight. Never list a price for every weight.');
+  for (let kg = AIR_TIERS[0] + 1; kg <= AIR_MAX_KG; kg++) extraAmounts.push(airBox(kg));
   lines.push(`- Lithium battery surcharge: ${money(v.air_lithium)}. Documents only: first kg ${money(v.doc_first_kg)}, each extra kg ${money(v.doc_extra_kg)}.`);
+  lines.push('- Air Freight is door delivery only — there is no collect-from-warehouse option for Air.');
   lines.push('- Included: door delivery anywhere in Sri Lanka and Sri Lanka customs clearance handling. Not included: government duty/tax, if it applies (paid by the customer directly).');
   lines.push('- Weekly air courier; usually arrives 10-14 days after the Sydney cut-off, depending on flights.');
 

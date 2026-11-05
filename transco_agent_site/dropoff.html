@@ -342,6 +342,7 @@
       "At the destination": "ගමනාන්තයේදී",
       "Pickup from our warehouse": "අපේ ගබඩාවෙන් ගන්නවා", "The receiver collects the boxes.": "Receiver box ගන්න එනවා.",
       "Door delivery": "Door delivery", "Delivered to the receiver's address (extra charge).": "Receiver ගේ ලිපිනයටම (අමතර ගාස්තුවක්).",
+      "Included with Air Freight — delivered anywhere in Sri Lanka.": "Air Freight එකට ඇතුළත් — ශ්‍රී ලංකාවේ ඕනෑම තැනකට ගෙදරටම.",
       "Sender — you": "යවන්නා — ඔබ", "As on your passport or NIC.": "ඔබේ passport හෝ NIC එකේ විදිහටම.",
       "Use my details from last time": "කලින් දුන්න විස්තර පාවිච්චි කරන්න",
       "Full name (as on passport / NIC)": "සම්පූර්ණ නම (passport / NIC එකේ විදිහට)",
@@ -503,6 +504,7 @@
       "Please enter the length, width and height of each odd-size item in cm (1–500).": "ஒவ்வொரு பொருளின் நீளம், அகலம், உயரத்தை cm இல் உள்ளிடவும் (1–500).",
       "At the destination": "சேருமிடத்தில்",
       "Pickup from our warehouse": "எங்கள் கிடங்கில் சேகரிப்பு", "The receiver collects the boxes.": "பெறுநர் பெட்டிகளைச் சேகரிப்பார்.",
+      "Included with Air Freight — delivered anywhere in Sri Lanka.": "Air Freight இல் அடங்கும் — இலங்கையில் எங்கும் வீட்டுக்கே விநியோகம்.",
       "Door delivery": "Door delivery", "Delivered to the receiver's address (extra charge).": "பெறுநர் முகவரிக்கே விநியோகம் (கூடுதல் கட்டணம்).",
       "Sender — you": "அனுப்புநர் — நீங்கள்", "As on your passport or NIC.": "உங்கள் passport அல்லது NIC இல் உள்ளபடி.",
       "Use my details from last time": "கடந்த முறை விவரங்களைப் பயன்படுத்து",
@@ -783,9 +785,13 @@
         return choice('data-service="' + s.key + '"', state.service === s.key, s.key === "air" ? "✈️" : "🚢", t(s.label));
       }).join("") + "</div>";
       // Door delivery or collection — on the first step, the same as the online booking form.
+      // Air Freight is door delivery only (included, anywhere in Sri Lanka).
+      if (state.service === "air") state.deliveryType = "door";
       html += "<h2>" + esc(t("How will the receiver get the boxes?")) + '</h2><div class="choices">' +
-        choice('data-delivery="door"', state.deliveryType === "door", "🚚", t("Door delivery"), t("Delivered to the receiver's address (extra charge).")) +
-        choice('data-delivery="collect"', state.deliveryType === "collect", "🏭", state.country === "sri_lanka" ? t("Collect from Wattala warehouse") : t("Pickup from our warehouse"), t("The receiver collects the boxes.")) +
+        (state.service === "air"
+          ? choice('data-delivery="door"', true, "🚚", t("Door delivery"), t("Included with Air Freight — delivered anywhere in Sri Lanka."))
+          : choice('data-delivery="door"', state.deliveryType === "door", "🚚", t("Door delivery"), t("Delivered to the receiver's address (extra charge).")) +
+            choice('data-delivery="collect"', state.deliveryType === "collect", "🏭", state.country === "sri_lanka" ? t("Collect from Wattala warehouse") : t("Pickup from our warehouse"), t("The receiver collects the boxes."))) +
         "</div>";
     }
     return html;
