@@ -7672,6 +7672,38 @@ const VOICE_HINT =
   'Kandy, Negombo, Ja-Ela, Kurunegala, Galle, Matara, Jaffna, Dehiwala, Wattala, Kadawatha.';
 const VOICE_LANGUAGES = ['english', 'sinhala', 'tamil'];
 
+// Gemini hears Singlish (Sinhala with English cargo words) far better than
+// Whisper: in the 2026-11-05 test it got 8/8 notes right, Whisper 3.5/8
+// (Sinhala notes came back as Tamil/Malayalam or gibberish).
+const GEMINI_VOICE_PROMPT =
+  'This is a WhatsApp voice note from a customer of Transco Cargo, a Sydney company that ships boxes ' +
+  '(Tea Chest, Gift Box, Wine Box, Quarter CBM box, TV) to Sri Lanka and India. Customers speak Sinhala, ' +
+  'Tamil, English, or a mix (Sinhala or Tamil with English words like box, tea chest, BL, pickup, door delivery, price).\n' +
+  'Write down exactly what was said: Sinhala in Sinhala script, Tamil in Tamil script, English words in English. ' +
+  'Write numbers as digits (BL numbers are 6 digits). Do not translate, answer or add anything. ' +
+  'Note: "mata" in Sinhala means "to me", not the town Matara.\n' +
+  'Reply with JSON only: {"transcript": "...", "confidence": "high|medium|low"}. ' +
+  'If there is no speech or you cannot make it out, use an empty transcript and "low".';
+
+async function geminiHear(audio) {
+  const model = process.env.GEMINI_VOICE_MODEL || 'gemini-2.5-flash';
+  const r = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      contents: [{ role: 'user', parts: [
+        { text: GEMINI_VOICE_PROMPT },
+        { inline_data: { mime_type: audio.mimeType.split(';')[0], data: audio.data.toString('base64') } }
+      ] }],
+      generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+    },
+    { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY }, timeout: 30000 }
+  );
+  const raw = (r.data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  const parsed = JSON.parse(raw);
+  const text = String(parsed.transcript || '').trim();
+  return { text, unsure: text.length < 2 || parsed.confidence === 'low' };
+}
+
 async function whisper(audio, language) {
   const form = new FormData();
   form.append('file', new Blob([audio.data], { type: audio.mimeType }), 'voice.ogg');
@@ -7705,8 +7737,8 @@ async function whisper(audio, language) {
 // answering a guess.
 async function transcribeWhatsAppAudio(mediaId) {
 
-  if (!GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY is not configured');
+  if (!process.env.GEMINI_API_KEY && !GROQ_API_KEY) {
+    throw new Error('Neither GEMINI_API_KEY nor GROQ_API_KEY is configured');
   }
 
   const mediaInfo = await axios.get(
@@ -7718,6 +7750,16 @@ async function transcribeWhatsAppAudio(mediaId) {
     { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` }, responseType: 'arraybuffer', timeout: 30000, maxContentLength: 16 * 1024 * 1024 }
   );
   const audio = { data: Buffer.from(audioResponse.data), mimeType: mediaInfo.data.mime_type || 'audio/ogg' };
+
+  // Gemini first; Whisper only if Gemini is down or not set up.
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return { ...(await geminiHear(audio)), audio };
+    } catch (err) {
+      console.error('Gemini voice failed, using Whisper:', err.response?.data?.error?.message || err.message);
+      if (!GROQ_API_KEY) throw err;
+    }
+  }
 
   // Let Whisper detect the language. If it lands on something our
   // customers don't speak (it often mistakes Sinhala for Hindi), try again
