@@ -84,6 +84,9 @@ export interface BackendCustomer {
   totalShipments?: number;
   shipmentDates?: string[];
   createdByImport?: boolean;
+  /** "website_chat": a signed-out visitor typed their name + phone in the chat. */
+  addedFrom?: string;
+  hasOnlineAccount?: boolean;
   totalRevenue?: number;
   outstandingBalance?: number | null;
   /** Website chats: the My Transco account the visitor was signed in to. */
@@ -385,6 +388,7 @@ export function mapConversation(c: BackendCustomerWithMessages): Conversation {
     totalShipments: c.totalShipments,
     shipmentDates: c.shipmentDates,
     createdByImport: c.createdByImport,
+    websiteNoAccount: c.addedFrom === "website_chat" && c.hasOnlineAccount !== true,
     totalRevenue: c.totalRevenue,
     outstandingBalance: c.outstandingBalance,
   };

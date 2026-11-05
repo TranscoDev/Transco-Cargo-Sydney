@@ -25,6 +25,8 @@ const { hasRealName } = require('./customerTools');
 const agentAnswer = require('./agentAnswer');
 const customerPhotos = require('./customerPhotos');
 const { hearAudio } = require('./voiceHear');
+const { ObjectId } = require('mongodb');
+const { normalizePhoneNumber } = require('./normalizePhone');
 
 // Photos from the website chat's 📎 button (shrunk in the browser first).
 const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
@@ -35,6 +37,13 @@ const VOICE_PER_HOUR = 10;
 const VOICE_MIME_RE = /^audio\/(webm|ogg|mp4|x-m4a|aac|mpeg)(;.*)?$/;
 const VOICE_UNCLEAR_REPLY =
   "🎤 Sorry, I couldn't hear that voice message clearly. Could you type your question, or record it again somewhere quieter?";
+// Signed-out visitors: the My Transco invite + name/phone form (see /contact).
+const ACCOUNT_URL = 'https://my.transcosydney.com.au/account.html';
+const CONTACT_SAVED_REPLY = (name, phone) =>
+  `Thanks ${name.split(' ')[0]}! 🙏 We've saved your details — our team can reach you on ${phone}.\n\n` +
+  `👉 Create your free My Transco account to see our replies, your bookings and tracking anytime: ${ACCOUNT_URL}`;
+const CONTACT_SKIPPED_REPLY =
+  `No problem! If you'd like to see our replies anytime, you can create a free My Transco account: ${ACCOUNT_URL}`;
 const CANT_VIEW_PHOTO_REPLY =
   "📸 Thanks for the photo — I couldn't look at it just now. Could you tell me what it is and what you'd like to know?";
 
@@ -384,6 +393,33 @@ module.exports = function createWebChatRouter({
       // A plain device name ("iPhone", "Windows computer") so a customer
       // with chats on several devices can tell them apart in My Transco.
       // Only this short label is kept, never the browser's full details.
+      // Signed-out visitors (not linked to a customer yet): once at the
+      // start, and again when they ask for the team if they skipped it,
+      // the widget shows the My Transco invite + name/phone form under the
+      // reply (askContact). staffWillReply = handed to the team, so the
+      // widget starts checking for staff replies (POST /updates).
+      let handoverNow = false;
+      const askable = !account && !customer.linkedCustomerId && !customer.visitorContact;
+      const asked = customer.contactAsked || {};
+      const replyJson = res.json.bind(res);
+      res.json = (body) => {
+        if (!body || typeof body !== 'object' || body.error) return replyJson(body);
+        const stage = !askable || !body.reply ? null
+          : !asked.start ? 'start'
+          : handoverNow && !asked.handover ? 'handover' : null;
+        const out = {
+          ...body,
+          ...(handoverNow || body.handedOff ? { staffWillReply: true } : {}),
+          ...(stage ? { askContact: stage } : {})
+        };
+        if (!stage) return replyJson(out);
+        // Saved before the reply goes out, so a quick next message isn't asked again.
+        customers().updateOne({ _id: customer._id }, { $set: { [`contactAsked.${stage}`]: new Date() } })
+          .catch(err => console.error('contactAsked save failed:', err.message))
+          .then(() => replyJson(out));
+        return res;
+      };
+
       if (!customer.device) {
         const device = deviceLabel(req.headers['user-agent']);
         await customers().updateOne({ _id: customer._id }, { $set: { device } });
@@ -612,6 +648,7 @@ module.exports = function createWebChatRouter({
       }
 
       const needsAttention = mainReply.startsWith(HANDOFF_MARKER);
+      handoverNow = needsAttention;
       let cleanContent = needsAttention
         ? mainReply.slice(HANDOFF_MARKER.length).trimStart()
         : mainReply;
@@ -843,6 +880,107 @@ module.exports = function createWebChatRouter({
     } catch (err) {
       console.error('Web chat error:', err.response?.data ?? err.message ?? err);
       res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+  });
+
+  // ---------- signed-out visitors: name + phone, and staff replies ----------
+
+  const findChat = (sessionId) => (typeof sessionId === 'string' && sessionId.length >= 10 && sessionId.length <= 100
+    ? customers().findOne({ sessionId, channel: 'website' })
+    : Promise.resolve(null));
+
+  // The visitor's name + phone from the form under the bot's reply (or
+  // skip). A NEW number becomes a customer (added from the website chat,
+  // no My Transco account yet) and this chat is linked to it, so staff see
+  // who it is. A number we already know is NEVER changed or linked here —
+  // anyone can type someone else's number — the details just show in the
+  // chat and staff get the "This might be …" suggestion in Conversations.
+  // Typing a number never gives the visitor any account access.
+  router.post('/contact', async (req, res) => {
+    try {
+      const { sessionId, name, phone, skip } = req.body || {};
+      const chat = await findChat(sessionId);
+      if (!chat) return res.status(404).json({ error: 'Chat not found.' });
+      if (skip === true) {
+        await customers().updateOne({ _id: chat._id }, { $set: { contactSkippedAt: new Date() } });
+        return res.json({ reply: CONTACT_SKIPPED_REPLY });
+      }
+      const cleanName = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
+      const phoneNumber = typeof phone === 'string' ? normalizePhoneNumber(phone) : null;
+      if (cleanName.length < 2) return res.status(400).json({ error: 'Please type your name.' });
+      if (!phoneNumber || phoneNumber.length < 9) return res.status(400).json({ error: 'Please check the phone number.' });
+      if (chat.visitorContact) return res.status(409).json({ error: 'Your details are already saved.' });
+
+      const shown = '+' + phoneNumber;
+      const contactMessage = await saveMessage({
+        customerId: chat._id, senderType: 'CUSTOMER', content: `📇 My details: ${cleanName} · ${shown}`,
+        isRead: false, replyToMessageId: null, whatsappStatus: null
+      });
+
+      const set = { visitorContact: { name: cleanName, phoneNumber, at: new Date() } };
+      let known = await customers().findOne({ phoneNumber, channel: { $ne: 'website' } }, { projection: { _id: 1 } });
+      let added = null;
+      if (!known) {
+        const doc = { phoneNumber, name: cleanName, mode: 'CHATBOT', status: 'ACTIVE', sources: ['website'], addedFrom: 'website_chat', createdAt: new Date() };
+        try {
+          const { insertedId } = await customers().insertOne(doc);
+          added = { _id: insertedId, ...doc };
+        } catch (err) {
+          if (err.code !== 11000) throw err; // the same number added a moment ago — treat as known
+          known = true;
+        }
+      }
+      if (added) {
+        Object.assign(set, { linkedCustomerId: added._id, linkedBy: 'visitor', nameBeforeLink: chat.name, name: cleanName });
+      }
+      await customers().updateOne({ _id: chat._id }, { $set: set });
+
+      if (added) {
+        broadcast('customer.contact_updated', { customerId: added._id, customer: added });
+        broadcast('customer.link_changed', {
+          customerId: chat._id,
+          name: cleanName,
+          linkedAccount: { id: String(added._id), name: cleanName, phoneNumber, customerCode: null, byStaff: true, byVisitor: true }
+        });
+      }
+      await broadcastMessageCreated({ ...chat, ...set }, contactMessage);
+
+      const reply = CONTACT_SAVED_REPLY(cleanName, shown);
+      const thanks = await saveMessage({
+        customerId: chat._id, senderType: 'CHATBOT', content: reply,
+        isRead: true, replyToMessageId: contactMessage._id, whatsappStatus: null
+      });
+      await broadcastMessageCreated({ ...chat, ...set }, thanks);
+      res.json({ reply });
+    } catch (err) {
+      console.error('Web chat contact failed:', err.message);
+      res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+  });
+
+  // Staff replies for this browser's chat (the widget checks every few
+  // seconds after a handover, and when the visitor comes back). The
+  // session id is the browser's own random key; only text goes out —
+  // pictures and voice messages are named, not sent.
+  router.post('/updates', async (req, res) => {
+    try {
+      const { sessionId, after } = req.body || {};
+      const chat = await findChat(sessionId);
+      if (!chat) return res.json({ messages: [] });
+      const q = { customerId: chat._id, senderType: 'HUMAN' };
+      if (typeof after === 'string' && ObjectId.isValid(after)) q._id = { $gt: new ObjectId(after) };
+      const list = await messages().find(q).sort({ _id: 1 }).limit(20).toArray();
+      res.json({
+        messages: list.map(m => ({
+          id: String(m._id),
+          text: m.content || '',
+          picture: m.mediaType === 'image',
+          voice: m.mediaType === 'audio'
+        }))
+      });
+    } catch (err) {
+      console.error('Web chat updates failed:', err.message);
+      res.status(500).json({ error: 'Could not check for replies.' });
     }
   });
 

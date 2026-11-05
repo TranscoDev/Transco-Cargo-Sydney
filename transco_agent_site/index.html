@@ -717,6 +717,7 @@
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
 <script src="/chat-voice.js"></script>
+<script src="/chat-staff.js"></script>
 </head>
 <body>
 
@@ -972,7 +973,8 @@
       return "agentsite-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
     }
   }
-  var sessionId = getSessionId();
+  // Kept in this browser for 7 days, so staff replies still reach the visitor (chat-staff.js).
+  var sessionId = window.TranscoChatStaff ? TranscoChatStaff.sessionId(SESSION_STORAGE_KEY) : getSessionId();
 
   var messagesEl = document.getElementById("ta-messages");
   var input = document.getElementById("ta-input");
@@ -1142,6 +1144,7 @@
         }
         if (data.handedOff) {
           addMessage(data.note || "A staff member will be with you shortly.", "system");
+          if (window.TranscoChatStaff) TranscoChatStaff.afterReply(data);
           return;
         }
         var botEl = addMessage(data.reply || "", "bot", data.media, true);
@@ -1149,6 +1152,7 @@
         addActions(data.actions);
         addMenu(data.menu && data.menu.items);
         if (window.TranscoChatLinks && TranscoChatLinks.backToMenu) TranscoChatLinks.backToMenu(botEl, data.menu && data.menu.items, function () { sendPayload({ sessionId: sessionId, menuItemId: "menu_home" }, "🏠 Back to menu"); });
+        if (window.TranscoChatStaff) TranscoChatStaff.afterReply(data);
       })
       .catch(function () {
         typingEl.remove();
@@ -1175,6 +1179,8 @@
   if (window.TranscoChatVoice) TranscoChatVoice.attach(input, function (voice) {
     sendPayload({ sessionId: sessionId, voice: voice }, "🎤 Voice message");
   });
+  // Staff replies + name/phone form for visitors who aren't signed in (chat-staff.js).
+  if (window.TranscoChatStaff) TranscoChatStaff.start({ api: WIDGET_API_URL, sessionId: sessionId, list: messagesEl, add: function (text) { return addMessage(text, "bot"); } });
 
   sendBtn.addEventListener("click", sendMessage);
   input.addEventListener("keydown", function (e) {

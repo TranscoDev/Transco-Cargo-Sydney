@@ -178,9 +178,9 @@ export function ContactCard({
           {conversation.linkedAccount && !conversation.mergedIds?.length && (
             <span
               className="inline-flex items-center gap-1 rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success-foreground"
-              title={`${conversation.linkedAccount.byStaff ? "Linked by staff" : "Signed in to My Transco"} · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}
+              title={`${conversation.linkedAccount.byVisitor ? "Typed their name and phone in the chat — no My Transco account" : conversation.linkedAccount.byStaff ? "Linked by staff" : "Signed in to My Transco"} · ${formatPhone(conversation.linkedAccount.phoneNumber ?? "")}`}
             >
-              {conversation.linkedAccount.byStaff ? "🔗 Linked" : "✓ Signed in"}
+              {conversation.linkedAccount.byVisitor ? "📇 Gave details" : conversation.linkedAccount.byStaff ? "🔗 Linked" : "✓ Signed in"}
               {conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
             </span>
           )}

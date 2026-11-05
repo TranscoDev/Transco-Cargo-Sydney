@@ -1116,7 +1116,17 @@ function ContactRow({
         {formatPhone(conversation.phoneNumber)}
       </td>
       <td className="px-4 py-3">
-        <SourceBadges sources={sourcesFor(conversation)} />
+        <div className="flex flex-wrap items-center gap-1">
+          <SourceBadges sources={sourcesFor(conversation)} />
+          {conversation.websiteNoAccount && (
+            <span
+              className="rounded bg-attention-soft px-1.5 py-0.5 text-xs font-medium text-attention-foreground"
+              title="Typed their name and phone in the website chat — no My Transco account yet"
+            >
+              No account
+            </span>
+          )}
+        </div>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
         {(() => {

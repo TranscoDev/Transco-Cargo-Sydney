@@ -1586,14 +1586,18 @@ async function markNeedsAttention(customer, triggerMessage) {
 // console's Conversations instead of the anonymous session.
 // byStaff: linked by staff in Conversations (not a sign-in) — staff-side
 // only; the bot never treats the visitor as signed in because of it.
-function linkedAccountSummary(account, byStaff = false) {
+// linkedBy 'visitor': a signed-out visitor typed their name + phone and we
+// added them as a new customer (webChatRoutes.js /contact) — staff-side only
+// like a staff link, shown as "details from the chat".
+function linkedAccountSummary(account, linkedBy) {
   if (!account) return null;
   return {
     id: String(account._id),
     name: account.name || null,
     phoneNumber: account.phoneNumber || null,
     customerCode: account.customerCode || null,
-    byStaff
+    byStaff: linkedBy !== 'signin',
+    byVisitor: linkedBy === 'visitor'
   };
 }
 
@@ -1603,7 +1607,7 @@ async function linkedAccountFor(customer) {
     { _id: customer.linkedCustomerId },
     { projection: { name: 1, phoneNumber: 1, customerCode: 1 } }
   );
-  return linkedAccountSummary(account, customer.linkedBy === 'staff');
+  return linkedAccountSummary(account, customer.linkedBy);
 }
 
 async function broadcastMessageCreated(customer, message) {
@@ -2686,7 +2690,7 @@ app.get('/api/customers', async (req, res) => {
         hasOnlineAccount: Boolean(customer.portalJoinedAt || customer.passwordHash),
 
         linkedAccount: customer.linkedCustomerId
-          ? linkedAccountSummary(customerById.get(String(customer.linkedCustomerId)), customer.linkedBy === 'staff')
+          ? linkedAccountSummary(customerById.get(String(customer.linkedCustomerId)), customer.linkedBy)
           : null,
 
         messages:
@@ -4914,7 +4918,7 @@ app.patch('/api/customers/:customerId/link', async (req, res) => {
     const chat = await customers().findOne({ _id: new ObjectId(customerId) });
     if (!chat) return res.status(404).json({ error: 'Chat not found' });
     if (chat.channel !== 'website') return res.status(400).json({ error: 'Only website chats can be linked.' });
-    if (chat.linkedCustomerId && chat.linkedBy !== 'staff') {
+    if (chat.linkedCustomerId && chat.linkedBy === 'signin') {
       return res.status(409).json({ error: 'This visitor signed in — the chat is already theirs.' });
     }
 

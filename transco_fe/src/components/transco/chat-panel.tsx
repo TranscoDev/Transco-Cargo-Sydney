@@ -126,8 +126,24 @@ export function ChatPanel({
               </span>
               {conversation.linkedAccount && (
                 <span className="rounded bg-success-soft px-1.5 font-medium text-success-foreground">
-                  {conversation.linkedAccount.byStaff ? "🔗 Linked" : "✓ Signed in"}{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
+                  {conversation.linkedAccount.byVisitor ? "📇 Gave details · no account" : conversation.linkedAccount.byStaff ? "🔗 Linked" : "✓ Signed in"}{conversation.linkedAccount.customerCode ? ` · ${conversation.linkedAccount.customerCode}` : ""}
                 </span>
+              )}
+              {/* Website chat with a real number (signed in, linked, or typed by the visitor): reach them after they leave. */}
+              {conversation.channel === "website" && conversation.linkedAccount?.phoneNumber && (
+                <>
+                  <a href={`tel:+${conversation.linkedAccount.phoneNumber.replace(/\D/g, "")}`} className="font-medium text-primary hover:underline">
+                    📞 Call
+                  </a>
+                  <a
+                    href={`https://wa.me/${conversation.linkedAccount.phoneNumber.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary hover:underline"
+                  >
+                    WhatsApp
+                  </a>
+                </>
               )}
               <Link
                 to="/console/customers/$customerId"

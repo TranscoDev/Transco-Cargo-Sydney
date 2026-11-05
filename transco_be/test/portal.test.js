@@ -2207,3 +2207,50 @@ test('website 🎤: a voice message is kept for staff; not heard → asks the cu
   assert.match(saved[0].mediaUrl, /\.webm$/);
   assert.equal(saved[1].senderType, 'CHATBOT');
 });
+
+test('website visitor not signed in: asked once at the start, name + phone saves a new customer, staff replies reach the chat', async () => {
+  const sessionId = 'agentsite-contact-test-' + Date.now();
+  const first = await chat(sessionId, { message: 'hello' });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.askContact, 'start');
+  const second = await chat(sessionId, { message: 'what are your hours' });
+  assert.equal(second.body.askContact, undefined, 'only asked once at the start');
+
+  const bad = await api('POST', '/api/web-chat/contact', { body: { sessionId, name: 'Nimal Visitor', phone: '12' } });
+  assert.equal(bad.status, 400);
+
+  const phone = '0499 7' + String(Date.now()).slice(-5);
+  const saved = await api('POST', '/api/web-chat/contact', { body: { sessionId, name: 'Nimal Visitor', phone } });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.match(saved.body.reply, /My Transco/);
+
+  const visitor = await db.collection('customers').findOne({ sessionId, channel: 'website' });
+  assert.equal(visitor.linkedBy, 'visitor');
+  const added = await db.collection('customers').findOne({ _id: visitor.linkedCustomerId });
+  assert.equal(added.name, 'Nimal Visitor');
+  assert.equal(added.addedFrom, 'website_chat');
+
+  const again = await api('POST', '/api/web-chat/contact', { body: { sessionId, name: 'Someone Else', phone } });
+  assert.equal(again.status, 409);
+  const third = await chat(sessionId, { message: 'thanks' });
+  assert.equal(third.body.askContact, undefined, 'never asked after giving details');
+
+  // A second visitor typing the SAME number: the customer is not changed and the chat is not linked.
+  const other = 'agentsite-contact-test2-' + Date.now();
+  await chat(other, { message: 'hi' });
+  const dup = await api('POST', '/api/web-chat/contact', { body: { sessionId: other, name: 'Impostor', phone } });
+  assert.equal(dup.status, 200);
+  const otherChat = await db.collection('customers').findOne({ sessionId: other, channel: 'website' });
+  assert.equal(otherChat.linkedCustomerId, undefined);
+  assert.equal((await db.collection('customers').findOne({ _id: added._id })).name, 'Nimal Visitor');
+
+  // Staff reply → the visitor's widget gets it.
+  const none = await api('POST', '/api/web-chat/updates', { body: { sessionId } });
+  assert.deepEqual(none.body.messages, []);
+  await db.collection('messages').insertOne({ customerId: visitor._id, senderType: 'HUMAN', content: 'Hi Nimal, we can help', isRead: true, createdAt: new Date() });
+  const got = await api('POST', '/api/web-chat/updates', { body: { sessionId } });
+  assert.equal(got.body.messages.length, 1);
+  assert.equal(got.body.messages[0].text, 'Hi Nimal, we can help');
+  const after = await api('POST', '/api/web-chat/updates', { body: { sessionId, after: got.body.messages[0].id } });
+  assert.deepEqual(after.body.messages, []);
+});

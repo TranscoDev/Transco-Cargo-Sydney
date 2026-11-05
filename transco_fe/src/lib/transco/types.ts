@@ -197,6 +197,8 @@ export interface Conversation {
   shipmentDates?: string[] | undefined;
   /** First saved by a shipment sheet import (an old customer, not a new one). */
   createdByImport?: boolean | undefined;
+  /** Added from a website chat (the visitor typed their name + phone) and no My Transco account yet. */
+  websiteNoAccount?: boolean | undefined;
   totalRevenue?: number | undefined;
   outstandingBalance?: number | null | undefined;
   /** Website chats only: the My Transco account the visitor was signed in
@@ -229,6 +231,8 @@ export interface LinkedAccount {
   customerCode: string | null;
   /** Linked by staff in Conversations, not a My Transco sign-in. */
   byStaff?: boolean;
+  /** A signed-out visitor typed their name + phone in the chat and was added as a new customer. */
+  byVisitor?: boolean;
 }
 
 /** GET /api/customers/:id/profile — the CRM detail view. A superset of
