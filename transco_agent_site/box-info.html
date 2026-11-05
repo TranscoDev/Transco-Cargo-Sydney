@@ -233,6 +233,7 @@
 </style>
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
+<script src="/chat-voice.js"></script>
 </head>
 <body>
 
@@ -484,6 +485,7 @@
       .then(function (res) { return res.json(); })
       .then(function (data) {
         typingEl.remove();
+        if (data.heard) addMessage('🎤 I heard: "' + data.heard + '"', "bot");
         if (data.error) { addMessage("Sorry, something went wrong. Please try again.", "bot"); return; }
         if (data.handedOff) { addMessage(data.note || "A staff member will be with you shortly.", "bot"); return; }
         var botEl = addMessage(data.reply || "", "bot", data.media, true);
@@ -507,6 +509,10 @@
   // 📎 Photo button (chat-photo.js).
   if (window.TranscoChatPhoto) TranscoChatPhoto.attach(input, function (image, caption) {
     sendPayload({ sessionId: sessionId, message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");
+  });
+  // 🎤 Voice message button (chat-voice.js).
+  if (window.TranscoChatVoice) TranscoChatVoice.attach(input, function (voice) {
+    sendPayload({ sessionId: sessionId, voice: voice }, "🎤 Voice message");
   });
 
   // ---- Phones: the chat opens full-screen from the floating button ----

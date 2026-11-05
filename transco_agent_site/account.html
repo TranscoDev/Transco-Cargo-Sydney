@@ -452,6 +452,7 @@
 <script src="/live-prices.js" data-api="https://transco-backend-production.up.railway.app"></script>
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
+<script src="/chat-voice.js"></script>
 </head>
 <body>
   <a class="sr-only" href="#main">Skip to content</a>
@@ -560,7 +561,7 @@
       // sign in
       agentTitle: "Transco Agent", agentSub: "Prices, tracking and bookings — just ask.", agentHello: "Hi {name}! How can I help?", agentHelloNoName: "Hi! How can I help?",
       agentPlaceholder: "Type your question…", agentSend: "Send", agentClose: "Close chat",
-      agentError: "Sorry, something went wrong. Please try again.", agentOffline: "Sorry, I couldn't reach our server. Please check your connection and try again.", agentHandedOff: "A staff member will reply here shortly.", backToMenu: "Back to menu",
+      agentError: "Sorry, something went wrong. Please try again.", agentOffline: "Sorry, I couldn't reach our server. Please check your connection and try again.", agentHandedOff: "A staff member will reply here shortly.", backToMenu: "Back to menu", voiceMessage: "Voice message", voiceHeard: "I heard", voiceRecord: "Send a voice message", voiceRecording: "Recording…", voiceCancel: "Cancel", voiceSend: "Send", voiceTooShort: "That was too short — please try again.", voiceNoMic: "Please allow the microphone to send a voice message, or type your question instead.",
       notifyAsk: "🔔 Get a notification when the Transco team replies", notifyOn: "Turn on", notifyDone: "🔔 Notifications are on", notifyIos: "🔔 For notifications on iPhone: tap Share ⬆️ → Add to Home Screen, then open My Transco from your home screen.", notifyBlocked: "Notifications are blocked — allow them in your browser settings.", notifyLater: "Not now",
       chatsTitle: "Your chats", chatsOpen: "Your chats", newChat: "Start a new chat", staffName: "Transco team", voiceGone: "This voice message is no longer available.", staffPicture: "Picture from the Transco team", pictureGone: "This picture is no longer available.", chatFrom: "Chat from {d}", chatDevice: "{d}", chatYou: "You: ",
       sugMyBookings: "My bookings", sugMyBl: "My BL number", sugDecl: "Declaration status", sugHours: "Opening hours",
@@ -700,7 +701,7 @@
       notFoundTitle: "ඒක හොයාගන්න බැරි වුණා", notFoundBody: "ඒක අයින් කරලා වෙන්න පුළුවන්, නැත්නම් වෙන account එකකට අයිති වෙන්න පුළුවන්.",
       agentTitle: "Transco Agent", agentSub: "මිල, tracking සහ bookings — අහන්න.", agentHello: "ආයුබෝවන් {name}! මම උදව් කරන්නේ කොහොමද?", agentHelloNoName: "ආයුබෝවන්! මම උදව් කරන්නේ කොහොමද?",
       agentPlaceholder: "ඔයාගේ ප්‍රශ්නය type කරන්න…", agentSend: "යවන්න", agentClose: "Chat එක වහන්න",
-      agentError: "සමාවෙන්න, මොකක් හරි වැරැද්දක් වුණා. ආයෙත් try කරන්න.", agentOffline: "සමාවෙන්න, server එකට connect වෙන්න බැරි වුණා. Connection එක check කරලා ආයෙත් try කරන්න.", agentHandedOff: "අපේ team එකේ කෙනෙක් ඉක්මනින් මෙතන reply කරයි.", backToMenu: "ප්‍රධාන මෙනුවට",
+      agentError: "සමාවෙන්න, මොකක් හරි වැරැද්දක් වුණා. ආයෙත් try කරන්න.", agentOffline: "සමාවෙන්න, server එකට connect වෙන්න බැරි වුණා. Connection එක check කරලා ආයෙත් try කරන්න.", agentHandedOff: "අපේ team එකේ කෙනෙක් ඉක්මනින් මෙතන reply කරයි.", backToMenu: "ප්‍රධාන මෙනුවට", voiceMessage: "හඬ පණිවිඩය", voiceHeard: "මට ඇසුණේ", voiceRecord: "හඬ පණිවිඩයක් යවන්න", voiceRecording: "Record වෙනවා…", voiceCancel: "අවලංගු කරන්න", voiceSend: "යවන්න", voiceTooShort: "ඒක ගොඩක් කෙටියි — ආයෙත් උත්සාහ කරන්න.", voiceNoMic: "හඬ පණිවිඩයක් යවන්න microphone එකට අවසර දෙන්න, නැත්නම් ඔයාගේ ප්‍රශ්නය type කරන්න.",
       notifyAsk: "🔔 Transco team එක reply කළාම notification එකක් ගන්න", notifyOn: "On කරන්න", notifyDone: "🔔 Notifications on", notifyIos: "🔔 iPhone එකේ notifications සඳහා: Share ⬆️ → Add to Home Screen ඔබලා, home screen එකෙන් My Transco open කරන්න.", notifyBlocked: "Notifications block කරලා — browser settings වලින් allow කරන්න.", notifyLater: "පස්සේ",
       chatsTitle: "ඔයාගේ chats", chatsOpen: "ඔයාගේ chats", newChat: "අලුත් chat එකක්", staffName: "Transco team", voiceGone: "මේ voice message එක දැන් නෑ.", staffPicture: "Transco team එකෙන් picture එකක්", pictureGone: "මේ picture එක දැන් නෑ.", chatFrom: "{d} chat එක", chatYou: "ඔයා: ",
       sugMyBookings: "මගේ bookings", sugMyBl: "මගේ BL number එක", sugDecl: "Declaration තත්ත්වය", sugHours: "විවෘත වෙලාවන්",
@@ -833,7 +834,7 @@
       notFoundTitle: "அதைக் கண்டுபிடிக்க முடியவில்லை", notFoundBody: "அது நீக்கப்பட்டிருக்கலாம், அல்லது வேறு account க்குச் சொந்தமானதாக இருக்கலாம்.",
       agentTitle: "Transco Agent", agentSub: "விலை, tracking மற்றும் bookings — கேளுங்கள்.", agentHello: "வணக்கம் {name}! நான் எப்படி உதவலாம்?", agentHelloNoName: "வணக்கம்! நான் எப்படி உதவலாம்?",
       agentPlaceholder: "உங்கள் கேள்வியை type செய்யுங்கள்…", agentSend: "அனுப்பு", agentClose: "Chat ஐ மூடு",
-      agentError: "மன்னிக்கவும், ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.", agentOffline: "மன்னிக்கவும், server ஐ அணுக முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.", agentHandedOff: "எங்கள் குழுவில் ஒருவர் விரைவில் இங்கே பதிலளிப்பார்.", backToMenu: "முதன்மை மெனுவுக்கு",
+      agentError: "மன்னிக்கவும், ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.", agentOffline: "மன்னிக்கவும், server ஐ அணுக முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.", agentHandedOff: "எங்கள் குழுவில் ஒருவர் விரைவில் இங்கே பதிலளிப்பார்.", backToMenu: "முதன்மை மெனுவுக்கு", voiceMessage: "குரல் செய்தி", voiceHeard: "நான் கேட்டது", voiceRecord: "குரல் செய்தி அனுப்பு", voiceRecording: "பதிவாகிறது…", voiceCancel: "ரத்து", voiceSend: "அனுப்பு", voiceTooShort: "இது மிகவும் குறுகியது — மீண்டும் முயற்சிக்கவும்.", voiceNoMic: "குரல் செய்தி அனுப்ப microphone அனுமதி தாருங்கள், அல்லது உங்கள் கேள்வியை type செய்யுங்கள்.",
       notifyAsk: "🔔 Transco team பதில் அனுப்பும்போது notification பெறுங்கள்", notifyOn: "On செய்", notifyDone: "🔔 Notifications on", notifyIos: "🔔 iPhone இல் notifications பெற: Share ⬆️ → Add to Home Screen அழுத்தி, home screen இலிருந்து My Transco திறக்கவும்.", notifyBlocked: "Notifications தடுக்கப்பட்டுள்ளன — browser settings இல் அனுமதிக்கவும்.", notifyLater: "பிறகு",
       chatsTitle: "உங்கள் chats", chatsOpen: "உங்கள் chats", newChat: "புதிய chat", staffName: "Transco team", voiceGone: "இந்த voice message இப்போது கிடைக்காது.", staffPicture: "Transco team அனுப்பிய படம்", pictureGone: "இந்த படம் இப்போது கிடைக்காது.", chatFrom: "{d} chat", chatYou: "நீங்கள்: ",
       sugMyBookings: "என் bookings", sugMyBl: "என் BL number", sugDecl: "Declaration நிலை", sugHours: "திறந்திருக்கும் நேரம்",
@@ -1343,6 +1344,7 @@
       .then(function (res) { return res.json(); })
       .then(function (data) {
         typing.remove();
+        if (data.heard) addAgentMessage("🎤 " + t("voiceHeard") + ': "' + data.heard + '"', "bot");
         if (data.error) {
           // This chat is another account's: the next message starts a new one.
           if (data.reason === "other_account") session(AGENT_SESSION_KEY, null);
@@ -1396,6 +1398,10 @@
     if (window.TranscoChatPhoto) TranscoChatPhoto.attach(agent.input, function (image, caption) {
       sendToAgent({ message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");
     });
+    // 🎤 Voice message button (chat-voice.js).
+    if (window.TranscoChatVoice) TranscoChatVoice.attach(agent.input, function (voice) {
+      sendToAgent({ voice: voice }, "🎤 " + t("voiceMessage"));
+    }, { record: t("voiceRecord"), recording: t("voiceRecording"), cancel: t("voiceCancel"), send: t("voiceSend"), tooShort: t("voiceTooShort"), noMic: t("voiceNoMic") });
     // ☰ = your chats (only when there's more than one); + = a new chat.
     agent.chatsBtn = h("button", { type: "button", class: "ag-close", "aria-label": t("chatsOpen"), title: t("chatsOpen"), text: "☰" });
     agent.chatsBtn.addEventListener("click", showChatList);

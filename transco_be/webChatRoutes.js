@@ -24,10 +24,17 @@ const { detectAccountIntent, handleAccountIntent, ACTION_INTENTS, parsePriceQuot
 const { hasRealName } = require('./customerTools');
 const agentAnswer = require('./agentAnswer');
 const customerPhotos = require('./customerPhotos');
+const { hearAudio } = require('./voiceHear');
 
 // Photos from the website chat's 📎 button (shrunk in the browser first).
 const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
 const PHOTOS_PER_HOUR = 5;
+// Voice messages from the 🎤 button (2 minutes of browser audio ≈ 1–2 MB).
+const VOICE_MAX_BYTES = 4 * 1024 * 1024;
+const VOICE_PER_HOUR = 10;
+const VOICE_MIME_RE = /^audio\/(webm|ogg|mp4|x-m4a|aac|mpeg)(;.*)?$/;
+const VOICE_UNCLEAR_REPLY =
+  "🎤 Sorry, I couldn't hear that voice message clearly. Could you type your question, or record it again somewhere quieter?";
 const CANT_VIEW_PHOTO_REPLY =
   "📸 Thanks for the photo — I couldn't look at it just now. Could you tell me what it is and what you'd like to know?";
 
@@ -205,7 +212,8 @@ module.exports = function createWebChatRouter({
 
   router.post('/', async (req, res) => {
     try {
-      const { sessionId, message, menuItemId, action, shipmentId, label, country, image } = req.body || {};
+      const { sessionId, menuItemId, action, shipmentId, label, country, image, voice } = req.body || {};
+      let { message } = req.body || {};
 
       if (!sessionId || typeof sessionId !== 'string') {
         return res.status(400).json({ error: 'sessionId is required' });
@@ -222,6 +230,20 @@ module.exports = function createWebChatRouter({
           return res.status(400).json({ error: 'Please send a JPG or PNG photo under 3 MB.' });
         }
         photo = { data, mimeType };
+      }
+
+      // A voice message from the 🎤 button: { data: base64, mimeType }.
+      // Heard the same way as a WhatsApp voice note (voiceHear.js) and then
+      // answered like a typed message; the original is kept for staff.
+      let voiceNote = null;
+      if (voice !== undefined && voice !== null) {
+        const mimeType = voice && typeof voice.mimeType === 'string' ? voice.mimeType.toLowerCase() : '';
+        const data = voice && typeof voice.data === 'string' ? Buffer.from(voice.data, 'base64') : null;
+        if (!VOICE_MIME_RE.test(mimeType) || !data || !data.length || data.length > VOICE_MAX_BYTES) {
+          return res.status(400).json({ error: 'Please record the voice message again (up to 2 minutes).' });
+        }
+        if (photo) return res.status(400).json({ error: 'Send a photo and a voice message separately.' });
+        voiceNote = { data, mimeType };
       }
 
       // Signed-in My Transco customer, if the widget sent a valid
@@ -267,11 +289,14 @@ module.exports = function createWebChatRouter({
       } else if (!photo && typeof message === 'string' && MENU_WORDS_RE.test(message.trim())) {
         // Typed "menu" / "main menu" — same as the button, shown as typed.
         resolvedTap = { ...resolveMenuTap('menu_home'), title: message.trim() };
-      } else if (!photo && (!message || typeof message !== 'string' || !message.trim())) {
+      } else if (!photo && !voiceNote && (!message || typeof message !== 'string' || !message.trim())) {
         return res.status(400).json({ error: 'message is required' });
       }
       if (photo && (resolvedTap || accountAction)) {
         return res.status(400).json({ error: 'Send a photo on its own or with a typed message.' });
+      }
+      if (voiceNote && (resolvedTap || accountAction)) {
+        return res.status(400).json({ error: 'Send a voice message on its own.' });
       }
       const caption = photo && typeof message === 'string' ? message.trim().slice(0, 2000) : '';
 
@@ -289,6 +314,48 @@ module.exports = function createWebChatRouter({
           return res.status(429).json({ error: `You can send up to ${PHOTOS_PER_HOUR} photos an hour — please describe it in words instead.` });
         }
         photoMedia = await customerPhotos.save(photo.data, photo.mimeType);
+      }
+
+      let voiceMedia = null;
+      let heard = null;
+      if (voiceNote) {
+        const recent = await messages().countDocuments({
+          customerId: customer._id,
+          senderType: 'CUSTOMER',
+          mediaType: 'audio',
+          createdAt: { $gt: new Date(Date.now() - 60 * 60 * 1000) }
+        });
+        if (recent >= VOICE_PER_HOUR) {
+          return res.status(429).json({ error: `You can send up to ${VOICE_PER_HOUR} voice messages an hour — please type your question instead.` });
+        }
+        voiceMedia = await customerPhotos.saveVoice(voiceNote.data, voiceNote.mimeType);
+        let result = null;
+        try {
+          result = await hearAudio(voiceNote);
+        } catch (err) {
+          console.error('Web chat voice failed:', err.response?.data ?? err.message);
+        }
+        // Couldn't hear it: keep it for staff, ask the customer to type it.
+        if (!result || result.unsure) {
+          const incomingVoice = await saveMessage({
+            customerId: customer._id, senderType: 'CUSTOMER', content: '🎤 Voice message',
+            isRead: false, replyToMessageId: null, whatsappStatus: null, ...voiceMedia
+          });
+          await broadcastMessageCreated(customer, incomingVoice);
+          if (customer.mode !== 'CHATBOT') return res.json({ reply: null, handedOff: true, heard: null });
+          const sorry = await saveMessage({
+            customerId: customer._id, senderType: 'CHATBOT', content: VOICE_UNCLEAR_REPLY,
+            isRead: true, replyToMessageId: incomingVoice._id, whatsappStatus: null
+          });
+          await broadcastMessageCreated(customer, sorry);
+          return res.json({ reply: VOICE_UNCLEAR_REPLY, media: null, menu: null, handedOff: false, heard: null });
+        }
+        heard = result.text;
+        message = heard;
+        // Every reply below tells the widget what was heard, so the
+        // customer sees "🎤 I heard: …" and can spot a wrong word.
+        const sendJson = res.json.bind(res);
+        res.json = (body) => sendJson(body && typeof body === 'object' ? { ...body, heard } : body);
       }
 
       // Link this browser's chat transcript to the signed-in customer, so
@@ -333,6 +400,7 @@ module.exports = function createWebChatRouter({
         ? (typeof label === 'string' && label.trim() ? label.trim().slice(0, 80) : accountAction.replace(/_/g, ' '))
         : resolvedTap ? resolvedTap.title
         : photo ? (caption ? `📷 ${caption}` : '📷 Photo')
+        : voiceNote ? `🎤 ${heard}`
         : message.trim();
 
       const incoming = await saveMessage({
@@ -342,10 +410,19 @@ module.exports = function createWebChatRouter({
         isRead: false,
         replyToMessageId: null,
         whatsappStatus: null,
-        ...(photoMedia || {})
+        ...(photoMedia || voiceMedia || {})
       });
 
       await broadcastMessageCreated(customer, incoming);
+
+      // Same as WhatsApp: say what was heard before answering.
+      if (voiceNote && customer.mode === 'CHATBOT') {
+        const heardMessage = await saveMessage({
+          customerId: customer._id, senderType: 'CHATBOT', content: `🎤 I heard: "${heard}"`,
+          isRead: true, replyToMessageId: incoming._id, whatsappStatus: null
+        });
+        await broadcastMessageCreated(customer, heardMessage);
+      }
 
       // A human already took over this session — same rule as
       // WhatsApp: don't call Flowise, let staff handle it directly via

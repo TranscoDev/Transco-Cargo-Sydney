@@ -172,6 +172,9 @@ before(async () => {
       STAFF_NOTIFICATION_PHONE: '',
       RESEND_API_KEY: '',
       GOOGLE_SERVICE_ACCOUNT_JSON: '',
+      // No voice hearing in tests: a voice message takes the "couldn't hear it" path.
+      GEMINI_API_KEY: '',
+      GROQ_API_KEY: '',
       SESSION_SECRET: 'portal-test-secret',
       PORTAL_AUTH_IP_LIMIT: '1000',
       WALKIN_IP_LIMIT: '1000'
@@ -2181,4 +2184,26 @@ test('WhatsApp: "Hi" gets the menu + a personal My Transco link; menu taps get w
   await post({ type: 'interactive', interactive: { type: 'list_reply', list_reply: { id: 'menu_track', title: '📦 Track My Shipment' } } });
   await wait(() => sentTo().length > 0);
   assert.ok(sentTo().some(r => JSON.stringify(r.body).includes('/account.html')), 'tracking tap → My Transco link');
+});
+
+test('website 🎤: a voice message is kept for staff; not heard → asks the customer to type it', async () => {
+  const sessionId = 'voice-test-' + Date.now();
+  const audio = { data: Buffer.from('not really audio').toString('base64'), mimeType: 'audio/webm' };
+
+  const bad = await chat(sessionId, { voice: { data: audio.data, mimeType: 'video/mp4' } });
+  assert.equal(bad.status, 400);
+  const both = await chat(sessionId, { voice: audio, image: { data: audio.data, mimeType: 'image/jpeg' } });
+  assert.equal(both.status, 400);
+
+  const sent = await chat(sessionId, { voice: audio });
+  assert.equal(sent.status, 200, JSON.stringify(sent.body));
+  assert.equal(sent.body.heard, null);
+  assert.match(sent.body.reply, /couldn't hear that voice message/);
+
+  const visitor = await db.collection('customers').findOne({ sessionId, channel: 'website' });
+  const saved = await db.collection('messages').find({ customerId: visitor._id }).sort({ createdAt: 1 }).toArray();
+  assert.equal(saved[0].senderType, 'CUSTOMER');
+  assert.equal(saved[0].mediaType, 'audio');
+  assert.match(saved[0].mediaUrl, /\.webm$/);
+  assert.equal(saved[1].senderType, 'CHATBOT');
 });
