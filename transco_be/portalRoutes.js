@@ -962,6 +962,11 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
   const publicMessage = (m) => ({
     id: String(m._id), from: fromLabel[m.senderType], text: m.content || '', at: m.createdAt,
     ...(m.senderType === 'HUMAN' && m.mediaType === 'audio' && m.mediaUrl ? { voice: true } : {}),
+    // Their own voice note (🎤 button): played back as a voice bubble, with
+    // what the bot heard under it (none when it couldn't make it out).
+    ...(m.senderType === 'CUSTOMER' && m.mediaType === 'audio' && m.mediaUrl
+      ? { voice: true, ...(m.content && m.content !== '🎤 Voice message' ? { heard: m.content.replace(/^🎤\s*/, '') } : {}) }
+      : {}),
     ...(m.senderType === 'HUMAN' && m.mediaType === 'image' && m.mediaUrl ? { image: true } : {})
   });
 
@@ -1017,21 +1022,22 @@ module.exports = function createPortalRouter({ customerAuth, tools, sendOtpMessa
     res.json({ messages: list.reverse().map(publicMessage) });
   }));
 
-  // A staff voice message or picture in one of the customer's own chats.
-  const staffMedia = (mediaType, what) => wrap(async (req, res) => {
+  // A staff voice message or picture in one of the customer's own chats
+  // (voice: their own voice notes too).
+  const staffMedia = (mediaType, what, senders = ['HUMAN']) => wrap(async (req, res) => {
     const { chatId, messageId } = req.params;
     const notFound = () => res.status(404).json({ error: `We couldn't find that ${what}.` });
     if (!ObjectId.isValid(chatId) || !ObjectId.isValid(messageId)) return notFound();
     const chat = await customers().findOne({ _id: new ObjectId(chatId), ...myChatsFilter(req.customer) }, { projection: { _id: 1 } });
     if (!chat) return notFound();
-    const m = await messages().findOne({ _id: new ObjectId(messageId), customerId: chat._id, senderType: 'HUMAN', mediaType });
+    const m = await messages().findOne({ _id: new ObjectId(messageId), customerId: chat._id, senderType: { $in: senders }, mediaType });
     const file = m && customerPhotos.fileFor(m.mediaUrl);
     if (!file) return notFound();
     res.set('Cache-Control', 'private, max-age=86400');
     res.set('X-Content-Type-Options', 'nosniff');
     res.sendFile(file);
   });
-  router.get('/messages/chats/:chatId/voice/:messageId', staffMedia('audio', 'voice message'));
+  router.get('/messages/chats/:chatId/voice/:messageId', staffMedia('audio', 'voice message', ['HUMAN', 'CUSTOMER']));
   router.get('/messages/chats/:chatId/image/:messageId', staffMedia('image', 'picture'));
 
   // ---------- notifications (a pop-up when the Transco team replies) ----------

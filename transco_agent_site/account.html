@@ -1217,6 +1217,14 @@
 
   function agentScroll() { agent.body.scrollTop = agent.body.scrollHeight; }
 
+  // A voice message in one of the customer's own chats, fetched with the
+  // sign-in token → a URL the player can use.
+  function voiceUrl(chatId, messageId) {
+    return fetch(API_BASE + "/messages/chats/" + encodeURIComponent(chatId) + "/voice/" + encodeURIComponent(messageId), { headers: { Authorization: "Bearer " + token } })
+      .then(function (res) { return res.ok ? res.blob() : Promise.reject(); })
+      .then(function (blob) { return URL.createObjectURL(blob); });
+  }
+
   function addAgentMessage(text, kind, media, persist) {
     if (agent.empty) { agent.empty.remove(); agent.empty = null; }
     var el = h("div", { class: "ag-msg " + kind });
@@ -1344,7 +1352,7 @@
       .then(function (res) { return res.json(); })
       .then(function (data) {
         typing.remove();
-        if (data.heard) addAgentMessage("🎤 " + t("voiceHeard") + ': "' + data.heard + '"', "bot");
+        if (data.heard && window.TranscoChatVoice) TranscoChatVoice.heard(data.heard, null, t("voiceHeard"));
         if (data.error) {
           // This chat is another account's: the next message starts a new one.
           if (data.reason === "other_account") session(AGENT_SESSION_KEY, null);
@@ -1399,8 +1407,11 @@
       sendToAgent({ message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");
     });
     // 🎤 Voice message button (chat-voice.js).
-    if (window.TranscoChatVoice) TranscoChatVoice.attach(agent.input, function (voice) {
-      sendToAgent({ voice: voice }, "🎤 " + t("voiceMessage"));
+    // Their own voice note shows as a ▶ bubble; "I heard: …" goes under it when the reply comes.
+    if (window.TranscoChatVoice) TranscoChatVoice.attach(agent.input, function (voice, played) {
+      if (agent.sending) return;
+      TranscoChatVoice.bubble(addAgentMessage("🎤 " + t("voiceMessage"), "customer"), played.url, played.seconds);
+      sendToAgent({ voice: voice });
     }, { record: t("voiceRecord"), recording: t("voiceRecording"), cancel: t("voiceCancel"), send: t("voiceSend"), tooShort: t("voiceTooShort"), noMic: t("voiceNoMic") });
     // ☰ = your chats (only when there's more than one); + = a new chat.
     agent.chatsBtn = h("button", { type: "button", class: "ag-close", "aria-label": t("chatsOpen"), title: t("chatsOpen"), text: "☰" });
@@ -1591,8 +1602,16 @@
       if (seq !== agent.seq || agent.chatId !== id) return;
       var list = data.messages || [];
       list.forEach(function (m) {
-        if (full || m.from === "staff") addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, m.voice ? { voiceChat: id, voiceId: m.id } : m.image ? { voiceChat: id, imageId: m.id } : null, false);
         agent.lastId = m.id;
+        // "I heard: …" sits under their voice note instead of as its own message.
+        if (m.from === "bot" && /^🎤 I heard: /.test(m.text)) return;
+        if (!full && m.from !== "staff") return;
+        if (m.from === "me" && m.voice && window.TranscoChatVoice) {
+          var mine = TranscoChatVoice.bubble(addAgentMessage(m.text, "customer", null, false), voiceUrl(id, m.id));
+          if (m.heard) TranscoChatVoice.heard(m.heard, mine, t("voiceHeard"));
+          return;
+        }
+        addAgentMessage(m.text, m.from === "me" ? "customer" : m.from, m.voice ? { voiceChat: id, voiceId: m.id } : m.image ? { voiceChat: id, imageId: m.id } : null, false);
       });
       if (full && !list.length) { agent.empty = agentSuggestions(); agent.body.appendChild(agent.empty); }
       if (showing) {

@@ -136,7 +136,8 @@
           cleanUp();
           if (!keep) return;
           if (tooShort || !blob.size) { alert(t.tooShort || "That was too short — hold on a little longer and try again."); return; }
-          toBase64(blob).then(function (data) { send({ data: data, mimeType: mime.split(";")[0] }); });
+          var played = { url: URL.createObjectURL(blob), seconds: seconds };
+          toBase64(blob).then(function (data) { send({ data: data, mimeType: mime.split(";")[0] }, played); });
         };
         recorder.start();
         input.disabled = true;
@@ -150,5 +151,97 @@
     row.insertBefore(btn, input);
   }
 
-  window.TranscoChatVoice = { attach: attach };
+  // ---------- the customer's own voice note, shown like WhatsApp ----------
+  // bubble(el, src, seconds): turns a chat bubble into ▶ wave 0:04. src is a
+  // URL or a Promise of one (My Transco fetches it with the sign-in token).
+  // heard(text[, el]): the small "I heard: …" line under it (the last
+  // bubble by default), so a wrong word is easy to spot without a second
+  // message repeating it.
+  var lastBubble = null;
+
+  function addBubbleStyle() {
+    if (document.getElementById("tc-vn-style")) return;
+    var s = document.createElement("style");
+    s.id = "tc-vn-style";
+    s.textContent =
+      ".tc-vn{display:flex;align-items:center;gap:10px;min-width:190px}" +
+      ".tc-vn-play{flex-shrink:0;width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:13px;line-height:1;" +
+      "display:inline-flex;align-items:center;justify-content:center;padding:0;color:inherit;background:currentColor}" +
+      ".tc-vn-play span{filter:invert(1);mix-blend-mode:normal}" +
+      ".tc-vn-play:disabled{opacity:.4;cursor:default}" +
+      ".tc-vn-wave{flex:1;display:flex;align-items:center;gap:2px;height:24px}" +
+      ".tc-vn-wave i{flex:1;max-width:4px;border-radius:2px;background:currentColor;opacity:.35;transition:opacity .15s}" +
+      ".tc-vn-wave i.on{opacity:.95}" +
+      ".tc-vn-time{flex-shrink:0;font-size:12px;opacity:.8;font-variant-numeric:tabular-nums}" +
+      ".tc-vn-heard{margin-top:6px;font-size:12.5px;line-height:1.4;opacity:.75}";
+    document.head.appendChild(s);
+  }
+
+  var PLAY = "▶︎"; // ▶ as a plain symbol, not the iPhone emoji
+  function fmtTime(n) { n = Math.max(0, Math.round(n || 0)); return Math.floor(n / 60) + ":" + ("0" + (n % 60)).slice(-2); }
+
+  function bubble(el, src, seconds) {
+    addBubbleStyle();
+    el.innerHTML = "";
+    var row = document.createElement("div");
+    row.className = "tc-vn";
+    var play = document.createElement("button");
+    play.type = "button";
+    play.className = "tc-vn-play";
+    play.setAttribute("aria-label", "Play voice message");
+    var icon = document.createElement("span");
+    icon.textContent = PLAY;
+    play.appendChild(icon);
+    play.disabled = true;
+    var wave = document.createElement("span");
+    wave.className = "tc-vn-wave";
+    var bars = [];
+    for (var i = 0; i < 22; i++) {
+      var b = document.createElement("i");
+      b.style.height = (6 + Math.round(16 * Math.abs(Math.sin(i * 1.7 + 0.6)))) + "px";
+      wave.appendChild(b);
+      bars.push(b);
+    }
+    var time = document.createElement("span");
+    time.className = "tc-vn-time";
+    time.textContent = seconds ? fmtTime(seconds) : "";
+    row.appendChild(play); row.appendChild(wave); row.appendChild(time);
+    el.appendChild(row);
+    lastBubble = el;
+
+    var audio = null, total = seconds || 0;
+    function paint() {
+      var p = audio && total ? audio.currentTime / total : 0;
+      bars.forEach(function (bar, k) { bar.className = k / bars.length < p ? "on" : ""; });
+    }
+    Promise.resolve(src).then(function (url) {
+      audio = new Audio(url);
+      audio.preload = "metadata";
+      audio.addEventListener("loadedmetadata", function () {
+        if (isFinite(audio.duration) && audio.duration > 0) { total = audio.duration; time.textContent = fmtTime(total); }
+      });
+      audio.addEventListener("timeupdate", function () { paint(); if (total) time.textContent = fmtTime(total - audio.currentTime); });
+      audio.addEventListener("ended", function () { icon.textContent = PLAY; audio.currentTime = 0; paint(); time.textContent = fmtTime(total); });
+      play.disabled = false;
+    }).catch(function () {
+      time.textContent = "—";
+    });
+    play.addEventListener("click", function () {
+      if (!audio) return;
+      if (audio.paused) { audio.play(); icon.textContent = "❚❚"; }
+      else { audio.pause(); icon.textContent = PLAY; }
+    });
+    return el;
+  }
+
+  function heard(text, el, label) {
+    el = el || lastBubble;
+    if (!el || !text) return;
+    var line = document.createElement("div");
+    line.className = "tc-vn-heard";
+    line.textContent = (label || "I heard") + ': "' + text + '"';
+    el.appendChild(line);
+  }
+
+  window.TranscoChatVoice = { attach: attach, bubble: bubble, heard: heard };
 })();

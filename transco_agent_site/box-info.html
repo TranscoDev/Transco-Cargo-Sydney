@@ -487,7 +487,7 @@
       .then(function (res) { return res.json(); })
       .then(function (data) {
         typingEl.remove();
-        if (data.heard) addMessage('🎤 I heard: "' + data.heard + '"', "bot");
+        if (data.heard && window.TranscoChatVoice) TranscoChatVoice.heard(data.heard);
         if (data.error) { addMessage("Sorry, something went wrong. Please try again.", "bot"); return; }
         if (data.handedOff) { addMessage(data.note || "A staff member will be with you shortly.", "bot"); if (window.TranscoChatStaff) TranscoChatStaff.afterReply(data); return; }
         var botEl = addMessage(data.reply || "", "bot", data.media, true);
@@ -514,8 +514,11 @@
     sendPayload({ sessionId: sessionId, message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");
   });
   // 🎤 Voice message button (chat-voice.js).
-  if (window.TranscoChatVoice) TranscoChatVoice.attach(input, function (voice) {
-    sendPayload({ sessionId: sessionId, voice: voice }, "🎤 Voice message");
+  // Their own voice note shows as a ▶ bubble; "I heard: …" goes under it when the reply comes.
+  if (window.TranscoChatVoice) TranscoChatVoice.attach(input, function (voice, played) {
+    if (sending) return;
+    TranscoChatVoice.bubble(addMessage("", "customer"), played.url, played.seconds);
+    sendPayload({ sessionId: sessionId, voice: voice }, "", true);
   });
   // Staff replies + name/phone form for visitors who aren't signed in (chat-staff.js).
   if (window.TranscoChatStaff) TranscoChatStaff.start({ api: WIDGET_API_URL, sessionId: sessionId, list: messagesEl, add: function (text) { return addMessage(text, "bot"); } });
