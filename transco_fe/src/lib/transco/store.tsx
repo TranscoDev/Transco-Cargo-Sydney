@@ -24,6 +24,7 @@ import {
   fetchShipments,
   importCustomersFile,
   mapBooking,
+  mapConversation,
   mapMessage,
   type BackendBooking,
   markConversationRead,
@@ -867,11 +868,16 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
         case "customer.contact_updated": {
           const { customerId, customer } = event.payload as ContactUpdatedPayload;
           setConversations((prev) =>
-            prev.map((c) =>
-              c.id === customerId
-                ? { ...c, email: customer.email, notes: customer.notes, customerName: customer.name || c.customerName }
-                : c,
-            ),
+            // A customer created while the console is open (walk-in confirmed,
+            // website visitor's details, Ask AI "Save as customer") joins the
+            // list straight away instead of only after a page refresh.
+            prev.some((c) => c.id === customerId)
+              ? prev.map((c) =>
+                  c.id === customerId
+                    ? { ...c, email: customer.email, notes: customer.notes, customerName: customer.name || c.customerName }
+                    : c,
+                )
+              : [...prev, mapConversation({ ...customer, _id: String(customerId), messages: [] })],
           );
           return;
         }
