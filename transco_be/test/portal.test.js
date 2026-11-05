@@ -32,6 +32,7 @@ let whatsappRequests = [];
 let flowiseRequests = [];
 let flowiseReplyText = 'Stubbed Flowise reply';
 let peblMode = 'found'; // 'found' | 'missing' | 'down'
+let peblArrival = '12 Nov 2026';
 
 function collectBody(req) {
   return new Promise((resolve) => {
@@ -67,7 +68,7 @@ const stubPebl = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html' });
   res.end(
     '<dl><dt>Shipment #</dt><dd>PE-57</dd><dt>Port of loading</dt><dd>Sydney</dd>' +
-    '<dt>Port of discharge</dt><dd>Colombo</dd><dt>Estimated arrival date</dt><dd>12 Nov 2026</dd></dl>'
+    `<dt>Port of discharge</dt><dd>Colombo</dd><dt>Estimated arrival date</dt><dd>${peblArrival}</dd></dl>`
   );
 });
 
@@ -2253,4 +2254,51 @@ test('website visitor not signed in: asked once at the start, name + phone saves
   assert.equal(got.body.messages[0].text, 'Hi Nimal, we can help');
   const after = await api('POST', '/api/web-chat/updates', { body: { sessionId, after: got.body.messages[0].id } });
   assert.deepEqual(after.body.messages, []);
+});
+
+test('arrival reminder: about a week before PEBL arrival, a My Transco account gets the Wattala message once', async () => {
+  const inDays = (n) => new Date(Date.now() + n * 86400000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const account = await db.collection('customers').insertOne({ phoneNumber: '61499' + String(Date.now()).slice(-6), name: 'Arrival Tester', portalJoinedAt: new Date(), mode: 'CHATBOT', status: 'ACTIVE' });
+  const noAccount = await db.collection('customers').insertOne({ phoneNumber: '61498' + String(Date.now()).slice(-6), name: 'No Account', mode: 'CHATBOT', status: 'ACTIVE' });
+  const bl = 'ARR' + String(Date.now()).slice(-6);
+  await db.collection('shipments').insertOne({ shipmentNumber: 'SHP-' + bl, hblNumber: bl, customerId: account.insertedId, status: 'in_transit' });
+  await db.collection('shipments').insertOne({ shipmentNumber: 'SHP-X' + bl, hblNumber: 'X' + bl, customerId: noAccount.insertedId, status: 'in_transit' });
+  await db.collection('shipments').insertOne({ shipmentNumber: 'SHP-D' + bl, hblNumber: 'D' + bl, customerId: account.insertedId, status: 'in_transit', doorDeliveryDestination: 'Kandy' });
+
+  const chatMessages = async () => {
+    const chat = await db.collection('customers').findOne({ channel: 'website', linkedCustomerId: account.insertedId, linkedBy: 'signin' });
+    return chat ? db.collection('messages').find({ customerId: chat._id, senderType: 'HUMAN' }).toArray() : [];
+  };
+
+  try {
+    peblArrival = inDays(20);
+    const tooEarly = await api('POST', '/api/arrival-reminders/run', { token: staffToken });
+    assert.equal(tooEarly.status, 200, JSON.stringify(tooEarly.body));
+    assert.equal((await chatMessages()).length, 0, 'nothing 20 days out');
+
+    // Next day's check: 5 days out → the reminder.
+    await db.collection('shipments').updateMany({ hblNumber: { $in: [bl, 'D' + bl] } }, { $unset: { peblEta: '' } });
+    peblArrival = inDays(5);
+    await api('POST', '/api/arrival-reminders/run', { token: staffToken });
+    let sent = await chatMessages();
+    assert.equal(sent.length, 1, 'one reminder (door delivery BL skipped)');
+    assert.match(sent[0].content, new RegExp(`BL ${bl}`));
+    assert.match(sent[0].content, /Wattala/);
+    const ship = await db.collection('shipments').findOne({ hblNumber: bl });
+    assert.ok(ship.arrivalReminder && ship.arrivalReminder.sentAt);
+    assert.equal(await db.collection('shipments').countDocuments({ hblNumber: 'X' + bl, arrivalReminder: { $exists: true } }), 0, 'no My Transco account → no reminder');
+
+    // Same date again → nothing new; PEBL moves it 4 days later → one update.
+    await db.collection('shipments').updateOne({ hblNumber: bl }, { $unset: { peblEta: '' } });
+    await api('POST', '/api/arrival-reminders/run', { token: staffToken });
+    assert.equal((await chatMessages()).length, 1);
+    await db.collection('shipments').updateOne({ hblNumber: bl }, { $unset: { peblEta: '' } });
+    peblArrival = inDays(9);
+    await api('POST', '/api/arrival-reminders/run', { token: staffToken });
+    sent = await chatMessages();
+    assert.equal(sent.length, 2);
+    assert.match(sent[1].content, /has changed/);
+  } finally {
+    peblArrival = '12 Nov 2026';
+  }
 });

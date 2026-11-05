@@ -27,6 +27,7 @@ const {
 } = require('./db');
 const pii = require('./pii');
 const { blockedDates, upcomingClosures } = require('./notices');
+const { arrivingSoon } = require('./arrivalReminders');
 
 // A customer sends back the masked number we showed them ("N••••567")
 // when they didn't change it: swap in the real one it stands for.
@@ -708,6 +709,8 @@ function createCustomerTools({
         ? { key: shipment.status, label: SHIPMENT_STATUS_LABELS[shipment.status], tone: shipment.status === 'delivered' ? 'done' : 'active' }
         : { key: 'unknown', label: 'Status not updated yet', tone: 'muted' },
       updatedAt: shipment.updatedAt || shipment.createdAt || null,
+      // "Arriving in about a week" (arrivalReminders.js), shown on the BL.
+      arriving: arrivingSoon(shipment),
       steps: buildSteps({ booking, shipment })
     };
   }
@@ -847,7 +850,7 @@ function createCustomerTools({
     ]);
     // The BL number is how a customer's shipment is identified — the
     // newest one (shown big on the home screen) and a few earlier ones.
-    const blCard = s => ({ shipmentId: s.id, blNumber: s.blNumber, batchLabel: s.batchLabel, status: s.status, destination: s.destination });
+    const blCard = s => ({ shipmentId: s.id, blNumber: s.blNumber, batchLabel: s.batchLabel, status: s.status, destination: s.destination, arriving: s.arriving });
     return {
       latestBl: bls[0] ? blCard(bls[0]) : null,
       earlierBls: bls.slice(1, 6).map(blCard),

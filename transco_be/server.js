@@ -5928,6 +5928,57 @@ app.post('/api/campaigns/email', async (req, res) => {
 // (password or quick-register sign-in); DO_NOT_CONTACT/BLOCKED skipped.
 // dryRun: the counts only, nothing sent.
 
+// A message from us into a My Transco account's chat (their newest
+// signed-in chat, or a new one). broadcastMessageCreated also sends the
+// phone notification. Used by "Message on My Transco" and the arrival
+// reminders (arrivalReminders.js).
+async function sendToMyTransco(account, content, media = null) {
+  let chat = (await customers().find({ channel: 'website', linkedCustomerId: account._id, linkedBy: 'signin' })
+    .sort({ _id: -1 }).limit(1).toArray())[0];
+  if (!chat) {
+    const sessionId = `web-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const doc = {
+      sessionId,
+      phoneNumber: sessionId,
+      name: account.name || `Website Visitor #${sessionId.slice(-4).toUpperCase()}`,
+      mode: 'CHATBOT',
+      channel: 'website',
+      status: 'ACTIVE',
+      sources: ['website'],
+      createdAt: new Date(),
+      linkedCustomerId: account._id,
+      linkedBy: 'signin'
+    };
+    const { insertedId } = await customers().insertOne(doc);
+    chat = { ...doc, _id: insertedId };
+  }
+  const outgoing = await saveMessage({
+    customerId: chat._id,
+    senderType: 'HUMAN',
+    content,
+    isRead: true,
+    replyToMessageId: null,
+    whatsappStatus: null,
+    ...(media || {})
+  });
+  await broadcastMessageCreated(chat, outgoing);
+  return outgoing;
+}
+
+// "Arriving in about a week — book your Wattala collection" reminders.
+const arrivalReminders = require('./arrivalReminders').createArrivalReminders({ lookupPebl, sendToMyTransco });
+if (process.env.ARRIVAL_REMINDERS !== 'off') arrivalReminders.start();
+
+// Staff: run the check now instead of waiting for the next one.
+app.post('/api/arrival-reminders/run', async (req, res) => {
+  try {
+    res.json(await arrivalReminders.runOnce());
+  } catch (err) {
+    console.error('Arrival reminders run failed:', err.message);
+    res.status(500).json({ error: 'Could not check arrival dates.' });
+  }
+});
+
 app.post('/api/campaigns/portal', async (req, res) => {
   try {
     const { customerIds, body, image, dryRun } = req.body ?? {};
@@ -5960,35 +6011,7 @@ app.post('/api/campaigns/portal', async (req, res) => {
 
     for (const account of reachable) {
       try {
-        let chat = (await customers().find({ channel: 'website', linkedCustomerId: account._id, linkedBy: 'signin' })
-          .sort({ _id: -1 }).limit(1).toArray())[0];
-        if (!chat) {
-          const sessionId = `web-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-          const doc = {
-            sessionId,
-            phoneNumber: sessionId,
-            name: account.name || `Website Visitor #${sessionId.slice(-4).toUpperCase()}`,
-            mode: 'CHATBOT',
-            channel: 'website',
-            status: 'ACTIVE',
-            sources: ['website'],
-            createdAt: new Date(),
-            linkedCustomerId: account._id,
-            linkedBy: 'signin'
-          };
-          const { insertedId } = await customers().insertOne(doc);
-          chat = { ...doc, _id: insertedId };
-        }
-        const outgoing = await saveMessage({
-          customerId: chat._id,
-          senderType: 'HUMAN',
-          content: text || '🖼️ Picture',
-          isRead: true,
-          replyToMessageId: null,
-          whatsappStatus: null,
-          ...(picture || {})
-        });
-        await broadcastMessageCreated(chat, outgoing);
+        await sendToMyTransco(account, text || '🖼️ Picture', picture);
         results.sent += 1;
       } catch (sendErr) {
         console.error(`My Transco message failed for ${account._id}:`, sendErr.message);

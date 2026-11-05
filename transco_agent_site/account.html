@@ -165,6 +165,7 @@
   .bl-card .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
   .bl-card .meta b { color: var(--navy); }
   .bl-card .hint { font-size: 14px; color: var(--muted); margin: 10px 0 12px; }
+  .arriving-note { margin: 8px 0 4px; padding: 8px 12px; border-radius: 10px; background: #fff7e0; border: 1px solid #f0d58a; color: #5c4400; font-size: 14px; line-height: 1.45; font-weight: 600; }
   .bl-card .acts { display: flex; gap: 8px; flex-wrap: wrap; }
   .bl-card .earlier { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
   .bl-card .earlier a { text-decoration: none; }
@@ -547,6 +548,7 @@
       howHelp: "How can we help today?", comingUp: "Coming up", slDistrict: "District", slChoose: "choose", slOther: "Other — type it below",
       qTrack: "Track my shipment", qPrice: "Get a price", qBook: "New booking",
       latestShipment: "Your latest shipment", latestBooking: "Your latest booking", viewAll: "View all",
+      arrivingSoon: "📦 Your goods (BL {bl}) are expected to arrive in Sri Lanka in about a week — around {d}.",
       yourBl: "Your BL number", blHint: "Quote this number whenever you contact us or track your shipment.",
       copyBl: "Copy", blCopied: "Copied ✓", trackBl: "Track this shipment", earlierBls: "Earlier BLs",
       declAlertOne: "1 booking still needs a declaration form.", declAlertMany: "{n} bookings still need a declaration form.", seeWhat: "See what to do",
@@ -689,6 +691,7 @@
       howHelp: "අද අපි ඔයාට උදව් කරන්නේ කොහොමද?", comingUp: "ළඟදීම", slDistrict: "දිස්ත්‍රික්කය", slChoose: "තෝරන්න", slOther: "වෙනත් — පහළ type කරන්න",
       qTrack: "මගේ shipment එක track කරන්න", qPrice: "මිලක් ගන්න", qBook: "අලුත් booking",
       latestShipment: "ඔයාගේ අලුත්ම shipment එක", latestBooking: "ඔයාගේ අලුත්ම booking එක", viewAll: "ඔක්කොම බලන්න",
+      arrivingSoon: "📦 ඔබේ භාණ්ඩ (BL {bl}) තව සතියකින් පමණ — {d} දින පමණ — ශ්‍රී ලංකාවට පැමිණීමට නියමිතයි.",
       yourBl: "ඔයාගේ BL අංකය", blHint: "අපිට කතා කරද්දී හෝ shipment එක track කරද්දී මේ අංකය කියන්න.",
       copyBl: "Copy", blCopied: "Copy වුණා ✓", trackBl: "මේ shipment එක track කරන්න", earlierBls: "කලින් BL",
       declAlertOne: "Booking 1කට තවම declaration form එක ඕන.", declAlertMany: "Bookings {n}කට තවම declaration form එක ඕන.", seeWhat: "කරන්න ඕන දේ බලන්න",
@@ -822,6 +825,7 @@
       howHelp: "இன்று நாங்கள் எப்படி உதவலாம்?", comingUp: "வரவிருப்பவை", slDistrict: "மாவட்டம்", slChoose: "தேர்ந்தெடுங்கள்", slOther: "வேறு — கீழே type செய்யுங்கள்",
       qTrack: "என் shipment ஐ track செய்", qPrice: "விலை பெறு", qBook: "புதிய booking",
       latestShipment: "உங்கள் சமீபத்திய shipment", latestBooking: "உங்கள் சமீபத்திய booking", viewAll: "அனைத்தையும் பார்",
+      arrivingSoon: "📦 உங்கள் பொருட்கள் (BL {bl}) சுமார் ஒரு வாரத்தில் — {d} அளவில் — இலங்கைக்கு வந்து சேரும் என எதிர்பார்க்கப்படுகிறது.",
       yourBl: "உங்கள் BL எண்", blHint: "எங்களைத் தொடர்பு கொள்ளும்போதும் shipment ஐ track செய்யும்போதும் இந்த எண்ணைக் குறிப்பிடுங்கள்.",
       copyBl: "Copy", blCopied: "Copy ஆனது ✓", trackBl: "இந்த shipment ஐ track செய்", earlierBls: "முந்தைய BL",
       declAlertOne: "1 booking க்கு இன்னும் declaration form தேவை.", declAlertMany: "{n} bookings க்கு இன்னும் declaration form தேவை.", seeWhat: "என்ன செய்ய வேண்டும் என்று பார்",
@@ -2375,8 +2379,15 @@
       h("div", { class: "lines" },
         s.items ? h("div", { text: s.items }) : null,
         s.destination ? h("div", { text: "→ " + s.destination }) : null,
-        s.batchLabel && s.blNumber ? h("div", { class: "muted small", style: "margin-top:4px", text: "BL " + s.blNumber }) : null),
+        s.batchLabel && s.blNumber ? h("div", { class: "muted small", style: "margin-top:4px", text: "BL " + s.blNumber }) : null,
+        arrivingNote(s.blNumber, s.arriving)),
       h("div", { class: "foot" }, statusPill(s.status), h("span", { class: "go", "aria-hidden": "true", text: t("liveTitle") + " →" })));
+  }
+  // "Arriving in Sri Lanka in about a week" under a BL (the full message,
+  // with the Wattala warehouse details, is in their chat).
+  function arrivingNote(bl, arriving) {
+    if (!bl || !arriving) return null;
+    return h("div", { class: "arriving-note", role: "status", text: t("arrivingSoon", { bl: bl, d: arriving.label }) });
   }
   function timeline(steps) {
     return h("ol", { class: "timeline" }, steps.map(function (s) {
@@ -2429,6 +2440,7 @@
         blCard = h("section", { class: "bl-card", "aria-label": t("yourBl") },
           h("div", { class: "lbl", text: t("yourBl") }),
           h("div", { class: "num", text: latestBl.blNumber }),
+          arrivingNote(latestBl.blNumber, latestBl.arriving),
           h("div", { class: "meta" },
             latestBl.status ? statusPill(latestBl.status) : null,
             latestBl.batchLabel ? h("b", { text: latestBl.batchLabel }) : null,
@@ -3741,6 +3753,7 @@
           h("div", null, h("div", { class: "muted small", text: s.batchLabel && s.blNumber ? "BL " + s.blNumber : t("blRef") }), h("h1", { class: "page-title", style: "margin-top:0", text: s.batchLabel || s.blNumber || t("shipmentWord") })),
           statusPill(s.status)),
         s.updatedAt ? h("p", { class: "muted small", style: "margin:0 0 16px", text: t("updated", { d: fmtDate(s.updatedAt, { day: "numeric", month: "long", year: "numeric" }) }) }) : null,
+        arrivingNote(s.blNumber, s.arriving),
         h("div", { class: "stack" },
           h("div", { class: "card" }, h("h2", { style: "font-size:17px;margin:0 0 14px", text: t("progressTitle") }), timeline(s.steps)),
           liveTrackingBlock(s.id),
