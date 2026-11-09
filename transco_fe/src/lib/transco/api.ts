@@ -1215,6 +1215,19 @@ export async function askAi(question: string, sessionId: string) {
   return body as { reply: string; unsure: boolean };
 }
 
+// A customer's voice note (downloaded from the office WhatsApp Web) → what
+// they said. `unsure` = it couldn't make it out.
+export async function hearVoiceNote(voice: { data: string; mimeType: string }) {
+  const res = await fetch(`${API_BASE_URL}/api/ask-ai/hear`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ voice }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || `Voice note failed (${res.status})`);
+  return body as { text: string; unsure: boolean };
+}
+
 // ---- Ask AI customer threads (one saved chat per office-WhatsApp customer) ----
 
 export interface AiThreadMessage {

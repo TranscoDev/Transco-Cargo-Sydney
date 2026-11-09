@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  ArrowLeft, Check, ClipboardPaste, Copy, Loader2, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserPlus, UserRound, WandSparkles, X,
+  ArrowLeft, Check, ClipboardPaste, Copy, Loader2, Mic, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserPlus, UserRound, WandSparkles, X,
 } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addAiThreadMessage, askAi, createAiThread, editAiThreadMessage, fetchAiThread, fetchAiThreads,
-  importAiThreadMessages, saveAiThreadCustomer, suggestAiThreadReply, updateAiThread,
+  hearVoiceNote, importAiThreadMessages, saveAiThreadCustomer, suggestAiThreadReply, updateAiThread,
   type AiThread, type AiThreadMessage, type AiThreadRow,
 } from "@/lib/transco/api";
 import { parseWhatsAppPaste, senderIsPhone } from "@/lib/transco/whatsapp-paste";
@@ -515,11 +515,76 @@ function QuickChat({ onBack }: { onBack: () => void }) {
           rows={2}
           className="min-h-15 flex-1 resize-none"
         />
+        <VoiceNoteButton disabled={busy} onHeard={(t) => setText((cur) => addHeard(cur, t))} onError={setError} />
         <Button onClick={() => void send()} disabled={busy || !text.trim()} className="h-15">
           <SendHorizontal className="h-4 w-4" />
           <span className="sr-only">Send</span>
         </Button>
       </div>
+    </>
+  );
+}
+
+// A customer's voice note from the office WhatsApp Web (⌄ → Download) →
+// what they said, put in the box for staff to check before asking the AI.
+// Picked by file extension because browsers name these types differently.
+const VOICE_TYPES: Record<string, string> = {
+  ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg", m4a: "audio/mp4", mp4: "audio/mp4",
+  mp3: "audio/mpeg", aac: "audio/aac", wav: "audio/wav", webm: "audio/webm",
+};
+
+function addHeard(current: string, heard: string) {
+  return current.trim() ? `${current.trim()}\n${heard}` : heard;
+}
+
+function fileBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function VoiceNoteButton({ disabled, onHeard, onError }: {
+  disabled?: boolean;
+  onHeard: (text: string) => void;
+  onError: (message: string | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    onError(null);
+    setBusy(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      const r = await hearVoiceNote({ data: await fileBase64(file), mimeType: VOICE_TYPES[ext] || file.type || "audio/ogg" });
+      if (r.text) onHeard(r.text);
+      if (!r.text) onError("Couldn't make out the voice note. Please listen and type it.");
+      else if (r.unsure) onError("Not fully sure what was said — listen and fix the words before asking.");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not listen to the voice note.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <>
+      <input ref={inputRef} type="file" accept="audio/*,.ogg,.opus,.m4a" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled || busy}
+        title="Pick a voice note you downloaded from WhatsApp Web"
+      >
+        {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mic className="mr-1.5 h-4 w-4" />}
+        {busy ? "Listening…" : "Voice note"}
+      </Button>
     </>
   );
 }
@@ -721,6 +786,7 @@ function ThreadChat({ id, notice, onBack, onChanged, onDeleted }: {
             {busy === "us" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <SendHorizontal className="mr-1.5 h-4 w-4" />}
             We sent
           </Button>
+          <VoiceNoteButton disabled={!!busy} onHeard={(t) => setText((cur) => addHeard(cur, t))} onError={setError} />
         </div>
       </div>
     </>

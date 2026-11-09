@@ -7414,6 +7414,29 @@ app.post('/api/ask-ai', async (req, res) => {
   }
 });
 
+// Ask AI voice note: staff download a customer's voice note from the
+// office WhatsApp Web and get back what was said, heard the same way as a
+// bot voice note (voiceHear.js). Only the words come back — staff check
+// them, then ask the AI as usual. Nothing is saved.
+const ASK_AI_VOICE_MAX_BYTES = 6 * 1024 * 1024;
+app.post('/api/ask-ai/hear', async (req, res) => {
+  const voice = req.body?.voice;
+  const mimeType = typeof voice?.mimeType === 'string' ? voice.mimeType.toLowerCase() : '';
+  const data = typeof voice?.data === 'string' ? Buffer.from(voice.data, 'base64') : null;
+  if (!/^audio\/(webm|ogg|mp4|x-m4a|aac|mpeg|wav)(;.*)?$/.test(mimeType)) {
+    return res.status(400).json({ error: 'That file is not a voice note. Pick the file you downloaded from WhatsApp.' });
+  }
+  if (!data || !data.length || data.length > ASK_AI_VOICE_MAX_BYTES) {
+    return res.status(400).json({ error: 'That voice note is too long. Please listen and type it instead.' });
+  }
+  try {
+    res.json(await hearAudio({ data, mimeType }));
+  } catch (err) {
+    console.error('Ask AI voice failed:', err.message);
+    res.status(500).json({ error: 'Could not listen to the voice note just now. Please try again.' });
+  }
+});
+
 // Push notifications (pushNotify.js): staff get new bookings and their
 // tasks, My Transco customers get staff messages. Booking pop-ups ride on
 // the booking.created event every booking path already sends.
