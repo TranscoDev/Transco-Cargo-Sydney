@@ -515,7 +515,7 @@ function QuickChat({ onBack }: { onBack: () => void }) {
           rows={2}
           className="min-h-15 flex-1 resize-none"
         />
-        <VoiceNoteButton disabled={busy} onHeard={(t) => setText((cur) => addHeard(cur, t))} onError={setError} />
+        <VoiceNoteButton disabled={busy} className="h-15" onHeard={(t) => setText((cur) => addHeard(cur, t))} onError={setError} />
         <Button onClick={() => void send()} disabled={busy || !text.trim()} className="h-15">
           <SendHorizontal className="h-4 w-4" />
           <span className="sr-only">Send</span>
@@ -546,8 +546,9 @@ function fileBase64(file: File) {
   });
 }
 
-function VoiceNoteButton({ disabled, onHeard, onError }: {
+function VoiceNoteButton({ disabled, className, onHeard, onError }: {
   disabled?: boolean;
+  className?: string;
   onHeard: (text: string) => void;
   onError: (message: string | null) => void;
 }) {
@@ -580,6 +581,7 @@ function VoiceNoteButton({ disabled, onHeard, onError }: {
         variant="outline"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || busy}
+        className={className}
         title="Pick a voice note you downloaded from WhatsApp Web"
       >
         {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mic className="mr-1.5 h-4 w-4" />}
