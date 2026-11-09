@@ -278,11 +278,21 @@ async function callGemini(system, ask, image) {
     {
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: 'user', parts }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 2500 }
+      // 2.5 Flash's thinking counts against maxOutputTokens: with the long
+      // facts it used to think most of 2500 away and the reply came back cut
+      // off mid-sentence. Cap the thinking, leave room for the reply.
+      generationConfig: { temperature: 0.2, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 1024 } }
     },
     { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY }, timeout: 30000 }
   );
-  return (r.data?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  const candidate = r.data?.candidates?.[0];
+  // A cut-off reply is worse than none: callers fall back to the next AI or
+  // the unchecked reply.
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    console.error('Gemini reply cut off (MAX_TOKENS) — not used');
+    return '';
+  }
+  return (candidate?.content?.parts || []).map(p => p.text || '').join('');
 }
 
 async function callGroq(model, system, ask) {

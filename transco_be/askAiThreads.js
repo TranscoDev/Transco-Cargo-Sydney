@@ -352,7 +352,8 @@ async function checkReply(text, question, history) {
       (history ? `Earlier chat:\n${history.slice(-3000)}\n\n` : '') +
       `Customer's new message:\n${question}\n\nBot reply:\n${text}`
     ) || '').trim();
-    return fixed || text;
+    // WhatsApp bold is *one* star; "**TV**" shows the stars to the customer.
+    return (fixed || text).replace(/\*\*(.+?)\*\*/g, '*$1*');
   } catch (err) {
     console.error('Ask AI: reply check failed:', err.message);
     return text;
