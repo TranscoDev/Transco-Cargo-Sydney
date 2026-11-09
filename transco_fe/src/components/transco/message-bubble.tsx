@@ -145,6 +145,9 @@ export function MessageBubble({
             Asked for staff help
           </p>
         )}
+        {message.staffAlert && (
+          <p className="mb-0.5 text-xs font-semibold text-attention-foreground">⚠️ {message.staffAlert}</p>
+        )}
         <MediaContent message={message} />
         {message.body && (
           <p className="whitespace-pre-wrap break-words leading-snug">

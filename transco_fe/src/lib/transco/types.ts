@@ -150,6 +150,8 @@ export interface Message {
   /** The customer's photo was deleted after 90 days. */
   photoDeleted?: boolean | undefined;
   voiceDeleted?: boolean | undefined;
+  /** A note only staff see, e.g. a voice message not heard because of the hourly limit. */
+  staffAlert?: string | undefined;
   /** Set when chats from several channels are shown together (one customer's WhatsApp + website chats). */
   via?: "whatsapp" | "website" | undefined;
   mediaType?: MediaType | null | undefined;
