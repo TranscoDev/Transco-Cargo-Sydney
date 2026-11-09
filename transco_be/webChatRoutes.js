@@ -33,10 +33,16 @@ const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
 const PHOTOS_PER_HOUR = 5;
 // Voice messages from the 🎤 button (2 minutes of browser audio ≈ 1–2 MB).
 const VOICE_MAX_BYTES = 4 * 1024 * 1024;
-const VOICE_PER_HOUR = 10;
+const VOICE_PER_HOUR = 30;
 const VOICE_MIME_RE = /^audio\/(webm|ogg|mp4|x-m4a|aac|mpeg)(;.*)?$/;
 const VOICE_UNCLEAR_REPLY =
   "🎤 Sorry, I couldn't hear that voice message clearly. Could you type your question, or record it again somewhere quieter?";
+// Asked in all three languages: the voice note wasn't heard, so we don't
+// know which one they speak.
+const VOICE_LIMIT_REPLY =
+  '🙏 Could you please type your question as a text message?\n' +
+  'කරුණාකර ඔබේ ප්‍රශ්නය text message එකක් ලෙස type කරන්න.\n' +
+  'தயவுசெய்து உங்கள் கேள்வியை text message ஆக type செய்யுங்கள்.';
 // Signed-out visitors: the My Transco invite + name/phone form (see /contact).
 const ACCOUNT_URL = 'https://my.transcosydney.com.au/account.html';
 const CONTACT_SAVED_REPLY = (name, phone) =>
@@ -334,10 +340,24 @@ module.exports = function createWebChatRouter({
           mediaType: 'audio',
           createdAt: { $gt: new Date(Date.now() - 60 * 60 * 1000) }
         });
-        if (recent >= VOICE_PER_HOUR) {
-          return res.status(429).json({ error: `You can send up to ${VOICE_PER_HOUR} voice messages an hour — please type your question instead.` });
-        }
         voiceMedia = await customerPhotos.saveVoice(voiceNote.data, voiceNote.mimeType);
+        // Over the hourly limit: not heard. The customer is only asked to
+        // type it; staff see why on the kept voice note (staffAlert).
+        if (recent >= VOICE_PER_HOUR) {
+          const keptVoice = await saveMessage({
+            customerId: customer._id, senderType: 'CUSTOMER', content: '🎤 Voice message',
+            isRead: false, replyToMessageId: null, whatsappStatus: null, ...voiceMedia,
+            staffAlert: `Voice limit reached (${VOICE_PER_HOUR} an hour) — not heard by the bot. Please listen and reply.`
+          });
+          await broadcastMessageCreated(customer, keptVoice);
+          if (customer.mode !== 'CHATBOT') return res.json({ reply: null, handedOff: true, heard: null });
+          const askText = await saveMessage({
+            customerId: customer._id, senderType: 'CHATBOT', content: VOICE_LIMIT_REPLY,
+            isRead: true, replyToMessageId: keptVoice._id, whatsappStatus: null
+          });
+          await broadcastMessageCreated(customer, askText);
+          return res.json({ reply: VOICE_LIMIT_REPLY, media: null, menu: null, handedOff: false, heard: null });
+        }
         let result = null;
         try {
           result = await hearAudio(voiceNote);

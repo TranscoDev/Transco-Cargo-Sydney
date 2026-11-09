@@ -464,7 +464,8 @@ async function saveMessage({
   replyToMessageId,
   whatsappStatus,
   mediaUrl = null,
-  mediaType = null
+  mediaType = null,
+  staffAlert = null
 }) {
   const doc = {
     customerId,
@@ -475,6 +476,7 @@ async function saveMessage({
     whatsappStatus,
     mediaUrl,
     mediaType,
+    ...(staffAlert ? { staffAlert } : {}),
     createdAt: new Date()
   };
 
