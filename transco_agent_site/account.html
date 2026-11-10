@@ -466,11 +466,11 @@
     <div class="nav-right">
       <div class="nav-links">
         <a href="/#agent" class="nav-link-primary">Chat with Transco Agent</a>
-        <a href="/sri-lanka.html">Sri Lanka</a>
-        <a href="/india.html">India</a>
-        <a href="/box-info.html">Box Info</a>
-        <a href="/contact.html">Contact</a>
-        <a href="/account.html" class="active">My Transco</a>
+        <a href="/sri-lanka">Sri Lanka</a>
+        <a href="/india">India</a>
+        <a href="/box-info">Box Info</a>
+        <a href="/contact">Contact</a>
+        <a href="/account" class="active">My Transco</a>
       </div>
     </div>
     <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-mobile-panel">
@@ -479,12 +479,12 @@
   </nav>
   <div class="nav-mobile-panel" id="nav-mobile-panel">
     <a href="/#agent">Chat with Transco Agent</a>
-    <a href="/account.html" class="active">My Transco</a>
-    <a href="/sri-lanka.html">Sri Lanka</a>
-    <a href="/india.html">India</a>
-    <a href="/box-info.html">Box Info</a>
-    <a href="/about.html">About</a>
-    <a href="/contact.html">Contact</a>
+    <a href="/account" class="active">My Transco</a>
+    <a href="/sri-lanka">Sri Lanka</a>
+    <a href="/india">India</a>
+    <a href="/box-info">Box Info</a>
+    <a href="/about">About</a>
+    <a href="/contact">Contact</a>
   </div>
 
   <div class="shell">
@@ -1235,10 +1235,10 @@
     if (window.TranscoChatLinks) {
       // Links become tappable buttons; ones to this page open in place.
       el.innerHTML = TranscoChatLinks.html(text);
-      Array.prototype.forEach.call(el.querySelectorAll('a[href^="/account.html#"]'), function (a) {
+      Array.prototype.forEach.call(el.querySelectorAll('a[href^="/account#"]'), function (a) {
         a.addEventListener("click", function (e) {
           e.preventDefault();
-          location.hash = a.getAttribute("href").slice("/account.html".length);
+          location.hash = a.getAttribute("href").slice("/account".length);
           if (!isWide()) closeAgent();
         });
       });
@@ -1283,10 +1283,10 @@
   // new page load; on a phone the chat closes so the page is visible.
   function agentLink(href, label, className) {
     var a = h("a", { href: href, class: className, text: label });
-    if (href.indexOf("/account.html#") === 0) {
+    if (/^\/account(\.html)?#/.test(href)) {
       a.addEventListener("click", function (e) {
         e.preventDefault();
-        location.hash = href.slice("/account.html".length);
+        location.hash = href.slice(href.indexOf("#"));
         if (!isWide()) closeAgent();
       });
     } else if (/^https?:/.test(href)) {
@@ -2035,7 +2035,7 @@
       h("div", { class: "field" }, h("label", { for: "join-email", text: t("regEmail") }), email, h("span", { class: "help", text: t("regEmailHelp") })),
       h("div", { class: "field" }, h("div", { class: "spread" }, h("label", { for: "join-password", text: t("choosePassword") }), pw.toggle), pw.input, h("span", { class: "help", text: t("passwordHelp") })),
       h("label", { for: "join-privacy", style: "display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:15px;cursor:pointer" }, agree,
-        h("span", null, t("agreePre") + " ", h("a", { href: "/privacy.html", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), ".")),
+        h("span", null, t("agreePre") + " ", h("a", { href: "/privacy", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), ".")),
       errBox, h("div", { style: "margin-top:16px" }, submit));
     render(h("div", { class: "auth-wrap stack" }, h("div", { class: "card" },
       h("h1", { class: "page-title", text: t("joinTitle") }),
@@ -2166,7 +2166,7 @@
         pw.input,
         h("span", { class: "help", text: t("passwordHelp") })),
       h("label", { for: "reg-privacy", style: "display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:15px;cursor:pointer" }, agree,
-        h("span", null, t("agreePre") + " ", h("a", { href: "/privacy.html", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), ".")),
+        h("span", null, t("agreePre") + " ", h("a", { href: "/privacy", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), ".")),
       errBox,
       h("div", { style: "margin-top:16px" }, submit));
 
@@ -3129,7 +3129,7 @@
       })]);
     }
     return [
-      draft._edit ? null : h("p", { class: "small", style: "margin:-4px 0 12px" }, h("a", { href: "/box-info.html?from=booking", onclick: saveDraftForLater, text: "📦 " + t("boxInfoLink") + " →" })),
+      draft._edit ? null : h("p", { class: "small", style: "margin:-4px 0 12px" }, h("a", { href: "/box-info?from=booking", onclick: saveDraftForLater, text: "📦 " + t("boxInfoLink") + " →" })),
       h("div", { class: "card", style: "padding:4px 16px" }, c.itemTypes.map(function (it) {
         var qty = draft.qty[it.key] || 0;
         var out = h("output", { "aria-live": "polite", text: String(qty) });
@@ -3795,7 +3795,7 @@
           h("div", { class: "card" },
             h("h2", { style: "font-size:17px;margin:0 0 6px", text: "🧾 " + t("invoicesTitle") }),
             h("p", { class: "muted", style: "margin:0 0 12px", text: t("invoicesBody") }),
-            h("a", { class: "btn secondary", href: "/contact.html", text: t("contactUs") }))));
+            h("a", { class: "btn secondary", href: "/contact", text: t("contactUs") }))));
     });
   }
 
@@ -4078,7 +4078,7 @@
     }
     var card = h(bare ? "div" : "div", { class: bare ? "" : "card", style: bare ? "" : "margin-top:14px" },
       bare ? null : h("h3", { style: "font-size:16px;margin:0 0 6px", text: t("privacyTitle") }),
-      h("p", { class: "muted small", style: "margin:0 0 12px" }, t("privacySub") + " ", h("a", { href: "/privacy.html", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), "."),
+      h("p", { class: "muted small", style: "margin:0 0 12px" }, t("privacySub") + " ", h("a", { href: "/privacy", target: "_blank", rel: "noopener", text: t("privacyPolicy") }), "."),
       dl, body, status);
     return card;
   }

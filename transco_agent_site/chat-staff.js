@@ -16,7 +16,7 @@
 (function () {
   var KEEP_MS = 7 * 24 * 60 * 60 * 1000;
   var CHECK_MS = 8000;
-  var ACCOUNT_URL = "https://my.transcosydney.com.au/account.html";
+  var ACCOUNT_URL = "https://my.transcosydney.com.au/account";
   var opts = null, timer = null;
 
   function read(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }

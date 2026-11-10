@@ -16,13 +16,13 @@ self.addEventListener("push", function (e) {
     renotify: Boolean(d.tag),
     icon: "/favicon.png",
     badge: "/favicon.png",
-    data: { url: d.url || "/account.html" }
+    data: { url: d.url || "/account" }
   }));
 });
 
 self.addEventListener("notificationclick", function (e) {
   e.notification.close();
-  var url = new URL((e.notification.data && e.notification.data.url) || "/account.html", self.location.origin).href;
+  var url = new URL((e.notification.data && e.notification.data.url) || "/account", self.location.origin).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
     for (var i = 0; i < list.length; i++) {
       var c = list[i];

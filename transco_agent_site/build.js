@@ -46,7 +46,7 @@ scripts['/sl-cities.js'] = fs.readFileSync(path.join(__dirname, '..', 'transco_b
 // My Transco as a home-screen app (account.html links it) — iPhones only
 // allow notifications from a home-screen app.
 const MANIFEST = JSON.stringify({
-  name: 'My Transco', short_name: 'My Transco', start_url: '/account.html', scope: '/',
+  name: 'My Transco', short_name: 'My Transco', id: '/account.html', start_url: '/account', scope: '/',
   display: 'standalone', background_color: '#fbfaf7', theme_color: '#182233',
   icons: [{ src: '/favicon.png', sizes: '192x192', type: 'image/png' }]
 });
@@ -55,7 +55,7 @@ const extraHeaders = previewOrigin ? { 'x-robots-tag': 'noindex, nofollow' } : {
 
 // Pages that were removed or renamed — old links and bookmarks land on
 // the replacement instead of a 404.
-const redirects = { '/prices.html': '/box-info.html' };
+const redirects = { '/prices.html': '/box-info' };
 
 const worker = `const PAGES = ${JSON.stringify(pages)};
 const SCRIPTS = ${JSON.stringify(scripts)};
@@ -80,6 +80,12 @@ export default {
     const moved = REDIRECTS[url.pathname] || (clean && REDIRECTS[clean]);
     if (moved) {
       return new Response(null, { status: 301, headers: { location: moved + url.search + url.hash, ...EXTRA_HEADERS } });
+    }
+    // Old ".html" links (WhatsApp, emails, bookmarks) forward to the clean
+    // address; the browser keeps the #part and ?part stays on.
+    if (PAGES[url.pathname] && url.pathname.endsWith(".html")) {
+      const to = url.pathname === "/index.html" ? "/" : url.pathname.slice(0, -5);
+      return new Response(null, { status: 301, headers: { location: to + url.search, ...EXTRA_HEADERS } });
     }
     const script = SCRIPTS[url.pathname];
     if (script) {

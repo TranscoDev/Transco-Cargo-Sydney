@@ -919,7 +919,7 @@
       '<div class="pw-wrap" style="margin-bottom:10px"><input id="known-pw" type="' + (account.showPw ? "text" : "password") + '" autocomplete="current-password" placeholder="' + esc(t("Password")) + '" value="' + esc(account.pw) + '" aria-label="' + esc(t("Password")) + '" />' +
       '<button type="button" id="known-pw-toggle" class="pw-toggle" aria-pressed="' + !!account.showPw + '" aria-label="' + esc(account.showPw ? t("Hide password") : t("Show password")) + '">' + (account.showPw ? EYE_OFF_ICON : EYE_ICON) + "</button></div>" +
       '<button type="button" class="small-btn" id="known-signin"' + (account.busy ? " disabled" : "") + ">" + esc(t("Fill in my details")) + "</button>" +
-      '<div class="msg" style="margin-top:8px"><a href="/account.html#/signin" target="_blank" rel="noopener">' + esc(t("Forgot your password? Reset it on My Transco")) + "</a></div>";
+      '<div class="msg" style="margin-top:8px"><a href="/account#/signin" target="_blank" rel="noopener">' + esc(t("Forgot your password? Reset it on My Transco")) + "</a></div>";
     if (account.msg) html2 += '<div class="msg' + (account.msgBad ? " bad" : "") + '">' + esc(account.msg) + "</div>";
     return html2 + "</div>";
   }
@@ -1080,7 +1080,7 @@
       '<div class="field' + (badFields["account.email"] ? " bad" : "") + '"><label for="na-email">' + esc(t("Email")) + '</label><input id="na-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(newAcct.email) + '" /></div>' +
       '<div class="field' + (badFields["account.password"] ? " bad" : "") + '"><label for="na-pw">' + esc(t("Choose a password")) + '</label><div class="pw-wrap"><input id="na-pw" type="' + (newAcct.showPw ? "text" : "password") + '" autocomplete="new-password" placeholder="' + esc(t("At least 8 characters")) + '" value="' + esc(newAcct.password) + '" />' +
         '<button type="button" id="na-pw-toggle" class="pw-toggle" aria-pressed="' + !!newAcct.showPw + '" aria-label="' + esc(newAcct.showPw ? t("Hide password") : t("Show password")) + '">' + (newAcct.showPw ? EYE_OFF_ICON : EYE_ICON) + "</button></div></div>" +
-      '<label class="check' + (badFields["account.privacyAccepted"] ? " bad" : "") + '"><input type="checkbox" id="na-agree"' + (newAcct.agree ? " checked" : "") + " /><span>" + esc(t("I agree to the")) + ' <a href="/privacy.html" target="_blank" rel="noopener">' + esc(t("Privacy Policy")) + "</a>.</span></label>" +
+      '<label class="check' + (badFields["account.privacyAccepted"] ? " bad" : "") + '"><input type="checkbox" id="na-agree"' + (newAcct.agree ? " checked" : "") + " /><span>" + esc(t("I agree to the")) + ' <a href="/privacy" target="_blank" rel="noopener">' + esc(t("Privacy Policy")) + "</a>.</span></label>" +
       '<p style="text-align:center;margin:12px 0 0"><button type="button" id="na-skip" class="linkish">' + esc(t("Skip — just send the form")) + "</button></p></div>";
   }
 

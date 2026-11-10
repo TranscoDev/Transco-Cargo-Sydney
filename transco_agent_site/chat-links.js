@@ -34,19 +34,21 @@
     if (u.protocol !== "https:" && u.protocol !== "http:") return null;
     if (/^(wa\.me|api\.whatsapp\.com)$/.test(u.hostname)) return { href: u.href, key: "whatsapp", external: true };
     if (!SITE_HOSTS.test(u.hostname)) return { href: u.href, text: u.hostname.replace(/^www\./, ""), external: true };
-    var href = u.pathname + u.search + u.hash;
-    var page = u.pathname.replace(/^\/+/, "") || "index.html";
+    // Our own pages use clean addresses ("/account", not "/account.html").
+    var path = u.pathname.replace(/\/index\.html$/, "/").replace(/\.html$/, "");
+    var href = path + u.search + u.hash;
+    var page = path.replace(/^\/+/, "") || "index";
     var hash = u.hash || "";
     var key = "open";
-    if (page === "account.html") {
+    if (page === "account") {
       key = /^#\/book/.test(hash) ? "book"
         : /^#\/(shipments|track)/.test(hash) ? "track"
         : /^#\/profile/.test(hash) ? "profile"
         : "account";
-    } else if (page === "dropoff.html") key = "dropoff";
-    else if (page === "box-info.html") key = "boxes";
-    else if (page === "privacy.html") key = "privacy";
-    else if (page === "contact.html") key = "contact";
+    } else if (page === "dropoff") key = "dropoff";
+    else if (page === "box-info") key = "boxes";
+    else if (page === "privacy") key = "privacy";
+    else if (page === "contact") key = "contact";
     return { href: href, key: key };
   }
 
