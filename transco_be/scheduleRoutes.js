@@ -89,8 +89,10 @@ function validate(body, { partial = false, existing = null } = {}) {
   return { value };
 }
 
-module.exports = function createScheduleRouters({ getSydneyNow }) {
+module.exports = function createScheduleRouters({ getSydneyNow, onChange = () => {} }) {
   const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+  // After any change, re-check the "add the next date" admin tasks.
+  const changed = () => setTimeout(onChange, 0);
 
   function sydneyToday() {
     const now = getSydneyNow();
@@ -152,6 +154,7 @@ module.exports = function createScheduleRouters({ getSydneyNow }) {
     const now = new Date();
     const doc = { ...value, createdAt: now, updatedAt: now, updatedBy: (req.user && req.user.email) || 'staff' };
     const { insertedId } = await shippingSchedule().insertOne(doc);
+    changed();
     res.status(201).json({ date: shape({ ...doc, _id: insertedId }) });
   }));
 
@@ -168,6 +171,7 @@ module.exports = function createScheduleRouters({ getSydneyNow }) {
     }
     const set = { ...value, updatedAt: new Date(), updatedBy: (req.user && req.user.email) || 'staff' };
     await shippingSchedule().updateOne({ _id }, { $set: set });
+    changed();
     res.json({ date: shape({ ...existing, ...set }) });
   }));
 
@@ -175,6 +179,7 @@ module.exports = function createScheduleRouters({ getSydneyNow }) {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid id' });
     const result = await shippingSchedule().deleteOne({ _id: new ObjectId(req.params.id) });
     if (!result.deletedCount) return res.status(404).json({ error: 'That date was not found.' });
+    changed();
     res.status(204).send();
   }));
 

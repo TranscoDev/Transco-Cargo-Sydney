@@ -7326,7 +7326,10 @@ app.use('/api/my-transco', createStaffPortalRouter({ tools: customerTools }));
 app.use('/api/my-transco', require('./receiptRoutes')({ broadcast }));
 
 // Shipping calendar: public read for the website, staff management in the console.
-const scheduleRouters = require('./scheduleRoutes')({ getSydneyNow });
+// Admins get a Task board task when the last date is 2 weeks away (calendarAlerts.js).
+const calendarAlerts = require('./calendarAlerts').createCalendarAlerts({ broadcast, getSydneyNow, adminEmails: ADMIN_EMAILS });
+const recheckCalendar = calendarAlerts.start();
+const scheduleRouters = require('./scheduleRoutes')({ getSydneyNow, onChange: recheckCalendar });
 app.use('/api/public', scheduleRouters.publicRouter);
 app.use('/api/schedule', scheduleRouters.staffRouter);
 
