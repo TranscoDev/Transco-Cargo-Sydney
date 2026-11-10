@@ -3,9 +3,9 @@
 // ============================================================
 //
 // Staff type the cutoff dates into the console's Shipping calendar. When a
-// country's last entered cutoff is WARN_DAYS away or less (or there are
-// none ahead), the main admin account gets a task on the Task board. Once a later
-// date is added, those tasks close by themselves.
+// country has fewer than MIN_AHEAD dates ahead, or its last entered cutoff
+// is WARN_DAYS away or less, the main admin account gets a task on the
+// Task board. Once enough dates are added, those tasks close by themselves.
 //
 // A task is made once per admin for each "last date" — marking it done
 // without adding a date doesn't bring it back until that date changes.
@@ -14,7 +14,11 @@ const { shippingSchedule, staffTasks, users } = require('./db');
 const { COUNTRIES } = require('./scheduleRoutes');
 const pushNotify = require('./pushNotify');
 
-const WARN_DAYS = 14;
+const WARN_DAYS = 21;
+// Customers can see the next shipment and the one after it.
+const MIN_AHEAD = 2;
+// First tasks from this day (Sydney) — the office asked for a fresh start.
+const ALERTS_FROM = '2026-11-11';
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 const SYSTEM_ID = 'system';
 const SYSTEM_NAME = 'Shipping calendar';
@@ -41,10 +45,11 @@ function createCalendarAlerts({ broadcast, getSydneyNow, adminEmails }) {
     running = true;
     try {
       const today = sydneyToday();
+      if (today < ALERTS_FROM) return;
       for (const [country, label] of Object.entries(COUNTRIES)) {
-        const last = await shippingSchedule().find({ country, cutoff: { $gte: today } }).sort({ cutoff: -1 }).limit(1).next();
-        const lastCutoff = last ? last.cutoff : null;
-        const needed = !lastCutoff || dayNumber(lastCutoff) - dayNumber(today) <= WARN_DAYS;
+        const ahead = await shippingSchedule().find({ country, cutoff: { $gte: today } }, { projection: { cutoff: 1 } }).sort({ cutoff: -1 }).toArray();
+        const lastCutoff = ahead.length ? ahead[0].cutoff : null;
+        const needed = ahead.length < MIN_AHEAD || dayNumber(lastCutoff) - dayNumber(today) <= WARN_DAYS;
         const open = { 'calendarAlert.country': country, status: { $ne: 'done' } };
 
         if (!needed) {
@@ -59,7 +64,7 @@ function createCalendarAlerts({ broadcast, getSydneyNow, adminEmails }) {
 
         const key = `${country}:${lastCutoff || 'none'}`;
         const note = lastCutoff
-          ? `The last ${label} cutoff on the calendar is ${showDay(lastCutoff)}. After that the website and the bot have no next shipment to show. Add the next date in Shipping calendar — this task closes by itself.`
+          ? `The last ${label} cutoff on the calendar is ${showDay(lastCutoff)}. Customers asking about the shipment after that get no date. Add the next date in Shipping calendar — this task closes by itself.`
           : `There are no upcoming ${label} cutoff dates, so the website and the bot can't show the next shipment. Add the next date in Shipping calendar — this task closes by itself.`;
         for (const admin of await admins()) {
           const adminId = String(admin._id);
