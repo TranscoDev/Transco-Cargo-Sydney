@@ -74,9 +74,12 @@ export default {
     if (url.pathname === "/manifest.webmanifest") {
       return new Response(MANIFEST, { headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=3600", ...EXTRA_HEADERS } });
     }
-    const moved = REDIRECTS[url.pathname];
+    // Clean addresses: "/account" serves the same page as "/account.html".
+    // The .html addresses must keep working — links already sent use them.
+    const clean = url.pathname !== "/" && !url.pathname.includes(".") ? url.pathname.replace(/\\/$/, "") + ".html" : null;
+    const moved = REDIRECTS[url.pathname] || (clean && REDIRECTS[clean]);
     if (moved) {
-      return new Response(null, { status: 301, headers: { location: moved, ...EXTRA_HEADERS } });
+      return new Response(null, { status: 301, headers: { location: moved + url.search + url.hash, ...EXTRA_HEADERS } });
     }
     const script = SCRIPTS[url.pathname];
     if (script) {
@@ -84,7 +87,7 @@ export default {
         headers: { "content-type": "application/javascript; charset=UTF-8", "cache-control": "public, max-age=300", ...EXTRA_HEADERS }
       });
     }
-    const page = PAGES[url.pathname];
+    const page = PAGES[url.pathname] || (clean && PAGES[clean]);
     if (!page) {
       return new Response("Not found", { status: 404, headers: EXTRA_HEADERS });
     }
