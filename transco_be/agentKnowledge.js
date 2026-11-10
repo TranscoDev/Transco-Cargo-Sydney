@@ -34,7 +34,13 @@ const DETAILS = [
   { key: 'pickup_phone', group: 'Sydney contacts', label: 'Pickup & appointments — phone (Transco #2)', default: '0468 382 023' },
   { key: 'insurance_name', group: 'Sydney contacts', label: 'Insurance — name', default: 'Supun' },
   { key: 'insurance_phone', group: 'Sydney contacts', label: 'Insurance — phone', default: '03 9357 7228' },
+  { key: 'home_city', group: 'Sydney warehouse', label: 'Home city (where customers drop off)', default: 'Sydney' },
   { key: 'head_office_phone', group: 'Head office & India', label: 'Melbourne head office / India phone', default: '+61 3 9703 2255' },
+  { key: 'head_office_name', group: 'Head office & India', label: 'Personal effects contact — name', default: 'Geeshani Bhagya' },
+  { key: 'head_office_email', group: 'Head office & India', label: 'Personal effects contact — email', default: 'peops@transcocargo.com.au' },
+  { key: 'head_office_fax', group: 'Head office & India', label: 'Head office fax', default: '+61 3 9790 0677' },
+  { key: 'india_name', group: 'Head office & India', label: 'India shipments contact — name', default: 'Kaushika Hemachandra' },
+  { key: 'india_email', group: 'Head office & India', label: 'India shipments contact — email', default: 'kaushika@transcocargo.com.au' },
   { key: 'colombo_address', group: 'Colombo warehouse', label: 'Colombo (Wattala) warehouse address', default: '176/2 Alwis Town, Hendala, Wattala' },
   { key: 'colombo_phone_1', group: 'Colombo warehouse', label: 'Colombo phone 1', default: '070 644 0604' },
   { key: 'colombo_phone_2', group: 'Colombo warehouse', label: 'Colombo phone 2', default: '070 644 0601' },
@@ -42,7 +48,9 @@ const DETAILS = [
   { key: 'colombo_hotline', group: 'Colombo warehouse', label: 'Colombo hotline', default: '+94 70 644 0330' },
   { key: 'tracking_link', group: 'Tracking', label: 'BL tracking website', default: 'https://pebl-tracker.transcocargo.com.au/search-bl/' },
   { key: 'payid', group: 'Payment (admin only)', label: 'PayID', default: 'transcosydney@gmail.com', adminOnly: true },
-  { key: 'payid_name', group: 'Payment (admin only)', label: 'PayID account name', default: 'JDM CARS PTY LTD', adminOnly: true }
+  { key: 'payid_name', group: 'Payment (admin only)', label: 'PayID account name', default: 'JDM CARS PTY LTD', adminOnly: true },
+  { key: 'bank_bsb', group: 'Payment (admin only)', label: 'Bank BSB', default: '814282', adminOnly: true },
+  { key: 'bank_account', group: 'Payment (admin only)', label: 'Bank account number', default: '51609262', adminOnly: true }
 ];
 
 // Started from the manager's "Agent Transco" document, with our current
@@ -242,7 +250,10 @@ function createAgentKnowledgeRouters() {
   publicRouter.get('/agent-knowledge', async (req, res, next) => {
     try {
       res.set('Cache-Control', 'no-store');
-      res.json(await botKnowledge());
+      // The company's own name and website (Settings → Company), so a
+      // copy of the bot for another company says their name, not ours.
+      const c = await require('./company').companyDetails();
+      res.json({ ...(await botKnowledge()), company: { name: c.name, short_name: c.short_name, website: c.website, bot_name: c.bot_name } });
     } catch (err) { next(err); }
   });
 
