@@ -46,9 +46,9 @@ const PRICES = [
   { key: 'in_general_1', group: 'India', label: 'General box — 1 box', default: 400 },
   { key: 'in_general_2', group: 'India', label: 'General box — 2 boxes', default: 600 },
   { key: 'in_general_3', group: 'India', label: 'General box — 3 boxes', default: 800 },
-  { key: 'in_tea_1', group: 'India', label: 'Tea Chest — 1 box', default: 600 },
-  { key: 'in_tea_2', group: 'India', label: 'Tea Chest — 2 boxes', default: 900 },
-  { key: 'in_tea_3', group: 'India', label: 'Tea Chest — 3 boxes', default: 1200 },
+  { key: 'in_tea_1', group: 'India', label: 'Tea Chest — 1 box', default: 400 },
+  { key: 'in_tea_2', group: 'India', label: 'Tea Chest — 2 boxes', default: 600 },
+  { key: 'in_tea_3', group: 'India', label: 'Tea Chest — 3 boxes', default: 800 },
   { key: 'in_quarter_1', group: 'India', label: 'Quarter CBM — 1 box', default: 600 },
   { key: 'in_quarter_2', group: 'India', label: 'Quarter CBM — 2 boxes', default: 900 },
   { key: 'in_quarter_3', group: 'India', label: 'Quarter CBM — 3 boxes', default: 1200 }
