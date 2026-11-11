@@ -119,13 +119,13 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
   const known = new Set((data?.prices ?? []).map((p) => p.key));
   const [view, setView] = useState("prices");
 
-  const priceBox = (key: string) => (
+  const priceBox = (key: string, width = "w-24") => (
     <MoneyInput
       type="number"
       inputMode="decimal"
       min={0}
       step="1"
-      className="h-8 w-24 text-right"
+      className={`h-8 ${width} text-right`}
       disabled={!canEdit}
       aria-label={data?.prices.find((p) => p.key === key)?.label}
       value={values[key] ?? ""}
@@ -242,12 +242,12 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
                       <tbody>
                         {ZONE_ROWS.map((z) => (
                           <tr key={z.key}>
-                            <td className="py-1 pr-2">
+                            <td className="whitespace-nowrap py-1 pr-3">
                               <span className="font-medium text-foreground">{z.label}</span>
                               <span className="block text-xs text-muted-foreground">{z.note}</span>
                             </td>
-                            <td className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${z.key}_first`)}</div></td>
-                            <td className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${z.key}_extra`)}</div></td>
+                            <td className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${z.key}_first`, "w-20")}</div></td>
+                            <td className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${z.key}_extra`, "w-20")}</div></td>
                           </tr>
                         ))}
                       </tbody>
@@ -257,7 +257,7 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
               )}
 
               {INDIA_ROWS.some((r) => known.has(`${r.key}_1`)) && (
-                <Card className="md:col-span-2 xl:col-span-1">
+                <Card className="md:col-span-2">
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-sm">India (total for 1, 2 or 3 boxes)</CardTitle>
                   </CardHeader>
@@ -274,12 +274,12 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
                       <tbody>
                         {INDIA_ROWS.map((r) => (
                           <tr key={r.key}>
-                            <td className="py-1 pr-2">
+                            <td className="whitespace-nowrap py-1 pr-3">
                               <span className="font-medium text-foreground">{r.label}</span>
                               <span className="block text-xs text-muted-foreground">{r.note}</span>
                             </td>
                             {[1, 2, 3].map((n) => (
-                              <td key={n} className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${r.key}_${n}`)}</div></td>
+                              <td key={n} className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${r.key}_${n}`, "w-20")}</div></td>
                             ))}
                           </tr>
                         ))}
