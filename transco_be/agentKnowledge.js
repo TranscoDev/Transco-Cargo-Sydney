@@ -47,6 +47,10 @@ const DETAILS = [
   { key: 'colombo_phone_3', group: 'Colombo warehouse', label: 'Colombo phone 3', default: '011 298 1910' },
   { key: 'colombo_hotline', group: 'Colombo warehouse', label: 'Colombo hotline', default: '+94 70 644 0330' },
   { key: 'tracking_link', group: 'Tracking', label: 'BL tracking website', default: 'https://pebl-tracker.transcocargo.com.au/search-bl/' },
+  // "Name, address, Suburb — phone"; "-" = no shop in that slot.
+  { key: 'partner_shop_1', group: 'Partner shops (boxes)', label: 'Partner shop 1 — name, address, suburb — phone', default: 'Balajie Groceries, 20 Aurelia St, Toongabbie — 0469 587 525' },
+  { key: 'partner_shop_2', group: 'Partner shops (boxes)', label: 'Partner shop 2 (type - for none)', default: 'Hills Mega Mart, 37-39 Boomerang Pl, Seven Hills — 0423 836 324' },
+  { key: 'partner_shop_3', group: 'Partner shops (boxes)', label: 'Partner shop 3 (type - for none)', default: 'Kate Food Products, 41 Boomerang Place, Seven Hills — 02 9831 5820' },
   { key: 'payid', group: 'Payment (admin only)', label: 'PayID', default: 'transcosydney@gmail.com', adminOnly: true },
   { key: 'payid_name', group: 'Payment (admin only)', label: 'PayID account name', default: 'JDM CARS PTY LTD', adminOnly: true },
   { key: 'bank_bsb', group: 'Payment (admin only)', label: 'Bank BSB', default: '814282', adminOnly: true },

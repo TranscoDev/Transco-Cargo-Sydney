@@ -151,6 +151,8 @@ async function buildFacts() {
   lines.push(`- Office: ${d.office_phone}. Pickups & appointments: ${d.pickup_name} ${d.pickup_phone}. Insurance: ${d.insurance_name} ${d.insurance_phone}. Melbourne head office / India: ${d.head_office_phone}`);
   lines.push(`- Colombo (Wattala) warehouse: ${d.colombo_address}; phones ${d.colombo_phone_1}, ${d.colombo_phone_2}, ${d.colombo_phone_3}; hotline after arrival ${d.colombo_hotline}`);
   lines.push(`- Tracking website: ${d.tracking_link}`);
+  const shops = [d.partner_shop_1, d.partner_shop_2, d.partner_shop_3].filter(s => s && s.trim() !== '-');
+  if (shops.length) lines.push(`- Partner shops selling our boxes: ${shops.join('; ')}`);
 
   for (const s of k.sections) lines.push('', `# ${s.title.toUpperCase()}`, s.text);
 
