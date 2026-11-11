@@ -33,10 +33,13 @@ function createCalendarAlerts({ broadcast, getSydneyNow, adminEmails }) {
   const showDay = iso => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
   const changed = id => { try { broadcast('task.changed', { id: String(id) }); } catch { /* live update is optional */ } };
 
-  // Only the main admin account(s) (ADMIN_EMAILS, e.g. admin@transco.lk) —
-  // not every login with the admin role (IT has that too).
+  // The office admins: the main admin account(s) (ADMIN_EMAILS) plus
+  // CALENDAR_ALERT_EMAILS (default Malshani, staff01) — not every login
+  // with the admin role (IT has that too). This gives no extra access.
+  const alertEmails = [...adminEmails, ...(process.env.CALENDAR_ALERT_EMAILS || 'staff01@transco.lk')
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean)];
   async function admins() {
-    return users().find({ email: { $in: adminEmails } }, { projection: { name: 1, email: 1 } }).toArray();
+    return users().find({ email: { $in: alertEmails } }, { projection: { name: 1, email: 1 } }).toArray();
   }
 
   let running = false;
