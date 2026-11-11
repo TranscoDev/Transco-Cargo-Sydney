@@ -13,7 +13,8 @@
     var s = document.createElement("style");
     s.id = "tc-grow-style";
     s.textContent =
-      "textarea.tc-grow{resize:none;min-width:0;display:block;line-height:1.35;overflow-y:hidden;max-height:" + MAX + "px;}" +
+      "textarea.tc-grow{resize:none;min-width:0;display:block;line-height:1.35;overflow-x:hidden;overflow-y:hidden;white-space:pre-wrap;max-height:" + MAX + "px;}" +
+      "textarea.tc-grow::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
       ".tc-grow-row{align-items:flex-end;}";
     document.head.appendChild(s);
   }
@@ -27,6 +28,9 @@
 
     function fit() {
       box.style.height = "auto";
+      // Not on screen yet (chat closed / still being built): keep the
+      // natural one-line height — measuring now would give 0.
+      if (!box.scrollHeight) { box.style.height = ""; return; }
       var h = box.scrollHeight + (box.offsetHeight - box.clientHeight);
       box.style.height = Math.min(h, MAX) + "px";
       box.style.overflowY = h > MAX ? "auto" : "hidden";
@@ -34,6 +38,7 @@
     var later = function () { setTimeout(fit, 0); };
 
     box.addEventListener("input", fit);
+    box.addEventListener("focus", fit);
     box.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
