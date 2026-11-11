@@ -62,7 +62,6 @@ function SettingsPage() {
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <YourAccountCard email={me?.email ?? null} name={me?.name ?? null} />
-          {hasPage("settings") && <CompanyCard />}
         </div>
         <div className="flex flex-col gap-6">
           <NotificationsCard />
