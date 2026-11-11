@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { BadgePercent, BookOpenText, ChevronRight, CreditCard, History, Lock, MapPin, MessageSquareText, MessagesSquare, Phone, RotateCcw, Search } from "lucide-react";
+import { BadgePercent, BookOpenText, Building2, ChevronRight, CreditCard, History, Lock, MapPin, MessageSquareText, MessagesSquare, Phone, RotateCcw, Search } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { canSee } from "@/lib/transco/auth";
+import { canSee, getCurrentUser } from "@/lib/transco/auth";
+import { CompanyCard } from "@/routes/console.settings";
 import { BotFaqPage } from "@/routes/console.ai.faqs";
 import { PricesPage } from "@/routes/console.prices";
 import {
@@ -112,13 +113,15 @@ function AgentKnowledgePage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load the agent knowledge"));
   }, []);
 
-  const [tab, setTab] = useState("contacts");
+  // Company (Settings → Company) comes first, for logins with the Settings page.
+  const showCompany = (() => { const pages = getCurrentUser()?.pages; return !pages || pages.includes("settings"); })();
+  const [tab, setTab] = useState(showCompany ? "company" : "contacts");
   const showPrices = canSee("prices");
   const knowledgeTab = ["contacts", "places", "payment", "text"].includes(tab);
   // Open a tab from the link, e.g. /console/ai/agent?tab=prices.
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
-    if (t && ["contacts", "places", "payment", "text", "qa", "prices", "history"].includes(t) && (t !== "prices" || canSee("prices"))) setTab(t);
+    if (t && ["company", "contacts", "places", "payment", "text", "qa", "prices", "history"].includes(t) && (t !== "prices" || canSee("prices")) && (t !== "company" || showCompany)) setTab(t);
   }, []);
   const [query, setQuery] = useState("");
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -195,6 +198,7 @@ function AgentKnowledgePage() {
       <div className="mb-6 rounded-xl border bg-secondary/40 p-4 text-sm text-muted-foreground">
         <p className="mb-1.5 font-medium text-foreground">💡 How the bot uses this</p>
         <ul className="list-disc space-y-1 pl-5">
+          <li><b>Company</b>: your business name, logo and contacts (the same card as in Settings).</li>
           <li><b>Contacts, Places, Payment</b> go into every bot reply (English, Sinhala and Tamil).</li>
           <li><b>Bot text</b> is used to answer questions the bot has no ready answer for. If the answer isn't there, the chat goes to staff.</li>
           <li><b>Q&amp;A</b>: single questions the bot answers by itself (e.g. "I only have an Australian passport").</li>
@@ -235,6 +239,7 @@ function AgentKnowledgePage() {
           ) : (
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="mb-4 flex h-auto flex-wrap justify-start">
+                {showCompany && <TabsTrigger value="company" className="gap-1.5"><Building2 className="h-3.5 w-3.5" /> Company</TabsTrigger>}
                 <TabsTrigger value="contacts" className="gap-1.5"><Phone className="h-3.5 w-3.5" /> Contacts</TabsTrigger>
                 <TabsTrigger value="places" className="gap-1.5"><MapPin className="h-3.5 w-3.5" /> Places</TabsTrigger>
                 <TabsTrigger value="payment" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Payment</TabsTrigger>
@@ -243,6 +248,11 @@ function AgentKnowledgePage() {
                 {showPrices && <TabsTrigger value="prices" className="gap-1.5"><BadgePercent className="h-3.5 w-3.5" /> Prices</TabsTrigger>}
                 <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" /> History</TabsTrigger>
               </TabsList>
+              {showCompany && (
+                <TabsContent value="company" className="mt-0">
+                  <CompanyCard embedded />
+                </TabsContent>
+              )}
               <TabsContent value="qa" className="mt-0">
                 <BotFaqPage embedded />
               </TabsContent>
