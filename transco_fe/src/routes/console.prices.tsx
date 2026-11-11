@@ -6,6 +6,7 @@ import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoneyInput } from "@/components/transco/money-input";
 import {
   fetchPriceHistory,
@@ -26,6 +27,18 @@ export const Route = createFileRoute("/console/prices")({
 
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short", timeZone: "Australia/Sydney" }) : "";
+
+// Door delivery (z1_first, z1_extra…) and India (in_tea_1…) show as tables.
+const ZONE_ROWS = [
+  { key: "z1", label: "Zone 1", note: "up to 20 km" },
+  { key: "z2", label: "Zone 2", note: "21–100 km" },
+  { key: "z3", label: "Zone 3", note: "over 100 km" },
+];
+const INDIA_ROWS = [
+  { key: "in_general", label: "General box", note: "same as Tea Chest" },
+  { key: "in_tea", label: "Tea Chest", note: "up to 30 kg" },
+  { key: "in_quarter", label: "Quarter CBM", note: "up to 50 kg" },
+];
 
 const TYPE_LABEL: Record<Promotion["type"], string> = {
   percent: "% off",
@@ -101,6 +114,27 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
     for (const p of data?.prices ?? []) map.set(p.group, [...(map.get(p.group) ?? []), p]);
     return [...map.entries()];
   }, [data]);
+  // Prices shown as a table (door delivery, India); the rest are short lists.
+  const inTable = new Set([...ZONE_ROWS.flatMap((z) => [`${z.key}_first`, `${z.key}_extra`]), ...INDIA_ROWS.flatMap((r) => [1, 2, 3].map((n) => `${r.key}_${n}`))]);
+  const known = new Set((data?.prices ?? []).map((p) => p.key));
+  const [view, setView] = useState("prices");
+
+  const priceBox = (key: string) => (
+    <MoneyInput
+      type="number"
+      inputMode="decimal"
+      min={0}
+      step="1"
+      className="h-8 w-24 text-right"
+      disabled={!canEdit}
+      aria-label={data?.prices.find((p) => p.key === key)?.label}
+      value={values[key] ?? ""}
+      onChange={(e) => {
+        setValues((v) => ({ ...v, [key]: e.target.value }));
+        setSuccess(null);
+      }}
+    />
+  );
 
   const updatePromo = (i: number, patch: Partial<Promotion>) => {
     setPromotions((list) => list.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -162,44 +196,102 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
       {!data ? (
         <p className="text-sm text-muted-foreground">{error ?? "Loading…"}</p>
       ) : (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-          <Card>
-            <CardHeader className="p-5 pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Tags className="h-4 w-4" /> Prices (AUD)
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">3 Tea Chests and door-delivery totals are worked out from these.</p>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5 p-5 pt-2">
-              {groups.map(([group, items]) => (
-                <div key={group} className="flex flex-col gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
-                  {items.map((p) => (
-                    <label key={p.key} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-foreground">{p.label}</span>
-                      <span className="flex items-center gap-1">
-                        <MoneyInput
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          step="1"
-                          className="h-8 w-24 text-right"
-                          disabled={!canEdit}
-                          value={values[p.key] ?? ""}
-                          onChange={(e) => {
-                            setValues((v) => ({ ...v, [p.key]: e.target.value }));
-                            setSuccess(null);
-                          }}
-                        />
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        <Tabs value={view} onValueChange={setView}>
+          <TabsList className="mb-4 h-auto flex-wrap justify-start">
+            <TabsTrigger value="prices" className="gap-1.5"><Tags className="h-3.5 w-3.5" /> Prices (AUD)</TabsTrigger>
+            <TabsTrigger value="promotions" className="gap-1.5"><BadgePercent className="h-3.5 w-3.5" /> Promotions ({promotions.length})</TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" /> Earlier versions</TabsTrigger>
+          </TabsList>
 
-          <div className="flex flex-col gap-6">
+          <TabsContent value="prices" className="mt-0">
+            <p className="mb-3 text-sm text-muted-foreground">3 Tea Chests and door-delivery totals are worked out from these.</p>
+            <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {groups.map(([group, items]) => {
+                const list = items.filter((p) => !inTable.has(p.key));
+                return list.length ? (
+                  <Card key={group}>
+                    <CardHeader className="p-4 pb-2">
+                      <CardTitle className="text-sm">{group}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-2 p-4 pt-1">
+                      {list.map((p) => (
+                        <label key={p.key} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-foreground">{p.label}</span>
+                          {priceBox(p.key)}
+                        </label>
+                      ))}
+                    </CardContent>
+                  </Card>
+                ) : null;
+              })}
+
+              {ZONE_ROWS.some((z) => known.has(`${z.key}_first`)) && (
+                <Card>
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm">Door delivery in Sri Lanka (per order)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-1">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-muted-foreground">
+                          <th className="pb-1.5 text-left font-medium" />
+                          <th className="pb-1.5 text-right font-medium">First box</th>
+                          <th className="pb-1.5 text-right font-medium">Each extra</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ZONE_ROWS.map((z) => (
+                          <tr key={z.key}>
+                            <td className="py-1 pr-2">
+                              <span className="font-medium text-foreground">{z.label}</span>
+                              <span className="block text-xs text-muted-foreground">{z.note}</span>
+                            </td>
+                            <td className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${z.key}_first`)}</div></td>
+                            <td className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${z.key}_extra`)}</div></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {INDIA_ROWS.some((r) => known.has(`${r.key}_1`)) && (
+                <Card className="md:col-span-2 xl:col-span-1">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm">India (total for 1, 2 or 3 boxes)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-1">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-muted-foreground">
+                          <th className="pb-1.5 text-left font-medium" />
+                          {[1, 2, 3].map((n) => (
+                            <th key={n} className="pb-1.5 text-right font-medium">{n} box{n > 1 ? "es" : ""}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {INDIA_ROWS.map((r) => (
+                          <tr key={r.key}>
+                            <td className="py-1 pr-2">
+                              <span className="font-medium text-foreground">{r.label}</span>
+                              <span className="block text-xs text-muted-foreground">{r.note}</span>
+                            </td>
+                            {[1, 2, 3].map((n) => (
+                              <td key={n} className="py-1 pl-1"><div className="flex justify-end">{priceBox(`${r.key}_${n}`)}</div></td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="promotions" className="mt-0">
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 p-5 pb-3">
                 <div>
@@ -229,9 +321,12 @@ export function PricesPage({ embedded = false }: { embedded?: boolean }) {
                 ))}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-0">
             <HistoryCard key={historyKey} canEdit={canEdit} onRestore={restore} />
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       )}
 
       {data && canEdit && (
