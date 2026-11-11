@@ -33,7 +33,8 @@ const when = (iso: string | null) =>
 // The page layout only — which boxes sit together on which card, with short
 // labels (the card title gives the context). The saved data is unchanged.
 type Field = { key: string; label: string; wide?: boolean; hint?: string };
-type CardDef = { title: string; fields: Field[] };
+// full: the card takes the whole row (its boxes sit up to 4 across).
+type CardDef = { title: string; fields: Field[]; full?: boolean };
 type TabKey = "contacts" | "places" | "payment";
 
 const LAYOUT: Record<TabKey, CardDef[]> = {
@@ -41,8 +42,10 @@ const LAYOUT: Record<TabKey, CardDef[]> = {
     { title: "Office", fields: [{ key: "office_phone", label: "Phone (Transco #1)" }] },
     { title: "Pickup & appointments", fields: [{ key: "pickup_name", label: "Name" }, { key: "pickup_phone", label: "Phone (Transco #2)" }] },
     { title: "Insurance", fields: [{ key: "insurance_name", label: "Name" }, { key: "insurance_phone", label: "Phone" }] },
+    { title: "India shipments", fields: [{ key: "india_name", label: "Name" }, { key: "india_email", label: "Email" }] },
     {
       title: "Melbourne head office",
+      full: true,
       fields: [
         { key: "head_office_phone", label: "Phone (also India)" },
         { key: "head_office_fax", label: "Fax" },
@@ -50,8 +53,7 @@ const LAYOUT: Record<TabKey, CardDef[]> = {
         { key: "head_office_email", label: "Email" },
       ],
     },
-    { title: "India shipments", fields: [{ key: "india_name", label: "Name" }, { key: "india_email", label: "Email" }] },
-    { title: "Tracking", fields: [{ key: "tracking_link", label: "BL tracking website", wide: true }] },
+    { title: "Tracking", full: true, fields: [{ key: "tracking_link", label: "BL tracking website", wide: true }] },
   ],
   places: [
     {
@@ -74,6 +76,7 @@ const LAYOUT: Record<TabKey, CardDef[]> = {
     },
     {
       title: "Partner shops (boxes)",
+      full: true,
       fields: [
         { key: "partner_shop_1", label: "Shop 1", wide: true, hint: "Name, address, suburb — phone" },
         { key: "partner_shop_2", label: "Shop 2", wide: true, hint: "Type - for no shop" },
@@ -134,11 +137,11 @@ function AgentKnowledgePage() {
     const byKey = new Map((data?.details ?? []).map((d) => [d.key, d]));
     const build = (defs: CardDef[]) =>
       defs
-        .map((c) => ({ title: c.title, fields: c.fields.filter((f) => byKey.has(f.key)).map((f) => ({ ...f, d: byKey.get(f.key)! })) }))
+        .map((c) => ({ title: c.title, full: c.full, fields: c.fields.filter((f) => byKey.has(f.key)).map((f) => ({ ...f, d: byKey.get(f.key)! })) }))
         .filter((c) => c.fields.length);
     const other = (data?.details ?? []).filter((d) => !PLACED.has(d.key)).map((d) => ({ key: d.key, label: d.label, d }));
     return {
-      contacts: [...build(LAYOUT.contacts), ...(other.length ? [{ title: "Other", fields: other }] : [])],
+      contacts: [...build(LAYOUT.contacts), ...(other.length ? [{ title: "Other", full: true, fields: other }] : [])],
       places: build(LAYOUT.places),
       payment: build(LAYOUT.payment),
     };
@@ -315,25 +318,25 @@ function CardGrid({
   isAdmin,
   onChange,
 }: {
-  cards: { title: string; fields: PlacedField[] }[];
+  cards: { title: string; full?: boolean | undefined; fields: PlacedField[] }[];
   details: Record<string, string>;
   isAdmin: boolean;
   onChange: (key: string, value: string) => void;
 }) {
   return (
-    <div className="grid items-start gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2">
       {cards.map((c) => (
-        <Card key={c.title}>
+        <Card key={c.title} className={c.full ? "md:col-span-2" : ""}>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-base">{c.title}</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 p-4 pt-1 sm:grid-cols-2">
+          <CardContent className={`grid gap-3 p-4 pt-1 sm:grid-cols-2 ${c.full ? "lg:grid-cols-4" : ""}`}>
             {c.fields.map((f) => {
               const value = details[f.key] ?? "";
               const locked = !!f.d.adminOnly && !isAdmin;
               const edited = value.trim() !== "" && value.trim() !== f.d.default;
               return (
-                <label key={f.key} className={`flex flex-col gap-1 text-sm ${f.wide ? "sm:col-span-2" : ""}`}>
+                <label key={f.key} className={`flex flex-col gap-1 text-sm ${f.wide || c.fields.length === 1 ? (c.full ? "sm:col-span-2 lg:col-span-4" : "sm:col-span-2") : ""}`}>
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     {f.label}
                     {f.d.adminOnly && <Lock className="h-3 w-3" />}
