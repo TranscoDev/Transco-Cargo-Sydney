@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { MessagesSquare, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
@@ -21,13 +21,15 @@ import {
 // each. The bot answers these itself (WhatsApp and website) without
 // passing the chat to staff. Switched-off ones are kept but not used.
 export const Route = createFileRoute("/console/ai/faqs")({
-  component: BotFaqPage,
+  component: () => <BotFaqPage />,
 });
 
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short", timeZone: "Australia/Sydney" }) : "";
 
-function BotFaqPage() {
+// embedded: shown as the Q&A tab on Agent Transco (no page frame or title).
+export function BotFaqPage({ embedded = false }: { embedded?: boolean }) {
+  const Shell = embedded ? Fragment : PageShell;
   const [faqs, setFaqs] = useState<AgentFaq[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -49,12 +51,14 @@ function BotFaqPage() {
   const replace = (f: AgentFaq) => setFaqs((list) => (list ?? []).map((x) => (x.id === f.id ? f : x)));
 
   return (
-    <PageShell>
-      <PageHeader
-        icon={MessagesSquare}
-        title="Bot Q&A"
-        description="Questions the bot answers by itself, on WhatsApp and the website — without passing the chat to staff."
-      />
+    <Shell>
+      {!embedded && (
+        <PageHeader
+          icon={MessagesSquare}
+          title="Bot Q&A"
+          description="Questions the bot answers by itself, on WhatsApp and the website — without passing the chat to staff."
+        />
+      )}
 
       <div className="mb-6 rounded-xl border bg-secondary/40 p-4 text-sm text-muted-foreground">
         <p className="mb-1.5 font-medium text-foreground">💡 Tips</p>
@@ -110,7 +114,7 @@ function BotFaqPage() {
           ))}
         </div>
       )}
-    </PageShell>
+    </Shell>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { BadgePercent, History, Lock, Plus, Tags, Trash2 } from "lucide-react";
 
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 // The prices the chat bot quotes with and the promotions it applies
 // (prices.js). Admins edit; everyone with the page can view.
 export const Route = createFileRoute("/console/prices")({
-  component: PricesPage,
+  component: () => <PricesPage />,
 });
 
 const when = (iso: string | null) =>
@@ -65,7 +65,9 @@ const newPromotion = (): Promotion => ({
   message: { en: "", si: "", ta: "" },
 });
 
-function PricesPage() {
+// embedded: shown as the Prices tab on Agent Transco (no page frame or title).
+export function PricesPage({ embedded = false }: { embedded?: boolean }) {
+  const Shell = embedded ? Fragment : PageShell;
   const [data, setData] = useState<PriceSettings | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -133,12 +135,14 @@ function PricesPage() {
   };
 
   return (
-    <PageShell>
-      <PageHeader
-        icon={BadgePercent}
-        title="Prices & Promotions"
-        description="The prices the chat bot quotes, and the offers it applies. Changes reach WhatsApp and the website chat from the next message."
-      />
+    <Shell>
+      {!embedded && (
+        <PageHeader
+          icon={BadgePercent}
+          title="Prices & Promotions"
+          description="The prices the chat bot quotes, and the offers it applies. Changes reach WhatsApp and the website chat from the next message."
+        />
+      )}
 
       <div className="mb-6 rounded-xl border bg-secondary/40 p-4 text-sm text-muted-foreground">
         <p className="mb-1.5 font-medium text-foreground">💡 How it works</p>
@@ -250,7 +254,7 @@ function PricesPage() {
           )}
         </div>
       )}
-    </PageShell>
+    </Shell>
   );
 }
 

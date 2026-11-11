@@ -31,7 +31,6 @@ import {
   Users,
   BookOpenText,
   BadgePercent,
-  MessagesSquare,
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -71,6 +70,8 @@ export interface NavLeaf {
   badge?: "conversations" | "walkIns" | "tasks" | "bookings" | "emails";
   /** Only for the admin (checked again by the backend). */
   adminOnly?: boolean;
+  /** Hidden when this page can be seen — it's a tab on that page then. */
+  hideIfCanSee?: string;
 }
 export interface NavGroup {
   label: string;
@@ -131,8 +132,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "All tasks", to: "/console/all-tasks", icon: ShieldCheck, adminOnly: true },
       { label: "Bot settings", to: "/console/ai/bot-controls", icon: Bot },
       { label: "Agent Transco", to: "/console/ai/agent", icon: BookOpenText },
-      { label: "Bot Q&A", to: "/console/ai/faqs", icon: MessagesSquare },
-      { label: "Prices & Promotions", to: "/console/prices", icon: BadgePercent },
+      // Bot Q&A and Prices are tabs on Agent Transco; Prices stays here only
+      // for a login that has Prices but not Agent Transco.
+      { label: "Prices & Promotions", to: "/console/prices", icon: BadgePercent, hideIfCanSee: "agent-knowledge" },
       { label: "Website notices", to: "/console/notices", icon: Megaphone },
     ],
   },
@@ -201,7 +203,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   // Only the pages this login may open (Settings → Staff → page access);
   // limited logins don't see the "Coming later" group either.
   const limited = !!getCurrentUser()?.pages;
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canSee(pageForPath(i.to)) && (!i.adminOnly || isAdmin)) }))
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canSee(pageForPath(i.to)) && (!i.adminOnly || isAdmin) && !(i.hideIfCanSee && canSee(i.hideIfCanSee))) }))
     .filter((g) => g.items.length && !(limited && g.later));
   const laterGroup = groups.find((g) => g.later);
   const [laterOpen, setLaterOpen] = useState(

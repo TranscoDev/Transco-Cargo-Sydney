@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpenText, ChevronRight, CreditCard, History, Lock, MapPin, MessageSquareText, Phone, RotateCcw, Search } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { BadgePercent, BookOpenText, ChevronRight, CreditCard, History, Lock, MapPin, MessageSquareText, MessagesSquare, Phone, RotateCcw, Search } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { canSee } from "@/lib/transco/auth";
+import { BotFaqPage } from "@/routes/console.ai.faqs";
+import { PricesPage } from "@/routes/console.prices";
 import {
   fetchAgentKnowledge,
   fetchAgentKnowledgeHistory,
@@ -107,6 +110,13 @@ function AgentKnowledgePage() {
   }, []);
 
   const [tab, setTab] = useState("contacts");
+  const showPrices = canSee("prices");
+  const knowledgeTab = ["contacts", "places", "payment", "text"].includes(tab);
+  // Open a tab from the link, e.g. /console/ai/agent?tab=prices.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && ["contacts", "places", "payment", "text", "qa", "prices", "history"].includes(t) && (t !== "prices" || canSee("prices"))) setTab(t);
+  }, []);
   const [query, setQuery] = useState("");
   const [openSection, setOpenSection] = useState<string | null>(null);
 
@@ -176,19 +186,16 @@ function AgentKnowledgePage() {
       <PageHeader
         icon={BookOpenText}
         title="Agent Transco"
-        description="What the chat bot knows. Change it here and the bot uses it from the next message — WhatsApp and the website."
+        description="Everything the chat bot knows, in one place. Changes reach WhatsApp and the website chat from the next message."
       />
 
       <div className="mb-6 rounded-xl border bg-secondary/40 p-4 text-sm text-muted-foreground">
         <p className="mb-1.5 font-medium text-foreground">💡 How the bot uses this</p>
         <ul className="list-disc space-y-1 pl-5">
-          <li><b>Contact details</b> go into every bot reply (English, Sinhala and Tamil).</li>
-          <li><b>Information</b> is used to answer questions the bot has no ready answer for. If the answer isn't here, the chat goes to staff.</li>
-          <li>
-            Single <b>questions &amp; answers</b> (e.g. "I only have an Australian passport") go on{" "}
-            <Link to="/console/ai/faqs" className="underline underline-offset-2">Bot Q&amp;A</Link>.
-          </li>
-          <li><b>Prices</b> are worked out by the bot's price calculator, and <b>shipping dates</b> come from the Shipping calendar — not edited here.</li>
+          <li><b>Contacts, Places, Payment</b> go into every bot reply (English, Sinhala and Tamil).</li>
+          <li><b>Bot text</b> is used to answer questions the bot has no ready answer for. If the answer isn't there, the chat goes to staff.</li>
+          <li><b>Q&amp;A</b>: single questions the bot answers by itself (e.g. "I only have an Australian passport").</li>
+          <li><b>Prices</b>: what the bot quotes and the offers it applies. <b>Shipping dates</b> come from the Shipping calendar.</li>
         </ul>
       </div>
 
@@ -196,10 +203,12 @@ function AgentKnowledgePage() {
         <p className="text-sm text-muted-foreground">{error ?? "Loading…"}</p>
       ) : (
         <>
-          <div className="relative mb-4 max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search — e.g. insurance, Wattala, BSB" className="pl-9" />
-          </div>
+          {(knowledgeTab || q) && (
+            <div className="relative mb-4 max-w-md">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search — e.g. insurance, Wattala, BSB" className="pl-9" />
+            </div>
+          )}
 
           {q ? (
             // Search: matching cards and bot text from every tab.
@@ -227,8 +236,18 @@ function AgentKnowledgePage() {
                 <TabsTrigger value="places" className="gap-1.5"><MapPin className="h-3.5 w-3.5" /> Places</TabsTrigger>
                 <TabsTrigger value="payment" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Payment</TabsTrigger>
                 <TabsTrigger value="text" className="gap-1.5"><MessageSquareText className="h-3.5 w-3.5" /> Bot text</TabsTrigger>
+                <TabsTrigger value="qa" className="gap-1.5"><MessagesSquare className="h-3.5 w-3.5" /> Q&amp;A</TabsTrigger>
+                {showPrices && <TabsTrigger value="prices" className="gap-1.5"><BadgePercent className="h-3.5 w-3.5" /> Prices</TabsTrigger>}
                 <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" /> History</TabsTrigger>
               </TabsList>
+              <TabsContent value="qa" className="mt-0">
+                <BotFaqPage embedded />
+              </TabsContent>
+              {showPrices && (
+                <TabsContent value="prices" className="mt-0">
+                  <PricesPage embedded />
+                </TabsContent>
+              )}
               {(["contacts", "places", "payment"] as const).map((t) => (
                 <TabsContent key={t} value={t} className="mt-0">
                   {t === "payment" && !data.isAdmin && (
@@ -258,7 +277,8 @@ function AgentKnowledgePage() {
         </>
       )}
 
-      {data && (
+      {/* Q&A and Prices have their own Save. */}
+      {data && (knowledgeTab || tab === "history" || changed || q) && (
         <div className="sticky bottom-0 z-10 mt-6 flex flex-wrap items-center gap-3 border-t bg-background/95 py-3 backdrop-blur">
           <Button type="button" disabled={saving || !changed} onClick={save}>
             {saving ? "Saving…" : "Save changes"}
