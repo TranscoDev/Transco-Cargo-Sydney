@@ -573,7 +573,7 @@
   .account-link:hover { background: rgba(18,161,137,0.32); }
 
   #ta-input-row { display: flex; gap: 8px; padding: 14px; border-top: 1px solid var(--line); background: #fff; }
-  #ta-input { flex: 1; border: 1px solid #d7dbd9; border-radius: 22px; padding: 11px 16px; font-size: 14.5px; outline: none; font-family: inherit; }
+  #ta-input { flex: 1; min-width: 0; border: 1px solid #d7dbd9; border-radius: 22px; padding: 11px 16px; font-size: 14.5px; outline: none; font-family: inherit; }
   #ta-input:focus { border-color: var(--navy); }
   #ta-send { background: var(--navy); color: #fff; border: none; border-radius: 50%; width: 42px; height: 42px; cursor: pointer; font-size: 16px; flex-shrink: 0; }
   #ta-send:disabled { opacity: 0.5; cursor: default; }
@@ -717,6 +717,7 @@
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
 <script src="/chat-voice.js"></script>
+<script src="/chat-grow.js"></script>
 <script src="/chat-staff.js"></script>
 </head>
 <body>
@@ -841,7 +842,7 @@
         <div id="ta-messages"></div>
         <div id="ta-menu-slot"></div>
         <div id="ta-input-row">
-          <input id="ta-input" type="text" placeholder="Type your question..." autocomplete="off" />
+          <textarea id="ta-input" rows="1" placeholder="Type your question..." autocomplete="off"></textarea>
           <button id="ta-send" aria-label="Send">➤</button>
         </div>
       </div>
@@ -1186,9 +1187,7 @@
   if (window.TranscoChatStaff) TranscoChatStaff.start({ api: WIDGET_API_URL, sessionId: sessionId, list: messagesEl, add: function (text) { return addMessage(text, "bot"); } });
 
   sendBtn.addEventListener("click", sendMessage);
-  input.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") sendMessage();
-  });
+  TranscoChatGrow.attach(input, sendMessage, sendBtn);
 
   // Called by the hero/quick-start country buttons — seeds the exact
   // same phrase the backend's COUNTRY_MENU_ITEMS already use ("I'm

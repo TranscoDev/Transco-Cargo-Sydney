@@ -423,8 +423,8 @@
   .ag-card .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
   .ag-card .go { background: none; border: none; padding: 4px 0; color: var(--sl-teal-deep); font-weight: 700; font-size: 13.5px; cursor: pointer; text-decoration: none; }
   .ag-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); background: #fff; }
-  .ag-input input { flex: 1; min-width: 0; border: 1.5px solid #cfd4d8; border-radius: 22px; padding: 11px 16px; font-size: 16px; outline: none; }
-  .ag-input input:focus { border-color: var(--navy); }
+  .ag-input input, .ag-input textarea { flex: 1; font-family: inherit; min-width: 0; border: 1.5px solid #cfd4d8; border-radius: 22px; padding: 11px 16px; font-size: 16px; outline: none; }
+  .ag-input input:focus, .ag-input textarea:focus { border-color: var(--navy); }
   .ag-input button { background: var(--navy); color: #fff; border: none; border-radius: 50%; width: 46px; height: 46px; cursor: pointer; font-size: 17px; flex-shrink: 0; }
   .ag-input button:disabled { opacity: 0.5; cursor: default; }
   button.tab-ai { flex: 1; text-align: center; border: none; background: none; padding: 10px 8px; border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--sl-teal-deep); cursor: pointer; font-family: inherit; }
@@ -454,6 +454,7 @@
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
 <script src="/chat-voice.js"></script>
+<script src="/chat-grow.js"></script>
 </head>
 <body>
   <a class="sr-only" href="#main">Skip to content</a>
@@ -1397,7 +1398,7 @@
     var closeBtn = h("button", { type: "button", class: "ag-close", "aria-label": t("agentClose"), text: "×" });
     closeBtn.addEventListener("click", closeAgent);
     agent.body = h("div", { class: "ag-body", "aria-live": "polite" });
-    agent.input = h("input", { type: "text", placeholder: t("agentPlaceholder"), "aria-label": t("agentPlaceholder"), autocomplete: "off", maxlength: "1000" });
+    agent.input = h("textarea", { rows: "1", placeholder: t("agentPlaceholder"), "aria-label": t("agentPlaceholder"), autocomplete: "off", maxlength: "1000" });
     agent.sendBtn = h("button", { type: "submit", "aria-label": t("agentSend"), text: "➤" });
     var form = h("form", { class: "ag-input", onsubmit: function (e) {
       e.preventDefault();
@@ -1406,6 +1407,8 @@
       agent.input.value = "";
       sendToAgent({ message: text }, text);
     } }, agent.input, agent.sendBtn);
+    // Long messages wrap and the box grows (chat-grow.js); Enter sends.
+    if (window.TranscoChatGrow) TranscoChatGrow.attach(agent.input, function () { if (form.requestSubmit) form.requestSubmit(); else agent.sendBtn.click(); });
     // 📎 Photo button (chat-photo.js).
     if (window.TranscoChatPhoto) TranscoChatPhoto.attach(agent.input, function (image, caption) {
       sendToAgent({ message: caption, image: image }, caption ? "📷 " + caption : "📷 Photo");

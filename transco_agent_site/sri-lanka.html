@@ -171,7 +171,7 @@
   .box-type-card .dims { font-size: 10.5px; color: var(--muted); }
 
   /* ---------- Compact chat sidebar ---------- */
-  .chat-side { position: sticky; top: 20px; background: var(--navy); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: min(620px, calc(100vh - 110px)); }
+  .chat-side { position: sticky; top: 86px; background: var(--navy); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: min(620px, calc(100vh - 106px)); }
   .chat-side-head { padding: 16px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .chat-side-avatar { width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, #2c4059, #10141f); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .chat-side-head .t { font-weight: 700; font-size: 14.5px; color: #fff; }
@@ -200,7 +200,7 @@
   @media (prefers-reduced-motion: reduce) { .cs-typing span { animation: none; opacity: 0.8; } }
 
   #cs-input-row { display: flex; gap: 6px; padding: 12px; border-top: 1px solid var(--line); background: #fff; }
-  #cs-input { flex: 1; border: 1px solid #d7dbd9; border-radius: 20px; padding: 9px 13px; font-size: 13px; outline: none; font-family: inherit; }
+  #cs-input { flex: 1; min-width: 0; border: 1px solid #d7dbd9; border-radius: 20px; padding: 9px 13px; font-size: 13px; outline: none; font-family: inherit; }
   #cs-input:focus { border-color: var(--navy); }
   #cs-send { background: var(--navy); color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 14px; flex-shrink: 0; }
   #cs-send:disabled { opacity: .5; }
@@ -266,6 +266,7 @@
 <script src="/chat-links.js"></script>
 <script src="/chat-photo.js"></script>
 <script src="/chat-voice.js"></script>
+<script src="/chat-grow.js"></script>
 <script src="/chat-staff.js"></script>
 </head>
 <body>
@@ -441,7 +442,7 @@
       </div>
       <div id="cs-messages"></div>
       <div id="cs-input-row">
-        <input id="cs-input" type="text" placeholder="Type your question..." />
+        <textarea id="cs-input" rows="1" placeholder="Type your question..."></textarea>
         <button id="cs-send" aria-label="Send">➤</button>
       </div>
     </aside>
@@ -683,7 +684,7 @@
   };
 
   sendBtn.addEventListener("click", sendMessage);
-  input.addEventListener("keydown", function (e) { if (e.key === "Enter") sendMessage(); });
+  TranscoChatGrow.attach(input, sendMessage, sendBtn);
 })();
 </script>
 
