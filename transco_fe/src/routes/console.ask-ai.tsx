@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addAiThreadMessage, askAi, createAiThread, editAiThreadMessage, fetchAiThread, fetchAiThreads,
-  hearVoiceNote, importAiThreadMessages, saveAiThreadCustomer, suggestAiThreadReply, updateAiThread,
+  hearVoiceNote, importAiThreadMessages, openAiThreadForCustomer, saveAiThreadCustomer, suggestAiThreadReply, updateAiThread,
   type AiThread, type AiThreadMessage, type AiThreadRow,
 } from "@/lib/transco/api";
 import { parseWhatsAppPaste, senderIsPhone } from "@/lib/transco/whatsapp-paste";
@@ -21,13 +21,21 @@ import { parseWhatsAppPaste, senderIsPhone } from "@/lib/transco/whatsapp-paste"
 // chats are saved (shared by all staff): paste what an office-WhatsApp
 // customer wrote, and the AI's suggestion reads that customer's earlier
 // messages. Nothing here is sent to the customer.
+// ?customer=<id> (from "Ask AI" on a customer profile) opens that
+// customer's own chat — the saved one, or a new one linked to them.
+type AskAiSearch = { customer?: string };
+
 export const Route = createFileRoute("/console/ask-ai")({
+  validateSearch: (search: Record<string, unknown>): AskAiSearch =>
+    typeof search["customer"] === "string" && search["customer"] ? { customer: search["customer"] } : {},
   component: AskAiPage,
 });
 
 const QUICK = "quick";
 
 function AskAiPage() {
+  const { customer } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [threads, setThreads] = useState<AiThreadRow[]>([]);
   const [selected, setSelected] = useState<string>(QUICK);
   // Phones show the list or the chat, not both.
@@ -51,6 +59,22 @@ function AskAiPage() {
   useEffect(() => { void loadList(); }, [loadList]);
 
   const open = (id: string) => { setSelected(id); setShowChat(true); setAdding(false); setNotice(null); };
+
+  useEffect(() => {
+    if (!customer) return;
+    let stop = false;
+    openAiThreadForCustomer(customer)
+      .then(async (r) => {
+        if (stop) return;
+        await loadList();
+        open(r.thread._id);
+      })
+      .catch((err) => { if (!stop) setListError(err instanceof Error ? err.message : "Could not open the customer's chat."); })
+      // Off the address, so a refresh doesn't open it again.
+      .finally(() => { if (!stop) void navigate({ search: {}, replace: true }); });
+    return () => { stop = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer]);
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -1272,6 +1272,9 @@ async function aiThreadRequest<T>(path: string, init: RequestInit = {}): Promise
 export const fetchAiThreads = () => aiThreadRequest<{ threads: AiThreadRow[] }>("").then((r) => r.threads);
 export const createAiThread = (name: string, phone: string) =>
   aiThreadRequest<{ thread: { _id: string }; existed?: boolean }>("", { method: "POST", body: JSON.stringify({ name, phone }) });
+/** A customer's own Ask AI chat — the linked one, or one started for them. */
+export const openAiThreadForCustomer = (customerId: string) =>
+  aiThreadRequest<{ thread: { _id: string }; existed?: boolean }>(`/for-customer/${encodeURIComponent(customerId)}`, { method: "POST" });
 export const fetchAiThread = (id: string) => aiThreadRequest<{ thread: AiThread }>(`/${id}`).then((r) => r.thread);
 export const updateAiThread = (id: string, body: { name?: string; phone?: string; deleted?: boolean }) =>
   aiThreadRequest<{ ok: true }>(`/${id}`, { method: "PATCH", body: JSON.stringify(body) });

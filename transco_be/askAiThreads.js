@@ -98,6 +98,42 @@ function createAskAiThreadsRouter({ getFlowiseReply, normalizePhoneNumber, onCus
     }
   });
 
+  // "Ask AI" on a customer profile: opens that customer's chat. A chat
+  // already linked to them wins; else one with the same phone number is
+  // linked to them; else a new linked chat is started. Never a second chat.
+  router.post('/for-customer/:customerId', async (req, res) => {
+    try {
+      if (!ObjectId.isValid(req.params.customerId)) return res.status(404).json({ error: 'Customer not found.' });
+      const customer = await getDb().collection('customers').findOne(
+        { _id: new ObjectId(req.params.customerId) },
+        { projection: { name: 1, phoneNumber: 1 } }
+      );
+      if (!customer) return res.status(404).json({ error: 'Customer not found.' });
+      const linked = await store().findOne({ customerId: customer._id, deleted: { $ne: true } }, { projection: { _id: 1 } });
+      if (linked) return res.json({ thread: { _id: linked._id }, existed: true });
+
+      const name = clean(customer.name, 80);
+      const phone = clean(customer.phoneNumber, 30);
+      const link = { customerId: customer._id, customerName: name || phone };
+      if (digits(phone).length >= 6) {
+        const tail = digits(phone).slice(-9);
+        const same = (await store().find({ deleted: { $ne: true }, phone: { $ne: '' } }, { projection: { phone: 1, name: 1 } }).toArray())
+          .find(t => digits(t.phone).slice(-9) === tail);
+        if (same) {
+          await store().updateOne({ _id: same._id }, { $set: { ...link, ...(same.name ? {} : { name }) } });
+          return res.json({ thread: { _id: same._id }, existed: true });
+        }
+      }
+      const now = new Date();
+      const doc = { name, phone, ...link, messages: [], summary: '', summarizedCount: 0, createdAt: now, updatedAt: now, createdBy: staffName(req) };
+      const { insertedId } = await store().insertOne(doc);
+      res.status(201).json({ thread: { _id: insertedId } });
+    } catch (err) {
+      console.error('Ask AI open for customer failed:', err.message);
+      res.status(500).json({ error: 'Could not open the chat.' });
+    }
+  });
+
   const findThread = async (req, res) => {
     if (!ObjectId.isValid(req.params.id)) { res.status(404).json({ error: 'Chat not found.' }); return null; }
     const t = await store().findOne({ _id: new ObjectId(req.params.id), deleted: { $ne: true } });

@@ -14,6 +14,7 @@ import {
   Ship,
   StickyNote,
   UserRoundCheck,
+  WandSparkles,
 } from "lucide-react";
 
 import {
@@ -177,6 +178,12 @@ function Profile({ profile: p }: { profile: CustomerProfile }) {
           {!viewOnly && <EmailButton about={{ customerId: p.id, customerName: p.customerName, chatCustomerIds: [p.id] }} />}
           {/* My Transco with no password — for customers who find sign-up hard. */}
           <LoginLinkButton customerId={p.id} />
+          {/* Their saved Ask AI chat (or a new one linked to them). */}
+          <Button asChild variant="outline">
+            <Link to="/console/ask-ai" search={{ customer: p.id }}>
+              <WandSparkles className="mr-2 h-4 w-4" /> Ask AI
+            </Link>
+          </Button>
           {!viewOnly && p.messages.length > 0 && (
             <Button type="button" onClick={openChat}>
               <MessageCircle className="mr-2 h-4 w-4" /> Open conversation
