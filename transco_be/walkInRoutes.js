@@ -189,7 +189,7 @@ Return ONLY one JSON object, no other text:
   "boxes": { "<type>": number },   // types: tea_chest, gift_box, wine_box, quarter_cbm, tv, other (odd-size item), general (India general cargo box)
   "sender": { "fullName": "", "idNumber": "", "street": "", "suburb": "", "state": "", "postcode": "", "mobile": "", "homePhone": "", "email": "" },
   "receiver": { "fullName": "", "idNumber": "", "address": "", "town": "", "mobile": "", "homePhone": "", "email": "" },
-  "contents": [ { "category": "food" | "new_clothing" | "used_clothing" | "new_toys" | "used_toys" | "medicine" | "electrical" | "electronics" | "others", "qty": number, "value": number | null, "description": "" } ],
+  "contents": [ { "category": "food" | "new_clothing" | "used_clothing" | "toys" | "medicine" | "vitamins" | "electrical" | "electronics" | "household" | "stationery" | "spare_parts" | "perfumes" | "cosmetics" | "baby_products" | "others", "qty": number, "value": number | null, "description": "" } ],
   "insurance": true | false | null,
   "signedName": ""
 }

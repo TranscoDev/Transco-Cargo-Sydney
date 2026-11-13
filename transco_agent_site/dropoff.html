@@ -257,9 +257,15 @@
       "Food": "ආහාර",
       "New clothing": "අලුත් ඇඳුම්",
       "Used clothing": "පාවිච්චි කළ ඇඳුම්",
-      "New toys": "අලුත් සෙල්ලම් බඩු",
-      "Used toys": "පාවිච්චි කළ සෙල්ලම් බඩු",
+      "Toys": "සෙල්ලම් බඩු",
       "Medicine": "බෙහෙත්",
+      "Vitamins": "විටමින්",
+      "Household items": "ගෘහ භාණ්ඩ",
+      "Stationery": "ලිපි ද්‍රව්‍ය",
+      "Spare parts": "අමතර කොටස්",
+      "Perfumes": "සුවඳ විලවුන්",
+      "Cosmetics": "රූපලාවන්‍ය භාණ්ඩ",
+      "Baby products": "ළදරු භාණ්ඩ",
       "Electrical": "විදුලි උපකරණ",
       "Electronics": "ඉලෙක්ට්‍රොනික උපකරණ",
       "Others": "වෙනත්",
@@ -420,9 +426,15 @@
       "Food": "உணவு",
       "New clothing": "புதிய ஆடைகள்",
       "Used clothing": "பயன்படுத்திய ஆடைகள்",
-      "New toys": "புதிய பொம்மைகள்",
-      "Used toys": "பயன்படுத்திய பொம்மைகள்",
+      "Toys": "பொம்மைகள்",
       "Medicine": "மருந்து",
+      "Vitamins": "விட்டமின்கள்",
+      "Household items": "வீட்டுப் பொருட்கள்",
+      "Stationery": "எழுதுபொருட்கள்",
+      "Spare parts": "உதிரி பாகங்கள்",
+      "Perfumes": "வாசனைத் திரவியங்கள்",
+      "Cosmetics": "அழகுசாதனப் பொருட்கள்",
+      "Baby products": "குழந்தைப் பொருட்கள்",
       "Electrical": "மின் சாதனங்கள்",
       "Electronics": "இலத்திரனியல் பொருட்கள்",
       "Others": "மற்றவை",
@@ -584,8 +596,10 @@
   function emptyPerson() { return { fullName: "", idNumber: "", address: "", town: "", mobile: "", homePhone: "", email: "", street: "", suburb: "", state: "", postcode: "" }; }
   function emptyItem() { return { description: "", condition: "", qty: "1", value: "" }; }
   // The UPB Gift Cargo Declaration categories (same as the booking form).
-  var CATS = [["food", "Food"], ["new_clothing", "New clothing"], ["used_clothing", "Used clothing"], ["new_toys", "New toys"], ["used_toys", "Used toys"],
-    ["medicine", "Medicine"], ["electrical", "Electrical"], ["electronics", "Electronics"], ["others", "Others"]];
+  var CATS = [["food", "Food"], ["new_clothing", "New clothing"], ["used_clothing", "Used clothing"], ["toys", "Toys"],
+    ["medicine", "Medicine"], ["vitamins", "Vitamins"], ["electrical", "Electrical"], ["electronics", "Electronics"],
+    ["household", "Household items"], ["stationery", "Stationery"], ["spare_parts", "Spare parts"], ["perfumes", "Perfumes"],
+    ["cosmetics", "Cosmetics"], ["baby_products", "Baby products"], ["others", "Others"]];
   function catRow(key) { return state.contents.filter(function (c) { return c.category === key; })[0]; }
   // TV / electrical / electronics: insurance recommended (pre-ticked).
   function needsInsurance() { return (state.boxes.tv || 0) > 0 || !!catRow("electrical") || !!catRow("electronics"); }

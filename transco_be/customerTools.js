@@ -291,11 +291,20 @@ const CONTENT_CATEGORIES = {
   food: { description: 'Food', condition: null },
   new_clothing: { description: 'Clothing', condition: 'new' },
   used_clothing: { description: 'Clothing', condition: 'used' },
+  toys: { description: 'Toys', condition: null },
+  // new_toys / used_toys: older bookings only (forms now send "toys").
   new_toys: { description: 'Toys', condition: 'new' },
   used_toys: { description: 'Toys', condition: 'used' },
   medicine: { description: 'Medicine', condition: null },
+  vitamins: { description: 'Vitamins', condition: null },
   electrical: { description: 'Electrical items', condition: null },
   electronics: { description: 'Electronics', condition: null },
+  household: { description: 'Household items', condition: null },
+  stationery: { description: 'Stationery', condition: null },
+  spare_parts: { description: 'Spare parts', condition: null },
+  perfumes: { description: 'Perfumes', condition: null },
+  cosmetics: { description: 'Cosmetics', condition: null },
+  baby_products: { description: 'Baby products', condition: null },
   others: { description: null, condition: null }
 };
 
