@@ -4278,9 +4278,33 @@ app.get('/api/consolidations/:consolidationId', async (req, res) => {
       });
     }
 
-    const consolidation = isSheetImport(stored)
+    let consolidation = isSheetImport(stored)
       ? stored
       : withCostingMoney(stored, await costingIncomeByConsolidation([stored._id]));
+
+    // Shipments made in the console have no sheet totals (all 0), so the
+    // box tiles are counted live from the BLs in it — same numbers as the
+    // loading sheet. Imported shipments keep their sheet's totals.
+    if (!isSheetImport(stored)) {
+      const sheet = await loadLandingSheet(consolidationId);
+      if (sheet) {
+        const t = sheet.totals;
+        consolidation = {
+          ...consolidation,
+          totals: {
+            ...(consolidation.totals || {}),
+            hbl: t.hbls,
+            tc: t.counts.tc || 0,
+            gb: t.counts.gb || 0,
+            ob: t.counts.ob || 0,
+            wb: t.counts.wb || 0,
+            dd: t.doorDeliveries,
+            totalCbm: t.hbls ? t.cbm : null,
+            totalBoxes: t.boxes
+          }
+        };
+      }
+    }
 
     const batchShipments = await shipments()
       .find({ consolidationId: consolidation._id })
