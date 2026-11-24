@@ -14,6 +14,29 @@
  * Sinhala and Tamil follow the same everyday style as My Transco:
  * common English shipping words (booking, BL, Tea Chest…) stay English.
  */
+// Sinhala dates: some phones/browsers give traditional month names
+// (උඳුවප්, නවම්, බක්…) — always show the everyday ones (දෙසැම්බර්, ජනවාරි…).
+(function () {
+  var M = ["ජනවාරි", "පෙබරවාරි", "මාර්තු", "අප්‍රේල්", "මැයි", "ජූනි",
+    "ජූලි", "අගෝස්තු", "සැප්තැම්බර්", "ඔක්තෝබර්", "නොවැම්බර්", "දෙසැම්බර්"];
+  var orig = Date.prototype.toLocaleDateString;
+  if (orig.__siMonths) return;
+  var fixed = function (loc, opts) {
+    if (typeof loc === "string" && /^si(-|$)/i.test(loc) && opts && opts.month &&
+        opts.month !== "numeric" && opts.month !== "2-digit" &&
+        window.Intl && Intl.DateTimeFormat.prototype.formatToParts) {
+      try {
+        var mon = opts.timeZone === "UTC" ? this.getUTCMonth() : this.getMonth();
+        return new Intl.DateTimeFormat(loc, opts).formatToParts(this)
+          .map(function (p) { return p.type === "month" ? M[mon] : p.value; }).join("");
+      } catch (e) {}
+    }
+    return orig.apply(this, arguments);
+  };
+  fixed.__siMonths = true;
+  Date.prototype.toLocaleDateString = fixed;
+})();
+
 (function () {
   var KEY = "transco_lang";
   var LANGS = ["en", "si", "ta"];

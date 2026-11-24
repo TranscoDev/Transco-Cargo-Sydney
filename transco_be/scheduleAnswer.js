@@ -20,6 +20,8 @@ const COUNTRY_LABEL = {
   ta: { sri_lanka: 'இலங்கை', india: 'இந்தியா' }
 };
 const LOCALE = { en: 'en-AU', si: 'si-LK', ta: 'ta-LK' };
+const SI_MONTHS = ['ජනවාරි', 'පෙබරවාරි', 'මාර්තු', 'අප්‍රේල්', 'මැයි', 'ජූනි',
+  'ජූලි', 'අගෝස්තු', 'සැප්තැම්බර්', 'ඔක්තෝබර්', 'නොවැම්බර්', 'දෙසැම්බර්'];
 
 const TEXT = {
   en: {
@@ -106,6 +108,14 @@ module.exports = function createScheduleAnswerer({ getSydneyNow }) {
   function fmt(iso, lang, withWeekday) {
     const [y, m, d] = iso.split('-').map(Number);
     const date = new Date(Date.UTC(y, m - 1, d));
+    // si-LK in Intl gives the traditional month names (උඳුවප්, නවම්…);
+    // customers read the everyday ones (දෙසැම්බර්, පෙබරවාරි…).
+    if (lang === 'si') {
+      const day = withWeekday
+        ? ' ' + date.toLocaleDateString('si-LK', { timeZone: 'UTC', weekday: 'short' })
+        : '';
+      return `${SI_MONTHS[m - 1]} ${d}${day}`;
+    }
     return date.toLocaleDateString(LOCALE[lang], {
       timeZone: 'UTC',
       ...(withWeekday ? { weekday: 'short' } : {}),

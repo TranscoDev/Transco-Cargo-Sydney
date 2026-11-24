@@ -1014,11 +1014,23 @@
   }
 
   var LOCALES = { en: "en-AU", si: "si-LK", ta: "ta-LK" };
+  // Sinhala dates: some phones/browsers give traditional month names
+  // (උඳුවප්, නවම්…) — always show the everyday ones (දෙසැම්බර්…).
+  var SI_MONTHS = ["ජනවාරි", "පෙබරවාරි", "මාර්තු", "අප්‍රේල්", "මැයි", "ජූනි",
+    "ජූලි", "අගෝස්තු", "සැප්තැම්බර්", "ඔක්තෝබර්", "නොවැම්බර්", "දෙසැම්බර්"];
+  function siDate(d, opts) {
+    return new Intl.DateTimeFormat("si-LK", opts).formatToParts(d)
+      .map(function (p) { return p.type === "month" ? SI_MONTHS[d.getMonth()] : p.value; }).join("");
+  }
   function fmtDate(value, opts) {
     if (!value) return "";
     var d = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + "T00:00:00") : new Date(value);
     if (isNaN(d.getTime())) return String(value);
-    try { return d.toLocaleDateString(LOCALES[lang], opts || { weekday: "short", day: "numeric", month: "short" }); }
+    opts = opts || { weekday: "short", day: "numeric", month: "short" };
+    try {
+      if (lang === "si" && opts.month && opts.month !== "numeric" && opts.month !== "2-digit") return siDate(d, opts);
+      return d.toLocaleDateString(LOCALES[lang], opts);
+    }
     catch (e) { return d.toDateString(); }
   }
   function fmtTime(hhmm) {
@@ -1525,7 +1537,10 @@
   }
 
   function chatDate(iso) {
-    try { return new Date(iso).toLocaleDateString(lang === "en" ? "en-AU" : lang, { day: "numeric", month: "short" }); } catch (e) { return ""; }
+    try {
+      if (lang === "si") return siDate(new Date(iso), { day: "numeric", month: "short" });
+      return new Date(iso).toLocaleDateString(lang === "en" ? "en-AU" : lang, { day: "numeric", month: "short" });
+    } catch (e) { return ""; }
   }
   function chatLabel(c) { return c.device || t("chatFrom", { d: chatDate(c.startedAt) }); }
 
