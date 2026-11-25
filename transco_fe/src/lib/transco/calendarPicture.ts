@@ -15,7 +15,7 @@ const NAVY = "#0b2545";
 const TEAL = "#0f8b8d";
 const ORANGE = "#f28c28";
 const GREY = "#5b6575";
-const SOFT = "#eef7f7";
+const SOFT = "#ffffff"; // card face — white on the tinted background
 const FONT = 'Inter, "Segoe UI", Arial, sans-serif';
 const NAME: Record<ScheduleCountry, string> = { sri_lanka: "Sri Lanka", india: "India" };
 const S = 1080;
@@ -26,12 +26,17 @@ export async function downloadCalendarPicture(sections: PictureSection[]) {
   cv.width = S;
   cv.height = S;
   const g = cv.getContext("2d")!;
-  g.fillStyle = "#ffffff";
+  // Soft background, same as the other WhatsApp pictures: light teal tint + faint circles.
+  g.fillStyle = "#f3f9f9";
   g.fillRect(0, 0, S, S);
+  circle(g, 1010, 50, 250, "#e2f2f2");
+  circle(g, 5, 985, 225, "#fdeede");
+  circle(g, 1050, 660, 120, "#e7f4f4");
 
-  // Real logo, side by side: mark + "Transco CARGO" wordmark.
-  g.drawImage(logo, 190, 25, 370, 366, 50, 34, 96, 95);
-  g.drawImage(logo, 115, 396, 535, 202, 158, 49, 186, 70);
+  // Real logo, side by side: mark + "Transco CARGO" wordmark (white made see-through).
+  const lg = transparentWhite(logo);
+  g.drawImage(lg, 190, 25, 370, 366, 50, 34, 96, 95);
+  g.drawImage(lg, 115, 396, 535, 202, 158, 49, 186, 70);
 
   const first = sections[0]!;
   const single = sections.length === 1;
@@ -70,7 +75,12 @@ export async function downloadCalendarPicture(sections: PictureSection[]) {
 /** One cutoff: teal date tile on the left, arrival dates on the right. */
 function card(g: CanvasRenderingContext2D, d: ScheduleDate, country: ScheduleCountry, x: number, y: number, w: number, h: number, wide: boolean) {
   const c = new Date(`${d.cutoff}T00:00:00`);
+  g.save();
+  g.shadowColor = "rgba(11, 37, 69, 0.10)";
+  g.shadowBlur = 18;
+  g.shadowOffsetY = 4;
   round(g, x, y, w, h, 24, SOFT);
+  g.restore();
   const tw = wide ? 170 : 150;
   round(g, x, y, tw, h, 24, TEAL);
   const cx = x + tw / 2;
@@ -121,6 +131,30 @@ function round(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: 
 function pill(g: CanvasRenderingContext2D, s: string, x: number, y: number, w: number, h: number, color: string, font: string) {
   round(g, x, y, w, h, h / 2, color);
   text(g, s, x + w / 2, y + h / 2 + 14, font, "#ffffff", "center");
+}
+
+function circle(g: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fillStyle = color;
+  g.fill();
+}
+
+/** Copy of the logo with its white background made transparent, so it sits on the tint. */
+function transparentWhite(img: HTMLImageElement): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = img.width;
+  c.height = img.height;
+  const x = c.getContext("2d")!;
+  x.drawImage(img, 0, 0);
+  const data = x.getImageData(0, 0, c.width, c.height);
+  const p = data.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const m = Math.min(p[i]!, p[i + 1]!, p[i + 2]!);
+    if (m > 215) p[i + 3] = Math.min(p[i + 3]!, Math.round(((255 - m) * 255) / 40));
+  }
+  x.putImageData(data, 0, 0);
+  return c;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
