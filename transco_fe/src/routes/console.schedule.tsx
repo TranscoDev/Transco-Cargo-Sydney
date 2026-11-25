@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, ExternalLink, History, PenLine, Plane, Plus, Ship, Trash2 } from "lucide-react";
+import { downloadCalendarPicture, type PictureSection } from "@/lib/transco/calendarPicture";
+import { CalendarDays, Download, ExternalLink, History, PenLine, Plane, Plus, Ship, Trash2 } from "lucide-react";
 
 import { EmptyState, ErrorState, LoadingRows, PageShell, PageHeader, SectionHeading, StatusBadge } from "@/components/transco/page-kit";
 import {
@@ -73,6 +74,32 @@ function SchedulePage() {
   const past = (dates ?? []).filter((d) => d.cutoff < today).reverse();
   const current = COUNTRIES.find((c) => c.key === country)!;
 
+  const [making, setMaking] = useState<"one" | "both" | null>(null);
+  const makePicture = async (which: "one" | "both") => {
+    setMaking(which);
+    try {
+      const sections: PictureSection[] =
+        which === "one"
+          ? [{ country, dates: upcoming }]
+          : await Promise.all(
+              COUNTRIES.map(async (c) => {
+                const r = await fetchSchedule(c.key);
+                return { country: c.key, dates: r.dates.filter((d) => d.cutoff >= r.today) };
+              }),
+            );
+      if (sections.every((s) => s.dates.length === 0)) {
+        notify.error("No upcoming dates", "Add a cutoff date first, then make the picture.");
+        return;
+      }
+      await downloadCalendarPicture(sections);
+      notify.success("Picture downloaded", "Find it in your Downloads folder and send it on WhatsApp.");
+    } catch (err) {
+      notify.error("Couldn't make the picture", friendlyError(err, "Please try again."));
+    } finally {
+      setMaking(null);
+    }
+  };
+
   const remove = async () => {
     if (!deleting) return;
     const d = deleting;
@@ -120,6 +147,17 @@ function SchedulePage() {
         <a href={`${WEBSITE}${current.page}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
           See it on the website <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         </a>
+      </div>
+
+      {/* WhatsApp picture of the next dates — drawn in the browser, nothing saved. */}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Picture for WhatsApp:</span>
+        <Button type="button" variant="outline" size="sm" disabled={making !== null || !dates} onClick={() => makePicture("one")}>
+          <Download className="mr-1.5 h-4 w-4" /> {making === "one" ? "Making…" : `${current.label} only`}
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={making !== null} onClick={() => makePicture("both")}>
+          <Download className="mr-1.5 h-4 w-4" /> {making === "both" ? "Making…" : "Sri Lanka + India"}
+        </Button>
       </div>
 
       {adding && (
