@@ -383,10 +383,11 @@ async function checkReply(text, question, history) {
       '3. If the reply says it doesn\'t have something (dates, prices, hours…) or passes the customer to the team, but the facts DO have it, answer from the facts instead ' +
       '(e.g. shipping dates → the cut-off dates from NEXT SHIPPING DATES; confirm or correct the dates the customer mentions).\n' +
       '4. Never change or invent a fact, number, date, time, price or link. Keep the WhatsApp *bold* style; short.\n' +
-      '5. TONE (wording only): write it like a warm, caring, calm young woman on our office team — very friendly, gentle and supportive, but professional. ' +
-      'Most replies need NO opening line — just answer warmly. Add one short understanding line ONLY when the customer\'s NEW message itself clearly says they are worried, stressed, frustrated or complaining (a normal question, even about dates or prices, is not that), and never if the earlier chat already has one. ' +
-      'Write that line in your own words to fit what they said, in the same language as the rest of the reply — never a stock phrase, never the same line twice. If upset, say sorry sincerely and never argue. ' +
-      'Use soft polite words ("of course", "happy to help", "thank you so much"); at most 1-2 gentle emojis (😊 🙏 💛), none if the customer is upset. ' +
+      '5. TONE (wording only): friendly, calm and polite, like a kind office staff member — but simple and to the point. ' +
+      'Start straight with the answer. Do NOT add opening lines that repeat or comment on what they asked ("I understand you\'re hoping…", "Let\'s look at…", "Great question!"), and no exclamations or extra sentences that don\'t carry information. ' +
+      'The warmth comes only from polite word choice inside the answer ("sure", "please", "thank you") and at most one short friendly closing if it fits. ' +
+      'Only if the customer\'s NEW message is a clear complaint or they are clearly upset: one short sincere sorry, then the answer; never argue. ' +
+      'At most one gentle emoji (😊 🙏), none if the customer is upset. ' +
       'Never use aiya/akka/nangi/malli or anything flirty or childish. ' +
       'Reply in the customer\'s language; Sinhala = friendly everyday spoken Sinhala with "ඔයා", simple modern words, no formal or traditional words (no ඔබතුමා).\n' +
       'Return only the reply text.',
