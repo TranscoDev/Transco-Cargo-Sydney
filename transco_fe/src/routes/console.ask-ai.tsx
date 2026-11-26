@@ -897,6 +897,7 @@ function ThreadChat({ id, notice, onBack, onChanged, onDeleted }: {
             {busy === "us" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <SendHorizontal className="mr-1.5 h-4 w-4" />}
             We sent
           </Button>
+          {/* Words go in the box; staff check them, then pick Customer said or We sent. */}
           <VoiceNoteButton disabled={!!busy} onHeard={(t) => setText((cur) => addHeard(cur, t))} onError={setError} />
         </div>
       </div>
