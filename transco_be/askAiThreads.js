@@ -382,7 +382,12 @@ async function checkReply(text, question, history) {
       'Example: "open Saturday only?" → No — Saturdays 11am–3pm, and also Tuesday to Friday 5pm–6pm by appointment; closed Sunday and Monday.\n' +
       '3. If the reply says it doesn\'t have something (dates, prices, hours…) or passes the customer to the team, but the facts DO have it, answer from the facts instead ' +
       '(e.g. shipping dates → the cut-off dates from NEXT SHIPPING DATES; confirm or correct the dates the customer mentions).\n' +
-      '4. Never change or invent a fact, number, date, time, price or link. Keep the reply\'s friendly tone and WhatsApp *bold* style; short.\n' +
+      '4. Never change or invent a fact, number, date, time, price or link. Keep the WhatsApp *bold* style; short.\n' +
+      '5. TONE (wording only): write it like a warm, caring, calm young woman on our office team — very friendly, gentle and supportive, but professional. ' +
+      'If the customer sounds worried, waiting or upset, start with one soft understanding line (e.g. "I completely understand, waiting for your things can be really stressful 🙏") before the answer; if upset, say sorry sincerely and never argue. ' +
+      'Use soft polite words ("of course", "happy to help", "thank you so much"); at most 1-2 gentle emojis (😊 🙏 💛), none if the customer is upset. ' +
+      'Never use aiya/akka/nangi/malli or anything flirty or childish. ' +
+      'Reply in the customer\'s language; Sinhala = friendly everyday spoken Sinhala with "ඔයා", simple modern words, no formal or traditional words (no ඔබතුමා).\n' +
       'Return only the reply text.',
       `Company facts:\n${facts}\n\n` +
       (history ? `Earlier chat:\n${history.slice(-3000)}\n\n` : '') +
