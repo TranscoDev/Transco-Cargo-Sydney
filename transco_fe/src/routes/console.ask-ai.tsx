@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  ArrowLeft, Check, ClipboardPaste, Copy, Loader2, Mic, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserPlus, UserRound, WandSparkles, X,
+  ArrowLeft, Check, ChevronDown, ClipboardPaste, Copy, Loader2, Mic, Paperclip, Pencil, Plus, RotateCcw, Search, SendHorizontal, Sparkles, Trash2, UserPlus, UserRound, WandSparkles, X,
 } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/transco/page-kit";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -561,7 +562,7 @@ function addHeard(current: string, heard: string) {
   return current.trim() ? `${current.trim()}\n${heard}` : heard;
 }
 
-function fileBase64(file: File) {
+function fileBase64(file: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
@@ -578,39 +579,123 @@ function VoiceNoteButton({ disabled, className, onHeard, onError }: {
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [seconds, setSeconds] = useState<number | null>(null); // recording when not null
+  const recRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; timer: number } | null>(null);
 
-  const pick = async (file: File | undefined) => {
-    if (!file) return;
+  // Both ways end here: voice → words → the box, for staff to check.
+  const hear = async (blob: Blob, mimeType: string, empty: string) => {
     onError(null);
     setBusy(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "";
-      const r = await hearVoiceNote({ data: await fileBase64(file), mimeType: VOICE_TYPES[ext] || file.type || "audio/ogg" });
+      const r = await hearVoiceNote({ data: await fileBase64(blob), mimeType });
       if (r.text) onHeard(r.text);
-      if (!r.text) onError("Couldn't make out the voice note. Please listen and type it.");
-      else if (r.unsure) onError("Not fully sure what was said — listen and fix the words before asking.");
+      if (!r.text) onError(empty);
+      else if (r.unsure) onError("Not fully sure what was said — check and fix the words before asking.");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Could not listen to the voice note.");
     } finally {
       setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   };
+
+  const pick = async (file: File | undefined) => {
+    if (inputRef.current) inputRef.current.value = "";
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    await hear(file, VOICE_TYPES[ext] || file.type || "audio/ogg", "Couldn't make out the voice note. Please listen and type it.");
+  };
+
+  // Staff speak the question: tap to start, tap again to stop. Max 3 minutes.
+  const stopRecording = () => {
+    const rec = recRef.current;
+    if (rec && rec.recorder.state !== "inactive") rec.recorder.stop();
+  };
+
+  const startRecording = async () => {
+    onError(null);
+    if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      onError("This browser can't record. Please use Chrome or type the question.");
+      return;
+    }
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      onError("No microphone access. Allow the microphone for this site (🔒 in the address bar) and try again.");
+      return;
+    }
+    const type = ["audio/webm", "audio/mp4", "audio/ogg"].find((t) => MediaRecorder.isTypeSupported(t));
+    const recorder = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const rec = recRef.current;
+      if (rec) { window.clearInterval(rec.timer); rec.stream.getTracks().forEach((t) => t.stop()); }
+      recRef.current = null;
+      setSeconds(null);
+      const mimeType = (recorder.mimeType || type || "audio/webm").split(";")[0] ?? "audio/webm";
+      const blob = new Blob(chunks, { type: mimeType });
+      if (!blob.size) { onError("Nothing was recorded. Please try again."); return; }
+      void hear(blob, mimeType, "Couldn't make out what you said. Please try again or type it.");
+    };
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      setSeconds(s);
+      if (s >= 180) stopRecording();
+    }, 250);
+    recRef.current = { recorder, stream, timer };
+    setSeconds(0);
+    recorder.start();
+  };
+
+  // Leaving the page mid-recording: let go of the microphone.
+  useEffect(() => () => {
+    const rec = recRef.current;
+    if (!rec) return;
+    window.clearInterval(rec.timer);
+    rec.recorder.onstop = null;
+    if (rec.recorder.state !== "inactive") rec.recorder.stop();
+    rec.stream.getTracks().forEach((t) => t.stop());
+  }, []);
+
+  if (seconds !== null) {
+    return (
+      <Button
+        type="button"
+        variant="destructive"
+        onClick={stopRecording}
+        className={className}
+        title="Tap to stop — the words go in the box for you to check"
+      >
+        <span className="mr-1.5 h-2.5 w-2.5 animate-pulse rounded-full bg-white" />
+        Stop {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      </Button>
+    );
+  }
 
   return (
     <>
       <input ref={inputRef} type="file" accept="audio/*,.ogg,.opus,.m4a" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => inputRef.current?.click()}
-        disabled={disabled || busy}
-        className={className}
-        title="Pick a voice note you downloaded from WhatsApp Web"
-      >
-        {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mic className="mr-1.5 h-4 w-4" />}
-        {busy ? "Listening…" : "Voice note"}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" disabled={disabled || busy} className={className} title="Speak the question, or pick a customer's voice note">
+            {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mic className="mr-1.5 h-4 w-4" />}
+            {busy ? "Listening…" : "Voice note"}
+            {!busy && <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuItem onSelect={() => void startRecording()} className="flex-col items-start gap-0.5 py-2">
+            <span className="flex items-center gap-2 font-medium"><Mic className="h-4 w-4" /> Record now</span>
+            <span className="pl-6 text-xs text-muted-foreground">Speak the question yourself</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => inputRef.current?.click()} className="flex-col items-start gap-0.5 py-2">
+            <span className="flex items-center gap-2 font-medium"><Paperclip className="h-4 w-4" /> Upload a file</span>
+            <span className="pl-6 text-xs text-muted-foreground">A customer's voice note from WhatsApp Web</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 }
