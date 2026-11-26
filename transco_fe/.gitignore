@@ -30,3 +30,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build id written by vite.config.ts on every build
+public/version.json
