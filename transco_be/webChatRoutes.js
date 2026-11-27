@@ -27,6 +27,7 @@ const customerPhotos = require('./customerPhotos');
 const { hearAudio } = require('./voiceHear');
 const { ObjectId } = require('mongodb');
 const { normalizePhoneNumber } = require('./normalizePhone');
+const quickReplies = require('./quickReplies');
 
 // Photos from the website chat's 📎 button (shrunk in the browser first).
 const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
@@ -612,12 +613,13 @@ module.exports = function createWebChatRouter({
       // dates the website shows), not by the AI. Done before the country
       // context below, so the AI still gets that on the next real question.
       if (answerScheduleQuestion && !photo) {
-        const scheduleReply = await answerScheduleQuestion({
+        let scheduleReply = await answerScheduleQuestion({
           text: outgoingText,
           country: (Object.prototype.hasOwnProperty.call(COUNTRY_CONTEXT_PHRASES, country) && country) || customer.webCountry || null,
           customerId: customer._id
         });
         if (scheduleReply) {
+          scheduleReply = `${account || !isNewCustomer ? '' : quickReplies.SHORT_WELCOME + '\n\n'}${scheduleReply}\n\n${await quickReplies.websiteLinks(outgoingText, scheduleReply)}`.trim();
           const saved = await saveMessage({
             customerId: customer._id,
             senderType: 'CHATBOT',
@@ -702,10 +704,18 @@ module.exports = function createWebChatRouter({
       // separate message, which is the simplest mapping onto a single
       // chat bubble with buttons underneath it.
       let menu = null;
+      // Regular = signed in, or has chatted in this browser before: no
+      // welcome; a bare "Hi" gets a short "Hi [name] 👋" (quickReplies.js).
+      const regularVisitor = Boolean(account) || !isNewCustomer;
+      let shortWelcome = false;
 
       if (cleanContent.startsWith(SHOW_MENU_MARKER)) {
         cleanContent = cleanContent.slice(SHOW_MENU_MARKER.length).trimStart();
-        menu = { items: WELCOME_MENU_ITEMS };
+        if (regularVisitor) {
+          cleanContent = quickReplies.shortHi(customer, account);
+        } else {
+          menu = { items: WELCOME_MENU_ITEMS };
+        }
 
       } else if (cleanContent.includes(ASK_QUANTITY_MARKER)) {
         cleanContent = cleanContent.split(ASK_QUANTITY_MARKER).join('').trim();
@@ -723,17 +733,11 @@ module.exports = function createWebChatRouter({
         cleanContent = cleanContent.split(SHOW_COUNTRY_MENU_MARKER).join('').trim();
         menu = { items: COUNTRY_MENU_ITEMS };
 
-      } else if (isNewCustomer) {
-        // A brand-new visitor whose first message was a real question,
-        // not a greeting (that case is handled above) — show the
-        // welcome message and the answer together as one reply, rather
-        // than answering with no greeting at all. Same welcome text as
-        // the SHOW_MENU_MARKER branch above, so it should carry the
-        // exact same tappable menu buttons too — this was previously
-        // missed, leaving a new visitor with the welcome text but no
-        // way to tap through it.
-        cleanContent = WEB_GREETING_TEXT + "\n\n" + cleanContent;
-        menu = { items: WELCOME_MENU_ITEMS };
+      } else if (!regularVisitor) {
+        // A brand-new visitor whose first message was a real question:
+        // one short welcome line on top of the answer (added below, after
+        // the booking marker is read), not the whole welcome menu.
+        shortWelcome = true;
       }
 
       if (cleanContent.includes(SHOW_BOX_MENU_MARKER)) {
@@ -857,6 +861,17 @@ module.exports = function createWebChatRouter({
       if (/\[\[[^\]]*\]\]/.test(cleanContent)) {
         console.warn('Unrecognized [[...]] marker in web chat reply, stripping before send:', cleanContent);
         cleanContent = cleanContent.replace(/\[\[[^\]]*\]\]/g, '').trim();
+      }
+
+      if (shortWelcome && cleanContent) {
+        cleanContent = `${quickReplies.SHORT_WELCOME}\n\n${cleanContent}`;
+      }
+      // Book (+ the button that fits the question) under every answer
+      // that has no menu of its own; "🏠 Back to menu" is added by the
+      // chat window itself (chat-links.js).
+      if (!menu && !needsAttention && cleanContent) {
+        const links = await quickReplies.websiteLinks(outgoingText, cleanContent);
+        if (links) cleanContent = `${cleanContent}\n\n${links}`;
       }
 
       const outgoing = await saveMessage({

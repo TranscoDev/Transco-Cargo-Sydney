@@ -257,13 +257,21 @@ test('CHATBOT mode: CUSTOMER message goes through Flowise and the reply links ba
   );
   ws.close();
 
-  assert.equal(chatbotEvent.payload.message.content, flowiseReplyText);
+  // A new customer's first answer starts with the short welcome line; a
+  // known one gets the answer alone.
+  const expected = chatbotEvent.payload.message.content;
+  assert.ok(
+    [flowiseReplyText, `👋 *Welcome to Transco Cargo Sydney!*\n\n${flowiseReplyText}`].includes(expected),
+    `unexpected reply: ${expected}`
+  );
   assert.equal(chatbotEvent.payload.customer._id, inboundEvent.payload.customer._id);
   assert.equal(chatbotEvent.payload.message.customerId, inboundEvent.payload.message.customerId);
   assert.equal(chatbotEvent.payload.message.replyToMessageId, inboundEvent.payload.message._id);
 
-  const waCall = whatsappRequests.find((r) => r.body.text?.body === flowiseReplyText);
+  // Sent as a WhatsApp button message: 📍 Directions (hours question), 📝 Book, ☰ Menu.
+  const waCall = whatsappRequests.find((r) => r.body.interactive?.body?.text === expected);
   assert.ok(waCall, 'the CHATBOT reply should have been sent through the WhatsApp stub');
+  assert.deepEqual(waCall.body.interactive.action.buttons.map((b) => b.reply.id), ['qb_directions', 'qb_book', 'qb_menu']);
 });
 
 test('CHATBOT mode: a Flowise failure does not create a fake reply', async () => {

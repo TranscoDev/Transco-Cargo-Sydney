@@ -11,11 +11,11 @@
  */
 (function () {
   var LABELS = {
-    en: { book: "Book now", track: "Track my shipment", profile: "Open my profile", account: "Open My Transco", dropoff: "Open the drop-off form", boxes: "See boxes & prices", privacy: "Read the privacy policy", contact: "Contact us", whatsapp: "Open WhatsApp", open: "Open" },
-    si: { book: "දැන් book කරන්න", track: "මගේ shipment එක බලන්න", profile: "මගේ profile එක", account: "My Transco open කරන්න", dropoff: "Drop-off form එක open කරන්න", boxes: "Boxes සහ මිල ගණන්", privacy: "Privacy policy කියවන්න", contact: "අපව අමතන්න", whatsapp: "WhatsApp open කරන්න", open: "Open" },
-    ta: { book: "இப்போது book செய்யுங்கள்", track: "என் shipment ஐப் பார்க்க", profile: "என் profile", account: "My Transco திறக்க", dropoff: "Drop-off form திறக்க", boxes: "Boxes மற்றும் விலைகள்", privacy: "Privacy policy படிக்க", contact: "எங்களைத் தொடர்புகொள்ள", whatsapp: "WhatsApp திறக்க", open: "திறக்க" }
+    en: { book: "Book now", track: "Track my shipment", profile: "Open my profile", account: "Open My Transco", dropoff: "Open the drop-off form", boxes: "See boxes & prices", privacy: "Read the privacy policy", contact: "Contact us", whatsapp: "Open WhatsApp", map: "Get directions", open: "Open" },
+    si: { book: "දැන් book කරන්න", track: "මගේ shipment එක බලන්න", profile: "මගේ profile එක", account: "My Transco open කරන්න", dropoff: "Drop-off form එක open කරන්න", boxes: "Boxes සහ මිල ගණන්", privacy: "Privacy policy කියවන්න", contact: "අපව අමතන්න", whatsapp: "WhatsApp open කරන්න", map: "යන මග බලන්න", open: "Open" },
+    ta: { book: "இப்போது book செய்யுங்கள்", track: "என் shipment ஐப் பார்க்க", profile: "என் profile", account: "My Transco திறக்க", dropoff: "Drop-off form திறக்க", boxes: "Boxes மற்றும் விலைகள்", privacy: "Privacy policy படிக்க", contact: "எங்களைத் தொடர்புகொள்ள", whatsapp: "WhatsApp திறக்க", map: "வழி காட்டு", open: "திறக்க" }
   };
-  var ICONS = { book: "📝", track: "📦", profile: "👤", account: "👤", dropoff: "📝", boxes: "📦", privacy: "🔒", contact: "📞", whatsapp: "💬", open: "🔗" };
+  var ICONS = { book: "📝", track: "📦", profile: "👤", account: "👤", dropoff: "📝", boxes: "📦", privacy: "🔒", contact: "📞", whatsapp: "💬", map: "📍", open: "🔗" };
   var SITE_HOSTS = /^(my\.|www\.)?transcosydney\.com\.au$|^transco-site\.pages\.dev$|(^|\.)transco-agent-site\.transcocargo\.workers\.dev$|^localhost$/;
 
   function esc(s) {
@@ -33,6 +33,7 @@
     try { u = new URL(raw); } catch (e) { return null; }
     if (u.protocol !== "https:" && u.protocol !== "http:") return null;
     if (/^(wa\.me|api\.whatsapp\.com)$/.test(u.hostname)) return { href: u.href, key: "whatsapp", external: true };
+    if (/^maps\.app\.goo\.gl$|^goo\.gl$/.test(u.hostname) || (/(^|\.)google\.[a-z.]+$/.test(u.hostname) && /^\/maps/.test(u.pathname))) return { href: u.href, key: "map", external: true };
     if (!SITE_HOSTS.test(u.hostname)) return { href: u.href, text: u.hostname.replace(/^www\./, ""), external: true };
     // Our own pages use clean addresses ("/account", not "/account.html").
     var path = u.pathname.replace(/\/index\.html$/, "/").replace(/\.html$/, "");

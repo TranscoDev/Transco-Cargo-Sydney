@@ -20,6 +20,7 @@ const { getDb } = require('./db');
 const { createCustomerAuth } = require('./customerAuth');
 const { createCustomerTools, hasRealName } = require('./customerTools');
 const agentAnswer = require('./agentAnswer');
+const quickReplies = require('./quickReplies');
 const customerPhotos = require('./customerPhotos');
 
 // Memory storage — files are small (a customer sheet, not a video) and
@@ -992,7 +993,11 @@ async function sendAndTrackOutbound(
   senderType,
   content,
   replyToMessageId = null,
-  skipShowMenu = false
+  skipShowMenu = false,
+  // Bot answers only: { question, welcome } — see quickReplies.js.
+  // question → reply buttons (📝 Book / ☰ Menu / a fitting one);
+  // welcome → a one-line welcome on top (a new customer's first answer).
+  answerOpts = null
 ) {
   const HANDOFF_MARKER = '[[HANDOFF]]';
   const BOX_MEDIA_MARKER = '[[SEND_VIDEO]]';
@@ -1096,10 +1101,21 @@ async function sendAndTrackOutbound(
   // for that one call site prevents the menu from being sent twice.
 
   if (cleanContent.startsWith(SHOW_MENU_MARKER)) {
+    // A regular customer saying "Hi" gets a short "Hi [name] 👋, how can
+    // I help?" with 📝 Book / ☰ Menu — typing "menu" still opens the menu.
+    if (answerOpts && !answerOpts.welcome && !/^\s*(main\s+)?menu\b/i.test(String(answerOpts.question || ''))) {
+      return sendAndTrackOutbound(customer, senderType, quickReplies.shortHi(customer), replyToMessageId, true, { question: '' });
+    }
     if (!skipShowMenu) {
       await sendWelcomeMenu(customer);
     }
     return;
+  }
+
+  // A new customer's first answer: one welcome line on top. (Never in
+  // front of a booking marker, which must stay at the very start.)
+  if (answerOpts && answerOpts.welcome && cleanContent && !/^\[\[BOOK_DROPOFF/i.test(cleanContent)) {
+    cleanContent = quickReplies.SHORT_WELCOME + '\n\n' + cleanContent;
   }
 
 
@@ -1479,11 +1495,36 @@ async function sendAndTrackOutbound(
     if (customer.channel === 'website') {
       outgoing.whatsappStatus = null;
     } else {
-      await sendWhatsAppMessage(
-        customer.phoneNumber,
-        cleanContent,
-        outgoing._id.toString()
-      );
+      // Bot answers with no menu of their own end with reply buttons.
+      const buttons = answerOpts && !needsAttention &&
+        !wantsBoxMenu && !wantsAirMenu && !wantsSeaMenu && !wantsFreightModeMenu
+        ? quickReplies.whatsappButtons(answerOpts.question)
+        : null;
+      // WhatsApp's button-message text is limited (1024): a longer answer
+      // goes as normal text with the buttons in a small message under it.
+      let textSent = false;
+      if (buttons && cleanContent.length <= 1000) {
+        try {
+          await sendWhatsAppReplyButtons(customer.phoneNumber, cleanContent, buttons, outgoing._id.toString());
+          textSent = true;
+        } catch (err) {
+          console.error('WhatsApp reply buttons failed, sending plain text:', err.response?.data ?? err.message);
+        }
+      }
+      if (!textSent) {
+        await sendWhatsAppMessage(
+          customer.phoneNumber,
+          cleanContent,
+          outgoing._id.toString()
+        );
+        if (buttons && cleanContent.length > 1000) {
+          try {
+            await sendWhatsAppReplyButtons(customer.phoneNumber, 'Anything else I can help with? 👇', buttons, null);
+          } catch (err) {
+            console.error('WhatsApp reply buttons failed:', err.response?.data ?? err.message);
+          }
+        }
+      }
 
       outgoing.whatsappStatus = 'SENT';
     }
@@ -1743,9 +1784,9 @@ app.post('/webhook', async (req, res) => {
         waName
       );
 
-    if (isNewCustomer) {
-      await sendWelcomeMenu(customer);
-    }
+    // The full welcome menu now goes only to a new customer who just says
+    // "Hi" (decided below, once the text — or voice note — is known). A
+    // new customer's first question gets a one-line welcome on the answer.
 
     let text = message.text?.body;
     let isVoiceMessage = false;
@@ -1812,6 +1853,29 @@ app.post('/webhook', async (req, res) => {
           text = tappedItem.phrase;
           tappedMenuLabel = message.interactive.list_reply.title;
         }
+      }
+    }
+
+    // A tap on the 📝 Book / ☰ Menu / fitting button under a bot answer
+    // (quickReplies.js whatsappButtons).
+    let showWelcomeMenuNow = false;
+    if (!text && message.type === 'interactive' && message.interactive?.button_reply) {
+      const tapped = message.interactive.button_reply;
+      text = tapped.title;
+      tappedMenuLabel = tapped.title;
+      if (tapped.id === 'qb_menu') {
+        showWelcomeMenuNow = true;
+      } else if (tapped.id === 'qb_book') {
+        menuLinkReply = "📝 Book online here — your declaration form is included:\n" + quickReplies.BOOK_URL;
+      } else if (tapped.id === 'qb_prices') {
+        showBoxTypeMenu = true;
+        menuLinkReply = MENU_LINK_REPLIES.menu_price();
+      } else if (tapped.id === 'qb_track') {
+        menuLinkReply = MENU_LINK_REPLIES.menu_track();
+      } else if (tapped.id === 'qb_calendar') {
+        menuLinkReply = MENU_LINK_REPLIES.menu_calendar();
+      } else if (tapped.id === 'qb_directions') {
+        menuLinkReply = await quickReplies.directionsText();
       }
     }
 
@@ -1928,6 +1992,11 @@ app.post('/webhook', async (req, res) => {
       await sendAndTrackOutbound(customer, 'CHATBOT', `🎤 I heard: "${text}"`, inboundMessage._id, true);
     }
 
+    if (showWelcomeMenuNow && customer.mode === 'CHATBOT') {
+      await sendWelcomeMenu(customer);
+      return;
+    }
+
     if (menuLinkReply && customer.mode === 'CHATBOT') {
       await sendAndTrackOutbound(customer, 'CHATBOT', menuLinkReply, inboundMessage._id, true);
       if (!showBoxTypeMenu) return;
@@ -1982,6 +2051,16 @@ app.post('/webhook', async (req, res) => {
 
     if (customer.mode === 'CHATBOT') {
 
+      // A new customer who only said "Hi": the full welcome menu, as before.
+      if (isNewCustomer && !photo && quickReplies.isGreetingOnly(text)) {
+        await sendWelcomeMenu(customer);
+        return;
+      }
+
+      // Answers end with 📝 Book / ☰ Menu (+ a fitting button); a new
+      // customer's first answer starts with a one-line welcome.
+      const answerOpts = { question: text, welcome: isNewCustomer };
+
       await sendTypingIndicator(message.id);
 
       // Schedule questions are answered from the shipping calendar staff
@@ -1993,7 +2072,7 @@ app.post('/webhook', async (req, res) => {
         customerId: customer._id
       });
       if (scheduleReply) {
-        await sendAndTrackOutbound(customer, 'CHATBOT', scheduleReply, inboundMessage._id, isNewCustomer);
+        await sendAndTrackOutbound(customer, 'CHATBOT', scheduleReply, inboundMessage._id, false, answerOpts);
         return;
       }
 
@@ -2025,7 +2104,8 @@ app.post('/webhook', async (req, res) => {
             'CHATBOT',
             reply,
             inboundMessage._id,
-            isNewCustomer
+            false,
+            answerOpts
           );
 
         } else {
@@ -6610,6 +6690,34 @@ async function sendWhatsAppInteractiveList(to, bizOpaqueCallbackData, {
       }
     }
 
+  );
+}
+
+// Native WhatsApp reply buttons (max 3) under a message — the answer's
+// quick buttons (quickReplies.js). Taps arrive as interactive.button_reply.
+async function sendWhatsAppReplyButtons(to, bodyText, buttons, bizOpaqueCallbackData) {
+  const payload = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: bodyText },
+      action: {
+        buttons: buttons.slice(0, 3).map(({ id, title }) => ({
+          type: 'reply',
+          reply: { id, title: title.slice(0, 20) }
+        }))
+      }
+    }
+  };
+  if (bizOpaqueCallbackData) {
+    payload.biz_opaque_callback_data = bizOpaqueCallbackData;
+  }
+  await axios.post(
+    `${WHATSAPP_API_BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+    payload,
+    { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' } }
   );
 }
 
