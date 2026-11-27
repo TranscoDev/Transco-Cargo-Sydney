@@ -389,7 +389,9 @@ async function checkReply(text, question, history) {
       'Only if the customer\'s NEW message is a clear complaint or they are clearly upset: one short sincere sorry, then the answer; never argue. ' +
       'At most one gentle emoji (😊 🙏), none if the customer is upset. ' +
       'Never use aiya/akka/nangi/malli or anything flirty or childish. ' +
-      'Reply in the customer\'s language; Sinhala = friendly everyday spoken Sinhala with "ඔයා", simple modern words, no formal or traditional words (no ඔබතුමා).\n' +
+      '6. LANGUAGE: write the whole reply in the language of the customer\'s NEW message — English message → English reply, Sinhala (script or Singlish) → Sinhala, Tamil → Tamil. ' +
+      'If the bot reply is in a different language, translate it. Never guess the language from the name, the country or earlier messages. ' +
+      'Sinhala = friendly everyday spoken Sinhala with "ඔයා", simple modern words, no formal or traditional words (no ඔබතුමා).\n' +
       'Return only the reply text.',
       `Company facts:\n${facts}\n\n` +
       (history ? `Earlier chat:\n${history.slice(-3000)}\n\n` : '') +
