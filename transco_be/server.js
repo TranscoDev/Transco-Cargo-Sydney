@@ -4051,7 +4051,7 @@ function addShipmentBoxes(counts, shipment, booking) {
 async function liveBoxCounts() {
   const list = await shipments().find(
     { hblNumber: { $nin: [null, ''] } },
-    { projection: { consolidationId: 1, bookingId: 1, boxes: 1, totalBoxes: 1, boxCount: 1, status: 1 } }
+    { projection: { consolidationId: 1, bookingId: 1, boxes: 1, totalBoxes: 1, boxCount: 1, status: 1, hblNumber: 1 } }
   ).toArray();
   const bookingIds = list.map(s => s.bookingId).filter(Boolean);
   const bookingList = bookingIds.length
@@ -4060,6 +4060,7 @@ async function liveBoxCounts() {
   const bookingById = new Map(bookingList.map(b => [String(b._id), b]));
 
   const byConsolidation = new Map();
+  const hblRangeById = new Map();
   const waiting = emptyBoxCounts();
   for (const s of list) {
     const booking = s.bookingId ? bookingById.get(String(s.bookingId)) : null;
@@ -4067,13 +4068,33 @@ async function liveBoxCounts() {
       const key = String(s.consolidationId);
       if (!byConsolidation.has(key)) byConsolidation.set(key, emptyBoxCounts());
       addShipmentBoxes(byConsolidation.get(key), s, booking);
+      hblRangeById.set(key, widenHblRange(hblRangeById.get(key), s.hblNumber));
     } else if (s.bookingId && s.status !== 'delivered') {
       // Given a BL at drop-off, still in the warehouse waiting for a shipment.
       addShipmentBoxes(waiting, s, booking);
     }
   }
-  return { byConsolidation, waiting };
+  return { byConsolidation, waiting, hblRangeById };
 }
+
+// Lowest–highest BL in a shipment, counted live from its BLs (console-made
+// shipments have no stored range; imported ones keep the sheet's range).
+function compareHbl(a, b) {
+  const na = /^[0-9]+$/.test(a) ? Number(a) : NaN;
+  const nb = /^[0-9]+$/.test(b) ? Number(b) : NaN;
+  if (!isNaN(na) && !isNaN(nb)) return na - nb;
+  return String(a).localeCompare(String(b));
+}
+function widenHblRange(range, hbl) {
+  const h = String(hbl || '').trim();
+  if (!h) return range;
+  if (!range) return { from: h, to: h };
+  return {
+    from: compareHbl(h, range.from) < 0 ? h : range.from,
+    to: compareHbl(h, range.to) > 0 ? h : range.to
+  };
+}
+const hasHblRange = c => !!(c.hblRange && c.hblRange.from);
 
 // The next free BL number (highest numeric BL + 1) — suggested to the
 // warehouse at drop-off; they can change it. (Not under /api/shipments/,
@@ -4168,10 +4189,11 @@ app.get('/api/consolidations', async (req, res) => {
     ]).toArray();
     const countById = new Map(counts.map(c => [String(c._id), c.count]));
 
-    const { byConsolidation, waiting } = await liveBoxCounts();
+    const { byConsolidation, waiting, hblRangeById } = await liveBoxCounts();
 
     const result = allConsolidations.map(c => ({
       ...c,
+      hblRange: hasHblRange(c) ? c.hblRange : (hblRangeById.get(String(c._id)) || { from: '', to: '' }),
       importedShipmentCount: countById.get(String(c._id)) ?? 0,
       liveBoxes: byConsolidation.get(String(c._id)) || emptyBoxCounts()
     }));
@@ -4310,6 +4332,11 @@ app.get('/api/consolidations/:consolidationId', async (req, res) => {
       .find({ consolidationId: consolidation._id })
       .sort({ hblNumber: 1 })
       .toArray();
+
+    if (!hasHblRange(consolidation)) {
+      const range = batchShipments.reduce((r, s) => widenHblRange(r, s.hblNumber), null);
+      if (range) consolidation = { ...consolidation, hblRange: range };
+    }
 
     const withInfo = await attachCustomerInfo(batchShipments);
 
