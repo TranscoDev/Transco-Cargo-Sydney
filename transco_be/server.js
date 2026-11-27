@@ -4224,6 +4224,16 @@ app.get('/api/consolidations', async (req, res) => {
 // tracker sheet, with empty totals; the label is "59-OCT" (number + the
 // departure month).
 const MONTHS_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const sydneyDay = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+
+// The month in a shipment's label ("61-DEC") is the month of its Sydney
+// cut-off. Its "Leaves Sydney" date is that cut-off when entered; until then
+// it's the next cut-off in the Shipping calendar on or after `fromDay`.
+async function cutoffMonth(etd, fromDay) {
+  if (typeof etd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(etd)) return MONTHS_SHORT[Number(etd.slice(5, 7)) - 1];
+  const next = await getDb().collection('shippingSchedule').find({ cutoff: { $gte: fromDay } }).sort({ cutoff: 1 }).limit(1).toArray();
+  return next.length ? MONTHS_SHORT[Number(String(next[0].cutoff).slice(5, 7)) - 1] : null;
+}
 function isoDateOrNull(v) {
   if (v === undefined || v === null || v === '') return { value: null };
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(new Date(`${v}T00:00:00Z`).getTime())) return { error: 'Dates must be real dates.' };
@@ -4246,11 +4256,11 @@ app.post('/api/consolidations', async (req, res) => {
       return res.status(400).json({ error: 'The arrival date can\'t be before the departure date.' });
     }
     const peNumber = typeof body.peNumber === 'string' && body.peNumber.trim() ? body.peNumber.trim().slice(0, 40) : null;
-    const monthFrom = departure.value ? new Date(`${departure.value}T00:00:00Z`) : getSydneyNow();
+    const month = (await cutoffMonth(departure.value, sydneyDay())) || MONTHS_SHORT[getSydneyNow().getUTCMonth()];
     const now = new Date().toISOString();
     const doc = {
       batchNumber,
-      label: `${batchNumber}-${MONTHS_SHORT[monthFrom.getUTCMonth()]}`,
+      label: `${batchNumber}-${month}`,
       peNumber,
       hblRange: { from: '', to: '' },
       totals: { hbl: 0, tc: 0, gb: 0, ob: 0, wb: 0, dd: 0, totalCbm: null, totalBoxes: null },
@@ -4565,6 +4575,14 @@ app.patch('/api/consolidations/:consolidationId', async (req, res) => {
       const d = isoDateOrNull(body[key]);
       if (d.error) return res.status(400).json({ error: d.error });
       set[`dates.${field}`] = d.value;
+    }
+
+    // The month in the label ("60-NOV") is the cut-off month: every save with
+    // a "Leaves Sydney" date brings it in line with that date.
+    const etd = set['dates.sydneyCalendarEtd'] !== undefined ? set['dates.sydneyCalendarEtd'] : existing.dates && existing.dates.sydneyCalendarEtd;
+    if (typeof etd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(etd)) {
+      const label = `${set.batchNumber || existing.batchNumber}-${await cutoffMonth(etd)}`;
+      if (label !== existing.label) set.label = label;
     }
 
     // Money typed in by staff (a shipment made in the console has no sheet to
@@ -7924,6 +7942,36 @@ initWebSocketServer(
   { verifySession }
 );
 
+// On start: the month in each shipment's label ("60-NOV") is its cut-off
+// month (see cutoffMonth) — fixes shipments made before their date was known.
+//  - with a proper "Leaves Sydney" date: that date's month;
+//  - without one: the next calendar cut-off on or after the day it was made,
+//    but only for shipments made since the last cut-off passed (older
+//    shipments without a date, e.g. imported 56, are left as they are).
+// Only the label's month changes; never blocks start.
+async function syncShipmentLabelMonths() {
+  try {
+    const today = sydneyDay();
+    const last = await getDb().collection('shippingSchedule').find({ cutoff: { $lt: today } }).sort({ cutoff: -1 }).limit(1).toArray();
+    const lastCutoff = last.length ? String(last[0].cutoff) : today;
+    const rows = await consolidations().find({}, { projection: { batchNumber: 1, label: 1, createdAt: 1, 'dates.sydneyCalendarEtd': 1 } }).toArray();
+    for (const r of rows) {
+      const etd = r.dates && r.dates.sydneyCalendarEtd;
+      const hasDate = typeof etd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(etd);
+      const made = r.createdAt ? sydneyDay(new Date(r.createdAt)) : null;
+      if (!hasDate && (!made || made <= lastCutoff)) continue;
+      const month = await cutoffMonth(hasDate ? etd : null, made);
+      if (!month) continue;
+      const label = `${r.batchNumber}-${month}`;
+      if (label === r.label) continue;
+      await consolidations().updateOne({ _id: r._id }, { $set: { label } });
+      console.log(`Shipment ${r.batchNumber}: label ${r.label} → ${label} (cut-off month)`);
+    }
+  } catch (err) {
+    console.error('Shipment label sync failed:', err.message);
+  }
+}
+
 
 connectToDatabase(
   MONGODB_URI,
@@ -7931,6 +7979,8 @@ connectToDatabase(
 )
 
   .then(() => seedStaffUser())
+
+  .then(() => syncShipmentLabelMonths())
 
   .then(() => {
 
